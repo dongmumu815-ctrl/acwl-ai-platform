@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ACWL AI大模型管理平台 - 专业的AI模型部署与管理解决方案" />
+    <meta name="keywords" content="AI,大模型,模型管理,模型部署,机器学习,深度学习" />
+    <meta name="author" content="ACWL Team" />
+    <title>ACWL AI - 大模型管理平台</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Loading styles -->
+    <style>
+      #loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+      }
+      
+      .loading-logo {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 20px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        color: white;
+        font-weight: bold;
+        animation: pulse 2s infinite;
+      }
+      
+      .loading-text {
+        color: white;
+        font-size: 18px;
+        font-weight: 500;
+        margin-bottom: 30px;
+        opacity: 0.9;
+      }
+      
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top: 3px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      
+      .fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+    <script type="module" crossorigin src="/ui/static/js/index-r5LxvshA.js"></script>
+    <link rel="modulepreload" crossorigin href="/ui/static/js/vue-V84s4Gm0.js">
+    <link rel="modulepreload" crossorigin href="/ui/static/js/utils-DBomvTX8.js">
+    <link rel="modulepreload" crossorigin href="/ui/static/js/elementPlus-D6IrqlRZ.js">
+    <link rel="stylesheet" crossorigin href="/ui/static/css/index-CWUjWFGS.css">
+  </head>
+  <body>
+    <!-- Loading screen -->
+    <div id="loading">
+      <div class="loading-logo">AI</div>
+      <div class="loading-text">ACWL AI 大模型管理平台</div>
+      <div class="loading-spinner"></div>
+    </div>
+    
+    <!-- Vue app mount point -->
+    <div id="app"></div>
+    
+    <!-- Main script -->
+    
+    <!-- Hide loading screen when app is ready -->
+    <script>
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          const loading = document.getElementById('loading');
+          if (loading) {
+            loading.classList.add('fade-out');
+            setTimeout(function() {
+              loading.style.display = 'none';
+            }, 300);
+          }
+        }, 1000);
+      });
+    </script>
+  </body>
+</html>

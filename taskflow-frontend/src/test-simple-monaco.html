@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单 Monaco Editor 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .btn {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        #editor-container {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .logs {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+        }
+        .log-info {
+            color: #007bff;
+        }
+        .log-error {
+            color: #dc3545;
+            background: #f8d7da;
+        }
+        .log-success {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>简单 Monaco Editor 测试</h1>
+        
+        <div class="controls">
+            <button class="btn btn-primary" onclick="createEditor()">创建编辑器</button>
+            <button class="btn btn-danger" onclick="destroyEditor()">销毁编辑器</button>
+            <button class="btn btn-success" onclick="testStats()">测试统计</button>
+            <button class="btn btn-primary" onclick="clearLogs()">清空日志</button>
+        </div>
+        
+        <div id="editor-container"></div>
+        
+        <div class="logs" id="logs">
+            <div class="log-entry log-info">日志输出区域</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/monaco-editor@0.45.0/min/vs/loader.js"></script>
+    <script>
+        let editor = null;
+        let monaco = null;
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '<div class="log-entry log-info">日志已清空</div>';
+        }
+        
+        async function createEditor() {
+            try {
+                log('开始创建 Monaco Editor...', 'info');
+                
+                if (editor) {
+                    log('编辑器已存在，先销毁', 'info');
+                    destroyEditor();
+                }
+                
+                // 配置 Monaco Editor
+                require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.45.0/min/vs' } });
+                
+                log('加载 Monaco Editor...', 'info');
+                
+                require(['vs/editor/editor.main'], function() {
+                    try {
+                        log('Monaco Editor 加载成功', 'success');
+                        monaco = window.monaco;
+                        
+                        const container = document.getElementById('editor-container');
+                        
+                        log('创建编辑器实例...', 'info');
+                        editor = monaco.editor.create(container, {
+                            value: 'print("Hello, World!")\n# 这是一个测试文件\nfor i in range(5):\n    print(f"数字: {i}")',
+                            language: 'python',
+                            theme: 'vs-dark',
+                            fontSize: 14,
+                            lineNumbers: 'on',
+                            minimap: { enabled: false },
+                            wordWrap: 'on',
+                            folding: true,
+                            automaticLayout: false
+                        });
+                        
+                        log('编辑器实例创建完成', 'success');
+                        
+                        // 手动布局
+                        setTimeout(() => {
+                            if (editor) {
+                                editor.layout();
+                                log('编辑器布局完成', 'success');
+                            }
+                        }, 100);
+                        
+                        // 监听内容变化
+                        editor.onDidChangeModelContent(() => {
+                            log('内容变化事件触发', 'info');
+                        });
+                        
+                        log('编辑器创建完成！', 'success');
+                        
+                    } catch (error) {
+                        log(`创建编辑器失败: ${error.message}`, 'error');
+                    }
+                });
+                
+            } catch (error) {
+                log(`加载 Monaco Editor 失败: ${error.message}`, 'error');
+            }
+        }
+        
+        function destroyEditor() {
+            if (editor) {
+                log('销毁编辑器...', 'info');
+                editor.dispose();
+                editor = null;
+                log('编辑器已销毁', 'success');
+            } else {
+                log('没有编辑器需要销毁', 'info');
+            }
+        }
+        
+        async function testStats() {
+            if (!editor) {
+                log('编辑器不存在，无法测试统计', 'error');
+                return;
+            }
+            
+            try {
+                log('开始测试统计信息...', 'info');
+                
+                const model = editor.getModel();
+                if (!model) {
+                    log('无法获取编辑器模型', 'error');
+                    return;
+                }
+                
+                log('获取模型成功', 'success');
+                
+                // 异步获取行数
+                const lineCount = await new Promise((resolve) => {
+                    setTimeout(() => {
+                        try {
+                            const count = model.getLineCount();
+                            log(`行数获取成功: ${count}`, 'success');
+                            resolve(count);
+                        } catch (error) {
+                            log(`获取行数失败: ${error.message}`, 'error');
+                            resolve(0);
+                        }
+                    }, 0);
+                });
+                
+                // 异步获取字符数
+                const charCount = await new Promise((resolve) => {
+                    setTimeout(() => {
+                        try {
+                            const count = model.getValueLength();
+                            log(`字符数获取成功: ${count}`, 'success');
+                            resolve(count);
+                        } catch (error) {
+                            log(`获取字符数失败: ${error.message}`, 'error');
+                            resolve(0);
+                        }
+                    }, 0);
+                });
+                
+                log(`统计完成 - 行数: ${lineCount}, 字符数: ${charCount}`, 'success');
+                
+            } catch (error) {
+                log(`测试统计失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 页面加载完成后自动创建编辑器
+        window.addEventListener('load', () => {
+            log('页面加载完成', 'info');
+            setTimeout(createEditor, 500);
+        });
+        
+    </script>
+</body>
+</html>

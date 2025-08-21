@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录测试页面</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #409eff;
+        }
+        button {
+            background: #409eff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background: #337ecc;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 6px;
+            display: none;
+        }
+        .success {
+            background: #f0f9ff;
+            border: 2px solid #409eff;
+            color: #409eff;
+        }
+        .error {
+            background: #fef0f0;
+            border: 2px solid #f56c6c;
+            color: #f56c6c;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+        .test-info {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #409eff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 登录功能测试</h1>
+        
+        <div class="test-info">
+            <strong>测试说明：</strong>
+            <ul>
+                <li>测试后端登录API接口</li>
+                <li>验证用户信息获取</li>
+                <li>检查前后端通信是否正常</li>
+            </ul>
+        </div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">📧 邮箱地址:</label>
+                <input type="email" id="email" value="admin@example.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">🔑 密码:</label>
+                <input type="password" id="password" value="admin123" required>
+            </div>
+            
+            <button type="submit" id="loginBtn">🚀 开始测试登录</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const resultDiv = document.getElementById('result');
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // 显示加载状态
+            loginBtn.disabled = true;
+            loginBtn.textContent = '⏳ 测试中...';
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.innerHTML = '<p>正在测试登录功能...</p>';
+            
+            try {
+                console.log('🔍 开始登录测试...');
+                console.log('📍 后端地址: http://localhost:8000');
+                
+                // 步骤1: 测试登录接口
+                console.log('📝 步骤1: 调用登录接口');
+                const loginResponse = await fetch('http://localhost:8000/auth/login/json', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+                
+                console.log('📊 登录响应状态:', loginResponse.status);
+                
+                if (!loginResponse.ok) {
+                    const errorData = await loginResponse.json();
+                    throw new Error(`登录失败 (${loginResponse.status}): ${errorData.detail || loginResponse.statusText}`);
+                }
+                
+                const loginData = await loginResponse.json();
+                console.log('✅ 登录成功，获得token:', loginData.access_token?.substring(0, 20) + '...');
+                
+                // 步骤2: 测试获取用户信息
+                console.log('📝 步骤2: 获取用户信息');
+                const userResponse = await fetch('http://localhost:8000/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${loginData.access_token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('📊 用户信息响应状态:', userResponse.status);
+                
+                if (!userResponse.ok) {
+                    const userError = await userResponse.json();
+                    throw new Error(`获取用户信息失败 (${userResponse.status}): ${userError.detail || userResponse.statusText}`);
+                }
+                
+                const userData = await userResponse.json();
+                console.log('✅ 用户信息获取成功:', userData);
+                
+                // 显示成功结果
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h3>🎉 测试成功！</h3>
+                    <div style="margin: 15px 0;">
+                        <strong>📋 测试结果:</strong>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>✅ 登录接口正常</li>
+                            <li>✅ 用户信息获取正常</li>
+                            <li>✅ 前后端通信正常</li>
+                        </ul>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0;">
+                        <strong>👤 用户信息:</strong><br>
+                        <strong>用户名:</strong> ${userData.username}<br>
+                        <strong>邮箱:</strong> ${userData.email}<br>
+                        <strong>角色:</strong> ${userData.role}<br>
+                        <strong>用户ID:</strong> ${userData.id}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 4px;">
+                        <strong>🔑 Token信息:</strong><br>
+                        <code style="word-break: break-all; font-size: 12px;">${loginData.access_token.substring(0, 50)}...</code>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('❌ 测试失败:', error);
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h3>❌ 测试失败</h3>
+                    <div style="margin: 15px 0;">
+                        <strong>🚨 错误信息:</strong><br>
+                        <code style="background: #fff; padding: 10px; display: block; margin: 10px 0; border-radius: 4px;">${error.message}</code>
+                    </div>
+                    <div style="background: #fff; padding: 15px; border-radius: 4px;">
+                        <strong>🔧 可能的解决方案:</strong>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>检查后端服务是否正在运行 (http://localhost:8000)</li>
+                            <li>确认用户名和密码是否正确</li>
+                            <li>检查网络连接</li>
+                            <li>查看浏览器控制台的详细错误信息</li>
+                        </ul>
+                    </div>
+                `;
+            } finally {
+                // 恢复按钮状态
+                loginBtn.disabled = false;
+                loginBtn.textContent = '🚀 开始测试登录';
+            }
+        });
+        
+        // 页面加载完成后的提示
+        window.addEventListener('load', () => {
+            console.log('🌟 登录测试页面已加载');
+            console.log('💡 请填写正确的用户名和密码进行测试');
+        });
+    </script>
+</body>
+</html>

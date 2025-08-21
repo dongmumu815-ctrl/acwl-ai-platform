@@ -1,0 +1,225 @@
+@use "./variables.scss" as *;
+
+// 全局样式重置
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  font-size: $font-size-base;
+  color: $text-color-primary;
+  background-color: $bg-color;
+}
+
+#app {
+  height: 100%;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+// 通用工具类
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.full-height {
+  height: 100%;
+}
+
+.full-width {
+  width: 100%;
+}
+
+// 间距工具类
+.m-0 { margin: 0; }
+.m-1 { margin: $spacing-xs; }
+.m-2 { margin: $spacing-sm; }
+.m-3 { margin: $spacing-md; }
+.m-4 { margin: $spacing-lg; }
+.m-5 { margin: $spacing-xl; }
+
+.p-0 { padding: 0; }
+.p-1 { padding: $spacing-xs; }
+.p-2 { padding: $spacing-sm; }
+.p-3 { padding: $spacing-md; }
+.p-4 { padding: $spacing-lg; }
+.p-5 { padding: $spacing-xl; }
+
+// 工作流相关样式
+.workflow-container {
+  height: 100%;
+  background: $bg-color-page;
+  
+  .workflow-header {
+    height: $header-height;
+    background: $bg-color-page;
+    border-bottom: 1px solid $border-color;
+    padding: 0 $spacing-md;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .workflow-content {
+    height: calc(100% - #{$header-height});
+    overflow: hidden;
+  }
+}
+
+.workflow-node {
+  background: $workflow-node-bg;
+  border: 1px solid $workflow-node-border;
+  border-radius: $border-radius-base;
+  padding: $spacing-sm;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    border-color: $workflow-node-active;
+    box-shadow: $box-shadow-light;
+  }
+  
+  &.active {
+    border-color: $workflow-node-active;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  }
+}
+
+// 状态标签样式
+.status-tag {
+  padding: 2px 8px;
+  border-radius: $border-radius-small;
+  font-size: $font-size-extra-small;
+  font-weight: 500;
+  
+  &.pending {
+    background: rgba(250, 173, 20, 0.1);
+    color: $status-pending;
+    border: 1px solid rgba(250, 173, 20, 0.3);
+  }
+  
+  &.running {
+    background: rgba(24, 144, 255, 0.1);
+    color: $status-running;
+    border: 1px solid rgba(24, 144, 255, 0.3);
+  }
+  
+  &.success {
+    background: rgba(82, 196, 26, 0.1);
+    color: $status-success;
+    border: 1px solid rgba(82, 196, 26, 0.3);
+  }
+  
+  &.failed {
+    background: rgba(255, 77, 79, 0.1);
+    color: $status-failed;
+    border: 1px solid rgba(255, 77, 79, 0.3);
+  }
+  
+  &.cancelled {
+    background: rgba(217, 217, 217, 0.1);
+    color: $status-cancelled;
+    border: 1px solid rgba(217, 217, 217, 0.3);
+  }
+}
+
+// 卡片样式
+.card {
+  background: $bg-color-page;
+  border-radius: $border-radius-base;
+  box-shadow: $box-shadow-base;
+  padding: $spacing-md;
+  margin-bottom: $spacing-md;
+}
+
+// 页面容器
+.page-container {
+  padding: $spacing-md;
+  height: 100%;
+  overflow-y: auto;
+}
+
+// 表格样式增强
+.el-table {
+  .el-table__header {
+    th {
+      background-color: #fafafa;
+      color: $text-color-primary;
+      font-weight: 600;
+    }
+  }
+}
+
+// 按钮组样式
+.button-group {
+  display: flex;
+  gap: $spacing-sm;
+  
+  .el-button {
+    margin-left: 0;
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .workflow-container {
+    .workflow-header {
+      padding: 0 $spacing-sm;
+    }
+  }
+  
+  .page-container {
+    padding: $spacing-sm;
+  }
+}
