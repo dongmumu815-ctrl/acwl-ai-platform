@@ -192,6 +192,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Graph } from '@antv/x6'
 import NodeConfig from '../../components/workflow/configs/NodeConfig.vue'
+import { workflowApi } from '@/api/workflow'
 import {
   ArrowLeft, Check, View, ZoomIn, ZoomOut, FullScreen,
   RefreshLeft, RefreshRight, Delete, ArrowRight, Close,
@@ -688,14 +689,20 @@ const bindKeyboardShortcuts = () => {
     return
   }
   
+  // 检查graph是否有bindKey方法
+  if (typeof graph.bindKey !== 'function') {
+    console.warn('Graph.bindKey method not available, skipping keyboard shortcuts')
+    return
+  }
+  
   try {
     // 撤销 Ctrl+Z
-  graph.bindKey(['ctrl+z', 'cmd+z'], () => {
-    if (graph.canUndo()) {
-      graph.undo()
-    }
-    return false
-  })
+    graph.bindKey(['ctrl+z', 'cmd+z'], () => {
+      if (graph.canUndo()) {
+        graph.undo()
+      }
+      return false
+    })
 
   // 重做 Ctrl+Y
   graph.bindKey(['ctrl+y', 'cmd+y'], () => {
@@ -1233,23 +1240,37 @@ const handleSave = async () => {
     const workflowData = {
       name: workflowName.value,
       description: '',
-      graph: graphData,
+      workflow_config: {
+        graph: graphData
+      },
       nodes: graphData.cells.filter(cell => cell.shape === 'workflow-node'),
-      edges: graphData.cells.filter(cell => cell.shape === 'edge'),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      connections: graphData.cells.filter(cell => cell.shape === 'edge')
     }
 
-    // 这里应该调用API保存到后端
-    console.log('保存工作流:', workflowData)
+    // 获取工作流ID，判断是创建还是更新
+    const workflowId = route.params.id
+    let response
     
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    if (workflowId && workflowId !== 'new') {
+      // 更新现有工作流
+      response = await workflowApi.updateWorkflow(workflowId, workflowData)
+      ElMessage.success('工作流更新成功')
+    } else {
+      // 创建新工作流
+      response = await workflowApi.createWorkflow(workflowData)
+      ElMessage.success('工作流创建成功')
+      
+      // 创建成功后跳转到编辑页面
+      if (response.data && response.data.id) {
+        router.replace(`/workflows/edit/${response.data.id}`)
+      }
+    }
     
-    ElMessage.success('工作流保存成功')
+    console.log('保存工作流成功:', response.data)
   } catch (error) {
     console.error('保存失败:', error)
-    ElMessage.error('保存失败')
+    const errorMessage = error.response?.data?.detail || error.message || '保存失败'
+    ElMessage.error(errorMessage)
   } finally {
     saveLoading.value = false
   }
@@ -1262,20 +1283,52 @@ const handlePreview = () => {
 }
 
 /**
+ * 加载工作流数据
+ */
+const loadWorkflowData = async (workflowId) => {
+  try {
+    // 响应拦截器已经返回了data部分，所以response就是工作流对象
+    const workflow = await workflowApi.getWorkflowDetail(workflowId)
+    
+    // 设置工作流名称
+    if (workflow && workflow.name) {
+      workflowName.value = workflow.name
+    }
+    
+    // 如果有图形数据，加载到编辑器中
+    if (workflow && workflow.workflow_config && workflow.workflow_config.graph) {
+      // 延迟加载图形数据，确保图编辑器已初始化
+      setTimeout(() => {
+        if (graph) {
+          graph.fromJSON(workflow.workflow_config.graph)
+        }
+      }, 200)
+    }
+    
+    console.log('工作流数据加载成功:', workflow)
+  } catch (error) {
+    console.error('加载工作流数据失败:', error)
+    const errorMessage = error.response?.data?.detail || error.message || '加载工作流数据失败'
+    ElMessage.error(errorMessage)
+  }
+}
+
+/**
  * 生命周期
  */
-onMounted(() => {
+onMounted(async () => {
   // 获取工作流ID
   const workflowId = route.params.id
-  if (workflowId && workflowId !== 'new') {
-    workflowName.value = `工作流 ${workflowId}`
-    // 这里可以加载现有工作流数据
-  }
   
   // 初始化图编辑器
   setTimeout(() => {
     initGraph()
   }, 100)
+  
+  // 如果是编辑现有工作流，加载数据
+  if (workflowId && workflowId !== 'new') {
+    await loadWorkflowData(workflowId)
+  }
 })
 
 onUnmounted(() => {
