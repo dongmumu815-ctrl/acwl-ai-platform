@@ -102,6 +102,15 @@ export const modelApi = {
   },
 
   /**
+   * 强制删除模型
+   * @param modelId 模型ID
+   * @returns 删除结果
+   */
+  forceDeleteModel(modelId: number) {
+    return request.delete<{ message: string }>(`/models/${modelId}`)
+  },
+
+  /**
    * 批量删除模型
    * @param modelIds 模型ID数组
    * @returns 删除结果
@@ -163,5 +172,18 @@ export const modelApi = {
       training: number
       totalSize: number
     }>('/models/stats')
+  },
+
+  /**
+   * 获取可用于Agent的模型列表
+   * @returns 可用模型列表，格式化为下拉选择所需的格式
+   */
+  getAvailableModelsForAgents() {
+    return request.get<Array<{
+      label: string
+      value: string
+      model_id: number
+      description?: string
+    }>>('/models/available-for-agents')
   }
 }

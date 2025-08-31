@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from typing import List, Optional
 from datetime import datetime
 
@@ -73,27 +74,51 @@ async def list_task_definitions(
     current_user: User = Depends(get_current_user)
 ):
     """获取任务定义列表"""
-    query = db.query(TaskDefinition)
+    query = select(TaskDefinition)
     
     # 应用过滤条件
     if params.task_name:
-        query = query.filter(TaskDefinition.task_name.ilike(f"%{params.task_name}%"))
+        query = query.where(TaskDefinition.task_name.ilike(f"%{params.task_name}%"))
     if params.task_type:
-        query = query.filter(TaskDefinition.task_type == params.task_type)
+        query = query.where(TaskDefinition.task_type == params.task_type)
     if params.task_status:
-        query = query.filter(TaskDefinition.task_status == params.task_status)
+        query = query.where(TaskDefinition.task_status == params.task_status)
     if params.task_category:
-        query = query.filter(TaskDefinition.task_category == params.task_category)
+        query = query.where(TaskDefinition.task_category == params.task_category)
     if params.project_id:
-        query = query.filter(TaskDefinition.project_id == params.project_id)
+        query = query.where(TaskDefinition.project_id == params.project_id)
     if params.workflow_id:
-        query = query.filter(TaskDefinition.workflow_id == params.workflow_id)
+        query = query.where(TaskDefinition.workflow_id == params.workflow_id)
     if params.created_by:
-        query = query.filter(TaskDefinition.created_by == params.created_by)
+        query = query.where(TaskDefinition.created_by == params.created_by)
     if params.is_template is not None:
-        query = query.filter(TaskDefinition.is_template == params.is_template)
+        query = query.where(TaskDefinition.is_template == params.is_template)
     if params.is_system is not None:
-        query = query.filter(TaskDefinition.is_system == params.is_system)
+        query = query.where(TaskDefinition.is_system == params.is_system)
+    
+    # 计算总数
+    count_query = select(func.count(TaskDefinition.id))
+    if params.task_name:
+        count_query = count_query.where(TaskDefinition.task_name.ilike(f"%{params.task_name}%"))
+    if params.task_type:
+        count_query = count_query.where(TaskDefinition.task_type == params.task_type)
+    if params.task_status:
+        count_query = count_query.where(TaskDefinition.task_status == params.task_status)
+    if params.task_category:
+        count_query = count_query.where(TaskDefinition.task_category == params.task_category)
+    if params.project_id:
+        count_query = count_query.where(TaskDefinition.project_id == params.project_id)
+    if params.workflow_id:
+        count_query = count_query.where(TaskDefinition.workflow_id == params.workflow_id)
+    if params.created_by:
+        count_query = count_query.where(TaskDefinition.created_by == params.created_by)
+    if params.is_template is not None:
+        count_query = count_query.where(TaskDefinition.is_template == params.is_template)
+    if params.is_system is not None:
+        count_query = count_query.where(TaskDefinition.is_system == params.is_system)
+    
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
     
     # 应用排序
     if params.sort_by:
@@ -107,8 +132,9 @@ async def list_task_definitions(
         query = query.order_by(TaskDefinition.created_at.desc())
     
     # 应用分页
-    total = query.count()
-    task_definitions = query.offset(params.skip).limit(params.limit).all()
+    query = query.offset(params.skip).limit(params.limit)
+    result = await db.execute(query)
+    task_definitions = result.scalars().all()
     
     return TaskDefinitionListResponse(
         items=task_definitions,

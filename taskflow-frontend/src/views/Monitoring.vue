@@ -90,8 +90,8 @@
               <div class="card-header">
                 <span>执行趋势</span>
                 <el-radio-group v-model="executionChartType" size="small">
-                  <el-radio-button label="count">执行次数</el-radio-button>
-                  <el-radio-button label="duration">平均耗时</el-radio-button>
+                  <el-radio-button value="count">执行次数</el-radio-button>
+              <el-radio-button value="duration">平均耗时</el-radio-button>
                 </el-radio-group>
               </div>
             </template>
@@ -118,9 +118,9 @@
               <div class="card-header">
                 <span>系统资源</span>
                 <el-radio-group v-model="resourceType" size="small">
-                  <el-radio-button label="cpu">CPU</el-radio-button>
-                  <el-radio-button label="memory">内存</el-radio-button>
-                  <el-radio-button label="disk">磁盘</el-radio-button>
+                  <el-radio-button value="cpu">CPU</el-radio-button>
+              <el-radio-button value="memory">内存</el-radio-button>
+              <el-radio-button value="disk">磁盘</el-radio-button>
                 </el-radio-group>
               </div>
             </template>

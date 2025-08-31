@@ -453,9 +453,9 @@
         
         <el-form-item label="权限范围" prop="scope">
           <el-radio-group v-model="form.scope">
-            <el-radio label="read">只读</el-radio>
-            <el-radio label="write">读写</el-radio>
-            <el-radio label="admin">管理员</el-radio>
+            <el-radio value="read">只读</el-radio>
+            <el-radio value="write">读写</el-radio>
+            <el-radio value="admin">管理员</el-radio>
           </el-radio-group>
           <div class="form-tip">
             <p><strong>只读:</strong> 只能查看数据，不能修改</p>
@@ -466,8 +466,8 @@
         
         <el-form-item label="过期时间">
           <el-radio-group v-model="form.expiryType" @change="handleExpiryTypeChange">
-            <el-radio label="never">永不过期</el-radio>
-            <el-radio label="custom">自定义</el-radio>
+            <el-radio value="never">永不过期</el-radio>
+            <el-radio value="custom">自定义</el-radio>
           </el-radio-group>
           <el-date-picker
             v-if="form.expiryType === 'custom'"

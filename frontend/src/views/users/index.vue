@@ -155,10 +155,10 @@
             <span>用户列表</span>
             <div class="header-actions">
               <el-radio-group v-model="viewMode" size="small">
-                <el-radio-button label="table">
+                <el-radio-button value="table">
                   <el-icon><List /></el-icon>
                 </el-radio-button>
-                <el-radio-button label="card">
+                <el-radio-button value="card">
                   <el-icon><Grid /></el-icon>
                 </el-radio-button>
               </el-radio-group>
@@ -502,9 +502,9 @@
         
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="userForm.status">
-            <el-radio label="active">活跃</el-radio>
-            <el-radio label="disabled">禁用</el-radio>
-            <el-radio label="pending">待激活</el-radio>
+            <el-radio value="active">活跃</el-radio>
+            <el-radio value="disabled">禁用</el-radio>
+            <el-radio value="pending">待激活</el-radio>
           </el-radio-group>
         </el-form-item>
         

@@ -53,6 +53,8 @@
           <el-menu-item index="/projects/create">创建项目</el-menu-item>
         </el-sub-menu>
         
+
+        
         <el-menu-item index="/monitoring">
           <el-icon><Monitor /></el-icon>
           <template #title>实时监控</template>
@@ -208,7 +210,8 @@ import {
   Operation,
   List,
   Folder,
-  Monitor
+  Monitor,
+  Avatar
 } from '@element-plus/icons-vue'
 
 /**

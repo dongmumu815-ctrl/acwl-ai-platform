@@ -6,7 +6,8 @@ API v1 主路由
 
 from fastapi import APIRouter
 
-from .endpoints import auth, users, models, deployments, health, servers, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes
+from .endpoints import auth, users, models, model_service_configs, deployments, health, servers, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents
+from . import instruction_sets
 
 # 创建API路由器
 api_router = APIRouter()
@@ -34,6 +35,12 @@ api_router.include_router(
     models.router,
     prefix="/models",
     tags=["模型管理"]
+)
+
+api_router.include_router(
+    model_service_configs.router,
+    prefix="/model-service-configs",
+    tags=["模型服务配置"]
 )
 
 api_router.include_router(
@@ -94,4 +101,16 @@ api_router.include_router(
     unified_nodes.router,
     prefix="/unified-nodes",
     tags=["统一节点管理"]
+)
+
+api_router.include_router(
+    agents.router,
+    prefix="/agents",
+    tags=["智能体管理"]
+)
+
+api_router.include_router(
+    instruction_sets.router,
+    prefix="/instruction-sets",
+    tags=["指令集管理"]
 )

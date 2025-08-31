@@ -10,6 +10,7 @@ from app.core.database import Base
 # 导入所有模型以确保它们被SQLAlchemy注册
 from .user import User
 from .model import Model, ModelType
+from .model_service_config import ModelServiceConfig
 from .deployment import Deployment, DeploymentGPU, DeploymentTemplate, DeploymentType, DeploymentStatus
 from .server import Server, GPUResource, ServerMetrics
 from .dataset import Dataset, DatasetType, DatasetStatus
@@ -45,6 +46,11 @@ from .workflow import (
 from .unified_node import (
     UnifiedNode, UnifiedNodeInstance, NodeExecution, NodeLog, NodeResult,
     UnifiedNodeType, NodeInstanceStatus, NodePriority, ErrorHandling
+)
+from .agent import Agent, AgentConversation, AgentMessage, AgentTool
+from .instruction_set import (
+    InstructionSet, InstructionNode, InstructionExecution,
+    InstructionSetStatus, NodeType, ConditionType, ActionType, ExecutionStatus
 )
 
 # 导出所有模型
@@ -137,4 +143,19 @@ __all__ = [
     "NodeInstanceStatus",
     "NodePriority",
     "ErrorHandling",
+    # 智能体相关
+    "Agent",
+    "AgentConversation",
+    "AgentMessage",
+    "AgentTool",
+    "ModelServiceConfig",
+    # 指令集相关
+    "InstructionSet",
+    "InstructionNode",
+    "InstructionExecution",
+    "InstructionSetStatus",
+    "NodeType",
+    "ConditionType",
+    "ActionType",
+    "ExecutionStatus",
 ]

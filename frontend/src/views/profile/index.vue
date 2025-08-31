@@ -147,9 +147,9 @@
                       <el-col :xs="24" :sm="12">
                         <el-form-item label="性别">
                           <el-radio-group v-model="basicForm.gender">
-                            <el-radio label="male">男</el-radio>
-                            <el-radio label="female">女</el-radio>
-                            <el-radio label="other">其他</el-radio>
+                            <el-radio value="male">男</el-radio>
+                <el-radio value="female">女</el-radio>
+                <el-radio value="other">其他</el-radio>
                           </el-radio-group>
                         </el-form-item>
                       </el-col>
@@ -449,9 +449,9 @@
                       <h4>通知频率</h4>
                       <el-form-item label="汇总频率">
                         <el-radio-group v-model="notificationSettings.frequency">
-                          <el-radio label="immediate">立即通知</el-radio>
-                          <el-radio label="hourly">每小时汇总</el-radio>
-                          <el-radio label="daily">每日汇总</el-radio>
+                          <el-radio value="immediate">立即通知</el-radio>
+                          <el-radio value="hourly">每小时汇总</el-radio>
+                          <el-radio value="daily">每日汇总</el-radio>
                         </el-radio-group>
                       </el-form-item>
                       
@@ -501,9 +501,9 @@
                       <h4>个人信息可见性</h4>
                       <el-form-item label="个人资料">
                         <el-radio-group v-model="privacySettings.profile.visibility">
-                          <el-radio label="public">公开</el-radio>
-                          <el-radio label="private">私密</el-radio>
-                          <el-radio label="friends">仅好友</el-radio>
+                          <el-radio value="public">公开</el-radio>
+                <el-radio value="private">私密</el-radio>
+                <el-radio value="friends">仅好友</el-radio>
                         </el-radio-group>
                         <div class="form-tip">控制其他用户是否可以查看您的个人资料</div>
                       </el-form-item>
@@ -551,8 +551,8 @@
                       
                       <el-form-item label="项目活动">
                         <el-radio-group v-model="privacySettings.activity.projectVisibility">
-                          <el-radio label="public">公开</el-radio>
-                          <el-radio label="private">私密</el-radio>
+                          <el-radio value="public">公开</el-radio>
+                          <el-radio value="private">私密</el-radio>
                         </el-radio-group>
                         <div class="form-tip">控制您的项目和模型是否对其他用户可见</div>
                       </el-form-item>

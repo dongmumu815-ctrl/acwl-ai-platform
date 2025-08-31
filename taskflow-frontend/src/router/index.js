@@ -148,6 +148,7 @@ const routes = [
             requiresAuth: true
           }
         },
+
         {
           path: 'monitoring',
           name: 'Monitoring',

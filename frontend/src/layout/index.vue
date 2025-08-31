@@ -138,8 +138,11 @@ import {
   Plus,
   Document,
   Cpu,
-  VideoCamera
+  VideoCamera,
+  Connection,
+  Folder
 } from '@element-plus/icons-vue'
+import RobotIcon from '@/components/RobotIcon.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // 使用状态管理
@@ -162,7 +165,10 @@ const iconMap: Record<string, any> = {
   User,
   Document,
   Cpu,
-  VideoCamera
+  VideoCamera,
+  Connection,
+  Folder,
+  Robot: RobotIcon
 }
 
 // 缓存的视图组件

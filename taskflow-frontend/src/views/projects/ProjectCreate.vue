@@ -69,8 +69,8 @@
                 <el-col :span="12">
                   <el-form-item label="项目状态" prop="status">
                     <el-radio-group v-model="projectForm.status">
-                      <el-radio label="active">激活</el-radio>
-                      <el-radio label="inactive">停用</el-radio>
+                      <el-radio value="active">激活</el-radio>
+            <el-radio value="inactive">停用</el-radio>
                     </el-radio-group>
                   </el-form-item>
                 </el-col>
@@ -196,8 +196,8 @@
               
               <el-form-item label="项目可见性">
                 <el-radio-group v-model="projectForm.visibility">
-                  <el-radio label="public">公开 - 所有用户可见</el-radio>
-                  <el-radio label="private">私有 - 仅项目成员可见</el-radio>
+                  <el-radio value="public">公开 - 所有用户可见</el-radio>
+            <el-radio value="private">私有 - 仅项目成员可见</el-radio>
                 </el-radio-group>
               </el-form-item>
               

@@ -467,7 +467,7 @@ import * as echarts from 'echarts'
 // 响应式数据
 const timeRange = ref('1h')
 const autoRefresh = ref(true)
-const refreshTimer = ref(null)
+const refreshTimer = ref<NodeJS.Timeout | null>(null)
 
 // 图表引用
 const cpuMemoryChartRef = ref(null)
@@ -476,10 +476,10 @@ const gpuChartRef = ref(null)
 const apiChartRef = ref(null)
 
 // 图表实例
-let cpuMemoryChart = null
-let networkChart = null
-let gpuChart = null
-let apiChart = null
+let cpuMemoryChart: echarts.ECharts | null = null
+let networkChart: echarts.ECharts | null = null
+let gpuChart: echarts.ECharts | null = null
+let apiChart: echarts.ECharts | null = null
 
 // 系统运行时间
 const systemUptime = ref('15天 8小时 32分钟')
@@ -651,7 +651,7 @@ const getTemperatureColor = (temperature: number) => {
 }
 
 const getGpuStatusText = (status: string) => {
-  const statusMap = {
+  const statusMap: { [key: string]: string } = {
     running: '运行中',
     idle: '空闲',
     error: '错误'
@@ -660,7 +660,7 @@ const getGpuStatusText = (status: string) => {
 }
 
 const getServiceStatusText = (status: string) => {
-  const statusMap = {
+  const statusMap: { [key: string]: string } = {
     running: '运行中',
     stopped: '已停止',
     error: '错误'

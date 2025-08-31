@@ -159,10 +159,10 @@
             <span>训练任务列表</span>
             <div class="header-actions">
               <el-radio-group v-model="viewMode" size="small">
-                <el-radio-button label="grid">
+                <el-radio-button value="grid">
                   <el-icon><Grid /></el-icon>
                 </el-radio-button>
-                <el-radio-button label="list">
+                <el-radio-button value="list">
                   <el-icon><List /></el-icon>
                 </el-radio-button>
               </el-radio-group>

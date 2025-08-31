@@ -36,12 +36,24 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     
     logger.info("✅ 数据库初始化完成")
+    
+    # 启动异步任务服务
+    from app.services.async_task_service import async_task_service
+    await async_task_service.start()
+    logger.info("✅ 异步任务服务启动完成")
+    
     logger.info(f"🌐 API文档地址: http://{settings.HOST}:{settings.PORT}/docs")
     
     yield
     
     # 关闭时执行
-    logger.info("🛑 ACWL-AI 平台关闭")
+    logger.info("🛑 ACWL-AI 平台关闭中...")
+    
+    # 停止异步任务服务
+    await async_task_service.stop()
+    logger.info("✅ 异步任务服务已停止")
+    
+    logger.info("🛑 ACWL-AI 平台关闭完成")
 
 
 # 创建FastAPI应用实例

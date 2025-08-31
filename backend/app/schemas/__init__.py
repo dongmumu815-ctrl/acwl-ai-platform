@@ -13,6 +13,7 @@ from .task import *
 from .executor import *
 from .scheduler import *
 from .workflow import *
+from .agent import *
 from .unified_node import (
     UnifiedNodeType, UnifiedNodeStatus, ExecutionStatus, LogLevel, NodePriority, ErrorHandling,
     UnifiedNodeBase, UnifiedNodeCreate, UnifiedNodeUpdate, UnifiedNodeInDB, UnifiedNodeResponse,
@@ -239,4 +240,37 @@ __all__ = [
     "NodeLogQueryParams",
     "NodeExecutionStats",
     "NodeExecutionStatsListResponse",
+    
+    # Agent schemas
+    "AgentStatus",
+    "AgentType",
+    "ToolType",
+    "AgentBase",
+    "AgentCreate",
+    "AgentUpdate",
+    "AgentInDB",
+    "AgentResponse",
+    "AgentListItem",
+    "AgentListResponse",
+    "AgentQueryParams",
+    "AgentToolBase",
+    "AgentToolCreate",
+    "AgentToolUpdate",
+    "AgentToolResponse",
+    "AgentToolListResponse",
+    "AgentConversationBase",
+    "AgentConversationCreate",
+    "AgentConversationUpdate",
+    "AgentConversationResponse",
+    "AgentConversationListResponse",
+    "AgentMessageBase",
+    "AgentMessageCreate",
+    "AgentMessageResponse",
+    "AgentMessageListResponse",
+    "AgentChatRequest",
+    "AgentChatResponse",
+    "AgentStatsResponse",
+    "ModelConfigSchema",
+    "MemoryConfigSchema",
+    "AgentConfigValidationResponse",
 ]

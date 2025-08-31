@@ -126,10 +126,10 @@
             <span>服务器列表</span>
             <div class="header-actions">
               <el-radio-group v-model="viewMode" size="small">
-                <el-radio-button label="grid">
+                <el-radio-button value="grid">
                   <el-icon><Grid /></el-icon>
                 </el-radio-button>
-                <el-radio-button label="list">
+                <el-radio-button value="list">
                   <el-icon><List /></el-icon>
                 </el-radio-button>
               </el-radio-group>
@@ -495,6 +495,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { createServer, updateServer } from '@/api/servers'
 
@@ -515,6 +516,9 @@ import {
   Grid,
   List
 } from '@element-plus/icons-vue'
+
+// 路由实例
+const router = useRouter()
 
 // 响应式数据
 const searchQuery = ref('')
@@ -763,8 +767,8 @@ const handleServerAction = async ({ action, server }: any) => {
       dialogVisible.value = true
       break
     case 'monitor':
-      // TODO: 跳转到监控页面
-      ElMessage.info('跳转到监控页面')
+      // 跳转到监控页面
+      router.push('/monitoring')
       break
     case 'scan':
       await scanGpus()

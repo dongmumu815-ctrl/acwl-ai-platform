@@ -145,17 +145,17 @@
                   
                   <el-form-item label="日期格式">
                     <el-radio-group v-model="basicSettings.dateFormat">
-                      <el-radio label="YYYY-MM-DD">2024-01-21</el-radio>
-                      <el-radio label="MM/DD/YYYY">01/21/2024</el-radio>
-                      <el-radio label="DD/MM/YYYY">21/01/2024</el-radio>
+                      <el-radio value="YYYY-MM-DD">2024-01-21</el-radio>
+                      <el-radio value="MM/DD/YYYY">01/21/2024</el-radio>
+                      <el-radio value="DD/MM/YYYY">21/01/2024</el-radio>
                     </el-radio-group>
                   </el-form-item>
                   
                   <el-form-item label="主题设置">
                     <el-radio-group v-model="basicSettings.theme">
-                      <el-radio label="light">浅色主题</el-radio>
-                      <el-radio label="dark">深色主题</el-radio>
-                      <el-radio label="auto">跟随系统</el-radio>
+                      <el-radio value="light">浅色主题</el-radio>
+                      <el-radio value="dark">深色主题</el-radio>
+                      <el-radio value="auto">跟随系统</el-radio>
                     </el-radio-group>
                   </el-form-item>
                   
@@ -384,9 +384,9 @@
                   
                   <el-form-item label="通知频率">
                     <el-radio-group v-model="notificationSettings.frequency">
-                      <el-radio label="immediate">立即发送</el-radio>
-                      <el-radio label="hourly">每小时汇总</el-radio>
-                      <el-radio label="daily">每日汇总</el-radio>
+                      <el-radio value="immediate">立即发送</el-radio>
+                      <el-radio value="hourly">每小时汇总</el-radio>
+                      <el-radio value="daily">每日汇总</el-radio>
                     </el-radio-group>
                   </el-form-item>
                   
@@ -515,10 +515,10 @@
                 <el-form :model="storageSettings" label-width="150px">
                   <el-form-item label="存储类型">
                     <el-radio-group v-model="storageSettings.type">
-                      <el-radio label="local">本地存储</el-radio>
-                      <el-radio label="s3">Amazon S3</el-radio>
-                      <el-radio label="oss">阿里云OSS</el-radio>
-                      <el-radio label="cos">腾讯云COS</el-radio>
+                      <el-radio value="local">本地存储</el-radio>
+                <el-radio value="s3">Amazon S3</el-radio>
+                <el-radio value="oss">阿里云OSS</el-radio>
+                <el-radio value="cos">腾讯云COS</el-radio>
                     </el-radio-group>
                   </el-form-item>
                   
@@ -588,9 +588,9 @@
                   
                   <el-form-item label="文件清理策略">
                     <el-radio-group v-model="storageSettings.cleanupPolicy">
-                      <el-radio label="never">永不清理</el-radio>
-                      <el-radio label="auto">自动清理</el-radio>
-                      <el-radio label="manual">手动清理</el-radio>
+                      <el-radio value="never">永不清理</el-radio>
+                      <el-radio value="auto">自动清理</el-radio>
+                      <el-radio value="manual">手动清理</el-radio>
                     </el-radio-group>
                   </el-form-item>
                   
@@ -757,9 +757,9 @@
                   
                   <el-form-item label="备份频率" v-if="backupSettings.autoBackup">
                     <el-radio-group v-model="backupSettings.frequency">
-                      <el-radio label="daily">每日</el-radio>
-                      <el-radio label="weekly">每周</el-radio>
-                      <el-radio label="monthly">每月</el-radio>
+                      <el-radio value="daily">每日</el-radio>
+                      <el-radio value="weekly">每周</el-radio>
+                      <el-radio value="monthly">每月</el-radio>
                     </el-radio-group>
                   </el-form-item>
                   
@@ -867,8 +867,8 @@
                   
                   <el-form-item label="日志格式">
                     <el-radio-group v-model="logSettings.format">
-                      <el-radio label="json">JSON格式</el-radio>
-                      <el-radio label="text">文本格式</el-radio>
+                      <el-radio value="json">JSON格式</el-radio>
+                <el-radio value="text">文本格式</el-radio>
                     </el-radio-group>
                   </el-form-item>
                   

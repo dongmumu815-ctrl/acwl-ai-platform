@@ -354,3 +354,44 @@ async def get_model_stats(
         "training": 0,  # 训练中的模型需要从其他表获取
         "totalSize": total_size
     }
+
+
+@router.get("/available-for-agents", summary="获取可用于Agent的模型列表")
+async def get_available_models_for_agents(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取可用于Agent配置的模型列表
+    只返回激活状态的LLM类型模型，格式化为前端下拉选择所需的格式
+    """
+    
+    # 查询激活的LLM模型
+    query = select(Model).where(
+        Model.is_active == True,
+        Model.model_type == ModelType.LLM
+    ).order_by(Model.name, Model.version)
+    
+    result = await db.execute(query)
+    models = result.scalars().all()
+    
+    # 格式化为前端下拉选择所需的格式
+    available_models = []
+    for model in models:
+        # 生成显示标签和值
+        label = f"{model.name}"
+        if model.version:
+            label += f" ({model.version})"
+        
+        value = f"{model.name}"
+        if model.version:
+            value += f":{model.version}"
+        
+        available_models.append({
+            "label": label,
+            "value": value,
+            "model_id": model.id,
+            "description": model.description
+        })
+    
+    return available_models

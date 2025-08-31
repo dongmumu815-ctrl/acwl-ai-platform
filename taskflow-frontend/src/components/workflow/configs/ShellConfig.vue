@@ -4,8 +4,8 @@
     
     <el-form-item label="执行方式">
       <el-radio-group v-model="localConfig.executeType" @change="handleChange">
-        <el-radio label="inline">内联脚本</el-radio>
-        <el-radio label="file">脚本文件</el-radio>
+        <el-radio value="inline">内联脚本</el-radio>
+        <el-radio value="file">脚本文件</el-radio>
       </el-radio-group>
     </el-form-item>
     

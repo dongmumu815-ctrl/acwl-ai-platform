@@ -103,6 +103,16 @@ export const asyncRoutes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'service-configs',
+        name: 'ModelServiceConfigs',
+        component: () => import('@/views/model-service-configs/index.vue'),
+        meta: {
+          title: '服务配置',
+          icon: 'Setting',
+          requiresAuth: true
+        }
+      },
+      {
         path: 'detail/:id',
         name: 'ModelDetail',
         component: () => import('@/views/models/index.vue'),
@@ -244,6 +254,49 @@ export const asyncRoutes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: '/agents',
+    component: Layout,
+    redirect: '/agents/list',
+    meta: {
+      title: '智能体管理',
+      icon: 'Robot',
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: 'list',
+        name: 'AgentList',
+        component: () => import('@/views/agents/index.vue'),
+        meta: {
+          title: '智能体列表',
+          icon: 'List',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'create',
+        name: 'AgentCreate',
+        component: () => import('@/views/agents/index.vue'),
+        meta: {
+          title: '创建智能体',
+          icon: 'Plus',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'detail/:id',
+        name: 'AgentDetail',
+        component: () => import('@/views/agents/index.vue'),
+        meta: {
+          title: '智能体详情',
+          hidden: true,
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
     path: '/fine-tuning',
     component: Layout,
     redirect: '/fine-tuning/jobs',
@@ -357,6 +410,30 @@ export const asyncRoutes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: '/monitoring',
+    component: Layout,
+    redirect: '/monitoring/index',
+    meta: {
+      title: '系统监控',
+      icon: 'Monitor',
+      requiresAuth: true,
+      requiresAdmin: true
+    },
+    children: [
+      {
+        path: 'index',
+        name: 'Monitoring',
+        component: () => import('@/views/monitoring/index.vue'),
+        meta: {
+          title: '系统监控',
+          icon: 'Monitor',
+          requiresAuth: true,
+          requiresAdmin: true
+        }
+      }
+    ]
+  },
+  {
     path: '/profile',
     component: Layout,
     redirect: '/profile/index',
@@ -370,6 +447,66 @@ export const asyncRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/profile/index.vue'),
         meta: {
           title: '个人中心',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
+    path: '/instruction-sets',
+    component: Layout,
+    redirect: '/instruction-sets/index',
+    meta: {
+      title: '指令集管理',
+      icon: 'Document',
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: 'index',
+        name: 'InstructionSets',
+        component: () => import('@/views/instruction-sets/index.vue'),
+        meta: {
+          title: '指令集管理',
+          icon: 'List',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
+    path: '/instruction-sets/:id',
+    component: Layout,
+    meta: {
+      hidden: true,
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: '',
+        name: 'InstructionSetDetail',
+        component: () => import('@/views/instruction-sets/detail.vue'),
+        meta: {
+          title: '指令集详情',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
+    path: '/instruction-sets/:id/test',
+    component: Layout,
+    meta: {
+      hidden: true,
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: '',
+        name: 'InstructionSetTest',
+        component: () => import('@/views/instruction-sets/test.vue'),
+        meta: {
+          title: '指令集测试',
           requiresAuth: true
         }
       }
