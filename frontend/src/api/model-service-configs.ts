@@ -166,6 +166,20 @@ export const modelServiceConfigApi = {
       url: '/model-service-configs/providers',
       method: 'get'
     })
+  },
+
+  /**
+   * 获取Ollama模型列表
+   * @param apiEndpoint Ollama API端点
+   */
+  getOllamaModels(apiEndpoint: string) {
+    return request({
+      url: '/model-service-configs/ollama-models',
+      method: 'get',
+      params: {
+        api_endpoint: apiEndpoint
+      }
+    })
   }
 }
 

@@ -18,7 +18,11 @@ import os
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(project_root)
 
-from app.services.db_service import RouterDBService
+from app.crud.instruction_set import instruction_set, CRUDInstructionNode
+from app.core.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.models.instruction_set import InstructionNode
 
 
 class OllamaLLMClient:
@@ -29,19 +33,29 @@ class OllamaLLMClient:
         初始化Ollama客户端
         
         Args:
-            config: 配置字典，包含type, model, base_url等
+            config: 配置字典，包含type, model, base_url, temperature等
         """
         self.model = config.get('model', 'qwen2.5:7b')
         self.base_url = config.get('base_url', 'http://localhost:11434')
+        
+        # 存储模型配置参数
+        self.temperature = config.get('temperature', 0.7)
+        self.top_p = config.get('top_p', 0.9)
+        self.max_tokens = config.get('max_tokens', 4096)
+        self.frequency_penalty = config.get('frequency_penalty', 0.0)
+        self.presence_penalty = config.get('presence_penalty', 0.0)
+        self.timeout = config.get('timeout', 30)
+        
         # self.api_url = f"{self.base_url.rstrip('/')}/api/generate"
         if not self.base_url.rstrip('/').endswith('/api/chat'):
             self.api_url = f"{self.base_url.rstrip('/')}/api/chat"
         else:
-            self.api_url = self.base_url.rstrip('/')
-        self.api_url = "http://acepiec-ai.acoming.net:11868"
+            self.api_url = self.base_url.rstrip('/').replace('/api/chat', '')
+            # self.api_url = "http://acepiec-ai.acoming.net:11868"
         self.api_url = f"{self.api_url.rstrip('/')}/api/generate"
         print("--------------------------------")
         print(self.api_url)
+        print(f"模型配置参数: temperature={self.temperature}, top_p={self.top_p}, max_tokens={self.max_tokens}")
         
     def judge_content(self, content: str, prompt: str, node_description: str) -> Dict[str, Any]:
         """
@@ -57,19 +71,30 @@ class OllamaLLMClient:
         """
         
         # 构建完整的提示词
+        #检测节点: {node_description}
+        
+## 工作流程
+### 步骤一：拆解“判断标准”中的关键词
+
+### 步骤二：判断待检测内容是否符合判断标准中的关键词,注意，只要涉及到了关键词，matched要必须返回:true
+# 角色
+#你叫进口与审读政策智能体，能够自主回答出版物进口与审读的政策依据。
+#你已经充分掌握了关于出版物进口与审读的相关政策依据，可以回复用户关于这方面的问题。
         full_prompt = f"""
-你是一个内容安全检测专家。请根据以下要求判断给定内容是否符合特定条件。
+你是一个内容审读专家。请根据以下要求判断给定内容是否符合特定条件。
 
-检测节点: {node_description}
-判断标准: {prompt}
+#判断标准: {prompt},如果内容符合判断标准，matched必须返回:true,如果内容不符合判断标准，matched必须返回:false
 
-待检测内容: "{content}"
+
+#待检测内容: "{content}"
+
 
 请严格按照以下JSON格式回复，不要包含任何其他内容：
 {{
     "matched": true/false,
     "confidence": 0.0-1.0之间的数值,
-    "reasoning": "详细的判断理由"
+    "reasoning": "详细的判断理由",
+    "Related_to_the_original_text": "相关的原文摘取"
 }}
 """     
         try:
@@ -81,18 +106,35 @@ class OllamaLLMClient:
             print("prompt:", full_prompt)
             print("node_description", node_description)
 
+            # 构建请求参数，包含温度等配置
+            self.temperature=0.1
+            request_data = {
+                "model": self.model,
+                "prompt": full_prompt,
+                "stream": False,
+                "format": "json",
+                "options": {
+                    "temperature": self.temperature,
+                    "top_p": self.top_p,
+                    "num_predict": self.max_tokens,  # Ollama使用num_predict而不是max_tokens
+                    "frequency_penalty": self.frequency_penalty,
+                    "presence_penalty": self.presence_penalty
+                }
+            }
+
+            request_data = {
+                "model": self.model,
+                "prompt": full_prompt,
+                "stream": False,
+                "format": "json",
+            }
+            
             response = requests.post(
                 self.api_url,
-                json={
-                    "model": self.model,
-                    "prompt": full_prompt,
-                    "stream": False,
-                    "format": "json"
-                },
-                timeout=30
+                json=request_data,
+                timeout=self.timeout
             )
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(response)
             
             if response.status_code == 200:
                 result = response.json()
@@ -101,12 +143,15 @@ class OllamaLLMClient:
                 # 尝试解析JSON响应
                 try:
                     parsed_result = json.loads(llm_response)
+
+                    print(str(parsed_result))
                     # 估算token使用量（简单估算：输入+输出字符数/4）
                     tokens_used = (len(full_prompt) + len(llm_response)) // 4
                     return {
                         'matched': bool(parsed_result.get('matched', False)),
                         'confidence': float(parsed_result.get('confidence', 0.0)),
                         'reasoning': str(parsed_result.get('reasoning', '无法获取判断理由')),
+                        'Related_to_the_original_text': str(parsed_result.get('Related_to_the_original_text', parsed_result.get('related_to_the_original_text', '无法获取相关原文'))),
                         'tokens_used': tokens_used
                     }
                 except json.JSONDecodeError:
@@ -176,7 +221,7 @@ class RiskLevel(Enum):
 
 @dataclass
 class DetectionResult:
-    """检测结果数据类"""
+    """检测结果"""
     node_id: str
     description: str
     matched: bool
@@ -187,6 +232,8 @@ class DetectionResult:
     sensitive_excerpt: str = ""  # 敏感内容摘录
     original_length: int = 0  # 原文长度
     tokens_used: int = 0  # LLM调用消耗的token数量
+    Related_to_the_original_text: str = ""  # LLM返回的相关原文
+    reasoning: str = ""  # LLM返回的详细判断理由
 
 
 class ContentSafetyNode:
@@ -238,6 +285,8 @@ class ContentSafetyNode:
         matched = False
         confidence = 0.0
         tokens_used = 0  # 初始化token使用量
+        related_to_original_text = ""  # 初始化相关原文
+        reasoning = ""  # 初始化判断理由
         
         # 如果有LLM客户端且有提示词，使用LLM进行智能判断
         if llm_client and self.llm_prompt:
@@ -246,7 +295,9 @@ class ContentSafetyNode:
                 matched = llm_result['matched']
                 confidence = llm_result['confidence']
                 tokens_used += llm_result.get('tokens_used', 0)  # 累计token使用量
-                evidence.append(f"LLM判断: {llm_result['reasoning']}")
+                related_to_original_text = llm_result.get('Related_to_the_original_text', llm_result.get('related_to_the_original_text', ""))  # 获取相关原文
+                reasoning = llm_result.get('reasoning', "")  # 获取判断理由
+                evidence.append(f"LLM判断: {reasoning}")
             except Exception as e:
                 evidence.append(f"LLM判断失败: {str(e)}")
                 # 降级到传统匹配方式
@@ -284,7 +335,9 @@ class ContentSafetyNode:
             children_results=children_results,
             sensitive_excerpt=sensitive_excerpt,
             original_length=len(content),
-            tokens_used=tokens_used  # 添加token使用量
+            tokens_used=tokens_used,  # 添加token使用量
+            Related_to_the_original_text=related_to_original_text,  # 添加相关原文
+            reasoning=reasoning  # 添加判断理由
         )
     
     def _fallback_detection(self, content: str, evidence: List[str]) -> tuple[bool, float]:
@@ -394,41 +447,50 @@ class EnhancedContentSafetyAgentDB:
         """
         self.llm_client = None
         self.instruction_set_id = instruction_set_id
+        self.root_node = None
         
         # 初始化LLM客户端
         if llm_config and llm_config.get('type') == 'ollama':
             self.llm_client = OllamaLLMClient(llm_config)
-        
-        # 从数据库加载检测树
-        self.root_node = self._load_detection_tree_from_db()
     
-    def _load_detection_tree_from_db(self) -> ContentSafetyNode:
+    async def initialize(self, db: AsyncSession):
+        """
+        异步初始化方法，从数据库加载检测树
+        
+        Args:
+            db: 数据库会话
+        """
+        # 从数据库加载检测树
+        self.root_node = await self._load_detection_tree_from_db(db)
+    
+    async def _load_detection_tree_from_db(self, db: AsyncSession) -> ContentSafetyNode:
         """
         从数据库中加载检测树结构
         
+        Args:
+            db: 数据库会话
+            
         Returns:
             根节点
         """
         print(f"正在从数据库加载指令集 {self.instruction_set_id}...")
         
-        # 初始化数据库服务
-        db = RouterDBService()
+        # 验证指令集是否存在
+        db_instruction_set = await instruction_set.get(db, id=self.instruction_set_id)
+        if not db_instruction_set:
+            raise Exception(f"指令集 {self.instruction_set_id} 不存在")
         
-        # 查询指令集中的所有节点
-        query_sql = """
-        SELECT id, parent_id, node_type, title, description, condition_text, keywords, condition_text,risk_level,
-               result_value, result_confidence, sort_order, condition_config
-        FROM instruction_nodes 
-        WHERE instruction_set_id = %s 
-        ORDER BY sort_order, id
-        """
+        # 获取指令集中的所有节点
+        result = await db.execute(
+            select(InstructionNode).where(
+                InstructionNode.instruction_set_id == self.instruction_set_id
+            ).order_by(InstructionNode.sort_order, InstructionNode.id)
+        )
+        nodes_data = result.scalars().all()
         
-        result = db.service.execute_sql('agent_db', query_sql, (self.instruction_set_id,))
-        print(result)
-        if not result['success'] or not result['data']:
+        if not nodes_data:
             raise Exception(f"无法从数据库加载指令集 {self.instruction_set_id}")
         
-        nodes_data = result['data']
         print(f"从数据库加载了 {len(nodes_data)} 个节点")
         
         # 构建节点映射
@@ -437,7 +499,7 @@ class EnhancedContentSafetyAgentDB:
         # 按层级组织节点
         nodes_by_parent = {}
         for node in nodes_data:
-            parent_id = node['parent_id']
+            parent_id = node.parent_id
             if parent_id not in nodes_by_parent:
                 nodes_by_parent[parent_id] = []
             nodes_by_parent[parent_id].append(node)
@@ -454,29 +516,25 @@ class EnhancedContentSafetyAgentDB:
                 else:
                     node_number = str(i)
                 
-                description = node_data['description'] or node_data['title']
+                description = node_data.description or node_data.title
                 
-                # 解析condition_config
+                # 解析meta_data配置
                 condition_config = {}
-                if node_data['condition_config']:
+                if node_data.meta_data:
                     try:
-                        condition_config = json.loads(node_data['condition_config'])
-                    except json.JSONDecodeError:
-                        print(f"警告: 节点 {node_number} 的condition_config解析失败")
+                        condition_config = json.loads(node_data.meta_data) if isinstance(node_data.meta_data, str) else node_data.meta_data
+                    except (json.JSONDecodeError, TypeError):
+                        print(f"警告: 节点 {node_number} 的meta_data解析失败")
                 
-                # 提取配置信息
-                #print(node_data["keywords"],node_data["condition_text"])
-                # print("-----------")
-                # import sys
-                # sys.exit()
-                keywords = condition_config.get('keywords', [])
+                # 提取配置信息，优先使用数据库字段，其次使用meta_data配置
+                keywords = node_data.keywords or condition_config.get('keywords', [])
                 patterns = condition_config.get('patterns', [])
-                llm_prompt = condition_config.get('llm_prompt', node_data['condition_text'])
-                risk_level_str = condition_config.get('risk_level', 'medium')
-
-                keywords=node_data["keywords"]
-                llm_prompt=node_data["condition_text"]
-                risk_level_str=node_data["risk_level"]
+                llm_prompt = node_data.condition_text or condition_config.get('llm_prompt', '')
+                risk_level_str = node_data.risk_level.value if node_data.risk_level else condition_config.get('risk_level', 'medium')
+                
+                # 处理keywords字段（可能是字符串或列表）
+                if isinstance(keywords, str):
+                    keywords = [k.strip() for k in keywords.split(',') if k.strip()]
                 
                 # 转换风险等级
                 try:
@@ -485,7 +543,7 @@ class EnhancedContentSafetyAgentDB:
                     risk_level = RiskLevel.MEDIUM
                 
                 # 转换节点类型
-                node_type = NodeType.CONDITION if node_data['node_type'] == 'CONDITION' else NodeType.ACTION
+                node_type = NodeType.CONDITION if node_data.node_type == 'CONDITION' else NodeType.ACTION
                 
                 # 创建节点
                 node = ContentSafetyNode(
@@ -498,10 +556,10 @@ class EnhancedContentSafetyAgentDB:
                     llm_prompt=llm_prompt
                 )
                 
-                nodes_map[node_data['id']] = node
+                nodes_map[node_data.id] = node
                 
                 # 递归创建子节点
-                create_nodes_with_numbers(node_data['id'], node_number)
+                create_nodes_with_numbers(node_data.id, node_number)
         
         # 从根节点开始创建
         create_nodes_with_numbers(None)
@@ -509,19 +567,29 @@ class EnhancedContentSafetyAgentDB:
         # 第二遍：建立父子关系
         root_node = None
         for node_data in nodes_data:
-            current_node = nodes_map[node_data['id']]
+            current_node = nodes_map[node_data.id]
             
-            if node_data['parent_id'] is None:
+            if node_data.parent_id is None:
                 # 这是根节点
                 root_node = current_node
+                print(f"找到根节点: {current_node.node_id} - {current_node.description}")
             else:
                 # 添加到父节点
-                parent_node = nodes_map.get(node_data['parent_id'])
+                parent_node = nodes_map.get(node_data.parent_id)
                 if parent_node:
                     parent_node.add_child(current_node)
+                else:
+                    print(f"警告: 节点 {node_data.id} 的父节点 {node_data.parent_id} 不存在")
         
         if root_node is None:
-            raise Exception("未找到根节点")
+            # 如果没有找到parent_id为None的节点，尝试找到第一个节点作为根节点
+            if nodes_data:
+                first_node_id = nodes_data[0].id
+                root_node = nodes_map.get(first_node_id)
+                print(f"未找到parent_id为None的根节点，使用第一个节点作为根节点: {root_node.node_id if root_node else 'None'}")
+            
+            if root_node is None:
+                raise Exception("未找到根节点，请检查数据库中的节点数据")
         
         print(f"检测树构建完成，根节点: {root_node.node_id}")
         
@@ -530,7 +598,7 @@ class EnhancedContentSafetyAgentDB:
         
         return root_node
     
-    def _print_instruction_set(self, nodes_data: List[Dict], nodes_map: Dict):
+    def _print_instruction_set(self, nodes_data: List[InstructionNode], nodes_map: Dict):
         """
         打印指令集内容
         
@@ -545,7 +613,7 @@ class EnhancedContentSafetyAgentDB:
         # 按层级组织节点
         nodes_by_parent = {}
         for node in nodes_data:
-            parent_id = node['parent_id']
+            parent_id = node.parent_id
             if parent_id not in nodes_by_parent:
                 nodes_by_parent[parent_id] = []
             nodes_by_parent[parent_id].append(node)
@@ -558,26 +626,26 @@ class EnhancedContentSafetyAgentDB:
             for node in nodes_by_parent[parent_id]:
                 indent = "  " * level
                 # 从nodes_map中获取已创建的节点，使用其node_id
-                created_node = nodes_map.get(node['id'])
+                created_node = nodes_map.get(node.id)
                 if created_node:
                     node_number = created_node.node_id
                 else:
                     node_number = "未知"
-                description = node['description'] or node['title']
+                description = node.description or node.title
                 
-                # 解析condition_config获取风险等级
+                # 解析meta_data获取风险等级
                 risk_level = "medium"
-                if node['condition_config']:
+                if node.meta_data:
                     try:
-                        config = json.loads(node['condition_config'])
+                        config = json.loads(node.meta_data) if isinstance(node.meta_data, str) else node.meta_data
                         risk_level = config.get('risk_level', 'medium')
-                    except:
+                    except (json.JSONDecodeError, TypeError):
                         pass
                 
                 print(f"{indent}├─ {node_number}: {description} (风险等级: {risk_level})")
                 
                 # 递归打印子节点
-                print_node_tree(node['id'], level + 1)
+                print_node_tree(node.id, level + 1)
         
         # 从根节点开始打印
         print_node_tree(None)
@@ -593,6 +661,8 @@ class EnhancedContentSafetyAgentDB:
         Returns:
             检测结果
         """
+        if self.root_node is None:
+            raise Exception("检测树未初始化，请先调用initialize方法")
         return self.root_node.detect(content, self.llm_client)
     
     def _calculate_overall_risk(self, result: DetectionResult) -> RiskLevel:

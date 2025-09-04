@@ -77,6 +77,50 @@ async def get_model_service_config_stats(
     return ModelServiceConfigStats(**stats)
 
 
+@router.get("/ollama-models", summary="获取Ollama模型列表")
+async def get_ollama_models(
+    api_endpoint: str = Query(..., description="Ollama API端点"),
+    current_user: User = Depends(get_current_active_user)
+) -> dict:
+    """
+    获取指定Ollama服务的模型列表
+    通过后端代理请求，避免前端直接调用Ollama服务
+    """
+    try:
+        # 清理端点URL
+        clean_endpoint = api_endpoint.rstrip('/')
+        tags_url = f"{clean_endpoint}/api/tags"
+        
+        # 发起请求获取模型列表
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            async with session.get(tags_url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return {
+                        "success": True,
+                        "models": data.get("models", []),
+                        "message": "获取模型列表成功"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "models": [],
+                        "message": f"请求失败，状态码: {response.status}"
+                    }
+    except aiohttp.ClientError as e:
+        return {
+            "success": False,
+            "models": [],
+            "message": f"网络请求失败: {str(e)}"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "models": [],
+            "message": f"获取模型列表失败: {str(e)}"
+        }
+
+
 @router.get("/", summary="获取模型服务配置列表")
 async def get_model_service_configs(
     page: int = Query(1, ge=1, description="页码"),

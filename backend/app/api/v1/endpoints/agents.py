@@ -641,6 +641,9 @@ async def chat_with_agent(
 
                 # 创建数据库版本的检测器，使用指令集ID 13
                  # 配置LLM（如果服务可用）
+
+                print("agent.model_service_config:::",agent.model_service_config)
+                print("+++++++++++++++++++++++++++++++++")
                 llm_config = {
                     "type": agent.model_service_config.provider,
                     "model": agent.model_service_config.model_name,
@@ -655,6 +658,8 @@ async def chat_with_agent(
                 }
                 
                 detector = EnhancedContentSafetyAgentDB(llm_config=llm_config, instruction_set_id=agent.instruction_set_id)
+                # 初始化检测器
+                await detector.initialize(db)
                 # 审核Agent：直接返回审核结果
                 start_time = time.time()
                 detection_result = detector.detect_content(chat_request.message)
@@ -674,7 +679,7 @@ async def chat_with_agent(
                 }
                 risk_level_cn = risk_level_map.get(detection_result.risk_level.value, detection_result.risk_level.value)
                 # detection_info.append(f"风险等级: {risk_level_cn}")
-                detection_info.append(f"置信度: {detection_result.confidence:.2f}")
+                # detection_info.append(f"置信度: {detection_result.confidence:.2f}")
                 detection_info.append(f"原文长度: {detection_result.original_length}")
                 detection_info.append(f"检测耗时: {detection_time:.3f} 秒")
                 detection_info.append(f"Token消耗量: {detection_result.tokens_used}")
@@ -695,7 +700,9 @@ async def chat_with_agent(
                             'description': node_result.description,
                             'risk_level': node_result.risk_level.value,
                             'confidence': node_result.confidence,
-                            'excerpt': node_result.sensitive_excerpt
+                            'excerpt': node_result.sensitive_excerpt,
+                            'Related_to_the_original_text': node_result.Related_to_the_original_text,
+                            'reasoning': node_result.reasoning
                         })
                     for child in node_result.children_results:
                         collect_matched_nodes(child)
@@ -726,11 +733,16 @@ async def chat_with_agent(
                 
                 # 获取最高风险等级
                 highest_risk_level = '安全'
+                highest_risk_confidence = 1
+                mg_contents=""
                 if matched_nodes:
                     highest_risk_level = risk_level_map.get(matched_nodes[0]['risk_level'], matched_nodes[0]['risk_level'])
-                
+                    highest_risk_confidence = matched_nodes[0]['confidence']
+                    mg_contents = matched_nodes[0].get('Related_to_the_original_text', matched_nodes[0].get('Related_to_the_original_text', '无法获取相关原文'))
                 # 更新检测结果的风险等级为最高风险等级
                 detection_info[1] = f"风险等级: {highest_risk_level}"
+                detection_info[2] = f"置信度: {highest_risk_confidence:.2f}"
+                detection_info[3] = f"敏感内容摘录: {mg_contents}"
                 
                 # 添加风险等级统计信息
                 risk_summary = []
@@ -749,9 +761,15 @@ async def chat_with_agent(
                         node_risk_level_cn = risk_level_map.get(node['risk_level'], node['risk_level'])
                         detection_info.append(f"    风险等级: {node_risk_level_cn}")
                         detection_info.append(f"    置信度: {node['confidence']:.2f}")
+                        # 显示详细判断理由
+                        if node.get('reasoning'):
+                            detection_info.append(f"    判断理由: {node['reasoning']}")
+                        # 显示检测理由（相关原文）
+                        if node.get('Related_to_the_original_text'):
+                            detection_info.append(f"    敏感摘录: {node['Related_to_the_original_text']}")
                         # 显示敏感摘录内容（如果存在）
-                        if node.get('excerpt'):
-                            detection_info.append(f"    敏感摘录: {node['excerpt']}")
+                        # if node.get('excerpt'):
+                        #     detection_info.append(f"    敏感摘录: {node['excerpt']}")
                 else:
                     detection_info.append("未匹配任何风险节点")
                 

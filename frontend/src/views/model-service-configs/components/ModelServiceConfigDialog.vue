@@ -539,18 +539,22 @@ const fetchOllamaModels = async () => {
   
   try {
     modelsLoading.value = true
-    const cleanBase = baseEndpoint.value.replace(/\/$/, '')
-    const response = await fetch(`${cleanBase}/api/tags`)
+    // 通过后端API获取Ollama模型列表，而不是前端直接调用
+    const response = await modelServiceConfigApi.getOllamaModels(baseEndpoint.value)
     
-    if (response.ok) {
-      const data = await response.json()
-      availableModels.value = data.models || []
+    if (response.success) {
+      availableModels.value = response.models || []
+      if (response.models && response.models.length > 0) {
+        ElMessage.success('模型列表获取成功')
+      } else {
+        ElMessage.warning('未找到可用模型')
+      }
     } else {
-      ElMessage.warning('无法获取模型列表，请检查Ollama服务是否正常运行')
+      ElMessage.warning(response.message || '无法获取模型列表，请检查Ollama服务是否正常运行')
     }
   } catch (error) {
     console.error('获取Ollama模型列表失败:', error)
-    ElMessage.warning('获取模型列表失败，请检查网络连接')
+    ElMessage.warning('获取模型列表失败，请检查网络连接和服务配置')
   } finally {
     modelsLoading.value = false
   }
