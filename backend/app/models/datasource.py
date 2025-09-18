@@ -15,6 +15,10 @@ from app.core.database import Base, TimestampMixin, UserMixin
 
 if TYPE_CHECKING:
     from .user import User
+    from .data_resource import DataResource
+    from .es_query_template import ESQueryTemplate
+    from .sql_query_template import SQLQueryTemplate
+    from .resource_package import ResourcePackage
 
 
 class DatasourceType(str, PyEnum):
@@ -174,9 +178,38 @@ class Datasource(Base, TimestampMixin, UserMixin):
         foreign_keys="[Datasource.created_by]",
         back_populates="datasources"
     )
-    
+
+    data_resources: Mapped[List["DataResource"]] = relationship(
+        "DataResource",
+        back_populates="datasource",
+        cascade="all, delete-orphan"
+    )
+
     project_associations: Mapped[List["ProjectDatasource"]] = relationship(
         "ProjectDatasource",
+        back_populates="datasource",
+        cascade="all, delete-orphan"
+    )
+    
+    # ES查询模板关系
+    es_query_templates: Mapped[List["ESQueryTemplate"]] = relationship(
+        "ESQueryTemplate",
+        foreign_keys="[ESQueryTemplate.datasource_id]",
+        back_populates="datasource",
+        cascade="all, delete-orphan"
+    )
+    
+    # SQL查询模板关系
+    sql_query_templates: Mapped[List["SQLQueryTemplate"]] = relationship(
+        "SQLQueryTemplate",
+        foreign_keys="[SQLQueryTemplate.datasource_id]",
+        back_populates="datasource",
+        cascade="all, delete-orphan"
+    )
+    
+    # 资源包关系
+    resource_packages: Mapped[List["ResourcePackage"]] = relationship(
+        "ResourcePackage",
         back_populates="datasource",
         cascade="all, delete-orphan"
     )

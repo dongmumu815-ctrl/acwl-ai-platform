@@ -18,6 +18,9 @@ if TYPE_CHECKING:
     from .task import TaskDefinition, TaskTemplate, TaskSchedule, ExecutorGroup
     from .workflow import Workflow, WorkflowInstance, WorkflowSchedule
     from .unified_node import UnifiedNode
+    from .es_query_template import ESQueryTemplate
+    from .sql_query_template import SQLQueryTemplate
+    from .resource_package import ResourcePackage, ResourcePackagePermission, ResourcePackageQueryHistory
 
 
 class User(Base, TimestampMixin):
@@ -63,6 +66,7 @@ class User(Base, TimestampMixin):
     # 关联关系
     datasets: Mapped[List["Dataset"]] = relationship(
         "Dataset",
+        foreign_keys="[Dataset.created_by]",
         back_populates="creator",
         cascade="all, delete-orphan"
     )
@@ -70,6 +74,7 @@ class User(Base, TimestampMixin):
     # 数据源相关关系
     datasources: Mapped[List["Datasource"]] = relationship(
         "Datasource",
+        foreign_keys="[Datasource.created_by]",
         back_populates="creator",
         cascade="all, delete-orphan"
     )
@@ -83,6 +88,7 @@ class User(Base, TimestampMixin):
     # 项目相关关系
     created_projects: Mapped[List["Project"]] = relationship(
         "Project",
+        foreign_keys="[Project.created_by]",
         back_populates="creator",
         cascade="all, delete-orphan"
     )
@@ -152,6 +158,51 @@ class User(Base, TimestampMixin):
         "UnifiedNode",
         foreign_keys="[UnifiedNode.created_by]",
         back_populates="creator",
+        cascade="all, delete-orphan"
+    )
+    
+    # ES查询模板关系
+    es_query_templates: Mapped[List["ESQueryTemplate"]] = relationship(
+        "ESQueryTemplate",
+        foreign_keys="[ESQueryTemplate.created_by]",
+        back_populates="creator",
+        cascade="all, delete-orphan"
+    )
+    
+    # SQL查询模板关系
+    sql_query_templates: Mapped[List["SQLQueryTemplate"]] = relationship(
+        "SQLQueryTemplate",
+        foreign_keys="[SQLQueryTemplate.created_by]",
+        back_populates="creator",
+        cascade="all, delete-orphan"
+    )
+    
+    # 资源包相关关系
+    created_resource_packages: Mapped[List["ResourcePackage"]] = relationship(
+        "ResourcePackage",
+        foreign_keys="[ResourcePackage.created_by]",
+        back_populates="creator",
+        cascade="all, delete-orphan"
+    )
+    
+    resource_package_permissions: Mapped[List["ResourcePackagePermission"]] = relationship(
+        "ResourcePackagePermission",
+        foreign_keys="[ResourcePackagePermission.user_id]",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    
+    granted_resource_package_permissions: Mapped[List["ResourcePackagePermission"]] = relationship(
+        "ResourcePackagePermission",
+        foreign_keys="[ResourcePackagePermission.granted_by]",
+        back_populates="granter",
+        cascade="all, delete-orphan"
+    )
+    
+    resource_package_query_histories: Mapped[List["ResourcePackageQueryHistory"]] = relationship(
+        "ResourcePackageQueryHistory",
+        foreign_keys="[ResourcePackageQueryHistory.user_id]",
+        back_populates="user",
         cascade="all, delete-orphan"
     )
     

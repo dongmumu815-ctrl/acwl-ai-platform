@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证错误测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            background-color: #409eff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #337ecc;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>认证错误处理测试</h1>
+    
+    <div class="test-section">
+        <h3>测试1: 模拟AUTHENTICATION_ERROR响应</h3>
+        <button onclick="testAuthError()">测试认证错误</button>
+        <div id="result1" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>测试2: 模拟401状态码</h3>
+        <button onclick="test401Error()">测试401错误</button>
+        <div id="result2" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>测试3: 正常API请求</h3>
+        <button onclick="testNormalRequest()">测试正常请求</button>
+        <div id="result3" class="result"></div>
+    </div>
+
+    <script>
+        // 模拟返回AUTHENTICATION_ERROR的API响应
+        async function testAuthError() {
+            const resultDiv = document.getElementById('result1');
+            resultDiv.textContent = '正在测试认证错误...';
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/v1/sql/templates/999', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer invalid_token_for_test',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                resultDiv.textContent = `状态码: ${response.status}\n响应数据: ${JSON.stringify(data, null, 2)}`;
+                
+                // 检查是否为认证错误
+                if (data.error === 'AUTHENTICATION_ERROR') {
+                    resultDiv.textContent += '\n\n✅ 检测到AUTHENTICATION_ERROR，应该触发跳转到登录页面';
+                }
+            } catch (error) {
+                resultDiv.textContent = `请求失败: ${error.message}`;
+            }
+        }
+        
+        // 模拟401状态码
+        async function test401Error() {
+            const resultDiv = document.getElementById('result2');
+            resultDiv.textContent = '正在测试401错误...';
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/v1/sql/templates', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer expired_token',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                resultDiv.textContent = `状态码: ${response.status}\n响应数据: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                resultDiv.textContent = `请求失败: ${error.message}`;
+            }
+        }
+        
+        // 正常API请求
+        async function testNormalRequest() {
+            const resultDiv = document.getElementById('result3');
+            resultDiv.textContent = '正在测试正常请求...';
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/v1/sql/templates', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzM3NTQ5NjI3fQ.CZJqOKJJNGJGJGJGJGJGJGJGJGJGJGJGJGJGJGJGJGJG',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                resultDiv.textContent = `状态码: ${response.status}\n响应数据: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                resultDiv.textContent = `请求失败: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -52,6 +52,8 @@ from .instruction_set import (
     InstructionSet, InstructionNode, InstructionExecution,
     InstructionSetStatus, NodeType, ConditionType, ActionType, ExecutionStatus
 )
+from .es_query_template import ESQueryTemplate
+from .sql_query_template import SQLQueryTemplate
 
 # 导出所有模型
 __all__ = [
@@ -158,4 +160,6 @@ __all__ = [
     "ConditionType",
     "ActionType",
     "ExecutionStatus",
+    "ESQueryTemplate",
+    "SQLQueryTemplate",
 ]

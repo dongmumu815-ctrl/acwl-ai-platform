@@ -396,11 +396,29 @@ const loadDatasources = async () => {
     })
     
     const response = await datasourceApi.getDatasources(params)
-    datasources.value = response.items.map(item => ({
-      ...item,
-      testing: false
-    }))
-    pagination.total = response.total
+    console.log('API response:2', response.data.items) // 调试日志
+    
+    // 防护代码：确保response和response.items存在
+    if (response && Array.isArray(response.data.items)) {
+      datasources.value = response.data.items.map(item => ({
+        ...item,
+        enabled: item.is_enabled, // 映射服务端字段 is_enabled 到前端字段 enabled
+        testing: false
+      }))
+      pagination.total = response.total || 0
+    } else if (response && Array.isArray(response)) {
+      // 如果API直接返回数组而不是包含items的对象
+      datasources.value = response.map(item => ({
+        ...item,
+        enabled: item.is_enabled, // 映射服务端字段 is_enabled 到前端字段 enabled
+        testing: false
+      }))
+      pagination.total = response.length
+    } else {
+      console.warn('Unexpected API response structure:', response)
+      datasources.value = []
+      pagination.total = 0
+    }
   } catch (error) {
     ElMessage.error('加载数据源列表失败')
     console.error('Load datasources error:', error)

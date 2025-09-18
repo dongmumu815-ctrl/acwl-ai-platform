@@ -11,8 +11,9 @@ import json
 import sys
 import os
 
-# 添加 example_review.py 的路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# 添加 legacy_scripts 目录到路径
+legacy_scripts_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'legacy_scripts')
+sys.path.append(legacy_scripts_path)
 from example_review import EnhancedContentSafetyAgent
 
 

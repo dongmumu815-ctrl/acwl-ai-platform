@@ -6,6 +6,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from typing import List, Optional
 import math
 
@@ -16,13 +17,13 @@ from app.models.datasource import DatasourceType, DatasourceStatus
 from app.schemas.datasource import (
     DatasourceCreate, DatasourceUpdate, DatasourceResponse, DatasourceListResponse,
     DatasourceTestRequest, DatasourceTestResponse, DatasourceTestLogResponse,
-    # DatasourceUsageStatsResponse, 
-    DatasourcePermissionCreate, DatasourcePermissionUpdate,
+    DatasourceFilter, DatasourcePermissionCreate, DatasourcePermissionUpdate,
     DatasourcePermissionResponse, DatasourceTemplateResponse, DatasourceFilter,
     DatasourceStats, DatasourceConnectionInfo, DatasourceQueryRequest, DatasourceQueryResponse
 )
 from app.services.datasource import DatasourceService
 from app.core.exceptions import ValidationError, NotFoundError, PermissionError
+from app.core.response import success_response
 
 router = APIRouter()
 
@@ -58,7 +59,7 @@ async def create_datasource(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"创建数据源失败: {str(e)}")
 
 
-@router.get("/", response_model=DatasourceListResponse)
+@router.get("/")
 async def get_datasources(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页大小"),
@@ -101,13 +102,15 @@ async def get_datasources(
         
         pages = math.ceil(total / size) if total > 0 else 1
         
-        return DatasourceListResponse(
+        result = DatasourceListResponse(
             items=[DatasourceResponse.from_orm(ds) for ds in datasources],
             total=total,
             page=page,
             size=size,
             pages=pages
         )
+        
+        return success_response(data=result, message="查询成功")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取数据源列表失败: {str(e)}")
 
@@ -439,25 +442,236 @@ async def execute_datasource_query(
     
     注意：此功能仅用于测试和调试，生产环境中应谨慎使用
     """
+    import time
+    import re
+    from sqlalchemy import text
+    
+    start_time = time.time()
+    
     try:
-        # 这里可以实现查询执行逻辑
-        # 为了安全考虑，可能需要限制查询类型（如只允许SELECT）
+        # 获取数据源信息
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            return DatasourceQueryResponse(
+                success=False,
+                columns=None,
+                data=None,
+                row_count=0,
+                execution_time=0,
+                message="数据源不存在",
+                error_details=f"数据源ID {datasource_id} 不存在"
+            )
+        
+        # 检查数据源状态
+        if not datasource.is_enabled:
+            return DatasourceQueryResponse(
+                success=False,
+                columns=None,
+                data=None,
+                row_count=0,
+                execution_time=0,
+                message="数据源已禁用",
+                error_details="数据源当前处于禁用状态"
+            )
+        
+        # 安全检查：只允许SELECT查询
+        query_upper = query_request.query.strip().upper()
+        if not query_upper.startswith('SELECT'):
+            return DatasourceQueryResponse(
+                success=False,
+                columns=None,
+                data=None,
+                row_count=0,
+                execution_time=0,
+                message="只允许执行SELECT查询",
+                error_details="出于安全考虑，只允许执行SELECT查询语句"
+            )
+        
+        # 检查是否包含危险关键词
+        dangerous_keywords = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE', 'TRUNCATE']
+        for keyword in dangerous_keywords:
+            if keyword in query_upper:
+                return DatasourceQueryResponse(
+                    success=False,
+                    columns=None,
+                    data=None,
+                    row_count=0,
+                    execution_time=0,
+                    message=f"查询包含禁止的关键词: {keyword}",
+                    error_details=f"出于安全考虑，不允许在查询中使用 {keyword} 关键词"
+                )
+        
+        # 执行查询
+        result = await service.execute_query(
+            datasource=datasource,
+            query=query_request.query,
+            limit=query_request.limit,
+            timeout=query_request.timeout
+        )
+        
+        execution_time = int((time.time() - start_time) * 1000)
         
         return DatasourceQueryResponse(
             success=True,
-            columns=["column1", "column2"],
-            data=[["value1", "value2"], ["value3", "value4"]],
-            row_count=2,
-            execution_time=100,
+            columns=result.get('columns', []),
+            data=result.get('data', []),
+            row_count=result.get('row_count', 0),
+            execution_time=execution_time,
             message="查询执行成功"
         )
+        
     except Exception as e:
+        execution_time = int((time.time() - start_time) * 1000)
+        error_message = str(e)
+        
+        # 记录错误日志
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"数据源查询执行失败 - 数据源ID: {datasource_id}, 错误: {error_message}")
+        
         return DatasourceQueryResponse(
             success=False,
             columns=None,
             data=None,
             row_count=0,
-            execution_time=0,
-            message=f"查询执行失败: {str(e)}",
-            error_details=str(e)
+            execution_time=execution_time,
+            message=f"查询执行失败: {error_message}",
+            error_details=error_message
         )
+
+
+@router.get("/{datasource_id}/tables/")
+async def get_datasource_tables(
+    datasource_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取数据源的表/视图/索引列表
+    
+    - **datasource_id**: 数据源ID
+    
+    对于Elasticsearch：直接返回索引列表
+    对于关系型数据库：需要先通过schemas API获取Schema，再通过schemas/{schema_name}/tables API获取表列表
+    """
+    try:
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"数据源 ID {datasource_id} 不存在")
+        
+        # 根据数据源类型返回不同结果
+        if datasource.datasource_type == DatasourceType.ELASTICSEARCH:
+            # ES直接返回索引列表
+            tables = await service._get_elasticsearch_indices(datasource)
+            return {"success": True, "data": tables, "message": "获取索引列表成功"}
+        else:
+            # 关系型数据库需要先选择Schema
+            return {
+                "success": False, 
+                "data": [], 
+                "message": "关系型数据库需要先选择Schema，请使用 /api/v1/datasources/{datasource_id}/schemas/ 获取Schema列表，然后使用 /api/v1/datasources/{datasource_id}/schemas/{schema_name}/tables/ 获取表列表"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取表列表失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/schemas/")
+async def get_datasource_schemas(
+    datasource_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取数据源的Schema列表
+    
+    - **datasource_id**: 数据源ID
+    
+    返回数据源中所有可用的Schema信息
+    """
+    try:
+        service = DatasourceService(db)
+        schemas = await service.get_datasource_schemas(datasource_id)
+        
+        return {"success": True, "data": schemas, "message": "获取Schema列表成功"}
+        
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取Schema列表失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/schemas/{schema_name}/tables/")
+async def get_datasource_tables_by_schema(
+    datasource_id: int,
+    schema_name: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取指定数据源指定Schema下的表和视图列表
+    
+    - **datasource_id**: 数据源ID
+    - **schema_name**: Schema名称
+    
+    返回指定Schema中所有可用的表和视图信息
+    """
+    try:
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"数据源 ID {datasource_id} 不存在")
+        
+        # 调用服务层方法获取指定Schema下的表列表
+        tables = await service.get_datasource_tables_by_schema(datasource_id, schema_name)
+        
+        return {"success": True, "data": tables, "message": f"获取Schema '{schema_name}' 下的表列表成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取Schema下表列表失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/schemas/{schema_name}/tables/{table_name}/fields/")
+async def get_datasource_table_fields(
+    datasource_id: int,
+    schema_name: str,
+    table_name: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取指定数据源指定Schema下指定表的字段列表
+    
+    - **datasource_id**: 数据源ID
+    - **schema_name**: Schema名称
+    - **table_name**: 表名称
+    
+    返回指定表中所有字段的详细信息
+    """
+    try:
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"数据源 ID {datasource_id} 不存在")
+        
+        # 调用服务层方法获取指定表的字段列表
+        fields = await service.get_datasource_table_fields(datasource_id, schema_name, table_name)
+        
+        return {"success": True, "data": fields, "message": f"获取表 '{table_name}' 的字段列表成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取表字段列表失败: {str(e)}")

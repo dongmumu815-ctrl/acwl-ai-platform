@@ -9,6 +9,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Text, Boolean, TIMESTAMP, ForeignKey, func
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime
 import logging
 
 from .config import settings
@@ -34,12 +35,12 @@ class Base(DeclarativeBase):
 
 class TimestampMixin:
     """时间戳混入类"""
-    created_at: Mapped[TIMESTAMP] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),
         comment="创建时间"
     )
-    updated_at: Mapped[TIMESTAMP] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),
         onupdate=func.current_timestamp(),
@@ -54,6 +55,12 @@ class UserMixin:
         ForeignKey("acwl_users.id", ondelete="SET NULL"),
         nullable=True,
         comment="创建者ID"
+    )
+    updated_by: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("acwl_users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="更新者ID"
     )
 
 
