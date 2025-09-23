@@ -27,6 +27,7 @@ class SQLTemplateRequest(BaseModel):
     dataResourceId: Optional[int] = Field(None, description="数据资源ID")
     query: str = Field(..., description="SQL查询语句")
     tags: Optional[List[str]] = Field([], description="标签")
+    config: Optional[dict] = Field({}, description="查询条件配置信息")
     is_template: bool = Field(True, description="是否为模板")
 
 class SQLTemplateResponse(BaseModel):
@@ -39,6 +40,7 @@ class SQLTemplateResponse(BaseModel):
     created_by: int
     query: str
     tags: Optional[List[str]]
+    config: Optional[dict]
     is_template: bool
     created_at: str
     updated_at: str
@@ -64,6 +66,7 @@ async def save_sql_query_template(
             query=request.query,
             created_by=current_user.id,
             tags=request.tags,
+            config=request.config,
             is_template=request.is_template
         )
         
@@ -80,6 +83,7 @@ async def save_sql_query_template(
                 "created_by": template.created_by,
                 "query": template.query,
                 "tags": template.tags,
+                "config": template.config,  # 添加配置字段
                 "is_template": template.is_template,
                 "created_at": template.created_at.isoformat(),
                 "updated_at": template.updated_at.isoformat()
@@ -134,6 +138,7 @@ async def get_sql_query_templates(
                 "created_by": template.created_by,
                 "query": template.query,
                 "tags": template.tags,
+                "config": template.config,  # 添加配置字段
                 "is_template": template.is_template,
                 "created_at": template.created_at.isoformat(),
                 "updated_at": template.updated_at.isoformat()
@@ -187,6 +192,7 @@ async def get_sql_query_template(
                 "created_by": template.created_by,
                 "query": template.query,
                 "tags": template.tags,
+                "config": template.config,  # 添加配置字段
                 "is_template": template.is_template,
                 "created_at": template.created_at.isoformat(),
                 "updated_at": template.updated_at.isoformat()
@@ -240,6 +246,7 @@ async def update_sql_query_template(
             data_resource_id=request.dataResourceId,
             query=request.query,
             tags=request.tags,
+            config=request.config,
             is_template=request.is_template
         )
         
@@ -256,6 +263,7 @@ async def update_sql_query_template(
                 "created_by": updated_template.created_by,
                 "query": updated_template.query,
                 "tags": updated_template.tags,
+                "config": updated_template.config,  # 添加配置字段
                 "is_template": updated_template.is_template,
                 "created_at": updated_template.created_at.isoformat(),
                 "updated_at": updated_template.updated_at.isoformat()

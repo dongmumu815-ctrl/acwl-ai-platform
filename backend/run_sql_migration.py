@@ -23,7 +23,7 @@ def run_migration():
     }
     
     # 迁移脚本路径
-    migration_file = Path(__file__).parent / 'migrations' / '017_add_data_resource_id_to_sql_templates.sql'
+    migration_file = Path(__file__).parent / 'migrations' / '017_add_config_to_sql_templates.sql'
     
     try:
         # 连接数据库

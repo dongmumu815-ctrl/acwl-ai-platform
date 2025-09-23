@@ -220,7 +220,7 @@ export const resourcePackageApi = {
    * 创建资源包
    */
   create(data: ResourcePackageCreateRequest): Promise<ResourcePackage> {
-    return post('/resource-packages', data)
+    return post('/resource-packages/', data)
   },
 
   /**

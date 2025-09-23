@@ -33,6 +33,7 @@ class SQLQueryTemplate(Base):
     # 查询内容
     query: Mapped[str] = mapped_column(Text, nullable=False, comment="SQL查询语句")
     tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True, comment="标签列表")
+    config: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True, comment="查询条件配置信息，包括必填条件、可选条件等")
     
     # 模板标识
     is_template: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="是否为模板（True）还是查询实例（False）")
@@ -61,6 +62,7 @@ class SQLQueryTemplate(Base):
             "dataResourceId": self.data_resource_id,
             "query": self.query,
             "tags": self.tags or [],
+            "config": self.config or {},
             "isTemplate": self.is_template,
             "createdBy": self.created_by,
             "createdAt": self.created_at.isoformat() if self.created_at else None,

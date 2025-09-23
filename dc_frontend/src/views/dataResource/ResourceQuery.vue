@@ -235,6 +235,7 @@ const onSQLQuerySave = async (queryData) => {
       dataResourceId: queryData.queryConfig.resourceId ? parseInt(queryData.queryConfig.resourceId) : null, // 使用正确的数据资源ID
       query: queryData.sql,
       tags: queryData.tags || [],
+      config: queryData.config || {}, // 包含配置信息
       isTemplate: true
     }
     
@@ -263,6 +264,7 @@ const onSQLQueryUpdate = async (queryData) => {
       dataResourceId: queryData.queryConfig.resourceId ? parseInt(queryData.queryConfig.resourceId) : null, // 使用正确的数据资源ID
       query: queryData.sql,
       tags: queryData.tags || [],
+      config: queryData.config || {}, // 包含配置信息
       isTemplate: true
     }
     

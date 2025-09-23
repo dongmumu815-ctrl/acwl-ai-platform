@@ -158,6 +158,17 @@ const authRoutes: RouteRecordRaw[] = [
           icon: 'Box',
           requiresAuth: true
         }
+      },
+      {
+        path: 'packages/:id/query',
+        name: 'ResourcePackageQuery',
+        component: () => import('@/views/resourcePackage/ResourcePackageQueryPage.vue'),
+        meta: {
+          title: '资源包查询',
+          requiresAuth: true,
+          hideInMenu: true,
+          activeMenu: '/data-resources/packages'
+        }
       }
     ]
   },

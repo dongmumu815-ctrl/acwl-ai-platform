@@ -10,6 +10,7 @@ export interface SQLTemplateRequest {
   dataResourceId?: number
   query: string
   tags?: string[]
+  config?: any // 配置信息
   isTemplate: boolean
 }
 
@@ -24,6 +25,7 @@ export interface SQLTemplateResponse {
   dataResourceId?: number
   query: string
   tags: string[]
+  config?: any // 配置信息
   isTemplate: boolean
   createdBy: string
   createdAt: string

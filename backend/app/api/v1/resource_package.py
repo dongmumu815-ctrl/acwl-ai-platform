@@ -5,8 +5,10 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_, func, text, select
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.response import success_response
 from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
 from app.models.resource_package import (
@@ -91,12 +93,27 @@ class ResourcePackageService:
         self.db.add(permission)
         
         await self.db.commit()
-        await self.db.refresh(db_package)
-        return db_package
+        
+        # 重新查询以获取完整的关联数据
+        from sqlalchemy.orm import selectinload
+        query = select(ResourcePackage).options(
+            selectinload(ResourcePackage.tags),
+            selectinload(ResourcePackage.permissions)
+        ).where(ResourcePackage.id == db_package.id)
+        result = await self.db.execute(query)
+        refreshed_package = result.scalar_one()
+        
+        return refreshed_package
     
     async def get_package(self, package_id: int, user_id: int) -> ResourcePackage:
         """获取资源包详情"""
-        query = select(ResourcePackage).where(ResourcePackage.id == package_id)
+        query = select(ResourcePackage).options(
+            selectinload(ResourcePackage.tags),
+            selectinload(ResourcePackage.permissions),
+            selectinload(ResourcePackage.datasource),
+            selectinload(ResourcePackage.resource),
+            selectinload(ResourcePackage.creator)
+        ).where(ResourcePackage.id == package_id)
         result = await self.db.execute(query)
         package = result.scalar_one_or_none()
         
@@ -280,17 +297,17 @@ class ResourcePackageService:
         total = total_result.scalar()
         
         # 排序
-        if search_req.order_by:
-            if search_req.order_by == "created_at":
+        if search_req.sort_by:
+            if search_req.sort_by == "created_at":
                 order_column = ResourcePackage.created_at
-            elif search_req.order_by == "updated_at":
+            elif search_req.sort_by == "updated_at":
                 order_column = ResourcePackage.updated_at
-            elif search_req.order_by == "name":
+            elif search_req.sort_by == "name":
                 order_column = ResourcePackage.name
             else:
                 order_column = ResourcePackage.created_at
             
-            if search_req.order_desc:
+            if search_req.sort_order and search_req.sort_order.lower() == "desc":
                 query = query.order_by(order_column.desc())
             else:
                 query = query.order_by(order_column.asc())
@@ -300,6 +317,12 @@ class ResourcePackageService:
         # 分页
         offset = (search_req.page - 1) * search_req.size
         query = query.offset(offset).limit(search_req.size)
+        
+        # 预加载关联数据
+        query = query.options(
+            selectinload(ResourcePackage.tags),
+            selectinload(ResourcePackage.permissions)
+        )
         
         # 执行查询
         result = await self.db.execute(query)
@@ -653,9 +676,8 @@ class ResourcePackageService:
         # 权限级别检查
         permission_levels = {
             PermissionType.READ: 1,
-            PermissionType.EXECUTE: 2,
-            PermissionType.WRITE: 3,
-            PermissionType.ADMIN: 4
+            PermissionType.WRITE: 2,
+            PermissionType.ADMIN: 3
         }
         
         user_level = permission_levels.get(permission.permission_type, 0)
@@ -729,7 +751,7 @@ async def delete_resource_package(
     return {"message": "资源包删除成功"}
 
 
-@router.post("/search", response_model=ResourcePackageListResponse)
+@router.post("/search")
 async def search_resource_packages(
     search_req: ResourcePackageSearchRequest,
     db: AsyncSession = Depends(get_db),
@@ -737,7 +759,11 @@ async def search_resource_packages(
 ):
     """搜索资源包"""
     service = ResourcePackageService(db)
-    return await service.search_packages(search_req, current_user.id)
+    result = await service.search_packages(search_req, current_user.id)
+    return success_response(
+        data=result.model_dump(),
+        message="查询成功"
+    )
 
 
 @router.get("/{package_id}/params", response_model=ResourcePackageParamsResponse)

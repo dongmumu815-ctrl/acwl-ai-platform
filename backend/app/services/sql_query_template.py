@@ -34,6 +34,7 @@ class SQLQueryTemplateService:
         created_by: int,
         data_resource_id: Optional[int] = None,
         tags: Optional[List[str]] = None,
+        config: Optional[Dict[str, Any]] = None,
         is_template: bool = True
     ) -> SQLQueryTemplate:
         """
@@ -45,6 +46,7 @@ class SQLQueryTemplateService:
             datasource_id: 数据源ID
             query: SQL查询语句
             tags: 标签列表
+            config: 查询条件配置信息
             is_template: 是否为模板
             created_by: 创建者ID
             
@@ -70,6 +72,7 @@ class SQLQueryTemplateService:
             data_resource_id=data_resource_id,
             query=query,
             tags=tags or [],
+            config=config or {},
             is_template=is_template,
             created_by=created_by
         )
@@ -187,6 +190,7 @@ class SQLQueryTemplateService:
         data_resource_id: Optional[int] = None,
         query: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        config: Optional[Dict[str, Any]] = None,
         is_template: Optional[bool] = None
     ) -> Optional[SQLQueryTemplate]:
         """
@@ -201,6 +205,7 @@ class SQLQueryTemplateService:
             data_resource_id: 新的数据资源ID
             query: 新的查询语句
             tags: 新的标签列表
+            config: 新的查询条件配置信息
             is_template: 是否为模板
             
         Returns:
@@ -224,6 +229,8 @@ class SQLQueryTemplateService:
             template.query = query
         if tags is not None:
             template.tags = tags
+        if config is not None:
+            template.config = config
         if is_template is not None:
             template.is_template = is_template
         

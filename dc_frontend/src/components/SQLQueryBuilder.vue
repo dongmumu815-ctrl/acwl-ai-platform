@@ -17,9 +17,16 @@
               <el-icon><CaretRight /></el-icon>
               执行查询
             </el-button>
-            <el-button type="success" @click="addToResourcePackage" :disabled="!queryResults.length || !hasQueryPermission">
-              <el-icon><FolderAdd /></el-icon>
-              添加到资源包
+            <el-button 
+              :type="props.isInResourcePackage ? 'warning' : 'success'" 
+              @click="addToResourcePackage" 
+              :disabled="!queryResults.length || !hasQueryPermission"
+            >
+              <el-icon>
+                <Edit v-if="props.isInResourcePackage" />
+                <FolderAdd v-else />
+              </el-icon>
+              {{ props.isInResourcePackage ? '更新到资源包' : '添加到资源包' }}
             </el-button>
           </div>
         </div>
@@ -30,7 +37,7 @@
         <div class="query-section">
           <h4 class="section-title">数据源</h4>
           <el-row :gutter="20">
-            <el-col :span="8">
+            <el-col :span="6">
               <el-form-item label="数据源ID">
                 <el-input
                   v-model="queryConfig.datasourceId"
@@ -41,7 +48,31 @@
                 />
               </el-form-item>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="6">
+              <el-form-item label="SQL模板" v-if="queryConfig.datasourceId">
+                <el-select
+                  v-model="selectedTemplateId"
+                  placeholder="选择SQL模板"
+                  style="width: 100%"
+                  clearable
+                  @change="onTemplateChange"
+                  :loading="loadingTemplates"
+                >
+                  <el-option
+                    v-for="template in availableTemplates"
+                    :key="template.id"
+                    :label="template.name"
+                    :value="template.id"
+                  >
+                    <div class="template-option">
+                      <span class="template-name">{{ template.name }}</span>
+                      <span class="template-desc">{{ template.description }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
               <el-form-item label="数据库/Schema" v-if="queryConfig.datasourceId && availableSchemas.length > 0">
                 <el-select
                   v-model="queryConfig.schema"
@@ -58,7 +89,7 @@
                 </el-select>
               </el-form-item>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="6">
               <el-form-item label="数据表/集合" v-if="queryConfig.datasourceId">
                 <el-select
                   v-model="queryConfig.table"
@@ -79,6 +110,165 @@
                   </el-option>
                 </el-select>
               </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 模板条件配置 -->
+        <div class="query-section" v-if="templateConfig && templateConfig.conditions && templateConfig.conditions.length > 0">
+          <h4 class="section-title">模板条件配置</h4>
+          <el-row :gutter="16">
+            <el-col :span="24">
+              <div class="template-conditions">
+                <!-- 锁定条件 -->
+                <div v-if="templateConfig?.value?.conditions?.filter(c => c.locked).length > 0" class="condition-group">
+                  <h5 class="condition-group-title locked">
+                    <el-icon><Lock /></el-icon>
+                    锁定条件
+                  </h5>
+                  <el-row :gutter="16">
+                    <el-col 
+                      v-for="condition in templateConfig.value.conditions.filter(c => c.locked)" 
+                      :key="condition.name"
+                      :span="8"
+                    >
+                      <el-form-item 
+                        :label="condition.label || condition.name"
+                        class="locked-condition"
+                      >
+                        <div class="locked-condition-display">
+                          <el-input
+                            :value="condition.lockedValue"
+                            readonly
+                            disabled
+                            class="locked-input"
+                          >
+                            <template #prefix>
+                              <el-icon class="lock-icon"><Lock /></el-icon>
+                            </template>
+                          </el-input>
+                          <div class="locked-reason" v-if="condition.lockedReason">
+                            <el-tooltip :content="condition.lockedReason" placement="top">
+                              <el-icon class="info-icon"><InfoFilled /></el-icon>
+                            </el-tooltip>
+                          </div>
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </div>
+
+                <!-- 必填条件 -->
+                <div v-if="templateConfig?.value?.conditions?.filter(c => c.required && !c.locked).length > 0" class="condition-group">
+                  <h5 class="condition-group-title required">
+                    <el-icon><Star /></el-icon>
+                    必填条件
+                  </h5>
+                  <el-row :gutter="16">
+                    <el-col 
+                      v-for="condition in templateConfig.value.conditions.filter(c => c.required && !c.locked)" 
+                      :key="condition.name"
+                      :span="8"
+                    >
+                      <el-form-item 
+                        :label="condition.label || condition.name"
+                        :required="condition.required"
+                      >
+                        <!-- 文本输入 -->
+                        <el-input
+                          v-if="condition.type === 'text'"
+                          v-model="templateConditionValues[condition.name]"
+                          :placeholder="condition.placeholder || `请输入${condition.label || condition.name}`"
+                        />
+                        <!-- 数字输入 -->
+                        <el-input-number
+                          v-else-if="condition.type === 'number'"
+                          v-model="templateConditionValues[condition.name]"
+                          :placeholder="condition.placeholder || `请输入${condition.label || condition.name}`"
+                          style="width: 100%"
+                        />
+                        <!-- 日期选择 -->
+                        <el-date-picker
+                          v-else-if="condition.type === 'date'"
+                          v-model="templateConditionValues[condition.name]"
+                          type="date"
+                          :placeholder="condition.placeholder || `请选择${condition.label || condition.name}`"
+                          style="width: 100%"
+                        />
+                        <!-- 下拉选择 -->
+                        <el-select
+                          v-else-if="condition.type === 'select'"
+                          v-model="templateConditionValues[condition.name]"
+                          :placeholder="condition.placeholder || `请选择${condition.label || condition.name}`"
+                          style="width: 100%"
+                        >
+                          <el-option
+                            v-for="option in condition.options"
+                            :key="option.value"
+                            :label="option.label"
+                            :value="option.value"
+                          />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </div>
+
+                <!-- 可选条件 -->
+                <div v-if="templateConfig?.value?.conditions?.filter(c => !c.required && !c.locked).length > 0" class="condition-group">
+                  <h5 class="condition-group-title optional">
+                    <el-icon><CircleCheck /></el-icon>
+                    可选条件
+                  </h5>
+                  <el-row :gutter="16">
+                    <el-col 
+                      v-for="condition in templateConfig.value.conditions.filter(c => !c.required && !c.locked)" 
+                      :key="condition.name"
+                      :span="8"
+                    >
+                      <el-form-item 
+                        :label="condition.label || condition.name"
+                      >
+                        <!-- 文本输入 -->
+                        <el-input
+                          v-if="condition.type === 'text'"
+                          v-model="templateConditionValues[condition.name]"
+                          :placeholder="condition.placeholder || `请输入${condition.label || condition.name}`"
+                        />
+                        <!-- 数字输入 -->
+                        <el-input-number
+                          v-else-if="condition.type === 'number'"
+                          v-model="templateConditionValues[condition.name]"
+                          :placeholder="condition.placeholder || `请输入${condition.label || condition.name}`"
+                          style="width: 100%"
+                        />
+                        <!-- 日期选择 -->
+                        <el-date-picker
+                          v-else-if="condition.type === 'date'"
+                          v-model="templateConditionValues[condition.name]"
+                          type="date"
+                          :placeholder="condition.placeholder || `请选择${condition.label || condition.name}`"
+                          style="width: 100%"
+                        />
+                        <!-- 下拉选择 -->
+                        <el-select
+                          v-else-if="condition.type === 'select'"
+                          v-model="templateConditionValues[condition.name]"
+                          :placeholder="condition.placeholder || `请选择${condition.label || condition.name}`"
+                          style="width: 100%"
+                        >
+                          <el-option
+                            v-for="option in condition.options"
+                            :key="option.value"
+                            :label="option.label"
+                            :value="option.value"
+                          />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </div>
+              </div>
             </el-col>
           </el-row>
         </div>
@@ -148,12 +338,14 @@
               v-for="(condition, index) in queryConfig.conditions"
               :key="index"
               class="condition-item"
+              :class="{ 'locked-condition': condition.locked }"
             >
               <el-select
                 v-model="condition.logic"
                 style="width: 80px"
                 size="small"
                 v-if="index > 0"
+                :disabled="condition.locked"
               >
                 <el-option label="AND" value="AND" />
                 <el-option label="OR" value="OR" />
@@ -164,6 +356,7 @@
                 placeholder="字段"
                 style="width: 150px"
                 size="small"
+                :disabled="condition.locked"
               >
                 <el-option
                   v-for="field in availableFields"
@@ -178,6 +371,7 @@
                 placeholder="操作符"
                 style="width: 100px"
                 size="small"
+                :disabled="condition.locked"
               >
                 <el-option label="=" value="=" />
                 <el-option label="!=" value="!=" />
@@ -197,13 +391,28 @@
                 placeholder="值"
                 style="width: 150px"
                 size="small"
+                :disabled="condition.locked"
                 v-if="!['IS NULL', 'IS NOT NULL'].includes(condition.operator)"
               />
+              
+              <!-- 锁定/解锁按钮 -->
+              <el-button
+                size="small"
+                :type="condition.locked ? 'warning' : 'info'"
+                @click="toggleConditionLock(index)"
+                :title="condition.locked ? '解锁条件' : '锁定条件'"
+              >
+                <el-icon>
+                  <Lock v-if="condition.locked" />
+                  <Unlock v-else />
+                </el-icon>
+              </el-button>
               
               <el-button
                 size="small"
                 type="danger"
                 @click="removeCondition(index)"
+                :disabled="condition.locked"
               >
                 <el-icon><Delete /></el-icon>
               </el-button>
@@ -271,7 +480,7 @@
         <!-- SQL预览 -->
         <div class="query-section" v-if="queryConfig.fields.length > 0">
           <h4 class="section-title">
-            SQL预览
+            SQL预览（包含所有条件）
             <el-button size="small" @click="copySQL">
               <el-icon><CopyDocument /></el-icon>
               复制
@@ -279,6 +488,18 @@
           </h4>
           <div class="sql-preview">
             <pre><code>{{ generatedSQL }}</code></pre>
+          </div>
+          
+          <!-- 执行SQL预览 -->
+          <h4 class="section-title" style="margin-top: 16px;">
+            执行SQL（过滤空值条件）
+            <el-button size="small" @click="copyExecutionSQL">
+              <el-icon><CopyDocument /></el-icon>
+              复制
+            </el-button>
+          </h4>
+          <div class="sql-preview">
+            <pre><code>{{ executionSQL }}</code></pre>
           </div>
         </div>
       </div>
@@ -398,10 +619,10 @@
       </template>
     </el-dialog>
 
-    <!-- 添加到资源包对话框 -->
+    <!-- 添加/更新资源包对话框 -->
     <el-dialog
       v-model="resourcePackageVisible"
-      title="添加到资源包"
+      :title="props.isInResourcePackage ? '更新资源包' : '添加到资源包'"
       width="600px"
     >
       <el-form :model="resourcePackageForm" label-width="100px">
@@ -490,7 +711,7 @@
         <div class="dialog-footer">
           <el-button @click="resourcePackageVisible = false">取消</el-button>
           <el-button type="primary" @click="confirmAddToResourcePackage" :loading="creatingResourcePackage">
-            创建资源包
+            {{ props.isInResourcePackage ? '更新资源包' : '创建资源包' }}
           </el-button>
         </div>
       </template>
@@ -499,7 +720,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   Search,
   Delete,
@@ -511,7 +732,10 @@ import {
   CopyDocument,
   Download,
   Refresh,
-  FolderAdd
+  FolderAdd,
+  Lock,
+  Unlock,
+  Edit
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -519,10 +743,65 @@ import { datasourceApi } from '@/api/datasource'
 import { getResourceFields } from '@/api/resource'
 import { getSQLTemplates } from '@/api/sqlQuery'
 import { resourcePackageApi, PackageType } from '@/api/resourcePackage'
+import type { SQLTemplateConfig } from '@/types/sql-template-config'
+
+// 定义保存数据接口
+interface SaveData {
+  name: string
+  description?: string
+  queryConfig: QueryConfig
+  sql: string
+  datasourceId: number | null
+  config: SQLTemplateConfig | null
+  id?: number
+}
+
+interface QueryField {
+  name: string
+  type: string
+  alias?: string
+  comment?: string
+}
+
+interface QueryCondition {
+  field: string
+  operator: string
+  value: any
+  logic?: 'AND' | 'OR'
+  locked?: boolean
+}
+
+// 定义SQL资源类型
+interface SQLResource {
+  id: number
+  name: string
+  description?: string
+  type?: string
+}
+
+// 定义SQL模板类型
+interface SQLTemplate {
+  id: number
+  name: string
+  query: string
+  config?: SQLTemplateConfig
+  // 支持两种字段名格式
+  datasource_id?: number
+  data_resource_id?: number
+  datasourceId?: number
+  dataResourceId?: number
+  description?: string
+  tags?: string[]
+}
+
+// 定义查询结果行类型
+interface QueryResultRow {
+  [key: string]: string | number | boolean | null | undefined
+}
 
 // 定义组件属性
 interface Props {
-  sqlResources?: any[]
+  sqlResources?: SQLResource[]
   hasQueryPermission?: boolean
   hasExportPermission?: boolean
   hasSavePermission?: boolean
@@ -530,15 +809,41 @@ interface Props {
   initialResourceId?: number | null
   initialSchema?: string
   initialTableName?: string
+  // 资源包相关属性
+  isInResourcePackage?: boolean
+  resourcePackageId?: number | null
+  resourcePackageName?: string
+}
+
+// 定义查询配置类型
+interface QueryConfig {
+  datasourceId: number | null
+  resourceId?: number
+  schema: string
+  table: string
+  fields: QueryField[]
+  conditions: QueryCondition[]
+  orderBy: { field: string; direction: 'ASC' | 'DESC' }
+  limit: number
+  offset: number
+  sql: string
+}
+
+// 定义保存表单类型
+interface SaveForm {
+  name: string
+  description: string
+  tags: string[]
 }
 
 // 定义组件事件
 interface Emits {
-  (e: 'execute-query', config: any): void
-  (e: 'save-query', form: any): void
-  (e: 'update-query', form: any): void
-  (e: 'export-results', results: any[]): void
-  (e: 'add-to-resource-package', data: any): void
+  (e: 'execute-query', config: QueryConfig): void
+  (e: 'save-query', form: SaveForm): void
+  (e: 'update-query', form: SaveForm): void
+  (e: 'export-results', results: Record<string, any>[]): void
+  (e: 'add-to-resource-package', data: { name: string; description: string; type: string; [key: string]: any }): void
+  (e: 'update-resource-package', data: { id: number; name: string; description: string; type: string; [key: string]: any }): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -549,7 +854,11 @@ const props = withDefaults(defineProps<Props>(), {
   initialDatasourceId: null,
   initialResourceId: null,
   initialSchema: '',
-  initialTableName: ''
+  initialTableName: '',
+  // 资源包相关属性默认值
+  isInResourcePackage: false,
+  resourcePackageId: null,
+  resourcePackageName: ''
 })
 
 const emit = defineEmits<Emits>()
@@ -564,14 +873,26 @@ const resourcePackageVisible = ref(false)
 const creatingResourcePackage = ref(false)
 const currentTemplateId = ref<number | null>(null) // 当前加载的模板ID
 
+// 缓存机制（提升性能）
+const tablesCache = new Map<string, any[]>() // 表列表缓存，key: datasourceId_schema
+const fieldsCache = new Map<string, QueryField[]>() // 字段列表缓存，key: datasourceId_schema_table
+
+// 模板选择相关（优化类型定义）
+const selectedTemplateId = ref<number | null>(null) // 用户选择的模板ID
+const availableTemplates = ref<SQLTemplate[]>([]) // 可用的模板列表
+const loadingTemplates = ref(false) // 模板加载状态
+const lastLoadedResourceId = ref<number | null>(null) // 上次加载模板的resourceId，用于防重复调用
+const templateConfig = ref<SQLTemplateConfig | null>(null) // 当前模板的配置信息
+const templateConditionValues = ref<Record<string, string | number | boolean | null>>({}) // 模板条件的用户输入值
+
 // SQL查询配置
 const queryConfig = reactive({
   datasourceId: null as number | null, // 直接使用数据源ID
   resourceId: null as number | null, // 数据资源ID
   schema: '',
   table: '',
-  fields: [] as any[],
-  conditions: [] as any[],
+  fields: [] as QueryField[],
+  conditions: [] as QueryCondition[],
   orderBy: {
     field: '',
     direction: 'ASC'
@@ -596,11 +917,11 @@ const resourcePackageForm = reactive({
 })
 
 // 查询结果
-const queryResults = ref<any[]>([])
-const resultColumns = ref<any[]>([])
-const availableSchemas = ref<any[]>([])
-const availableTables = ref<any[]>([])
-const availableFields = ref<any[]>([])
+const queryResults = ref<QueryResultRow[]>([])
+const resultColumns = ref<{ name: string; type: string; prop: string }[]>([])
+const availableSchemas = ref<{ name: string; description?: string }[]>([])
+const availableTables = ref<{ name: string; type?: string; schema?: string; rowCount?: number }[]>([])
+const availableFields = ref<{ name: string; type: string; description?: string }[]>([])
 const queryTags = ref<string[]>(['常用查询', '报表查询', '数据分析', '业务查询'])
 
 /**
@@ -611,65 +932,138 @@ const isResourceSelectionDisabled = computed(() => {
 })
 
 /**
- * 生成SQL语句
+ * 生成SQL语句（优化版本，使用缓存）
  */
 const generatedSQL = computed(() => {
+  // 早期返回，避免不必要的计算
   if (!queryConfig.table || queryConfig.fields.length === 0) {
     return ''
   }
   
-  let sql = 'SELECT '
+  const parts: string[] = ['SELECT']
   
-  // 字段列表
-  const fieldList = queryConfig.fields.map((field: any) => {
+  // 字段列表 - 优化：减少字符串拼接
+  const fieldList = queryConfig.fields.map((field: QueryField) => {
     return field.alias && field.alias !== field.name
       ? `${field.name} AS ${field.alias}`
       : field.name
-  }).join(', ')
+  })
+  parts.push(fieldList.join(', '))
+  parts.push('FROM', queryConfig.table)
   
-  sql += fieldList
-  sql += ` FROM ${queryConfig.table}`
-  
-  // WHERE条件
+  // WHERE条件 - 优化：只在有条件时处理
   if (queryConfig.conditions.length > 0) {
-    sql += ' WHERE '
-    const conditionList = queryConfig.conditions.map((condition: any, index: number) => {
-      let condStr = ''
-      if (index > 0) {
-        condStr += `${condition.logic} `
-      }
+    const conditionParts: string[] = ['WHERE']
+    const conditionList = queryConfig.conditions.map((condition: QueryCondition, index: number) => {
+      const prefix = index > 0 ? `${condition.logic} ` : ''
       
       if (['IS NULL', 'IS NOT NULL'].includes(condition.operator)) {
-        condStr += `${condition.field} ${condition.operator}`
+        return `${prefix}${condition.field} ${condition.operator}`
       } else {
-        condStr += `${condition.field} ${condition.operator} '${condition.value}'`
+        return `${prefix}${condition.field} ${condition.operator} '${condition.value}'`
       }
-      
-      return condStr
-    }).join(' ')
-    sql += conditionList
+    })
+    conditionParts.push(conditionList.join(' '))
+    parts.push(conditionParts.join(' '))
   }
   
-  // ORDER BY
+  // ORDER BY - 优化：只在有排序字段时添加
   if (queryConfig.orderBy.field) {
-    sql += ` ORDER BY ${queryConfig.orderBy.field} ${queryConfig.orderBy.direction}`
+    parts.push(`ORDER BY ${queryConfig.orderBy.field} ${queryConfig.orderBy.direction}`)
   }
   
-  // LIMIT
+  // LIMIT - 优化：只在有限制时添加
   if (queryConfig.limit) {
-    sql += ` LIMIT ${queryConfig.limit}`
+    parts.push(`LIMIT ${queryConfig.limit}`)
   }
   
-  // OFFSET
+  // OFFSET - 优化：只在有偏移时添加
   if (queryConfig.offset) {
-    sql += ` OFFSET ${queryConfig.offset}`
+    parts.push(`OFFSET ${queryConfig.offset}`)
   }
   
-  return sql
+  return parts.join(' ')
 })
 
 /**
- * 数据源变更处理
+ * 生成执行查询时的SQL语句（过滤空值条件）
+ */
+const executionSQL = computed(() => {
+  // 早期返回，避免不必要的计算
+  if (!queryConfig.table || queryConfig.fields.length === 0) {
+    return ''
+  }
+  
+  const parts: string[] = ['SELECT']
+  
+  // 字段列表 - 优化：减少字符串拼接
+  const fieldList = queryConfig.fields.map((field: QueryField) => {
+    return field.alias && field.alias !== field.name
+      ? `${field.name} AS ${field.alias}`
+      : field.name
+  })
+  parts.push(fieldList.join(', '))
+  parts.push('FROM', queryConfig.table)
+  
+  // WHERE条件 - 过滤掉值为空的条件
+  const validConditions = queryConfig.conditions.filter((condition: QueryCondition) => {
+    // 对于IS NULL和IS NOT NULL操作符，不需要值
+    if (['IS NULL', 'IS NOT NULL'].includes(condition.operator)) {
+      return true
+    }
+    // 对于其他操作符，检查值是否为空
+    return condition.value !== null && condition.value !== undefined && condition.value !== ''
+  })
+  
+  if (validConditions.length > 0) {
+    const conditionParts: string[] = ['WHERE']
+    const conditionList = validConditions.map((condition: QueryCondition, index: number) => {
+      const prefix = index > 0 ? `${condition.logic} ` : ''
+      
+      if (['IS NULL', 'IS NOT NULL'].includes(condition.operator)) {
+        return `${prefix}${condition.field} ${condition.operator}`
+      } else {
+        return `${prefix}${condition.field} ${condition.operator} '${condition.value}'`
+      }
+    })
+    conditionParts.push(conditionList.join(' '))
+    parts.push(conditionParts.join(' '))
+  }
+  
+  // ORDER BY - 优化：只在有排序字段时添加
+  if (queryConfig.orderBy.field) {
+    parts.push(`ORDER BY ${queryConfig.orderBy.field} ${queryConfig.orderBy.direction}`)
+  }
+  
+  // LIMIT - 优化：只在有限制时添加
+  if (queryConfig.limit) {
+    parts.push(`LIMIT ${queryConfig.limit}`)
+  }
+  
+  // OFFSET - 优化：只在有偏移时添加
+  if (queryConfig.offset) {
+    parts.push(`OFFSET ${queryConfig.offset}`)
+  }
+  
+  return parts.join(' ')
+})
+
+/**
+ * 获取有效的查询条件（过滤空值条件）
+ */
+const getValidConditions = () => {
+  return queryConfig.conditions.filter((condition: QueryCondition) => {
+    // 对于IS NULL和IS NOT NULL操作符，不需要值
+    if (['IS NULL', 'IS NOT NULL'].includes(condition.operator)) {
+      return true
+    }
+    // 对于其他操作符，检查值是否为空
+    return condition.value !== null && condition.value !== undefined && condition.value !== ''
+  })
+}
+
+/**
+ * 数据源变更处理（带缓存清理）
  */
 const onDatasourceChange = async () => {
   console.log('[onDatasourceChange] 开始处理数据源变更，当前数据源ID:', queryConfig.datasourceId)
@@ -681,6 +1075,23 @@ const onDatasourceChange = async () => {
   availableSchemas.value = []
   availableTables.value = []
   availableFields.value = []
+  
+  // 清理相关缓存
+  const oldDatasourceId = queryConfig.datasourceId
+  if (oldDatasourceId) {
+    // 清理该数据源相关的所有缓存
+    for (const [key] of tablesCache) {
+      if (key.startsWith(`${oldDatasourceId}_`)) {
+        tablesCache.delete(key)
+      }
+    }
+    for (const [key] of fieldsCache) {
+      if (key.startsWith(`${oldDatasourceId}_`)) {
+        fieldsCache.delete(key)
+      }
+    }
+    console.log('[onDatasourceChange] 已清理数据源相关缓存')
+  }
   
   console.log('[onDatasourceChange] 已清空所有配置和可用选项')
   
@@ -759,7 +1170,7 @@ const loadLatestSQLTemplate = async () => {
     if (response.data && response.data.length > 0) {
       // 按ID降序排序，获取最新的模板
       const latestTemplate = response.data.sort((a, b) => b.id - a.id)[0]
-
+      
       console.log('[loadLatestSQLTemplate] 最新模板:', latestTemplate)
       
       // 保存当前模板ID和信息
@@ -772,6 +1183,7 @@ const loadLatestSQLTemplate = async () => {
       await parseSQLTemplate(latestTemplate.query)
       
       ElMessage.success(`已加载最新的SQL模板: ${latestTemplate.name}`)
+      selectedTemplateId.value = latestTemplate.id
     }
   } catch (error) {
     console.error('加载SQL模板失败:', error)
@@ -780,23 +1192,35 @@ const loadLatestSQLTemplate = async () => {
 }
 
 /**
- * 加载指定Schema下的表列表
+ * 加载指定Schema下的表列表（带缓存优化）
  */
 const loadTablesForSchema = async (datasourceId: number, schema: string) => {
   console.log('[loadTablesForSchema] 开始加载表列表:', { datasourceId, schema })
+  
+  // 检查缓存
+  const cacheKey = `${datasourceId}_${schema}`
+  if (tablesCache.has(cacheKey)) {
+    console.log('[loadTablesForSchema] 使用缓存数据')
+    availableTables.value = tablesCache.get(cacheKey)!
+    return
+  }
   
   try {
     const tablesResponse = await datasourceApi.getDataSourceTablesWithSchema(datasourceId, schema)
     console.log('[loadTablesForSchema] 表列表API响应:', tablesResponse)
     
     if (tablesResponse.data) {
-      availableTables.value = tablesResponse.data.map(table => ({
+      const tables = tablesResponse.data.map(table => ({
         name: table.name,
         type: table.type || 'table',
         schema: schema,
         rowCount: 0 // 暂时设为0，后续可以通过其他API获取
       }))
-      console.log('[loadTablesForSchema] 成功加载表列表:', availableTables.value)
+      
+      // 更新缓存和响应式数据
+      tablesCache.set(cacheKey, tables)
+      availableTables.value = tables
+      console.log('[loadTablesForSchema] 成功加载表列表并缓存:', availableTables.value)
     } else {
       console.log('[loadTablesForSchema] API响应无数据')
       availableTables.value = []
@@ -832,7 +1256,7 @@ const onSchemaChange = async () => {
 }
 
 /**
- * 数据表变更处理
+ * 数据表变更处理（带缓存优化）
  */
 const onTableChange = async () => {
   console.log('🔄 开始表变更处理:', {
@@ -859,6 +1283,14 @@ const onTableChange = async () => {
     }
     const datasourceId = queryConfig.datasourceId
     
+    // 检查字段缓存
+    const fieldsCacheKey = `${datasourceId}_${queryConfig.schema}_${queryConfig.table}`
+    if (fieldsCache.has(fieldsCacheKey)) {
+      console.log('🔄 使用字段缓存数据')
+      availableFields.value = fieldsCache.get(fieldsCacheKey)!
+      return
+    }
+    
     console.log('🔄 开始获取表字段信息:', {
       datasourceId,
       schema: queryConfig.schema,
@@ -870,12 +1302,16 @@ const onTableChange = async () => {
     console.log('📊 API响应:', response)
     
     if (response.data) {
-      availableFields.value = response.data.map(field => ({
+      const fields = response.data.map(field => ({
         name: field.name,
         type: field.type || 'varchar',
         description: field.comment || ''
       }))
-      console.log('✅ 字段信息加载成功:', availableFields.value)
+      
+      // 更新缓存和响应式数据
+      fieldsCache.set(fieldsCacheKey, fields)
+      availableFields.value = fields
+      console.log('✅ 字段信息加载成功并缓存:', availableFields.value)
     } else {
       console.log('⚠️ API响应中没有数据')
     }
@@ -889,8 +1325,8 @@ const onTableChange = async () => {
 /**
  * 添加字段
  */
-const addField = (field: any) => {
-  const exists = queryConfig.fields.some((f: any) => f.name === field.name)
+const addField = (field: QueryField) => {
+  const exists = queryConfig.fields.some((f: QueryField) => f.name === field.name)
   if (!exists) {
     queryConfig.fields.push({ ...field, alias: '' })
   }
@@ -908,10 +1344,11 @@ const removeField = (index: number) => {
  */
 const addCondition = () => {
   queryConfig.conditions.push({
-    logic: 'AND',
+    logic: 'AND' as const,
     field: '',
     operator: '=',
-    value: ''
+    value: '',
+    locked: false
   })
 }
 
@@ -920,6 +1357,16 @@ const addCondition = () => {
  */
 const removeCondition = (index: number) => {
   queryConfig.conditions.splice(index, 1)
+}
+
+/**
+ * 切换条件锁定状态
+ */
+const toggleConditionLock = (index: number) => {
+  const condition = queryConfig.conditions[index]
+  if (condition) {
+    condition.locked = !condition.locked
+  }
 }
 
 /**
@@ -969,7 +1416,8 @@ const executeQuery = () => {
   
   querying.value = true
   
-  // 构建查询参数
+  // 构建查询参数，使用过滤后的条件
+  const validConditions = getValidConditions()
   const queryParams = {
     datasourceId: queryConfig.datasourceId,
     resourceId: queryConfig.resourceId,
@@ -980,11 +1428,11 @@ const executeQuery = () => {
       alias: field.alias || '',
       type: field.type
     })),
-    conditions: queryConfig.conditions,
+    conditions: validConditions, // 使用过滤后的条件
     orderBy: queryConfig.orderBy,
     limit: queryConfig.limit,
     offset: queryConfig.offset,
-    sql: generatedSQL.value // 包含生成的SQL语句
+    sql: executionSQL.value // 使用执行时的SQL语句（过滤空值条件）
   }
   
   console.log('🚀 执行查询，参数:', queryParams)
@@ -1020,11 +1468,27 @@ const confirmSaveQuery = () => {
     return
   }
   
-  const saveData = {
+  // 构建配置对象，包含当前的条件设置
+  const configToSave = {
+    ...templateConfig.value,
+    conditions: queryConfig.conditions.map(condition => ({
+      name: condition.field,
+      label: condition.field,
+      type: 'string',
+      required: false,
+      locked: condition.locked || false,
+      lockedValue: condition.locked ? condition.value : undefined,
+      defaultValue: !condition.locked ? condition.value : undefined,
+      operator: condition.operator || '='
+    }))
+  }
+  
+  const saveData: SaveData = {
     ...saveQueryForm,
     queryConfig: { ...queryConfig },
     sql: generatedSQL.value,
-    datasourceId: queryConfig.datasourceId
+    datasourceId: queryConfig.datasourceId,
+    config: configToSave // 包含完整的条件配置信息
   }
   
   // 如果有当前模板ID，则是更新操作
@@ -1061,12 +1525,30 @@ const copySQL = async () => {
 }
 
 /**
+ * 复制执行SQL
+ */
+const copyExecutionSQL = async () => {
+  try {
+    await navigator.clipboard.writeText(executionSQL.value)
+    ElMessage.success('执行SQL已复制到剪贴板')
+  } catch (err) {
+    ElMessage.error('复制失败')
+  }
+}
+
+/**
  * 解析SQL模板并填充到查询构建器
  * @param sqlQuery SQL查询语句
  */
 const parseSQLTemplate = async (sqlQuery: string) => {
   try {
     console.log('🔍 开始解析SQL:', sqlQuery)
+    
+    // 检查SQL查询是否为空或undefined
+    if (!sqlQuery || typeof sqlQuery !== 'string') {
+      console.warn('⚠️ SQL查询为空或无效，跳过解析')
+      return
+    }
     
     // 解析SQL语句并尝试提取表名和字段
     const sql = sqlQuery.toLowerCase().trim()
@@ -1193,13 +1675,49 @@ const parseSQLTemplate = async (sqlQuery: string) => {
  * 加载模板
  * @param template 模板数据
  */
-const loadTemplate = async (template: any) => {
+const loadTemplate = async (template: SQLTemplate) => {
   try {
     console.log('🔄 开始加载模板:', template)
     
-    // 设置数据源和资源ID
-    queryConfig.datasourceId = template.datasource_id || null
-    queryConfig.resourceId = template.data_resource_id || null
+    // 设置数据源和资源ID（支持两种字段名格式）
+    queryConfig.datasourceId = template.datasource_id || template.datasourceId || null
+    queryConfig.resourceId = template.data_resource_id || template.dataResourceId || null
+    
+    // 处理模板配置
+    if (template.config) {
+      console.log('🔄 加载模板配置:', template.config)
+      templateConfig.value = template.config as SQLTemplateConfig
+      
+      // 初始化条件值
+      templateConditionValues.value = {}
+      
+      // 处理必填条件
+      if (templateConfig.value.requiredConditions) {
+        templateConfig.value.requiredConditions.forEach((condition) => {
+          templateConditionValues.value[condition.field] = condition.defaultValue || null
+        })
+      }
+      
+      // 处理可选条件
+      if (templateConfig.value.optionalConditions) {
+        templateConfig.value.optionalConditions.forEach((condition) => {
+          templateConditionValues.value[condition.field] = condition.defaultValue || null
+        })
+      }
+      
+      // 处理锁定条件
+      if (templateConfig.value.lockedConditions) {
+        templateConfig.value.lockedConditions.forEach((condition) => {
+          templateConditionValues.value[condition.field] = condition.lockedValue
+        })
+      }
+      
+      console.log('✅ 模板配置加载完成:', templateConfig.value)
+      console.log('📝 条件值初始化:', templateConditionValues.value)
+    } else {
+      templateConfig.value = null
+      templateConditionValues.value = {}
+    }
     
     console.log('📝 设置配置:', {
       datasourceId: queryConfig.datasourceId,
@@ -1218,6 +1736,39 @@ const loadTemplate = async (template: any) => {
     await parseSQLTemplate(template.query)
     console.log('✅ SQL解析完成')
     
+    // 添加模板中的条件配置到查询配置
+    if (templateConfig.value?.conditions && Array.isArray(templateConfig.value.conditions)) {
+      console.log('🔄 处理模板条件配置:', templateConfig.value.conditions)
+      templateConfig.value.conditions.forEach(condition => {
+        console.log('🔍 处理条件:', condition)
+        
+        // 处理所有条件配置，不仅仅是锁定的条件
+        const fieldName = condition.name || condition.field // 兼容两种字段名
+        const conditionValue = condition.lockedValue || condition.value || condition.defaultValue || '' // 优先使用lockedValue，然后是value，最后是defaultValue
+        const isLocked = condition.locked === true // 明确检查是否锁定
+        
+        const existingCondition = queryConfig.conditions.find(c => c.field === fieldName)
+        if (!existingCondition) {
+          const newCondition: QueryCondition = {
+            logic: 'AND' as const,
+            field: fieldName,
+            operator: condition.operator || '=',
+            value: conditionValue,
+            locked: isLocked
+          }
+          console.log(`➕ 添加新的${isLocked ? '锁定' : '普通'}条件:`, newCondition)
+          queryConfig.conditions.push(newCondition)
+        } else {
+          // 如果条件已存在，更新其属性
+          existingCondition.locked = isLocked
+          existingCondition.operator = condition.operator || existingCondition.operator
+          existingCondition.value = conditionValue
+          console.log(`🔄 更新现有条件为${isLocked ? '锁定' : '普通'}:`, existingCondition)
+        }
+      })
+      console.log('✅ 条件处理完成，当前查询条件:', queryConfig.conditions)
+    }
+    
     // 额外等待确保所有异步操作完成
     await new Promise(resolve => setTimeout(resolve, 200))
     
@@ -1232,7 +1783,7 @@ const loadTemplate = async (template: any) => {
     console.log('📊 字段详细信息:', queryConfig.fields.map(f => ({
       name: f.name,
       type: f.type,
-      description: f.description
+      description: f.comment
     })))
     
     ElMessage.success(`已加载模板: ${template.name}`)
@@ -1315,35 +1866,68 @@ const getStatusTagType = (status: string): 'success' | 'primary' | 'warning' | '
  * 组件挂载时初始化
  */
 onMounted(async () => {
+  console.log('🚀 组件挂载，初始化参数:', {
+    initialDatasourceId: props.initialDatasourceId,
+    initialResourceId: props.initialResourceId,
+    initialSchema: props.initialSchema,
+    initialTableName: props.initialTableName
+  })
+  
   // 如果有初始数据源ID，设置并加载相关数据
   if (props.initialDatasourceId) {
     queryConfig.datasourceId = props.initialDatasourceId
+    console.log('📝 设置datasourceId:', props.initialDatasourceId)
   }
   
   // 如果有初始资源ID，设置资源ID
   if (props.initialResourceId) {
     queryConfig.resourceId = props.initialResourceId
-    console.log('🔄 onMounted设置resourceId:', props.initialResourceId)
+    console.log('📝 onMounted设置resourceId:', props.initialResourceId)
   }
   
   // 加载数据源相关信息
   if (queryConfig.datasourceId) {
+    console.log('🔄 开始加载数据源信息...')
     await onDatasourceChange()
   }
   
   // 设置初始Schema
   if (props.initialSchema) {
     queryConfig.schema = props.initialSchema
+    console.log('📝 设置初始Schema:', props.initialSchema)
     await onSchemaChange()
   }
   
   // 设置初始表名
   if (props.initialTableName) {
     queryConfig.table = props.initialTableName
+    console.log('📝 设置初始表名:', props.initialTableName)
     await onTableChange()
   }
   
-  // resourceId的模板加载由watch监听器处理，避免重复调用
+  // 模板加载由watch监听器统一处理，这里不重复调用
+  console.log('📝 组件挂载完成，resourceId:', queryConfig.resourceId)
+  
+  console.log('✅ 组件初始化完成')
+})
+
+/**
+ * 组件卸载时清理资源
+ */
+onUnmounted(() => {
+  console.log('🧹 组件卸载，清理缓存和定时器')
+  
+  // 清理防抖定时器
+  if (resourceIdDebounceTimer) {
+    clearTimeout(resourceIdDebounceTimer)
+    resourceIdDebounceTimer = null
+  }
+  
+  // 清理所有缓存
+  tablesCache.clear()
+  fieldsCache.clear()
+  
+  console.log('✅ 资源清理完成')
 })
 
 // 监听props变化
@@ -1355,11 +1939,37 @@ watch(() => props.initialResourceId, (newVal, oldVal) => {
   }
 }, { immediate: false })
 
-// 监听queryConfig.resourceId变化，处理模板加载
-watch(() => queryConfig.resourceId, (newVal, oldVal) => {
+// 防抖定时器
+let resourceIdDebounceTimer: NodeJS.Timeout | null = null
+
+// 监听queryConfig.resourceId变化，处理模板加载（添加防抖优化）
+watch(() => queryConfig.resourceId, async (newVal, oldVal) => {
+  console.log('👀 watch resourceId变化:', { newVal, oldVal })
+  
+  // 清除之前的防抖定时器
+  if (resourceIdDebounceTimer) {
+    clearTimeout(resourceIdDebounceTimer)
+  }
+  
   if (newVal && newVal !== oldVal) {
     console.log('🔄 queryConfig.resourceId变化，加载SQL模板:', newVal)
-    loadLatestSQLTemplate()
+    // 重置防重复调用状态，允许新的resourceId加载
+    lastLoadedResourceId.value = null
+    
+    // 使用防抖机制，避免频繁调用
+    resourceIdDebounceTimer = setTimeout(async () => {
+      try {
+        // 只加载模板列表，最新模板会在列表加载完成后自动选择
+        await loadAvailableTemplates()
+        console.log('✅ 模板加载完成')
+      } catch (error) {
+        console.error('❌ 模板加载失败:', error)
+      }
+    }, 300) // 300ms防抖延迟
+  } else if (!newVal) {
+    console.log('🧹 resourceId为空，清空模板列表')
+    availableTemplates.value = []
+    selectedTemplateId.value = null
   }
 }, { immediate: true })
 
@@ -1368,7 +1978,7 @@ watch(() => queryConfig.resourceId, (newVal, oldVal) => {
  * @param results 查询结果数据
  * @param columns 结果列信息
  */
-const setQueryResults = (results: any[], columns: any[]) => {
+const setQueryResults = (results: Record<string, any>[], columns: { name: string; type: string; prop: string }[]) => {
   queryResults.value = results
   resultColumns.value = columns
   querying.value = false
@@ -1399,7 +2009,14 @@ const resetQueryState = () => {
 }
 
 /**
- * 打开添加到资源包对话框
+ * 添加到资源包
+ */
+const addToResourcePackage = () => {
+  openAddToResourcePackage()
+}
+
+/**
+ * 打开添加/更新资源包对话框
  */
 const openAddToResourcePackage = () => {
   if (!queryConfig.table || queryConfig.fields.length === 0) {
@@ -1407,17 +2024,26 @@ const openAddToResourcePackage = () => {
     return
   }
   
-  // 重置表单
-  resourcePackageForm.name = ''
-  resourcePackageForm.description = ''
-  resourcePackageForm.limitConfig = 1000
-  resourcePackageForm.tags = []
+  // 根据是否在资源包中设置表单初始值
+  if (props.isInResourcePackage) {
+    // 更新模式：使用现有资源包信息
+    resourcePackageForm.name = props.resourcePackageName || ''
+    resourcePackageForm.description = ''
+    resourcePackageForm.limitConfig = 1000
+    resourcePackageForm.tags = []
+  } else {
+    // 创建模式：重置表单
+    resourcePackageForm.name = ''
+    resourcePackageForm.description = ''
+    resourcePackageForm.limitConfig = 1000
+    resourcePackageForm.tags = []
+  }
   
   resourcePackageVisible.value = true
 }
 
 /**
- * 确认添加到资源包
+ * 确认添加/更新资源包
  */
 const confirmAddToResourcePackage = async () => {
   if (!resourcePackageForm.name.trim()) {
@@ -1432,28 +2058,172 @@ const confirmAddToResourcePackage = async () => {
     const packageData = {
       name: resourcePackageForm.name,
       description: resourcePackageForm.description,
-      packageType: PackageType.SQL_QUERY,
-      datasourceId: queryConfig.datasourceId,
-      queryFields: queryConfig.fields.map(f => f.name),
-      queryConditions: queryConfig.conditions,
-      limitConfig: resourcePackageForm.limitConfig,
+      type: PackageType.SQL,
+      datasource_id: queryConfig.datasourceId,
+      base_config: {
+        schema: queryConfig.schema,
+        table: queryConfig.table,
+        fields: queryConfig.fields.map(f => f.name)
+      },
+      locked_conditions: [],
+      dynamic_conditions: queryConfig.conditions,
+      limit_config: resourcePackageForm.limitConfig,
       tags: resourcePackageForm.tags,
-      sqlQuery: generatedSQL.value
+      is_active: true
     }
     
-    await resourcePackageApi.create(packageData)
+    if (props.isInResourcePackage && props.resourcePackageId) {
+      // 更新模式
+      await resourcePackageApi.update(props.resourcePackageId, packageData)
+      ElMessage.success('资源包更新成功')
+      
+      // 触发更新事件通知父组件
+      emit('update-resource-package', {
+        id: props.resourcePackageId,
+        ...packageData
+      })
+    } else {
+      // 创建模式
+      await resourcePackageApi.create(packageData)
+      ElMessage.success('资源包创建成功')
+      
+      // 触发创建事件通知父组件
+      emit('add-to-resource-package', packageData)
+    }
     
-    ElMessage.success('资源包创建成功')
     resourcePackageVisible.value = false
     
-    // 触发事件通知父组件
-    emit('add-to-resource-package', packageData)
-    
   } catch (error) {
-    console.error('创建资源包失败:', error)
-    ElMessage.error('创建资源包失败')
+    console.error(props.isInResourcePackage ? '更新资源包失败:' : '创建资源包失败:', error)
+    ElMessage.error(props.isInResourcePackage ? '更新资源包失败' : '创建资源包失败')
   } finally {
     creatingResourcePackage.value = false
+  }
+}
+
+/**
+ * 加载可用的SQL模板列表
+ */
+const loadAvailableTemplates = async () => {
+  console.log('🔄 loadAvailableTemplates 被调用，当前状态:', {
+    resourceId: queryConfig.resourceId,
+    datasourceId: queryConfig.datasourceId,
+    initialResourceId: props.initialResourceId,
+    lastLoadedResourceId: lastLoadedResourceId.value,
+    isLoading: loadingTemplates.value
+  })
+  
+  // 如果没有resourceId，尝试使用props中的初始值
+  if (!queryConfig.resourceId && props.initialResourceId) {
+    queryConfig.resourceId = props.initialResourceId
+    console.log('📝 从props设置resourceId:', queryConfig.resourceId)
+  }
+  
+  if (!queryConfig.resourceId) {
+    console.log('⚠️ resourceId为空，清空模板列表')
+    availableTemplates.value = []
+    lastLoadedResourceId.value = null
+    return
+  }
+  
+  // 防重复调用：如果正在加载或已经为相同resourceId加载过，则跳过
+  if (loadingTemplates.value) {
+    console.log('⏳ 模板正在加载中，跳过重复调用')
+    return
+  }
+  
+  if (lastLoadedResourceId.value === queryConfig.resourceId) {
+    console.log('✅ 相同resourceId已加载过模板，跳过重复调用')
+    return
+  }
+  
+  try {
+    loadingTemplates.value = true
+    console.log('🔄 开始加载模板列表，resourceId:', queryConfig.resourceId)
+    
+    // 调用API获取模板列表
+    const response = await getSQLTemplates({
+      dataResourceId: queryConfig.resourceId,
+      isTemplate: true
+    })
+    
+    console.log('📊 API响应:', response)
+    
+    if (response.data && response.data.length > 0) {
+      // 按ID降序排序，最新的在前面
+      availableTemplates.value = response.data.sort((a, b) => b.id - a.id)
+      console.log('✅ 模板列表加载成功，数量:', availableTemplates.value.length)
+      console.log('📋 模板列表详情:', availableTemplates.value.map(t => ({ id: t.id, name: t.name })))
+      
+      // 自动选择最新的模板（第一个）
+      const latestTemplate = availableTemplates.value[0]
+      if (latestTemplate) {
+        console.log('🎯 自动选择最新模板:', latestTemplate.name)
+        selectedTemplateId.value = latestTemplate.id
+        currentTemplateId.value = latestTemplate.id
+        saveQueryForm.name = latestTemplate.name
+        saveQueryForm.description = latestTemplate.description || ''
+        saveQueryForm.tags = latestTemplate.tags || []
+        
+        // 加载模板配置
+        await loadTemplate(latestTemplate)
+      }
+    } else {
+      availableTemplates.value = []
+      console.log('⚠️ API响应为空或没有找到可用的模板')
+    }
+  } catch (error) {
+    console.error('❌ 加载模板列表失败:', error)
+    availableTemplates.value = []
+    ElMessage.error('加载模板列表失败')
+  } finally {
+    loadingTemplates.value = false
+    // 记录成功加载的resourceId，防止重复调用
+    lastLoadedResourceId.value = queryConfig.resourceId
+    console.log('🏁 模板加载完成，最终状态:', {
+      templatesCount: availableTemplates.value.length,
+      loading: loadingTemplates.value,
+      lastLoadedResourceId: lastLoadedResourceId.value
+    })
+  }
+}
+
+/**
+ * 模板选择变更处理
+ * @param templateId 选择的模板ID
+ */
+const onTemplateChange = async (templateId: number | null) => {
+  console.log('🔄 模板选择变更:', templateId)
+  
+  if (!templateId) {
+    // 清空选择，不做任何操作
+    selectedTemplateId.value = null
+    return
+  }
+  
+  // 查找选中的模板
+  const selectedTemplate = availableTemplates.value.find(template => template.id === templateId)
+  if (!selectedTemplate) {
+    ElMessage.error('未找到选中的模板')
+    return
+  }
+  
+  try {
+    console.log('🔄 开始加载选中的模板:', selectedTemplate)
+    
+    // 使用现有的loadTemplate方法加载模板
+    await loadTemplate(selectedTemplate)
+    
+    // 更新当前模板ID和保存表单信息
+    currentTemplateId.value = selectedTemplate.id
+    saveQueryForm.name = selectedTemplate.name
+    saveQueryForm.description = selectedTemplate.description || ''
+    saveQueryForm.tags = selectedTemplate.tags || []
+    
+    console.log('✅ 模板加载完成')
+  } catch (error) {
+    console.error('❌ 加载选中模板失败:', error)
+    ElMessage.error('加载选中模板失败')
   }
 }
 
@@ -1629,5 +2399,139 @@ defineExpose({
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.template-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.template-name {
+  font-weight: 600;
+  color: #303133;
+}
+
+.template-desc {
+  font-size: 12px;
+  color: #909399;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 模板条件配置样式 */
+.template-conditions {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e4e7ed;
+}
+
+.condition-group {
+  margin-bottom: 20px;
+}
+
+.condition-group:last-child {
+  margin-bottom: 0;
+}
+
+.condition-group-title {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.condition-group-title.required {
+  color: #e6a23c;
+}
+
+.condition-group-title.required::before {
+  content: "●";
+  color: #f56c6c;
+  font-size: 12px;
+}
+
+.condition-group-title.optional {
+  color: #909399;
+}
+
+.condition-group-title.optional::before {
+  content: "○";
+  color: #909399;
+  font-size: 12px;
+}
+
+.condition-group-title.locked {
+  color: #f56c6c;
+  background: #fef0f0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #fbc4c4;
+}
+
+.condition-group-title.locked::before {
+  content: "";
+}
+
+/* 锁定条件样式 */
+.locked-condition {
+  position: relative;
+  background-color: #fef0f0;
+  border: 1px solid #fbc4c4;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.condition-item.locked-condition {
+  background-color: #fef0f0;
+  border: 1px solid #fbc4c4;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.locked-condition-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.locked-input {
+  flex: 1;
+}
+
+.locked-input :deep(.el-input__inner) {
+  background-color: #f5f7fa !important;
+  border-color: #e4e7ed !important;
+  color: #909399 !important;
+  cursor: not-allowed;
+}
+
+.locked-input :deep(.el-input__prefix) {
+  color: #f56c6c;
+}
+
+.lock-icon {
+  color: #f56c6c;
+  font-size: 14px;
+}
+
+.locked-reason {
+  display: flex;
+  align-items: center;
+}
+
+.info-icon {
+  color: #909399;
+  font-size: 16px;
+  cursor: help;
+}
+
+.info-icon:hover {
+  color: #409eff;
 }
 </style>

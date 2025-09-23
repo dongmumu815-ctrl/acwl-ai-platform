@@ -1575,9 +1575,91 @@ class DatasourceService:
     async def _get_doris_table_fields(self, datasource: Datasource, schema_name: str, table_name: str) -> List[Dict[str, Any]]:
         """
         获取Doris表字段信息
+        
+        Args:
+            datasource: Doris数据源对象
+            schema_name: 数据库名称
+            table_name: 表名称
+            
+        Returns:
+            字段列表，每个字段包含名称、类型、是否可空、默认值、注释等信息
         """
-        # Doris字段查询实现
-        return []
+        import aiomysql
+        
+        try:
+            # 解密密码
+            password = decrypt_datasource_password(datasource.password) if datasource.password else None
+            
+            # 建立连接 - Doris使用MySQL协议
+            connection = await aiomysql.connect(
+                host=datasource.host,
+                port=datasource.port,
+                user=datasource.username,
+                password=password,
+                db=schema_name,
+                charset='utf8mb4'
+            )
+            
+            try:
+                cursor = await connection.cursor(aiomysql.DictCursor)
+                
+                # 查询表字段信息 - 使用INFORMATION_SCHEMA
+                query = """
+                    SELECT 
+                        COLUMN_NAME as name,
+                        DATA_TYPE as type,
+                        IS_NULLABLE as nullable,
+                        COLUMN_DEFAULT as default_value,
+                        COLUMN_COMMENT as comment,
+                        CHARACTER_MAXIMUM_LENGTH as max_length,
+                        NUMERIC_PRECISION as `precision`,
+                        NUMERIC_SCALE as scale,
+                        COLUMN_TYPE as full_type
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+                    ORDER BY ORDINAL_POSITION
+                """
+                
+                await cursor.execute(query, (schema_name, table_name))
+                rows = await cursor.fetchall()
+                
+                fields = []
+                for row in rows:
+                    field_info = {
+                        "name": row['name'],
+                        "type": row['type'],
+                        "full_type": row['full_type'] or row['type'],  # 完整类型信息，包含长度等
+                        "nullable": row['nullable'] == 'YES',
+                        "comment": row['comment'] or ""
+                    }
+                    
+                    # 添加默认值（如果存在）
+                    if row['default_value'] is not None:
+                        field_info['default_value'] = row['default_value']
+                    
+                    # 添加字符类型的最大长度
+                    if row['max_length'] is not None:
+                        field_info['max_length'] = row['max_length']
+                    
+                    # 添加数值类型的精度
+                    if row['precision'] is not None:
+                        field_info['precision'] = row['precision']
+                    
+                    # 添加数值类型的小数位数
+                    if row['scale'] is not None:
+                        field_info['scale'] = row['scale']
+                    
+                    fields.append(field_info)
+                
+                return fields
+                
+            finally:
+                await cursor.close()
+                connection.close()
+                
+        except Exception as e:
+            self.logger.error(f"获取Doris表字段失败 - Schema: {schema_name}, Table: {table_name}, 错误: {str(e)}")
+            raise Exception(f"获取Doris表字段失败: {str(e)}")
     
     async def execute_query(
         self,
@@ -1742,9 +1824,94 @@ class DatasourceService:
     ) -> Dict[str, Any]:
         """
         执行Doris查询
+        
+        Args:
+            datasource: Doris数据源对象
+            query: SQL查询语句
+            limit: 结果限制
+            timeout: 超时时间（秒）
+            
+        Returns:
+            查询结果字典，包含columns、data、row_count等字段
         """
-        # Doris查询实现
-        raise ValidationError("Doris查询功能暂未实现")
+        import aiomysql
+        
+        connection = None
+        try:
+            # 解密密码
+            password = decrypt_datasource_password(datasource.password) if datasource.password else None
+            
+            # 建立连接 - Doris使用MySQL协议
+            connection = await aiomysql.connect(
+                host=datasource.host,
+                port=datasource.port,
+                user=datasource.username,
+                password=password,
+                db=datasource.database_name,
+                charset='utf8mb4',
+                connect_timeout=timeout
+            )
+            
+            # 从查询中提取表名，用于确定目标数据库
+            table_names = self._extract_table_names_from_sql(query)
+            target_database = datasource.database_name
+            
+            # 如果查询中包含表名，尝试从数据资源表中获取对应的数据库名称
+            if table_names:
+                # 对于查询中的第一个表，尝试从数据资源表中获取其数据库名称
+                first_table = table_names[0]
+                resource_database = await self._get_database_name_for_table(datasource.id, first_table)
+                if resource_database:
+                    target_database = resource_database
+                    logging.info(f"表 {first_table} 使用数据资源配置的数据库: {target_database}")
+                else:
+                    logging.info(f"表 {first_table} 使用数据源默认数据库: {target_database}")
+            
+            # 如果连接时没有指定数据库，但有目标数据库名称，则使用USE语句
+            if target_database:
+                async with connection.cursor() as cursor:
+                    await cursor.execute(f"USE `{target_database}`")
+            
+            # 添加LIMIT子句
+            limited_query = self._add_limit_to_query(query, limit)
+            
+            async with connection.cursor() as cursor:
+                await cursor.execute(limited_query)
+                
+                # 获取列名
+                columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                
+                # 获取数据
+                rows = await cursor.fetchall()
+                
+                # 转换数据为可序列化格式
+                data = []
+                for row in rows:
+                    converted_row = []
+                    for value in row:
+                        if isinstance(value, (datetime, date)):
+                            converted_row.append(value.isoformat())
+                        elif value is None:
+                            converted_row.append(None)
+                        else:
+                            converted_row.append(str(value))
+                    data.append(converted_row)
+                
+                return {
+                    'columns': columns,
+                    'data': data,
+                    'row_count': len(data)
+                }
+                
+        except Exception as e:
+            self.logger.error(f"Doris查询执行失败: {str(e)}")
+            raise ValidationError(f"Doris查询执行失败: {str(e)}")
+        finally:
+            if connection:
+                try:
+                    connection.close()
+                except Exception as e:
+                    self.logger.warning(f"关闭Doris连接失败: {str(e)}")
     
     async def _execute_oracle_query(
         self,
