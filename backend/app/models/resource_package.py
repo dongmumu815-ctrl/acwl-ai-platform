@@ -10,20 +10,24 @@ from app.core.database import Base
 
 
 class ResourcePackage(Base):
-    """资源包模型"""
+    """资源包模型（优化版）"""
     __tablename__ = "resource_packages"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, comment="资源包名称")
     description = Column(Text, comment="资源包描述")
     type = Column(Enum('sql', 'elasticsearch', name='package_type'), nullable=False, comment="资源包类型")
-    datasource_id = Column(Integer, ForeignKey("acwl_datasources.id", ondelete="CASCADE"), nullable=False, comment="数据源ID")
-    resource_id = Column(Integer, ForeignKey("acwl_data_resources.id", ondelete="SET NULL"), comment="数据资源ID")
-    base_config = Column(JSON, comment="基础配置(schema, table, fields等)")
-    locked_conditions = Column(JSON, comment="锁定条件配置")
-    dynamic_conditions = Column(JSON, comment="动态条件配置")
-    order_config = Column(JSON, comment="排序配置")
-    limit_config = Column(Integer, default=1000, comment="默认限制条数")
+    
+    # 核心关联字段
+    template_id = Column(Integer, nullable=True, comment="关联的查询模板ID")
+    template_type = Column(Enum('sql', 'elasticsearch', name='template_type'), nullable=False, comment="模板类型")
+    dynamic_params = Column(JSON, comment="动态参数配置，用于覆盖模板中的参数")
+    
+    # 保留的业务字段（用于快速筛选和权限控制）
+    datasource_id = Column(Integer, ForeignKey("acwl_datasources.id", ondelete="CASCADE"), nullable=False, comment="数据源ID（冗余字段，用于快速筛选）")
+    resource_id = Column(Integer, ForeignKey("acwl_data_resources.id", ondelete="SET NULL"), comment="数据资源ID（业务关联）")
+    
+    # 系统字段
     is_active = Column(Boolean, default=True, comment="是否启用")
     created_by = Column(Integer, ForeignKey("acwl_users.id", ondelete="CASCADE"), nullable=False, comment="创建者ID")
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
@@ -38,7 +42,56 @@ class ResourcePackage(Base):
     tags = relationship("ResourcePackageTag", back_populates="package", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<ResourcePackage(id={self.id}, name='{self.name}', type='{self.type}')>"
+        return f"<ResourcePackage(id={self.id}, name='{self.name}', type='{self.type}', template_id={self.template_id})>"
+
+    @property
+    def template(self):
+        """获取关联的查询模板"""
+        from app.core.database import SessionLocal
+        
+        if self.template_type == 'sql':
+            from app.models.sql_query_template import SQLQueryTemplate
+            with SessionLocal() as db:
+                return db.query(SQLQueryTemplate).filter(SQLQueryTemplate.id == self.template_id).first()
+        elif self.template_type == 'elasticsearch':
+            from app.models.es_query_template import ESQueryTemplate
+            with SessionLocal() as db:
+                return db.query(ESQueryTemplate).filter(ESQueryTemplate.id == self.template_id).first()
+        return None
+
+    def get_query_content(self) -> Optional[str]:
+        """获取查询内容"""
+        template = self.template
+        if not template:
+            return None
+        
+        if self.template_type == 'sql':
+            return getattr(template, 'query', None)
+        elif self.template_type == 'elasticsearch':
+            return getattr(template, 'query', None)
+        
+        return None
+
+    def get_effective_params(self, request_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """获取有效的动态参数
+        
+        Args:
+            request_params: 请求中的参数
+            
+        Returns:
+            Dict[str, Any]: 合并后的有效参数
+        """
+        effective_params = {}
+        
+        # 首先使用资源包的动态参数
+        if self.dynamic_params:
+            effective_params.update(self.dynamic_params)
+        
+        # 然后使用请求中的参数覆盖
+        if request_params:
+            effective_params.update(request_params)
+        
+        return effective_params
 
 
 class ResourcePackagePermission(Base):

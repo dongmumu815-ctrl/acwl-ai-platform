@@ -47,6 +47,13 @@ class ESQueryTemplate(Base, TimestampMixin):
         comment="关联的数据源ID"
     )
     
+    data_resource_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("acwl_data_resources.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="关联的数据资源ID"
+    )
+    
     indices: Mapped[List[str]] = mapped_column(
         JSON,
         nullable=False,
@@ -78,6 +85,25 @@ class ESQueryTemplate(Base, TimestampMixin):
         ForeignKey("acwl_users.id", ondelete="CASCADE"),
         nullable=False,
         comment="创建者用户ID"
+    )
+    
+    # 条件锁定相关字段
+    condition_lock_types: Mapped[Optional[Dict[str, str]]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="条件锁定类型配置，key为conditionId，value为锁定类型(full/range/operator)"
+    )
+    
+    condition_ranges: Mapped[Optional[Dict[str, Dict[str, Any]]]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="条件值范围限制配置，key为conditionId，value为范围对象{min, max}"
+    )
+    
+    allowed_operators: Mapped[Optional[Dict[str, List[str]]]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="允许的操作符配置，key为conditionId，value为操作符列表"
     )
     
     # 关系映射

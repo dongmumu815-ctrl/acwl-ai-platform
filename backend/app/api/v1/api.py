@@ -6,7 +6,7 @@ API v1 主路由
 
 from fastapi import APIRouter
 
-from .endpoints import auth, users, models, model_service_configs, deployments, health, servers, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query
+from .endpoints import auth, users, models, model_service_configs, deployments, health, servers, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure
 from . import instruction_sets, data_resource, resource_package
 
 # 创建API路由器
@@ -136,4 +136,10 @@ api_router.include_router(
     resource_package.router,
     prefix="/resource-packages",
     tags=["资源包管理"]
+)
+
+api_router.include_router(
+    resource_package_secure.router,
+    prefix="/resource-packages",
+    tags=["安全资源包查询"]
 )

@@ -14,24 +14,18 @@
 import asyncio
 import json
 import logging
+import sys
+sys.path.append('.')
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from sqlalchemy import text, select, update
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text, select, update, func
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.models.resource_package import ResourcePackage
-from app.models.sql_query_template import SQLQueryTemplate
-from app.models.es_query_template import ESQueryTemplate
+from app.core.database import get_db_context
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# 创建异步数据库引擎
-engine = create_async_engine(settings.DATABASE_URL, echo=True)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 class ResourcePackageMigrator:
@@ -425,7 +419,7 @@ class ResourcePackageMigrator:
 
 async def main():
     """主函数"""
-    async with AsyncSessionLocal() as db:
+    async with get_db_context() as db:
         migrator = ResourcePackageMigrator(db)
         
         try:

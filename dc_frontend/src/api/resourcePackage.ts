@@ -77,6 +77,21 @@ export interface OrderConfig {
   direction: SortDirection
 }
 
+// 模板接口
+export interface Template {
+  id: number
+  name: string
+  description?: string
+  type: PackageType
+  datasource_id: number
+  content: string
+  default_params?: Record<string, any>
+  is_active: boolean
+  created_by: number
+  created_at: string
+  updated_at: string
+}
+
 // 资源包标签接口
 export interface ResourcePackageTag {
   id: number
@@ -106,11 +121,9 @@ export interface ResourcePackage {
   type: PackageType
   datasource_id: number
   resource_id?: number
-  base_config: BaseConfig
-  locked_conditions: ConditionConfig[]
-  dynamic_conditions: DynamicConditionConfig[]
-  order_config?: OrderConfig
-  limit_config: number
+  template_id: number
+  template_type: PackageType
+  dynamic_params?: Record<string, any>
   is_active: boolean
   created_by: number
   created_at: string
@@ -126,11 +139,9 @@ export interface ResourcePackageCreateRequest {
   type: PackageType
   datasource_id: number
   resource_id?: number
-  base_config: BaseConfig
-  locked_conditions: ConditionConfig[]
-  dynamic_conditions: DynamicConditionConfig[]
-  order_config?: OrderConfig
-  limit_config: number
+  template_id: number
+  template_type: PackageType
+  dynamic_params?: Record<string, any>
   is_active: boolean
   tags?: string[]
 }
@@ -139,11 +150,9 @@ export interface ResourcePackageCreateRequest {
 export interface ResourcePackageUpdateRequest {
   name?: string
   description?: string
-  base_config?: BaseConfig
-  locked_conditions?: ConditionConfig[]
-  dynamic_conditions?: DynamicConditionConfig[]
-  order_config?: OrderConfig
-  limit_config?: number
+  template_id?: number
+  template_type?: PackageType
+  dynamic_params?: Record<string, any>
   is_active?: boolean
   tags?: string[]
 }
@@ -203,14 +212,7 @@ export interface ResourcePackageParamInfo {
   validation_rules?: Record<string, any>
 }
 
-// 参数响应接口
-export interface ResourcePackageParamsResponse {
-  package_id: number
-  package_name: string
-  params: ResourcePackageParamInfo[]
-  base_config: BaseConfig
-  locked_conditions: ConditionConfig[]
-}
+
 
 /**
  * 资源包管理API
@@ -251,12 +253,7 @@ export const resourcePackageApi = {
     return post('/resource-packages/search', params)
   },
 
-  /**
-   * 获取资源包参数信息
-   */
-  getParams(id: number): Promise<ResourcePackageParamsResponse> {
-    return get(`/resource-packages/${id}/params`)
-  },
+
 
   /**
    * 查询资源包数据
@@ -266,12 +263,70 @@ export const resourcePackageApi = {
   },
 
   /**
+   * 安全查询资源包数据 - 增强安全性版本
+   * 专为ResourcePackageQueryPage.vue页面设计
+   */
+  secureQuery(id: number, params: ResourcePackageQueryRequest): Promise<ResourcePackageQueryResponse> {
+    return post(`/resource-packages/${id}/secure-query`, params)
+  },
+
+  /**
+   * 获取安全查询历史记录
+   */
+  getSecureQueryHistory(id: number, page: number = 1, size: number = 20): Promise<any> {
+    return get(`/resource-packages/${id}/query-history?page=${page}&size=${size}`)
+  },
+
+  /**
    * 获取查询历史
    */
   getHistory(id: number, page: number = 1, size: number = 20): Promise<any> {
     return get(`/resource-packages/${id}/history`, {
       page, size
     })
+  }
+}
+
+/**
+ * 模板管理API
+ */
+export const templateApi = {
+  /**
+   * 获取模板列表
+   */
+  list(datasource_id?: number, type?: PackageType): Promise<Template[]> {
+    const params: any = {}
+    if (datasource_id) params.datasource_id = datasource_id
+    if (type) params.type = type
+    return get('/templates/', params)
+  },
+
+  /**
+   * 获取模板详情
+   */
+  get(id: number): Promise<Template> {
+    return get(`/templates/${id}`)
+  },
+
+  /**
+   * 创建模板
+   */
+  create(data: Omit<Template, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<Template> {
+    return post('/templates/', data)
+  },
+
+  /**
+   * 更新模板
+   */
+  update(id: number, data: Partial<Omit<Template, 'id' | 'created_at' | 'updated_at' | 'created_by'>>): Promise<Template> {
+    return put(`/templates/${id}`, data)
+  },
+
+  /**
+   * 删除模板
+   */
+  delete(id: number): Promise<{ message: string }> {
+    return del(`/templates/${id}`)
   }
 }
 

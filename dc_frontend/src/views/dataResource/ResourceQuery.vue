@@ -60,11 +60,12 @@
 
     <!-- ES查询组件 -->
     <div class="es-query-section" v-if="queryType === 'elasticsearch'">
-      <ESQueryComponent
-        ref="esQueryComponentRef"
+      <ESQueryBuilder
+        ref="esQueryBuilderRef"
         :es-datasources="esDatasources"
         :initial-datasource-id="initialDatasourceId"
         :initial-indices="initialIndices"
+        :data-resource-id="currentResourceId"
         :has-es-query-permission="hasESQueryPermission"
         :has-export-permission="hasExportPermission"
         :has-save-permission="hasSavePermission"
@@ -84,7 +85,7 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import SQLQueryBuilder from '@/components/SQLQueryBuilder.vue'
-import ESQueryComponent from '@/components/ESQueryComponent.vue'
+import ESQueryBuilder from '@/components/ESQueryBuilder.vue'
 import SQLTemplateManager from '@/components/SQLTemplateManager.vue'
 import { saveSQLTemplate, updateSQLTemplate, executeSQLQuery } from '@/api/sqlQuery'
 import { saveESQueryTemplate } from '@/api/esQuery'
@@ -439,7 +440,7 @@ const onTemplateSelected = (template) => {
 // 组件引用
 const sqlQueryBuilderRef = ref(null)
 const sqlTemplateManagerRef = ref(null)
-const esQueryComponentRef = ref(null)
+const esQueryBuilderRef = ref(null)
 </script>
 
 <style scoped>

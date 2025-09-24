@@ -4,12 +4,14 @@
 数据资源中心API路由
 """
 
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_201_CREATED, HTTP_204_NO_CONTENT
 
 from app.core.database import get_db
+from app.core.response import success_response
 from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
 from app.schemas.data_resource import (
@@ -143,7 +145,7 @@ async def search_resources(
         raise HTTPException(status_code=500, detail=f"查询数据资源失败: {str(e)}")
 
 
-@router.get("/{resource_id}", response_model=DataResourceResponse)
+@router.get("/{resource_id}")
 async def get_resource(
     resource_id: int,
     db: AsyncSession = Depends(get_db),
@@ -166,12 +168,13 @@ async def get_resource(
         if not resource:
             raise HTTPException(status_code=404, detail="数据资源不存在")
         
-        return resource
+        return success_response(data=resource, message="获取数据资源成功")
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail="获取数据资源失败")
+        logger.error(f"获取数据资源失败，资源ID: {resource_id}, 用户ID: {current_user.id}, 错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取数据资源失败: {str(e)}")
 
 
 @router.put("/{resource_id}", response_model=DataResourceResponse)

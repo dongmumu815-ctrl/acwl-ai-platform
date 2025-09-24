@@ -22,7 +22,7 @@ class ResourcePackage(Base):
     type = Column(Enum('sql', 'elasticsearch', name='package_type'), nullable=False, comment="资源包类型")
     
     # 关联查询模板
-    template_id = Column(Integer, nullable=False, comment="关联的查询模板ID")
+    template_id = Column(Integer, nullable=True, comment="关联的查询模板ID")
     template_type = Column(Enum('sql', 'elasticsearch', name='template_type'), nullable=False, comment="模板类型")
     
     # 动态参数配置，用于覆盖模板中的默认参数

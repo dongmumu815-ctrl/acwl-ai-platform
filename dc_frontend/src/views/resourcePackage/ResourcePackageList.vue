@@ -224,7 +224,7 @@
                     </div>
                     <div class="meta-item">
                       <el-icon><Setting /></el-icon>
-                      <span>{{ pkg.locked_conditions.length + pkg.dynamic_conditions.length }} 条件</span>
+                      <span>{{ pkg.template_type || '未知' }} 模板</span>
                     </div>
                   </div>
                   
@@ -243,16 +243,16 @@
                     </el-tag>
                   </div>
                   
-                  <!-- 条件预览 -->
-                  <div class="package-preview" v-if="pkg.locked_conditions.length > 0 || pkg.dynamic_conditions.length > 0">
-                    <div class="preview-label">查询条件:</div>
+                  <!-- 模板预览 -->
+                  <div class="package-preview" v-if="pkg.template_id">
+                    <div class="preview-label">模板信息:</div>
                     <div class="preview-content">
-                      <div v-if="pkg.locked_conditions.length > 0" class="condition-info">
-                        <el-text type="danger" size="small">锁定: {{ pkg.locked_conditions.length }}</el-text>
+                      <div class="condition-info">
+                        <el-text type="primary" size="small">模板名称: {{ pkg.name }}</el-text>
                       </div>
-                      <div v-if="pkg.dynamic_conditions.length > 0" class="condition-info">
-                        <el-text type="primary" size="small">动态: {{ pkg.dynamic_conditions.length }}</el-text>
-                      </div>
+                      <!-- <div class="condition-info" v-if="pkg.dynamic_params && Object.keys(pkg.dynamic_params).length > 0">
+                        <el-text type="success" size="small">参数: {{ Object.keys(pkg.dynamic_params).length }}</el-text>
+                      </div> -->
                     </div>
                   </div>
                 </div>
@@ -262,7 +262,7 @@
                     size="small"
                     @click="handleView(pkg)"
                   >
-                    查看
+                    API
                   </el-button>
                   <el-button
                     v-if="pkg.is_active"
@@ -344,14 +344,14 @@
               </template>
             </el-table-column>
             
-            <el-table-column label="查询条件" width="120">
+            <el-table-column label="模板信息" width="120">
               <template #default="{ row }">
                 <div class="condition-info">
-                  <div v-if="row.locked_conditions.length > 0">
-                    <el-text type="danger" size="small">锁定: {{ row.locked_conditions.length }}</el-text>
+                  <div>
+                    <el-text type="primary" size="small">{{ row.template_type || '未知' }}</el-text>
                   </div>
-                  <div v-if="row.dynamic_conditions.length > 0">
-                    <el-text type="primary" size="small">动态: {{ row.dynamic_conditions.length }}</el-text>
+                  <div v-if="row.template_id">
+                    <el-text type="info" size="small">ID: {{ row.template_id }}</el-text>
                   </div>
                 </div>
               </template>
@@ -512,7 +512,7 @@ const stats = reactive({
 const getDatasourceName = computed(() => {
   return (datasourceId: number) => {
     const ds = datasources.value.find((d: Datasource) => d.id === datasourceId)
-    return ds ? ds.name : '未知数据源'
+    return ds ? ds.name : '数据源'
   }
 })
 
@@ -719,22 +719,14 @@ const handleCreate = () => {
 const handleEdit = (row: ResourcePackage) => {
   // 构建查询页面的URL参数
   const queryParams: Record<string, any> = {
-    datasourceType: row.type === 'sql' ? 'mysql' : 'elasticsearch'
+    datasourceType: row.type === 'sql' ? 'mysql' : 'elasticsearch',
+    templateId: row.template_id,
+    templateType: row.template_type
   }
   
-  // 如果是SQL类型，添加schema和tableName参数
-  if (row.type === 'sql' && row.base_config) {
-    if (row.base_config.schema) {
-      queryParams.schema = row.base_config.schema
-    }
-    if (row.base_config.table) {
-      queryParams.tableName = row.base_config.table
-    }
-  }
-  
-  // 跳转到数据查询页面，使用数据源ID作为路由参数
+  // 跳转到资源包查询页面
   router.push({
-    path: `/data-resources/query/${row.datasource_id}`,
+    path: `/resource-packages/query/${row.id}`,
     query: queryParams
   })
 }
@@ -744,6 +736,7 @@ const handleEdit = (row: ResourcePackage) => {
  */
 const handleView = (row: ResourcePackage) => {
   // 可以跳转到详情页面或打开详情对话框
+  ElMessage.info('正在努力开发中...')
   console.log('查看资源包:', row)
 }
 

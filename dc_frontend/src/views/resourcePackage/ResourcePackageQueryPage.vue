@@ -38,65 +38,70 @@
           </div>
         </template>
         
-        <!-- 锁定条件展示 -->
-        <div v-if="packageData.locked_conditions?.length" class="locked-conditions">
-          <h4>锁定条件</h4>
-          <div class="condition-list">
-            <el-tag
-              v-for="(condition, index) in packageData.locked_conditions"
-              :key="index"
-              type="warning"
-              class="condition-tag"
-            >
-              {{ condition.field }} {{ condition.operator }} {{ condition.value }}
+        <!-- 模板信息展示 -->
+        <div class="template-info">
+          <h4>模板信息</h4>
+          <div class="template-details">
+            <el-tag type="primary" class="template-tag">
+              类型: {{ packageData.template_type || '未知' }}
+            </el-tag>
+            <el-tag v-if="packageData.template_id" type="info" class="template-tag">
+              模板ID: {{ packageData.template_id }}
             </el-tag>
           </div>
         </div>
 
         <!-- 基础配置信息 -->
-        <div v-if="packageData.base_config" class="base-config">
+        <div class="base-config">
           <h4>查询配置</h4>
           <div class="config-info">
             <el-descriptions :column="2" size="small">
               <el-descriptions-item label="数据源">{{ getDatasourceName(packageData.datasource_id) }}</el-descriptions-item>
-              <el-descriptions-item label="查询类型">{{ packageData.type.toUpperCase() }}</el-descriptions-item>
-              <el-descriptions-item label="数据表" v-if="packageData.base_config.table">
-                {{ packageData.base_config.schema }}.{{ packageData.base_config.table }}
-              </el-descriptions-item>
-              <el-descriptions-item label="查询字段">
-                {{ packageData.base_config.fields?.join(', ') || '全部字段' }}
-              </el-descriptions-item>
+              <el-descriptions-item label="查询类型">{{ packageData.type?.toUpperCase() || '未知' }}</el-descriptions-item>
+              <el-descriptions-item label="模板类型">{{ packageData.template_type || '未知' }}</el-descriptions-item>
+              <el-descriptions-item label="模板ID">{{ packageData.template_id || '无' }}</el-descriptions-item>
             </el-descriptions>
           </div>
         </div>
       </el-card>
 
       <!-- 调试信息 -->
-      <el-card class="debug-info-card" v-if="packageData" style="margin-bottom: 20px; border: 2px dashed #409eff;">
+      <!-- <el-card class="debug-info-card" v-if="packageData" style="margin-bottom: 20px; border: 2px dashed #409eff;">
         <template #header>
           <span class="card-title" style="color: #409eff;">🐛 调试信息</span>
         </template>
         <div style="font-family: monospace; font-size: 12px;">
           <p><strong>资源包ID:</strong> {{ route.params.id }}</p>
           <p><strong>资源包数据:</strong> {{ packageData ? '已加载' : '未加载' }}</p>
-          <p><strong>动态条件数组:</strong> {{ packageData?.dynamic_conditions ? `存在 (${packageData.dynamic_conditions.length} 个)` : '不存在' }}</p>
-          <p><strong>动态条件长度:</strong> {{ packageData?.dynamic_conditions?.length || 0 }}</p>
-          <p><strong>渲染条件:</strong> {{ packageData?.dynamic_conditions?.length ? '满足' : '不满足' }}</p>
-          <div v-if="packageData?.dynamic_conditions?.length">
-            <p><strong>条件详情:</strong></p>
+          <p><strong>模板类型:</strong> {{ packageData?.template_type || '未知' }}</p>
+          <p><strong>模板ID:</strong> {{ packageData?.template_id || '无' }}</p>
+          <p><strong>动态参数:</strong> {{ packageData?.dynamic_params ? `存在 (${Object.keys(packageData.dynamic_params).length} 个)` : '不存在' }}</p>
+          <div v-if="packageData?.dynamic_params && Object.keys(packageData.dynamic_params).length">
+            <p><strong>参数详情:</strong></p>
             <ul style="margin: 0; padding-left: 20px;">
-              <li v-for="(condition, index) in packageData.dynamic_conditions" :key="index" style="margin: 5px 0;">
-                条件{{ index + 1 }}: param_name="{{ condition.param_name }}", field="{{ condition.field }}", operator="{{ condition.operator }}"
+              <li v-for="(value, key) in packageData.dynamic_params" :key="key" style="margin: 5px 0;">
+                参数: {{ key }} = {{ value }}
               </li>
             </ul>
           </div>
         </div>
-      </el-card>
+      </el-card> -->
 
-      <!-- 查询条件表单 -->
-      <el-card class="query-form-card" v-if="packageData?.dynamic_conditions?.length">
+      <!-- 查询参数表单 -->
+      <el-card class="query-form-card" v-if="packageData?.dynamic_params && Object.keys(packageData.dynamic_params).length">
         <template #header>
-          <span class="card-title">查询条件</span>
+          
+
+          <div class="card-header">
+           <span class="card-title">查询参数</span>
+            <div class="query-actions">
+              <el-button @click="resetForm">重置</el-button>
+              <el-button type="primary" @click="handleUserQuery" :loading="queryLoading">
+                <el-icon><Search /></el-icon>
+                执行查询
+              </el-button>
+            </div>
+          </div>
         </template>
         
         <el-form
@@ -108,58 +113,45 @@
         >
           <el-row :gutter="20">
             <el-col
-              v-for="condition in packageData.dynamic_conditions"
-              :key="condition.param_name"
+              v-for="(paramValue, paramName) in packageData.dynamic_params"
+              :key="paramName"
               :span="12"
             >
               <el-form-item
-                :label="condition.description || condition.field"
-                :prop="condition.param_name"
-                :required="condition.required"
+                :label="getConditionLabel(paramName)"
+                :prop="paramName"
               >
-                <!-- 不同操作符的输入组件 -->
-                <template v-if="['IN', 'NOT IN'].includes(condition.operator)">
-                  <el-select
-                    v-model="queryForm[condition.param_name]"
-                    multiple
-                    filterable
-                    allow-create
-                    :placeholder="getPlaceholder(condition)"
-                    style="width: 100%"
-                  >
-                    <el-option
-                      v-for="option in getFieldOptions(condition.field)"
-                      :key="option"
-                      :label="option"
-                      :value="option"
-                    />
-                  </el-select>
-                </template>
-                <template v-else-if="condition.operator === 'LIKE'">
-                  <el-input
-                    v-model="queryForm[condition.param_name]"
-                    :placeholder="getPlaceholder(condition)"
-                    prefix-icon="Search"
+                <!-- 根据参数类型显示不同的输入组件 -->
+                <template v-if="typeof paramValue === 'boolean'">
+                  <el-switch
+                    v-model="queryForm[paramName]"
+                    active-text="是"
+                    inactive-text="否"
+                    @focus="markFieldTouched(paramName)"
+                    @change="markFieldTouched(paramName)"
                   />
                 </template>
-                <template v-else-if="['>', '>=', '<', '<='].includes(condition.operator)">
+                <template v-else-if="typeof paramValue === 'number'">
                   <el-input-number
-                    v-model="queryForm[condition.param_name]"
-                    :placeholder="getPlaceholder(condition)"
+                    v-model="queryForm[paramName]"
+                    :placeholder="`请输入${getConditionLabel(paramName)}`"
                     style="width: 100%"
+                    @focus="markFieldTouched(paramName)"
+                    @input="markFieldTouched(paramName)"
                   />
                 </template>
                 <template v-else>
                   <el-input
-                    v-model="queryForm[condition.param_name]"
-                    :placeholder="getPlaceholder(condition)"
+                    v-model="queryForm[paramName]"
+                    :placeholder="`请输入${getConditionLabel(paramName)}`"
+                    @focus="markFieldTouched(paramName)"
+                    @input="markFieldTouched(paramName)"
                   />
                 </template>
                 
-                <div class="condition-info">
+                <div class="condition-info" v-if="getConditionInfo(paramName)">
                   <el-text size="small" type="info">
-                    {{ condition.field }} {{ condition.operator }}
-                    <span v-if="condition.default_value">（默认: {{ condition.default_value }}）</span>
+                    {{ getConditionInfo(paramName) }}
                   </el-text>
                 </div>
               </el-form-item>
@@ -168,14 +160,14 @@
         </el-form>
       </el-card>
 
-      <!-- 查询选项 -->
+      <!-- 查询选项
       <el-card class="query-options-card">
         <template #header>
           <div class="card-header">
             <span class="card-title">查询选项</span>
             <div class="query-actions">
               <el-button @click="resetForm">重置</el-button>
-              <el-button type="primary" @click="executeQuery" :loading="queryLoading">
+              <el-button type="primary" @click="handleUserQuery" :loading="queryLoading">
                 <el-icon><Search /></el-icon>
                 执行查询
               </el-button>
@@ -184,26 +176,6 @@
         </template>
         
         <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="排序字段">
-              <el-select v-model="queryOptions.orderField" placeholder="选择排序字段" clearable>
-                <el-option
-                  v-for="field in packageData?.base_config?.fields"
-                  :key="field"
-                  :label="field"
-                  :value="field"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="排序方向">
-              <el-select v-model="queryOptions.orderDirection" placeholder="选择排序方向">
-                <el-option label="升序" value="ASC" />
-                <el-option label="降序" value="DESC" />
-              </el-select>
-            </el-form-item>
-          </el-col>
           <el-col :span="8">
             <el-form-item label="查询条数">
               <el-input-number
@@ -215,7 +187,7 @@
             </el-form-item>
           </el-col>
         </el-row>
-      </el-card>
+      </el-card> -->
 
       <!-- 查询结果 -->
       <el-card class="query-results-card" v-if="queryResults">
@@ -250,16 +222,16 @@
             style="width: 100%"
           >
             <el-table-column
-              v-for="field in displayFields"
+              v-for="(field, index) in displayFields"
               :key="field"
-              :prop="field"
+              :prop="index.toString()"
               :label="field"
               :min-width="120"
               show-overflow-tooltip
             >
               <template #default="{ row }">
-                <span v-if="typeof row[field] === 'object'">{{ JSON.stringify(row[field]) }}</span>
-                <span v-else>{{ row[field] }}</span>
+                <span v-if="typeof row[index] === 'object'">{{ JSON.stringify(row[index]) }}</span>
+                <span v-else>{{ row[index] }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -296,9 +268,18 @@ import {
   resourcePackageApi, 
   type ResourcePackage, 
   type ResourcePackageQueryRequest,
-  type ResourcePackageQueryResponse 
+  type ResourcePackageQueryResponse
 } from '@/api/resourcePackage'
-import { datasourceApi, type DataSource } from '@/api/datasource'
+import { datasourceApi } from '@/api/datasource'
+import { type DataSource } from '@/types/datasource'
+import { getSQLTemplate, type SQLTemplateResponse } from '@/api/sqlQuery'
+import { templateApi } from '@/api/template'
+
+// 扩展ResourcePackage接口以包含模板条件
+interface ExtendedResourcePackage extends ResourcePackage {
+  template_conditions?: any[]
+  query?: string
+}
 
 /**
  * 路由和导航
@@ -311,7 +292,7 @@ const router = useRouter()
  */
 const loading = ref(false)
 const queryLoading = ref(false)
-const packageData = ref<ResourcePackage | null>(null)
+const packageData = ref<ExtendedResourcePackage | null>(null)
 const datasources = ref<DataSource[]>([])
 const queryResults = ref<ResourcePackageQueryResponse | null>(null)
 const queryFormRef = ref<FormInstance>()
@@ -323,10 +304,11 @@ const pageSize = ref(20)
 // 查询表单数据
 const queryForm = reactive<Record<string, any>>({})
 
+// 跟踪用户是否主动操作过每个输入框
+const fieldTouched = reactive<Record<string, boolean>>({})
+
 // 查询选项
 const queryOptions = reactive({
-  orderField: '',
-  orderDirection: 'ASC',
   limit: 1000
 })
 
@@ -337,26 +319,39 @@ const queryRules = computed(() => {
   console.log('🔄 计算表单验证规则...')
   const rules: FormRules = {}
   
-  if (packageData.value?.dynamic_conditions) {
-    console.log('📋 处理动态条件验证规则:', packageData.value.dynamic_conditions.length)
-    packageData.value.dynamic_conditions.forEach((condition, index) => {
-      console.log(`  条件 ${index + 1} 验证规则:`, {
-        param_name: condition.param_name,
-        required: condition.required,
-        hasParamName: !!condition.param_name
-      })
-      
-      if (condition.required && condition.param_name) {
-        rules[condition.param_name] = [
-          { required: true, message: `请输入${condition.description || condition.field}`, trigger: 'blur' }
-        ]
-        console.log(`    ✅ 添加验证规则: ${condition.param_name}`)
-      } else {
-        console.log(`    ⚠️ 跳过验证规则: required=${condition.required}, param_name=${condition.param_name}`)
+  if (packageData.value?.template_conditions) {
+    console.log('📋 处理模板条件验证规则:', packageData.value.template_conditions.length)
+    packageData.value.template_conditions.forEach((condition: any) => {
+      // 只为未锁定的条件添加验证规则
+      if (!condition.locked) {
+        const fieldRules: any[] = []
+        
+        // 必填验证
+        if (condition.required) {
+          fieldRules.push({
+            required: true,
+            message: `请输入${condition.label || condition.name}`,
+            trigger: 'blur'
+          })
+        }
+        
+        // 类型验证
+        if (condition.type === 'number') {
+          fieldRules.push({
+            type: 'number',
+            message: `${condition.label || condition.name}必须是数字`,
+            trigger: 'blur',
+            transform: (value: any) => Number(value)
+          })
+        }
+        
+        if (fieldRules.length > 0) {
+          rules[condition.name] = fieldRules
+        }
       }
     })
   } else {
-    console.log('⚠️ 没有动态条件数据，无法生成验证规则')
+    console.log('⚠️ 没有模板条件数据，无法生成验证规则')
   }
   
   console.log('📋 最终验证规则:', rules)
@@ -367,23 +362,23 @@ const queryRules = computed(() => {
  * 计算属性
  */
 const displayFields = computed(() => {
-  if (!queryResults.value?.data?.length) return []
+  // 🐛 调试日志：输出计算过程
+  console.log('🔍 displayFields计算中...')
+  console.log('🔍 queryResults.value:', queryResults.value)
+  console.log('🔍 queryResults.value?.columns:', queryResults.value?.columns)
+  console.log('🔍 queryResults.value?.data:', queryResults.value?.data)
   
-  // 如果配置了查询字段，优先显示配置的字段
-  if (packageData.value?.base_config?.fields?.length) {
-    return packageData.value.base_config.fields
-  }
+  // 使用API返回的columns作为显示字段
+  const fields = queryResults.value?.columns || []
+  console.log('🔍 最终的displayFields:', fields)
   
-  // 否则显示结果中的所有字段
-  return Object.keys(queryResults.value.data[0])
+  return fields
 })
 
 const paginatedData = computed(() => {
+  // 现在使用后端分页，直接返回API返回的数据
   if (!queryResults.value?.data?.length) return []
-  
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return queryResults.value.data.slice(start, end)
+  return queryResults.value.data
 })
 
 const getDatasourceName = computed(() => {
@@ -394,8 +389,40 @@ const getDatasourceName = computed(() => {
 })
 
 /**
+ * 获取条件标签
+ */
+const getConditionLabel = (paramName: string) => {
+  if (!packageData.value?.template_conditions) return paramName
+  const condition = packageData.value.template_conditions.find((c: any) => c.name === paramName)
+  return condition?.label || paramName
+}
+
+/**
+ * 获取条件信息
+ */
+const getConditionInfo = (paramName: string) => {
+  if (!packageData.value?.template_conditions) return ''
+  const condition = packageData.value.template_conditions.find((c: any) => c.name === paramName)
+  if (!condition) return ''
+  
+  let info = `${condition.name} ${condition.operator}`
+  if (condition.default_value) {
+    info += ` (默认: ${condition.default_value})`
+  }
+  return info
+}
+
+/**
  * 方法定义
  */
+
+/**
+ * 标记字段为用户主动操作过
+ */
+const markFieldTouched = (fieldName: string) => {
+  fieldTouched[fieldName] = true
+  console.log(`🎯 字段 ${fieldName} 被用户操作，已标记为touched`)
+}
 
 /**
  * 返回列表页面
@@ -424,32 +451,30 @@ const loadPackageData = async () => {
     const response = await resourcePackageApi.get(Number(packageId))
     console.log('✅ API响应:', response)
     
-    // 检查响应结构并正确提取数据
-    if (response.success && response.data) {
+    // 检查响应格式并提取数据
+    if (response && typeof response === 'object' && 'data' in response) {
+      // 如果是ApiResponse格式，提取data字段
       packageData.value = response.data
-      console.log('✅ 资源包数据加载成功:', packageData.value)
+      console.log('✅ 资源包数据加载成功 (从response.data):', packageData.value)
     } else {
-      // 如果响应直接是资源包数据（向后兼容）
+      // 如果直接是数据对象
       packageData.value = response as any
-      console.log('✅ 资源包数据加载成功（直接格式）:', packageData.value)
+      console.log('✅ 资源包数据加载成功 (直接使用response):', packageData.value)
     }
     
-    console.log('🔍 动态条件数据:', packageData.value?.dynamic_conditions)
+    console.log('🔍 资源包数据:', packageData.value)
+    console.log('🔍 模板ID:', packageData.value?.template_id)
+    console.log('🔍 模板类型:', packageData.value?.template_type)
     
-    if (packageData.value?.dynamic_conditions) {
-      console.log('📋 动态条件详情:')
-      packageData.value.dynamic_conditions.forEach((condition, index) => {
-        console.log(`  条件 ${index + 1}:`, {
-          param_name: condition.param_name,
-          field: condition.field,
-          operator: condition.operator,
-          description: condition.description,
-          required: condition.required,
-          default_value: condition.default_value
-        })
-      })
+    // 如果有模板信息，加载参数配置
+    if (packageData.value?.template_id && packageData.value?.template_type) {
+      console.log('✅ 满足模板加载条件，开始加载模板参数...')
+      await loadTemplateParams()
     } else {
-      console.warn('⚠️ 没有找到动态条件数据')
+      console.warn('⚠️ 不满足模板加载条件:', {
+        template_id: packageData.value?.template_id,
+        template_type: packageData.value?.template_type
+      })
     }
     
     initializeForm()
@@ -459,6 +484,54 @@ const loadPackageData = async () => {
     goBack()
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 根据模板类型加载参数配置
+ */
+const loadTemplateParams = async () => {
+  if (!packageData.value?.template_id || !packageData.value?.template_type) {
+    console.warn('模板ID或类型不存在，无法加载参数')
+    return
+  }
+
+  try {
+    console.log('🔄 开始加载模板参数，模板ID:', packageData.value.template_id, '类型:', packageData.value.template_type)
+    
+    let templateData: SQLTemplateResponse | any = null
+    
+    if (packageData.value.template_type === 'sql') {
+      // 调用SQL模板API
+      const response = await getSQLTemplate(packageData.value.template_id)
+      templateData = response.data
+    } else if (packageData.value.template_type === 'elasticsearch') {
+      // 调用ES模板API
+      const response = await templateApi.getByType(packageData.value.template_id, 'es')
+      templateData = response
+    }
+    
+    if (templateData && templateData.config) {
+      console.log('✅ 模板参数加载成功:', templateData.config)
+      // 从模板配置中解析条件参数，过滤掉锁定的条件
+      const conditions = templateData.config.conditions || []
+      const unlockedConditions = conditions.filter((condition: any) => !condition.locked)
+      
+      // 将未锁定的条件转换为动态参数格式
+      const dynamicParams: Record<string, any> = {}
+      unlockedConditions.forEach((condition: any) => {
+        dynamicParams[condition.name] = condition.default_value || ''
+      })
+      
+      if (packageData.value) {
+        packageData.value.dynamic_params = dynamicParams
+        packageData.value.template_conditions = unlockedConditions
+      }
+    } else {
+      console.warn('⚠️ 模板配置中没有找到参数信息')
+    }
+  } catch (error) {
+    console.error('❌ 加载模板参数失败:', error)
   }
 }
 
@@ -488,27 +561,49 @@ const initializeForm = () => {
   })
   console.log('🧹 查询表单已重置')
   
+  // 重置字段操作状态
+  Object.keys(fieldTouched).forEach(key => {
+    delete fieldTouched[key]
+  })
+  console.log('🧹 字段操作状态已重置')
+  
   // 设置默认值
-  if (packageData.value?.dynamic_conditions) {
+  if (packageData.value?.template_conditions) {
     console.log('📝 设置表单默认值...')
-    packageData.value.dynamic_conditions.forEach((condition, index) => {
+    packageData.value.template_conditions.forEach((condition: any, index: number) => {
       console.log(`  处理条件 ${index + 1}:`, {
-        param_name: condition.param_name,
+        name: condition.name,
         default_value: condition.default_value,
-        hasParamName: !!condition.param_name,
-        hasDefaultValue: condition.default_value !== undefined && condition.default_value !== null
+        type: condition.type,
+        locked: condition.locked
       })
       
-      if (condition.default_value !== undefined && condition.default_value !== null && condition.param_name) {
-        queryForm[condition.param_name] = condition.default_value
-        console.log(`    ✅ 设置默认值: ${condition.param_name} = ${condition.default_value}`)
+      // 只处理未锁定的条件
+      if (!condition.locked) {
+        if (condition.default_value !== undefined && condition.default_value !== null) {
+          queryForm[condition.name] = condition.default_value
+          console.log(`    ✅ 设置默认值: ${condition.name} = ${condition.default_value}`)
+        } else {
+          // 根据类型设置空值
+          switch (condition.type) {
+            case 'string':
+              queryForm[condition.name] = ''
+              break
+            case 'number':
+              queryForm[condition.name] = null
+              break
+            default:
+              queryForm[condition.name] = ''
+          }
+          console.log(`    ⚠️ 设置空值: ${condition.name} = ${queryForm[condition.name]}`)
+        }
       } else {
-        console.log(`    ⚠️ 跳过设置默认值: param_name=${condition.param_name}, default_value=${condition.default_value}`)
+        console.log(`    🔒 跳过锁定条件: ${condition.name}`)
       }
     })
     console.log('📋 最终表单数据:', queryForm)
   } else {
-    console.warn('⚠️ 没有动态条件数据，无法设置默认值')
+    console.warn('⚠️ 没有模板条件数据，无法设置默认值')
   }
   
   // 重置查询结果
@@ -517,38 +612,7 @@ const initializeForm = () => {
   console.log('✅ 查询表单初始化完成')
 }
 
-/**
- * 获取字段选项
- */
-const getFieldOptions = (field: string): string[] => {
-  // 这里可以根据字段类型返回预设选项
-  // 暂时返回空数组，让用户自由输入
-  return []
-}
 
-/**
- * 获取输入框占位符
- */
-const getPlaceholder = (condition: any): string => {
-  if (condition.default_value) {
-    return `默认值: ${condition.default_value}`
-  }
-  
-  switch (condition.operator) {
-    case 'LIKE':
-      return '支持通配符 %'
-    case 'IN':
-    case 'NOT IN':
-      return '选择或输入多个值'
-    case '>':
-    case '>=':
-    case '<':
-    case '<=':
-      return '输入数值'
-    default:
-      return `请输入${condition.description || condition.field}`
-  }
-}
 
 /**
  * 重置表单
@@ -556,6 +620,15 @@ const getPlaceholder = (condition: any): string => {
 const resetForm = () => {
   queryFormRef.value?.resetFields()
   initializeForm()
+}
+
+/**
+ * 处理用户主动查询（重置到第一页）
+ */
+const handleUserQuery = async () => {
+  // 用户主动查询时，重置到第一页
+  currentPage.value = 1
+  await executeQuery()
 }
 
 /**
@@ -579,17 +652,58 @@ const executeQuery = async () => {
   try {
     queryLoading.value = true
     
+    // 过滤参数：只包含用户主动操作过的字段
+    const filteredParams: Record<string, any> = {}
+    Object.keys(queryForm).forEach(key => {
+      // 如果用户操作过这个字段，或者字段有非空值，则包含在请求中
+      if (fieldTouched[key] || (queryForm[key] !== '' && queryForm[key] !== null && queryForm[key] !== undefined)) {
+        filteredParams[key] = queryForm[key]
+      }
+    })
+    
+    console.log('🔍 原始表单数据:', queryForm)
+    console.log('🎯 用户操作过的字段:', fieldTouched)
+    console.log('✅ 过滤后的参数:', filteredParams)
+    
+    // 使用新的安全查询接口
     const queryRequest: ResourcePackageQueryRequest = {
-      dynamic_params: { ...queryForm },
-      limit: queryOptions.limit,
-      offset: 0
+      dynamic_params: filteredParams,
+      limit: pageSize.value,
+      offset: (currentPage.value - 1) * pageSize.value
     }
     
-    const response = await resourcePackageApi.query(packageData.value.id, queryRequest)
-    queryResults.value = response
-    currentPage.value = 1
+    console.log('🔄 使用安全查询接口执行查询...')
+    const response = await resourcePackageApi.secureQuery(packageData.value.id, queryRequest)
     
-    ElMessage.success(`查询成功，共找到 ${response.total_count || 0} 条记录`)
+    // 🐛 调试日志：输出完整的API响应
+    console.log('📊 API完整响应:', response)
+    console.log('📊 response.data:', response.data)
+    console.log('📊 response.data.columns:', response.data?.columns)
+    console.log('📊 response.data.data:', response.data?.data)
+    
+    // 处理响应数据
+    if (response && response.data) {
+      queryResults.value = {
+        data: response.data.data || [],
+        columns: response.data.columns || [], // 🐛 添加columns字段
+        total_count: response.data.total_count || 0,
+        execution_time: response.data.execution_time || 0,
+        generated_query: response.data.generated_query,
+        status: response.data.status,
+        error_message: response.data.error_message
+      }
+    } else {
+      queryResults.value = response
+    }
+    
+    // 🐛 调试日志：输出处理后的queryResults
+    console.log('📊 处理后的queryResults:', queryResults.value)
+    
+    if (queryResults.value?.error_message) {
+      ElMessage.error(`查询失败: ${queryResults.value.error_message}`)
+    } else {
+      ElMessage.success(`查询成功，共找到 ${queryResults.value?.total_count || 0} 条记录`)
+    }
     
   } catch (error) {
     console.error('查询失败:', error)
@@ -599,16 +713,26 @@ const executeQuery = async () => {
   }
 }
 
+
+
 /**
  * 分页处理
  */
 const handleSizeChange = (newSize: number) => {
   pageSize.value = newSize
   currentPage.value = 1
+  // 重新执行查询
+  if (queryResults.value) {
+    executeQuery()
+  }
 }
 
 const handleCurrentChange = (newPage: number) => {
   currentPage.value = newPage
+  // 重新执行查询
+  if (queryResults.value) {
+    executeQuery()
+  }
 }
 
 /**

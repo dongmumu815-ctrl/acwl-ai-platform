@@ -170,11 +170,9 @@ class ResourcePackageBase(BaseModel):
     type: PackageType = Field(..., description="资源包类型")
     datasource_id: int = Field(..., description="数据源ID")
     resource_id: Optional[int] = Field(None, description="数据资源ID")
-    base_config: BaseConfig = Field(..., description="基础配置")
-    locked_conditions: List[ConditionConfig] = Field(default_factory=list, description="锁定条件")
-    dynamic_conditions: List[DynamicConditionConfig] = Field(default_factory=list, description="动态条件")
-    order_config: Optional[OrderConfig] = Field(None, description="排序配置")
-    limit_config: int = Field(1000, ge=1, le=10000, description="默认限制条数")
+    template_id: Optional[int] = Field(None, description="查询模板ID")
+    template_type: str = Field(..., description="模板类型(sql/elasticsearch)")
+    dynamic_params: Optional[Dict[str, Any]] = Field(None, description="动态参数")
     is_active: bool = Field(True, description="是否启用")
 
 
@@ -188,10 +186,10 @@ class ResourcePackageCreate(ResourcePackageBase):
             raise ValueError('资源包名称不能为空')
         return v.strip()
     
-    @validator('base_config')
-    def validate_base_config(cls, v):
-        if not v.fields:
-            raise ValueError('必须至少选择一个字段')
+    @validator('template_type')
+    def validate_template_type(cls, v):
+        if v not in ['sql', 'elasticsearch']:
+            raise ValueError('模板类型必须是sql或elasticsearch')
         return v
 
 
@@ -199,11 +197,9 @@ class ResourcePackageUpdate(BaseModel):
     """更新资源包模式"""
     name: Optional[str] = Field(None, max_length=255, description="资源包名称")
     description: Optional[str] = Field(None, description="资源包描述")
-    base_config: Optional[BaseConfig] = Field(None, description="基础配置")
-    locked_conditions: Optional[List[ConditionConfig]] = Field(None, description="锁定条件")
-    dynamic_conditions: Optional[List[DynamicConditionConfig]] = Field(None, description="动态条件")
-    order_config: Optional[OrderConfig] = Field(None, description="排序配置")
-    limit_config: Optional[int] = Field(None, ge=1, le=10000, description="默认限制条数")
+    template_id: Optional[int] = Field(None, description="查询模板ID")
+    template_type: Optional[str] = Field(None, description="模板类型(sql/elasticsearch)")
+    dynamic_params: Optional[Dict[str, Any]] = Field(None, description="动态参数")
     is_active: Optional[bool] = Field(None, description="是否启用")
     tags: Optional[List[str]] = Field(None, description="标签列表")
 
@@ -211,6 +207,27 @@ class ResourcePackageUpdate(BaseModel):
 class ResourcePackage(ResourcePackageBase):
     """资源包模式"""
     id: int
+    created_by: int
+    created_at: datetime
+    updated_at: datetime
+    tags: List[ResourcePackageTag] = Field(default_factory=list, description="标签列表")
+    permissions: List[ResourcePackagePermission] = Field(default_factory=list, description="权限列表")
+    
+    class Config:
+        from_attributes = True
+
+
+class ResourcePackageResponse(BaseModel):
+    """资源包响应模式（不包含dynamic_params）"""
+    id: int
+    name: str = Field(..., max_length=255, description="资源包名称")
+    description: Optional[str] = Field(None, description="资源包描述")
+    type: PackageType = Field(..., description="资源包类型")
+    datasource_id: int = Field(..., description="数据源ID")
+    resource_id: Optional[int] = Field(None, description="数据资源ID")
+    template_id: Optional[int] = Field(None, description="查询模板ID")
+    template_type: str = Field(..., description="模板类型(sql/elasticsearch)")
+    is_active: bool = Field(True, description="是否启用")
     created_by: int
     created_at: datetime
     updated_at: datetime
@@ -279,12 +296,3 @@ class ResourcePackageParamInfo(BaseModel):
     required: bool = Field(False, description="是否必填")
     description: Optional[str] = Field(None, description="参数描述")
     validation_rules: Optional[Dict[str, Any]] = Field(None, description="验证规则")
-
-
-class ResourcePackageParamsResponse(BaseModel):
-    """资源包参数响应模式"""
-    package_id: int = Field(..., description="资源包ID")
-    package_name: str = Field(..., description="资源包名称")
-    params: List[ResourcePackageParamInfo] = Field(default_factory=list, description="参数列表")
-    base_config: BaseConfig = Field(..., description="基础配置")
-    locked_conditions: List[ConditionConfig] = Field(default_factory=list, description="锁定条件")

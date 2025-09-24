@@ -24,7 +24,6 @@ from app.schemas.resource_package import (
     ResourcePackageCreate, ResourcePackageUpdate, ResourcePackage as ResourcePackageSchema,
     ResourcePackageListResponse, ResourcePackageSearchRequest,
     ResourcePackageQueryRequest, ResourcePackageQueryResponse,
-    ResourcePackageParamsResponse, ResourcePackageParamInfo,
     PermissionType, QueryStatus, PackageType
 )
 from app.services.data_resource_service import DataResourceService
@@ -57,18 +56,20 @@ class ResourcePackageService:
         Returns:
             ResourcePackageSchema: 创建的资源包信息
         """
-        # 验证模板是否存在
-        template = await self._get_template(package_data.template_id, package_data.template_type)
-        if not template:
-            raise HTTPException(status_code=404, detail="关联的查询模板不存在")
-        
-        # 验证模板类型与资源包类型一致
-        if package_data.template_type != package_data.type:
-            raise HTTPException(status_code=400, detail="模板类型与资源包类型不匹配")
-        
-        # 验证数据源一致性
-        if template.datasource_id != package_data.datasource_id:
-            raise HTTPException(status_code=400, detail="模板的数据源与资源包数据源不匹配")
+        # 如果提供了模板ID，验证模板是否存在
+        template = None
+        if package_data.template_id is not None:
+            template = await self._get_template(package_data.template_id, package_data.template_type)
+            if not template:
+                raise HTTPException(status_code=404, detail="关联的查询模板不存在")
+            
+            # 验证模板类型与资源包类型一致
+            if package_data.template_type != package_data.type:
+                raise HTTPException(status_code=400, detail="模板类型与资源包类型不匹配")
+            
+            # 验证数据源一致性
+            if template.datasource_id != package_data.datasource_id:
+                raise HTTPException(status_code=400, detail="模板的数据源与资源包数据源不匹配")
         
         # 创建资源包
         package = ResourcePackage(
@@ -200,6 +201,10 @@ class ResourcePackageService:
         error_message = None
         
         try:
+            # 检查是否有关联的查询模板
+            if package.template_id is None:
+                raise HTTPException(status_code=400, detail="资源包未关联查询模板，无法执行查询")
+            
             # 获取关联的查询模板
             template = await self._get_template(package.template_id, package.template_type)
             if not template:
@@ -244,57 +249,7 @@ class ResourcePackageService:
             error_message=error_message
         )
 
-    async def get_package_params(self, package_id: int, user_id: int) -> ResourcePackageParamsResponse:
-        """获取资源包参数信息
-        
-        Args:
-            package_id: 资源包ID
-            user_id: 用户ID
-            
-        Returns:
-            ResourcePackageParamsResponse: 参数信息
-        """
-        # 检查权限
-        if not await self._check_permission(package_id, user_id, PermissionType.READ):
-            raise HTTPException(status_code=403, detail="无权限访问此资源包")
-        
-        query = select(ResourcePackage).where(ResourcePackage.id == package_id)
-        result = await self.db.execute(query)
-        package = result.scalar_one_or_none()
-        
-        if not package:
-            raise HTTPException(status_code=404, detail="资源包不存在")
-        
-        # 获取关联的查询模板
-        template = await self._get_template(package.template_id, package.template_type)
-        if not template:
-            raise HTTPException(status_code=404, detail="关联的查询模板不存在")
-        
-        # 从模板配置中提取参数信息
-        template_config = getattr(template, 'config', {}) or {}
-        dynamic_conditions = template_config.get('dynamic_conditions', [])
-        
-        params = []
-        for condition in dynamic_conditions:
-            param_info = ResourcePackageParamInfo(
-                param_name=condition.get('param_key', ''),
-                field=condition.get('field', ''),
-                operator=condition.get('operator', '='),
-                param_type=condition.get('param_type', 'string'),
-                default_value=condition.get('default_value'),
-                required=condition.get('required', True),
-                description=condition.get('description', ''),
-                validation_rules=condition.get('validation_rules', {})
-            )
-            params.append(param_info)
-        
-        return ResourcePackageParamsResponse(
-            package_id=package.id,
-            package_name=package.name,
-            params=params,
-            base_config=template_config.get('base_config', {}),
-            locked_conditions=template_config.get('locked_conditions', [])
-        )
+
 
     async def _get_template(self, template_id: int, template_type: str) -> Union[SQLQueryTemplate, ESQueryTemplate, None]:
         """获取查询模板

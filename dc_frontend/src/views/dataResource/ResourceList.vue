@@ -177,7 +177,7 @@
             </el-button>
             <el-button
               v-if="row.previewAvailable"
-              type="success"
+              type="info"
               size="small"
               @click="previewData(row)"
               :disabled="!hasViewPermission"
@@ -185,21 +185,21 @@
               预览
             </el-button>
             <el-button
-              type="info"
+              type="success"
               size="small"
               @click="queryData(row)"
               :disabled="!hasViewPermission"
             >
-              查询
+              查询设定
             </el-button>
-            <el-button
+            <!-- <el-button
               type="warning"
               size="small"
               @click="showApiInfo(row)"
               :disabled="!hasViewPermission"
             >
               API
-            </el-button>
+            </el-button> -->
             <el-dropdown trigger="click">
               <el-button size="small">
                 更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>

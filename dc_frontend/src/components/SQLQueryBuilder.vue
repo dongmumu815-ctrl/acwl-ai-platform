@@ -2060,14 +2060,12 @@ const confirmAddToResourcePackage = async () => {
       description: resourcePackageForm.description,
       type: PackageType.SQL,
       datasource_id: queryConfig.datasourceId,
-      base_config: {
-        schema: queryConfig.schema,
-        table: queryConfig.table,
-        fields: queryConfig.fields.map(f => f.name)
-      },
-      locked_conditions: [],
-      dynamic_conditions: queryConfig.conditions,
-      limit_config: resourcePackageForm.limitConfig,
+      template_type: 'sql',
+      template_id: selectedTemplateId.value,
+      dynamic_params: queryConfig.conditions.reduce((params: any, condition: any) => {
+        params[condition.param_name] = condition.default_value || ''
+        return params
+      }, {}),
       tags: resourcePackageForm.tags,
       is_active: true
     }

@@ -5,8 +5,8 @@
 """
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, String, Text, Boolean, TIMESTAMP, ForeignKey, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
+from sqlalchemy import Integer, String, Text, Boolean, TIMESTAMP, ForeignKey, func, create_engine
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -74,11 +74,28 @@ engine = create_async_engine(
     pool_recycle=3600,
 )
 
+# 创建同步数据库引擎（用于兼容现有代码）
+sync_engine = create_engine(
+    settings.database_url,
+    echo=settings.DEBUG,
+    pool_size=20,
+    max_overflow=30,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
+
 # 创建异步会话工厂
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False
+)
+
+# 创建同步会话工厂（用于兼容现有代码）
+SessionLocal = sessionmaker(
+    bind=sync_engine,
+    autocommit=False,
+    autoflush=False
 )
 
 

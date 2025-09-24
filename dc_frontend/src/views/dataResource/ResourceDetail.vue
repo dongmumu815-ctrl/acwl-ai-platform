@@ -1,5 +1,5 @@
 <template>
-  <div class="resource-detail-container">
+  <div class="resource-detail-container" v-loading="loading">
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-left">
@@ -9,15 +9,15 @@
         </el-button>
         <div class="title-section">
           <h1 class="page-title">
-            <el-icon class="resource-icon" :style="{ color: getTypeColor(resource.type) }">
-              <component :is="getTypeIcon(resource.type)" />
+            <el-icon class="resource-icon" :style="{ color: getTypeColor(resource.resource_type) }">
+              <component :is="getTypeIcon(resource.resource_type)" />
             </el-icon>
-            {{ resource.name }}
+            {{ resource.display_name || resource.name }}
           </h1>
           <div class="title-meta">
-            <el-tag :type="getTypeTagType(resource.type)">{{ getTypeLabel(resource.type) }}</el-tag>
+            <el-tag :type="getTypeTagType(resource.resource_type)">{{ getTypeLabel(resource.resource_type) }}</el-tag>
             <el-tag :type="getStatusTagType(resource.status)">{{ getStatusLabel(resource.status) }}</el-tag>
-            <span class="meta-text">创建于 {{ formatDate(resource.createdAt) }}</span>
+            <span class="meta-text">创建于 {{ formatDate(resource.created_at) }}</span>
           </div>
         </div>
       </div>
@@ -68,16 +68,16 @@
           </h3>
           <el-descriptions :column="2" border>
             <el-descriptions-item label="资源名称">
-              {{ resource.name }}
+              {{ resource.display_name || resource.name }}
             </el-descriptions-item>
             <el-descriptions-item label="资源类型">
-              <el-tag :type="getTypeTagType(resource.type)">{{ getTypeLabel(resource.type) }}</el-tag>
+              <el-tag :type="getTypeTagType(resource.resource_type)">{{ getTypeLabel(resource.resource_type) }}</el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="文件大小">
-              {{ formatSize(resource.size) }}
+              {{ getResourceSize() }}
             </el-descriptions-item>
             <el-descriptions-item label="记录数">
-              <span v-if="resource.records !== null">{{ formatNumber(resource.records) }}</span>
+              <span v-if="getRecordCount() !== null">{{ formatNumber(getRecordCount()) }}</span>
               <span v-else class="text-placeholder">-</span>
             </el-descriptions-item>
             <el-descriptions-item label="状态">
@@ -85,23 +85,32 @@
             </el-descriptions-item>
             <el-descriptions-item label="所有者">
               <div class="owner-info">
-                <el-avatar :size="24" :src="resource.ownerAvatar">
-                  {{ resource.owner.charAt(0) }}
+                <el-avatar :size="24" :src="getCreatorInfo().avatar">
+                  {{ getCreatorInfo().full_name.charAt(0) }}
                 </el-avatar>
-                <span>{{ resource.owner }}</span>
+                <span>{{ getCreatorInfo().full_name }}</span>
               </div>
             </el-descriptions-item>
             <el-descriptions-item label="创建时间">
-              {{ formatDate(resource.createdAt) }}
+              {{ formatDate(resource.created_at) }}
             </el-descriptions-item>
             <el-descriptions-item label="最后修改">
-              {{ formatDate(resource.updatedAt) }}
+              {{ formatDate(resource.updated_at) }}
             </el-descriptions-item>
             <el-descriptions-item label="最后访问">
-              {{ formatDate(resource.lastAccessed) }}
+              {{ resource.last_accessed_at ? formatDate(resource.last_accessed_at) : '从未访问' }}
             </el-descriptions-item>
             <el-descriptions-item label="访问次数">
-              {{ resource.accessCount || 0 }} 次
+              {{ getAccessCount() }} 次
+            </el-descriptions-item>
+            <el-descriptions-item label="数据源" v-if="resource.datasource">
+              <div class="datasource-info">
+                <el-tag size="small">{{ resource.datasource.name }}</el-tag>
+                <span class="datasource-desc">{{ resource.datasource.description }}</span>
+              </div>
+            </el-descriptions-item>
+            <el-descriptions-item label="索引名称" v-if="resource.index_name">
+              <el-tag type="info" size="small">{{ resource.index_name }}</el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="描述" span="2">
               {{ resource.description || '暂无描述' }}
@@ -110,7 +119,7 @@
         </div>
 
         <!-- 数据预览 -->
-        <div class="info-card" v-if="resource.type === 'database' || resource.type === 'file'">
+        <div class="info-card" v-if="resource.resource_type === 'elasticsearch_index' || resource.resource_type === 'DORIS_TABLE'">
           <h3 class="card-title">
             <el-icon><View /></el-icon>
             数据预览
@@ -139,7 +148,7 @@
             
             <div class="preview-footer" v-if="previewData.length > 0">
               <span class="preview-info">
-                显示前 {{ previewData.length }} 条记录，共 {{ resource.records || 0 }} 条
+                显示前 {{ previewData.length }} 条记录，共 {{ getRecordCount() || 0 }} 条
               </span>
               <el-button size="small" @click="viewFullData">
                 查看完整数据
@@ -158,29 +167,36 @@
           <div class="permission-content">
             <div class="permission-item">
               <span class="permission-label">访问权限：</span>
-              <el-tag :type="resource.permissions.read ? 'success' : 'danger'">
-                {{ resource.permissions.read ? '可读' : '不可读' }}
+              <el-tag :type="permissions.read ? 'success' : 'danger'">
+                {{ permissions.read ? '可读' : '不可读' }}
               </el-tag>
             </div>
             
             <div class="permission-item">
               <span class="permission-label">下载权限：</span>
-              <el-tag :type="resource.permissions.download ? 'success' : 'danger'">
-                {{ resource.permissions.download ? '可下载' : '不可下载' }}
+              <el-tag :type="permissions.download ? 'success' : 'danger'">
+                {{ permissions.download ? '可下载' : '不可下载' }}
               </el-tag>
             </div>
             
             <div class="permission-item">
               <span class="permission-label">编辑权限：</span>
-              <el-tag :type="resource.permissions.edit ? 'success' : 'danger'">
-                {{ resource.permissions.edit ? '可编辑' : '不可编辑' }}
+              <el-tag :type="permissions.edit ? 'success' : 'danger'">
+                {{ permissions.edit ? '可编辑' : '不可编辑' }}
               </el-tag>
             </div>
             
             <div class="permission-item">
               <span class="permission-label">删除权限：</span>
-              <el-tag :type="resource.permissions.delete ? 'success' : 'danger'">
-                {{ resource.permissions.delete ? '可删除' : '不可删除' }}
+              <el-tag :type="permissions.delete ? 'success' : 'danger'">
+                {{ permissions.delete ? '可删除' : '不可删除' }}
+              </el-tag>
+            </div>
+            
+            <div class="permission-item">
+              <span class="permission-label">公开状态：</span>
+              <el-tag :type="resource.is_public ? 'success' : 'warning'">
+                {{ resource.is_public ? '公开' : '私有' }}
               </el-tag>
             </div>
           </div>
@@ -198,18 +214,18 @@
           
           <div class="stats-content">
             <div class="stat-item">
-              <div class="stat-value">{{ resource.accessCount || 0 }}</div>
+              <div class="stat-value">{{ getAccessCount() }}</div>
               <div class="stat-label">总访问次数</div>
             </div>
             
             <div class="stat-item">
-              <div class="stat-value">{{ resource.downloadCount || 0 }}</div>
-              <div class="stat-label">下载次数</div>
+              <div class="stat-value">{{ getQueryCount() }}</div>
+              <div class="stat-label">查询次数</div>
             </div>
             
             <div class="stat-item">
-              <div class="stat-value">{{ resource.shareCount || 0 }}</div>
-              <div class="stat-label">分享次数</div>
+              <div class="stat-value">{{ getTagCount() }}</div>
+              <div class="stat-label">标签数量</div>
             </div>
           </div>
           
@@ -277,39 +293,55 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
+import { dataResourceApi } from '@/api/dataResource'
+import type { DataResource } from '@/types/dataResource'
 
 // 路由相关
 const router = useRouter()
 const route = useRoute()
 
 // 响应式数据
+const loading = ref(false)
 const previewLoading = ref(false)
 const accessChartRef = ref<HTMLElement>()
-let accessChart: echarts.ECharts | null = null
+let accessChart: any = null
 
-// 资源详情数据
-const resource = ref({
-  id: 1,
-  name: '用户行为数据库',
-  description: '存储用户行为分析数据，包含用户访问记录、点击事件、页面浏览等信息',
-  type: 'database',
-  size: 2147483648, // 2GB
-  records: 1250000,
-  status: 'active',
-  owner: '张三',
-  ownerAvatar: '',
-  createdAt: '2024-01-10 09:00:00',
-  updatedAt: '2024-01-15 14:30:00',
-  lastAccessed: '2024-01-15 14:30:00',
-  accessCount: 156,
-  downloadCount: 23,
-  shareCount: 8,
-  permissions: {
-    read: true,
-    download: true,
-    edit: false,
-    delete: false
-  }
+// 资源详情数据 - 根据实际API响应结构初始化
+const resource = ref<any>({
+  id: null,
+  name: '',
+  display_name: '',
+  description: '',
+  resource_type: '',
+  status: '',
+  category: null,
+  category_id: null,
+  tags: null,
+  tag_list: null,
+  database_name: null,
+  table_name: null,
+  index_name: null,
+  schema_info: null,
+  datasource: null,
+  datasource_id: null,
+  is_public: false,
+  is_favorited: null,
+  view_count: 0,
+  query_count: 0,
+  created_at: '',
+  updated_at: '',
+  created_by: null,
+  updated_by: null,
+  last_accessed_at: null,
+  user_permission: null
+})
+
+// 权限信息
+const permissions = ref({
+  read: true,
+  download: false,
+  edit: false,
+  delete: false
 })
 
 // 数据预览
@@ -414,6 +446,9 @@ const relatedResources = ref([
  */
 const getTypeIcon = (type: string) => {
   const iconMap: Record<string, string> = {
+    DORIS_TABLE: 'DataBoard',
+    ELASTICSEARCH_INDEX: 'Search',
+    elasticsearch_index: 'Search',
     database: 'Coin',
     file: 'Document',
     api: 'Connection',
@@ -427,6 +462,9 @@ const getTypeIcon = (type: string) => {
  */
 const getTypeColor = (type: string) => {
   const colorMap: Record<string, string> = {
+    DORIS_TABLE: '#409EFF',
+    ELASTICSEARCH_INDEX: '#67C23A',
+    elasticsearch_index: '#67C23A',
     database: '#409EFF',
     file: '#67C23A',
     api: '#E6A23C',
@@ -440,6 +478,9 @@ const getTypeColor = (type: string) => {
  */
 const getTypeTagType = (type: string) => {
   const tagMap: Record<string, string> = {
+    DORIS_TABLE: 'primary',
+    ELASTICSEARCH_INDEX: 'success',
+    elasticsearch_index: 'success',
     database: 'primary',
     file: 'success',
     api: 'warning',
@@ -453,6 +494,9 @@ const getTypeTagType = (type: string) => {
  */
 const getTypeLabel = (type: string) => {
   const labelMap: Record<string, string> = {
+    DORIS_TABLE: 'Doris表',
+    ELASTICSEARCH_INDEX: 'ES索引',
+    elasticsearch_index: 'ES索引',
     database: '数据库',
     file: '文件',
     api: 'API',
@@ -466,9 +510,10 @@ const getTypeLabel = (type: string) => {
  */
 const getStatusTagType = (status: string) => {
   const tagMap: Record<string, string> = {
-    active: 'success',
-    maintenance: 'warning',
-    inactive: 'info'
+    ACTIVE: 'success',
+    INACTIVE: 'warning',
+    ARCHIVED: 'info',
+    ERROR: 'danger'
   }
   return tagMap[status] || 'info'
 }
@@ -478,9 +523,10 @@ const getStatusTagType = (status: string) => {
  */
 const getStatusLabel = (status: string) => {
   const labelMap: Record<string, string> = {
-    active: '正常',
-    maintenance: '维护',
-    inactive: '停用'
+    ACTIVE: '正常',
+    INACTIVE: '停用',
+    ARCHIVED: '归档',
+    ERROR: '错误'
   }
   return labelMap[status] || status
 }
@@ -573,7 +619,7 @@ const downloadResource = () => {
     ElMessage.warning('您没有下载权限')
     return
   }
-  ElMessage.success(`开始下载: ${resource.value.name}`)
+  ElMessage.success(`开始下载: ${resource.value.display_name || resource.value.name}`)
 }
 
 /**
@@ -650,14 +696,173 @@ const refreshPreview = () => {
  * 查看完整数据
  */
 const viewFullData = () => {
-  ElMessage.info('跳转到完整数据查看页面')
+  // 跳转到数据查看页面或打开数据查看对话框
+  ElMessage.info('功能开发中，敬请期待')
 }
 
 /**
  * 查看相关资源
  */
 const viewRelatedResource = (relatedResource: any) => {
-  router.push(`/data-center/resources/${relatedResource.id}`)
+  router.push(`/data-resources/detail/${relatedResource.id}`)
+}
+
+/**
+ * 获取创建者信息
+ */
+const getCreatorInfo = () => {
+  // 由于API返回的是created_by（用户ID），这里需要根据实际情况处理
+  // 可能需要额外的API调用来获取用户详细信息
+  if (resource.value.created_by) {
+    return {
+      id: resource.value.created_by,
+      username: `用户${resource.value.created_by}`,
+      full_name: `用户${resource.value.created_by}`,
+      avatar: null
+    }
+  }
+  return {
+    id: null,
+    username: '未知用户',
+    full_name: '未知用户',
+    avatar: null
+  }
+}
+
+/**
+ * 获取文件大小显示
+ */
+const getResourceSize = () => {
+  // API中没有直接的size字段，可能需要根据resource_type来处理
+  if (resource.value.schema_info && resource.value.schema_info.row_count) {
+    return `约 ${formatNumber(resource.value.schema_info.row_count)} 条记录`
+  }
+  return '未知大小'
+}
+
+/**
+ * 获取记录数
+ */
+const getRecordCount = () => {
+  if (resource.value.schema_info && resource.value.schema_info.row_count) {
+    return resource.value.schema_info.row_count
+  }
+  return null
+}
+
+/**
+ * 获取访问次数
+ */
+const getAccessCount = () => {
+  return resource.value.view_count || 0
+}
+
+/**
+ * 获取查询次数
+ */
+const getQueryCount = () => {
+  return resource.value.query_count || 0
+}
+
+/**
+ * 获取标签数量
+ */
+const getTagCount = () => {
+  if (resource.value.tags && Array.isArray(resource.value.tags)) {
+    return resource.value.tags.length
+  }
+  if (resource.value.tag_list && Array.isArray(resource.value.tag_list)) {
+    return resource.value.tag_list.length
+  }
+  return 0
+}
+
+/**
+ * 加载资源详情数据
+ */
+const loadResourceDetail = async () => {
+  const resourceId = route.params.id as string
+  if (!resourceId) {
+    ElMessage.error('资源ID不能为空')
+    router.push('/data-resources/list')
+    return
+  }
+
+  loading.value = true
+  try {
+    console.log('正在加载资源详情，ID:', resourceId)
+    const response = await dataResourceApi.getResourceDetail(Number(resourceId))
+    
+    // 检查响应是否为标准 ApiResponse 结构
+    let resourceData = null
+    if (response && response.success && response.data) {
+      resourceData = response.data
+    } else {
+      throw new Error('无法获取资源数据')
+    }
+    
+    if (resourceData) {
+      // 直接使用API返回的数据结构
+      resource.value = resourceData
+      console.log('资源详情加载成功:', resourceData)
+      
+      // 设置权限信息
+      permissions.value = {
+        read: true,
+        download: resource.value.is_public || false,
+        edit: false, // 根据user_permission字段设置
+        delete: false // 根据user_permission字段设置
+      }
+      
+      // 如果有用户权限信息，更新权限设置
+      if (resource.value.user_permission) {
+        permissions.value = {
+          ...permissions.value,
+          ...resource.value.user_permission
+        }
+      }
+      
+      // 加载预览数据（如果是支持的类型）
+      if (resource.value.resource_type === 'elasticsearch_index' || 
+          resource.value.resource_type === 'DORIS_TABLE') {
+        await loadPreviewData()
+      }
+    } else {
+      throw new Error('无法获取资源数据')
+    }
+  } catch (error) {
+    console.error('加载资源详情失败:', error)
+    ElMessage.error(`加载资源详情失败: ${error.message || '请稍后重试'}`)
+    // 可以选择返回列表页面或显示错误页面
+    // router.push('/data-resources/list')
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 加载预览数据
+ */
+const loadPreviewData = async () => {
+  if (!resource.value.id) return
+  
+  previewLoading.value = true
+  try {
+    // 这里可以调用预览数据的API
+    // const previewResponse = await dataResourceApi.getResourcePreview(resource.value.id)
+    // previewData.value = previewResponse.data.rows
+    // previewColumns.value = previewResponse.data.columns
+    
+    // 暂时使用模拟数据
+    console.log('加载预览数据...')
+    setTimeout(() => {
+      previewLoading.value = false
+    }, 1000)
+  } catch (error) {
+    console.error('加载预览数据失败:', error)
+    ElMessage.warning('预览数据加载失败')
+    previewLoading.value = false
+  }
 }
 
 /**
@@ -724,10 +929,11 @@ const initAccessChart = () => {
 /**
  * 组件挂载时初始化
  */
-onMounted(() => {
-  // 根据路由参数加载资源详情
-  const resourceId = route.params.id
-  console.log('加载资源详情:', resourceId)
+onMounted(async () => {
+  console.log('ResourceDetail组件挂载，路由参数:', route.params)
+  
+  // 加载资源详情
+  await loadResourceDetail()
   
   // 初始化图表
   setTimeout(() => {
@@ -857,10 +1063,21 @@ onUnmounted(() => {
 }
 
 .owner-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .datasource-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .datasource-desc {
+      color: var(--el-text-color-regular);
+      font-size: 12px;
+    }
+  }
 
 .text-placeholder {
   color: var(--el-text-color-placeholder);

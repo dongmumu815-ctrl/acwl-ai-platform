@@ -51,9 +51,14 @@ class ESTemplateRequest(BaseModel):
     name: str = Field(..., description="模板名称")
     description: Optional[str] = Field(None, description="模板描述")
     datasourceId: int = Field(..., description="数据源ID")
+    dataResourceId: Optional[int] = Field(None, description="数据资源ID")
     indices: List[str] = Field(..., description="索引列表")
     query: Dict[str, Any] = Field(..., description="查询DSL")
     tags: Optional[List[str]] = Field([], description="标签")
+    # 条件锁定相关字段
+    conditionLockTypes: Optional[Dict[str, str]] = Field(None, description="条件锁定类型配置")
+    conditionRanges: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="条件值范围限制配置")
+    allowedOperators: Optional[Dict[str, List[str]]] = Field(None, description="允许的操作符配置")
 
 class ESExplainRequest(BaseModel):
     """ES查询解释请求模型"""
@@ -235,11 +240,15 @@ async def save_es_query_template(
             name=request.name,
             description=request.description,
             datasource_id=request.datasourceId,
+            data_resource_id=request.dataResourceId,
             indices=request.indices,
             query=request.query,
             tags=request.tags,
             is_template=getattr(request, 'isTemplate', True),  # 默认为模板
-            created_by=current_user.id
+            created_by=current_user.id,
+            condition_lock_types=request.conditionLockTypes,
+            condition_ranges=request.conditionRanges,
+            allowed_operators=request.allowedOperators
         )
         
         return {
@@ -248,7 +257,8 @@ async def save_es_query_template(
                 "id": template.id,
                 "name": template.name,
                 "description": template.description,
-                "isTemplate": template.is_template
+                "isTemplate": template.is_template,
+                "dataResourceId": template.data_resource_id
             },
             "message": "查询模板保存成功"
         }
@@ -268,7 +278,9 @@ async def save_es_query_template(
 
 @router.get("/templates")
 async def get_es_query_templates(
-    datasource_id: int = Query(..., description="数据源ID"),
+    datasource_id: Optional[int] = Query(None, description="数据源ID"),
+    data_resource_id: Optional[int] = Query(None, description="数据资源ID"),
+    indices: Optional[str] = Query(None, description="索引名称，多个用逗号分隔"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -279,10 +291,17 @@ async def get_es_query_templates(
         # 创建ES查询模板服务
         template_service = ESQueryTemplateService(db)
         
+        # 解析索引参数
+        indices_list = None
+        if indices:
+            indices_list = [idx.strip() for idx in indices.split(',') if idx.strip()]
+        
         # 获取用户的查询模板列表
         templates = await template_service.get_templates(
             datasource_id=datasource_id,
-            created_by=current_user.id
+            data_resource_id=data_resource_id,
+            created_by=current_user.id,
+            indices=indices_list
         )
         
         # 转换为前端需要的格式
@@ -293,12 +312,16 @@ async def get_es_query_templates(
                 "name": template.name,
                 "description": template.description,
                 "datasourceId": template.datasource_id,
+                "dataResourceId": template.data_resource_id,
                 "indices": template.indices,
                 "query": template.query,
                 "tags": template.tags,
                 "isTemplate": template.is_template,
                 "createdAt": template.created_at.isoformat() if template.created_at else None,
-                "updatedAt": template.updated_at.isoformat() if template.updated_at else None
+                "updatedAt": template.updated_at.isoformat() if template.updated_at else None,
+                "conditionLockTypes": template.condition_lock_types,
+                "conditionRanges": template.condition_ranges,
+                "allowedOperators": template.allowed_operators
             })
         
         return {
@@ -379,6 +402,135 @@ async def get_es_field_mapping(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取字段映射失败: {str(e)}"
+        )
+
+@router.get("/templates/{template_id}")
+async def get_es_query_template(
+    template_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取单个ES查询模板详情
+    """
+    try:
+        # 创建ES查询模板服务
+        template_service = ESQueryTemplateService(db)
+        
+        # 获取查询模板
+        template = await template_service.get_template_by_id(template_id)
+        
+        if not template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="查询模板不存在"
+            )
+        
+        # 检查权限：用户只能访问自己创建的模板
+        if template.created_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权限访问此查询模板"
+            )
+        
+        return {
+            "success": True,
+            "data": {
+                "id": template.id,
+                "name": template.name,
+                "description": template.description,
+                "datasourceId": template.datasource_id,
+                "dataResourceId": template.data_resource_id,
+                "indices": template.indices,
+                "query": template.query,
+                "tags": template.tags,
+                "isTemplate": template.is_template,
+                "createdAt": template.created_at.isoformat() if template.created_at else None,
+                "updatedAt": template.updated_at.isoformat() if template.updated_at else None,
+                "default_params": getattr(template, 'default_params', {}),
+                "conditionLockTypes": template.condition_lock_types,
+                "conditionRanges": template.condition_ranges,
+                "allowedOperators": template.allowed_operators
+            },
+            "message": "获取查询模板成功"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取ES查询模板失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取模板失败: {str(e)}"
+        )
+
+@router.put("/templates/{template_id}")
+async def update_es_query_template(
+    template_id: int,
+    request: ESTemplateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    更新ES查询模板
+    """
+    try:
+        # 创建ES查询模板服务
+        template_service = ESQueryTemplateService(db)
+        
+        # 检查模板是否存在
+        template = await template_service.get_template_by_id(template_id)
+        if not template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="ES查询模板不存在"
+            )
+        
+        # 检查权限（只能修改自己的模板）
+        if template.created_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权修改此模板"
+            )
+        
+        # 更新模板数据
+        updated_template = await template_service.update_template(
+            template_id=template_id,
+            name=request.name,
+            description=request.description,
+            data_resource_id=request.dataResourceId,
+            indices=request.indices,
+            query=request.query,
+            tags=request.tags
+        )
+        
+        if not updated_template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="更新模板失败"
+            )
+        
+        logger.info(f"用户 {current_user.id} 更新了ES查询模板: {updated_template.name}")
+        
+        return {
+            "success": True,
+            "data": {
+                "id": updated_template.id,
+                "name": updated_template.name,
+                "description": updated_template.description,
+                "isTemplate": updated_template.is_template,
+                "dataResourceId": updated_template.data_resource_id
+            },
+            "message": "查询模板更新成功"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新ES查询模板失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新模板失败: {str(e)}"
         )
 
 @router.delete("/templates/{template_id}")

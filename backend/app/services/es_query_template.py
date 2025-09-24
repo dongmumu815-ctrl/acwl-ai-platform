@@ -28,11 +28,15 @@ class ESQueryTemplateService:
         name: str,
         description: Optional[str],
         datasource_id: int,
+        data_resource_id: Optional[int],
         indices: List[str],
         query: Dict[str, Any],
         tags: Optional[List[str]],
         is_template: bool,
-        created_by: int
+        created_by: int,
+        condition_lock_types: Optional[Dict[str, str]] = None,
+        condition_ranges: Optional[Dict[str, Dict[str, Any]]] = None,
+        allowed_operators: Optional[Dict[str, List[str]]] = None
     ) -> ESQueryTemplate:
         """
         创建ES查询模板
@@ -41,16 +45,23 @@ class ESQueryTemplateService:
             name: 模板名称
             description: 模板描述
             datasource_id: 数据源ID
+            data_resource_id: 数据资源ID
             indices: ES索引列表
             query: 查询DSL或可视化查询配置
             tags: 标签列表
             is_template: 是否为模板
             created_by: 创建者用户ID
+            condition_lock_types: 条件锁定类型配置
+            condition_ranges: 条件值范围限制配置
+            allowed_operators: 允许的操作符配置
             
         Returns:
             创建的ES查询模板对象
         """
         try:
+            # 添加调试日志，确认参数传递
+            logger.info(f"创建ES查询模板 - 参数信息: name={name}, datasource_id={datasource_id}, data_resource_id={data_resource_id}, created_by={created_by}")
+            
             # 验证数据源是否存在
             datasource_stmt = select(Datasource).where(Datasource.id == datasource_id)
             datasource_result = await self.db.execute(datasource_stmt)
@@ -64,18 +75,26 @@ class ESQueryTemplateService:
                 name=name,
                 description=description,
                 datasource_id=datasource_id,
+                data_resource_id=data_resource_id,
                 indices=indices or [],
                 query=query,
                 tags=tags or [],
                 is_template=is_template,
-                created_by=created_by
+                created_by=created_by,
+                condition_lock_types=condition_lock_types,
+                condition_ranges=condition_ranges,
+                allowed_operators=allowed_operators
             )
+            
+            # 添加调试日志，确认模板对象的data_resource_id值
+            logger.info(f"创建的模板对象 - data_resource_id: {template.data_resource_id}")
             
             self.db.add(template)
             await self.db.commit()
             await self.db.refresh(template)
             
-            logger.info(f"ES查询模板创建成功: {template.id} - {template.name}")
+            # 添加调试日志，确认保存后的data_resource_id值
+            logger.info(f"ES查询模板创建成功: {template.id} - {template.name}, 保存后的data_resource_id: {template.data_resource_id}")
             return template
             
         except Exception as e:
@@ -86,9 +105,11 @@ class ESQueryTemplateService:
     async def get_templates(
         self,
         datasource_id: Optional[int] = None,
+        data_resource_id: Optional[int] = None,
         created_by: Optional[int] = None,
         is_template: Optional[bool] = None,
         tags: Optional[List[str]] = None,
+        indices: Optional[List[str]] = None,
         limit: int = 100,
         offset: int = 0
     ) -> List[ESQueryTemplate]:
@@ -97,9 +118,11 @@ class ESQueryTemplateService:
         
         Args:
             datasource_id: 数据源ID过滤
+            data_resource_id: 数据资源ID过滤
             created_by: 创建者ID过滤
             is_template: 是否为模板过滤
             tags: 标签过滤
+            indices: 索引名称列表过滤
             limit: 限制数量
             offset: 偏移量
             
@@ -113,6 +136,9 @@ class ESQueryTemplateService:
             if datasource_id is not None:
                 conditions.append(ESQueryTemplate.datasource_id == datasource_id)
             
+            if data_resource_id is not None:
+                conditions.append(ESQueryTemplate.data_resource_id == data_resource_id)
+            
             if created_by is not None:
                 conditions.append(ESQueryTemplate.created_by == created_by)
             
@@ -125,6 +151,13 @@ class ESQueryTemplateService:
                 for tag in tags:
                     tag_conditions.append(ESQueryTemplate.tags.contains([tag]))
                 conditions.append(or_(*tag_conditions))
+            
+            # 索引过滤（模板的索引列表包含任一指定索引）
+            if indices:
+                index_conditions = []
+                for index in indices:
+                    index_conditions.append(ESQueryTemplate.indices.contains([index]))
+                conditions.append(or_(*index_conditions))
             
             # 构建查询语句
             stmt = (
@@ -188,6 +221,7 @@ class ESQueryTemplateService:
         template_id: int,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        data_resource_id: Optional[int] = None,
         indices: Optional[List[str]] = None,
         query: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None
@@ -199,6 +233,7 @@ class ESQueryTemplateService:
             template_id: 模板ID
             name: 新的模板名称
             description: 新的模板描述
+            data_resource_id: 新的数据资源ID
             indices: 新的索引列表
             query: 新的查询配置
             tags: 新的标签列表
@@ -216,6 +251,8 @@ class ESQueryTemplateService:
                 template.name = name
             if description is not None:
                 template.description = description
+            if data_resource_id is not None:
+                template.data_resource_id = data_resource_id
             if indices is not None:
                 template.indices = indices
             if query is not None:

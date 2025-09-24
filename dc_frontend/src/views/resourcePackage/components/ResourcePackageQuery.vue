@@ -26,26 +26,24 @@
           </div>
         </template>
         
-        <!-- 锁定条件展示 -->
-        <div v-if="packageData?.locked_conditions?.length" class="locked-conditions">
-          <h4>锁定条件</h4>
-          <div class="condition-list">
-            <el-tag
-              v-for="(condition, index) in packageData.locked_conditions"
-              :key="index"
-              type="warning"
-              class="condition-tag"
-            >
-              {{ condition.field }} {{ condition.operator }} {{ condition.value }}
+        <!-- 模板信息展示 -->
+        <div class="template-info">
+          <h4>模板信息</h4>
+          <div class="template-details">
+            <el-tag type="primary" class="template-tag">
+              类型: {{ packageData?.template_type || '未知' }}
+            </el-tag>
+            <el-tag v-if="packageData?.template_id" type="info" class="template-tag">
+              模板ID: {{ packageData.template_id }}
             </el-tag>
           </div>
         </div>
       </el-card>
 
-      <!-- 动态查询条件 -->
-      <el-card class="query-form" v-if="packageData?.dynamic_conditions?.length">
+      <!-- 动态查询参数 -->
+      <el-card class="query-form" v-if="packageData?.dynamic_params && Object.keys(packageData.dynamic_params).length">
         <template #header>
-          <span class="section-title">查询条件</span>
+          <span class="section-title">查询参数</span>
         </template>
         
         <el-form
@@ -56,58 +54,39 @@
         >
           <el-row :gutter="20">
             <el-col
-              v-for="condition in packageData.dynamic_conditions"
-              :key="condition.param_name"
+              v-for="(paramValue, paramName) in packageData.dynamic_params"
+              :key="paramName"
               :span="12"
             >
               <el-form-item
-                :label="condition.description || condition.field"
-                :prop="condition.param_name"
-                :required="condition.required"
+                :label="paramName"
+                :prop="paramName"
               >
-                <!-- 不同操作符的输入组件 -->
-                <template v-if="['IN', 'NOT IN'].includes(condition.operator)">
-                  <el-select
-                    v-model="queryForm[condition.param_name]"
-                    multiple
-                    filterable
-                    allow-create
-                    :placeholder="getPlaceholder(condition)"
-                    style="width: 100%"
-                  >
-                    <el-option
-                      v-for="option in getFieldOptions(condition.field)"
-                      :key="option"
-                      :label="option"
-                      :value="option"
-                    />
-                  </el-select>
-                </template>
-                <template v-else-if="condition.operator === 'LIKE'">
-                  <el-input
-                    v-model="queryForm[condition.param_name]"
-                    :placeholder="getPlaceholder(condition)"
-                    prefix-icon="Search"
+                <!-- 根据参数类型显示不同的输入组件 -->
+                <template v-if="typeof paramValue === 'boolean'">
+                  <el-switch
+                    v-model="queryForm[paramName]"
+                    active-text="是"
+                    inactive-text="否"
                   />
                 </template>
-                <template v-else-if="['>', '>=', '<', '<='].includes(condition.operator)">
+                <template v-else-if="typeof paramValue === 'number'">
                   <el-input-number
-                    v-model="queryForm[condition.param_name]"
-                    :placeholder="getPlaceholder(condition)"
+                    v-model="queryForm[paramName]"
+                    :placeholder="`请输入${paramName}`"
                     style="width: 100%"
                   />
                 </template>
                 <template v-else>
                   <el-input
-                    v-model="queryForm[condition.param_name]"
-                    :placeholder="getPlaceholder(condition)"
+                    v-model="queryForm[paramName]"
+                    :placeholder="`请输入${paramName}`"
                   />
                 </template>
                 
-                <div class="condition-info">
+                <div class="param-info">
                   <el-text size="small" type="info">
-                    {{ condition.field }} {{ condition.operator }}
-                    <span v-if="condition.default_value">（默认: {{ condition.default_value }}）</span>
+                    默认值: {{ paramValue }}
                   </el-text>
                 </div>
               </el-form-item>
@@ -121,29 +100,9 @@
         <template #header>
           <span class="section-title">查询选项</span>
         </template>
-        
+<!--         
         <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="排序字段">
-              <el-select v-model="queryOptions.orderField" placeholder="选择排序字段" clearable>
-                <el-option
-                  v-for="field in packageData?.base_config?.fields"
-                  :key="field"
-                  :label="field"
-                  :value="field"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="排序方向">
-              <el-select v-model="queryOptions.orderDirection" placeholder="选择排序方向">
-                <el-option label="升序" value="ASC" />
-                <el-option label="降序" value="DESC" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="查询条数">
               <el-input-number
                 v-model="queryOptions.limit"
@@ -153,7 +112,7 @@
               />
             </el-form-item>
           </el-col>
-        </el-row>
+        </el-row> -->
       </el-card>
 
       <!-- 查询结果 -->
@@ -174,23 +133,42 @@
         <div v-if="queryResults.data?.length">
           <!-- 数据表格 -->
           <el-table
-            :data="queryResults.data"
+            :data="paginatedData"
             stripe
             border
             max-height="400"
             style="width: 100%"
           >
             <el-table-column
-              v-for="field in displayFields"
-              :key="field"
-              :prop="field"
-              :label="field"
-              :min-width="120"
+              v-for="column in resultColumns"
+              :key="column.prop"
+              :prop="column.prop"
+              :label="column.label"
+              :width="column.width"
+              :min-width="column.minWidth"
               show-overflow-tooltip
             >
               <template #default="{ row }">
-                <span v-if="typeof row[field] === 'object'">{{ JSON.stringify(row[field]) }}</span>
-                <span v-else>{{ row[field] }}</span>
+                <span v-if="column.type === 'date'">
+                  {{ formatDate(row[column.columnIndex]) }}
+                </span>
+                <span v-else-if="column.type === 'number'">
+                  {{ formatNumber(row[column.columnIndex]) }}
+                </span>
+                <span v-else-if="column.type === 'boolean'">
+                  <el-tag :type="row[column.columnIndex] ? 'success' : 'info'">
+                    {{ row[column.columnIndex] ? '是' : '否' }}
+                  </el-tag>
+                </span>
+                <el-tag v-else-if="column.type === 'status'" :type="getStatusTagType(row[column.columnIndex])">
+                  {{ row[column.columnIndex] }}
+                </el-tag>
+                <span v-else-if="column.type === 'object'">
+                  {{ JSON.stringify(row[column.columnIndex]) }}
+                </span>
+                <span v-else>
+                  {{ row[column.columnIndex] }}
+                </span>
               </template>
             </el-table-column>
           </el-table>
@@ -293,15 +271,53 @@ const queryRules = computed(() => {
 
 // 计算属性
 const displayFields = computed(() => {
+  // 使用API返回的columns作为显示字段
+  return queryResults.value?.columns || []
+})
+
+/**
+ * 表格列配置
+ * 使用API返回的columns作为表头，并根据数据自动检测列类型设置相应的格式化
+ */
+const resultColumns = computed(() => {
+  // 如果没有columns信息或没有数据，返回空数组
+  if (!queryResults.value?.columns?.length || !queryResults.value?.data?.length) return []
+  
+  const firstRow = queryResults.value.data[0]
+  
+  return queryResults.value.columns.map((columnName, index) => {
+    // 获取对应位置的数据值用于类型检测
+    const value = Array.isArray(firstRow) ? firstRow[index] : firstRow[columnName]
+    
+    const column = {
+      prop: index.toString(), // 使用索引作为prop，因为数据是数组格式
+      label: columnName, // 直接使用API返回的列名
+      type: detectColumnType(columnName, value),
+      width: undefined as number | undefined,
+      minWidth: getColumnMinWidth(columnName, value),
+      columnIndex: index // 保存列索引用于数据访问
+    }
+    
+    // 根据字段类型设置固定宽度
+    if (column.type === 'boolean') {
+      column.width = 80
+    } else if (column.type === 'date') {
+      column.width = 160
+    } else if (column.type === 'number') {
+      column.width = 120
+    }
+    
+    return column
+  })
+})
+
+/**
+ * 分页数据
+ * 现在使用后端分页，直接返回API数据
+ */
+const paginatedData = computed(() => {
   if (!queryResults.value?.data?.length) return []
-  
-  // 如果配置了查询字段，优先显示配置的字段
-  if (props.packageData?.base_config?.fields?.length) {
-    return props.packageData.base_config.fields
-  }
-  
-  // 否则显示结果中的所有字段
-  return Object.keys(queryResults.value.data[0])
+  return queryResults.value.data
 })
 
 // 监听器
@@ -315,6 +331,191 @@ watch(() => props.visible, (newVal) => {
 watch(dialogVisible, (newVal) => {
   emit('update:visible', newVal)
 })
+
+// 辅助函数
+
+/**
+ * 检测列数据类型
+ * @param fieldName 字段名
+ * @param value 字段值
+ */
+const detectColumnType = (fieldName: string, value: any): string => {
+  // 根据字段名判断
+  const fieldLower = fieldName.toLowerCase()
+  
+  if (fieldLower.includes('time') || fieldLower.includes('date') || fieldLower.includes('created') || fieldLower.includes('updated')) {
+    return 'date'
+  }
+  
+  if (fieldLower.includes('status') || fieldLower.includes('state')) {
+    return 'status'
+  }
+  
+  // 根据值类型判断
+  if (typeof value === 'boolean') {
+    return 'boolean'
+  }
+  
+  if (typeof value === 'number') {
+    return 'number'
+  }
+  
+  if (typeof value === 'object' && value !== null) {
+    return 'object'
+  }
+  
+  // 检查是否为日期字符串
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return 'date'
+  }
+  
+  return 'string'
+}
+
+/**
+ * 获取列标签（友好的显示名称）
+ * @param fieldName 字段名
+ */
+const getColumnLabel = (fieldName: string): string => {
+  // 字段名映射表
+  const labelMap: Record<string, string> = {
+    'id': 'ID',
+    'name': '名称',
+    'title': '标题',
+    'description': '描述',
+    'status': '状态',
+    'state': '状态',
+    'type': '类型',
+    'created_at': '创建时间',
+    'updated_at': '更新时间',
+    'created_time': '创建时间',
+    'updated_time': '更新时间',
+    'create_time': '创建时间',
+    'update_time': '更新时间',
+    'is_active': '是否激活',
+    'is_deleted': '是否删除',
+    'is_enabled': '是否启用',
+    'count': '数量',
+    'total': '总计',
+    'amount': '金额',
+    'price': '价格',
+    'email': '邮箱',
+    'phone': '电话',
+    'address': '地址',
+    'remark': '备注',
+    'comment': '评论'
+  }
+  
+  // 先查找完全匹配
+  if (labelMap[fieldName.toLowerCase()]) {
+    return labelMap[fieldName.toLowerCase()]
+  }
+  
+  // 转换驼峰命名和下划线命名为友好显示
+  return fieldName
+    .replace(/_/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^\w/, c => c.toUpperCase())
+    .trim()
+}
+
+/**
+ * 获取列最小宽度
+ * @param fieldName 字段名
+ * @param value 字段值
+ */
+const getColumnMinWidth = (fieldName: string, value: any): number => {
+  const label = getColumnLabel(fieldName)
+  const labelLength = label.length * 14 // 估算字符宽度
+  const valueLength = String(value || '').length * 8
+  
+  return Math.max(labelLength, valueLength, 80)
+}
+
+/**
+ * 格式化日期
+ * @param date 日期字符串或对象
+ */
+const formatDate = (date: string | Date): string => {
+  if (!date) return ''
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) return String(date)
+    
+    return dateObj.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } catch (error) {
+    return String(date)
+  }
+}
+
+/**
+ * 格式化数字
+ * @param num 数字
+ */
+const formatNumber = (num: number | string): string => {
+  if (num === null || num === undefined || num === '') return ''
+  
+  const numValue = typeof num === 'string' ? parseFloat(num) : num
+  if (isNaN(numValue)) return String(num)
+  
+  return numValue.toLocaleString('zh-CN')
+}
+
+/**
+ * 获取状态标签类型
+ * @param status 状态值
+ */
+const getStatusTagType = (status: string): 'success' | 'primary' | 'warning' | 'info' | 'danger' => {
+  if (!status) return 'info'
+  
+  const statusLower = String(status).toLowerCase()
+  const statusMap: Record<string, 'success' | 'primary' | 'warning' | 'info' | 'danger'> = {
+    'active': 'success',
+    'enabled': 'success',
+    'success': 'success',
+    'completed': 'success',
+    'finished': 'success',
+    'approved': 'success',
+    '激活': 'success',
+    '启用': 'success',
+    '成功': 'success',
+    '完成': 'success',
+    '通过': 'success',
+    
+    'inactive': 'info',
+    'disabled': 'info',
+    'draft': 'info',
+    '禁用': 'info',
+    '草稿': 'info',
+    '待处理': 'info',
+    
+    'pending': 'warning',
+    'processing': 'warning',
+    'waiting': 'warning',
+    '处理中': 'warning',
+    '等待': 'warning',
+    '审核中': 'warning',
+    
+    'failed': 'danger',
+    'error': 'danger',
+    'deleted': 'danger',
+    'rejected': 'danger',
+    '失败': 'danger',
+    '错误': 'danger',
+    '删除': 'danger',
+    '拒绝': 'danger'
+  }
+  
+  return statusMap[statusLower] || 'primary'
+}
 
 // 方法
 const initializeForm = () => {
@@ -386,8 +587,8 @@ const executeQuery = async () => {
       parameters: { ...queryForm },
       order_field: queryOptions.orderField || undefined,
       order_direction: queryOptions.orderDirection,
-      limit: queryOptions.limit,
-      offset: (currentPage.value - 1) * pageSize.value
+      limit: queryOptions.limit
+      // 移除offset，使用前端分页
     }
     
     const response = await resourcePackageApi.query(props.packageData.id, queryRequest)
@@ -406,12 +607,12 @@ const executeQuery = async () => {
 const handleSizeChange = (newSize: number) => {
   pageSize.value = newSize
   currentPage.value = 1
-  executeQuery()
+  // 前端分页不需要重新查询，数据会自动更新
 }
 
 const handleCurrentChange = (newPage: number) => {
   currentPage.value = newPage
-  executeQuery()
+  // 前端分页不需要重新查询，数据会自动更新
 }
 
 const exportResults = async () => {

@@ -17,9 +17,8 @@ from app.models.resource_package import (
 )
 from app.schemas.resource_package import (
     ResourcePackageCreate, ResourcePackageUpdate, ResourcePackage as ResourcePackageSchema,
-    ResourcePackageListResponse, ResourcePackageSearchRequest,
+    ResourcePackageResponse, ResourcePackageListResponse, ResourcePackageSearchRequest,
     ResourcePackageQueryRequest, ResourcePackageQueryResponse,
-    ResourcePackageParamsResponse, ResourcePackageParamInfo,
     PermissionType, QueryStatus, PackageType
 )
 from app.services.data_resource_service import DataResourceService
@@ -27,6 +26,7 @@ from app.services.elasticsearch_service import ElasticsearchService
 import json
 import time
 import logging
+from jinja2 import Template
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +62,9 @@ class ResourcePackageService:
             type=package_data.type,
             datasource_id=package_data.datasource_id,
             resource_id=package_data.resource_id,
-            base_config=package_data.base_config.dict(),
-            locked_conditions=[cond.dict() for cond in package_data.locked_conditions],
-            dynamic_conditions=[cond.dict() for cond in package_data.dynamic_conditions],
-            order_config=package_data.order_config.dict() if package_data.order_config else None,
-            limit_config=package_data.limit_config,
+            template_id=package_data.template_id,
+            template_type=package_data.template_type,
+            dynamic_params=package_data.dynamic_params,
             is_active=package_data.is_active,
             created_by=user_id
         )
@@ -144,16 +142,12 @@ class ResourcePackageService:
             package.name = package_data.name
         if package_data.description is not None:
             package.description = package_data.description
-        if package_data.base_config is not None:
-            package.base_config = package_data.base_config.dict()
-        if package_data.locked_conditions is not None:
-            package.locked_conditions = [cond.dict() for cond in package_data.locked_conditions]
-        if package_data.dynamic_conditions is not None:
-            package.dynamic_conditions = [cond.dict() for cond in package_data.dynamic_conditions]
-        if package_data.order_config is not None:
-            package.order_config = package_data.order_config.dict()
-        if package_data.limit_config is not None:
-            package.limit_config = package_data.limit_config
+        if package_data.template_id is not None:
+            package.template_id = package_data.template_id
+        if package_data.template_type is not None:
+            package.template_type = package_data.template_type
+        if package_data.dynamic_params is not None:
+            package.dynamic_params = package_data.dynamic_params
         if package_data.is_active is not None:
             package.is_active = package_data.is_active
         
@@ -335,35 +329,7 @@ class ResourcePackageService:
             size=search_req.size
         )
     
-    async def get_package_params(self, package_id: int, user_id: int) -> ResourcePackageParamsResponse:
-        """获取资源包参数信息"""
-        # 检查权限
-        if not await self._check_permission(package_id, user_id, PermissionType.READ):
-            raise HTTPException(status_code=403, detail="无权限访问此资源包")
-        
-        query = select(ResourcePackage).where(ResourcePackage.id == package_id)
-        result = await self.db.execute(query)
-        package = result.scalar_one_or_none()
-        
-        if not package:
-            raise HTTPException(status_code=404, detail="资源包不存在")
-        
-        # 获取动态参数信息
-        params = []
-        for condition in package.dynamic_conditions:
-            param_info = ResourcePackageParamInfo(
-                field=condition["field"],
-                operator=condition["operator"],
-                required=condition.get("required", True),
-                description=condition.get("description", f"请输入{condition['field']}的值")
-            )
-            params.append(param_info)
-        
-        return ResourcePackageParamsResponse(
-            package_id=package_id,
-            package_name=package.name,
-            params=params
-        )
+
     
     async def query_package(self, package_id: int, query_req: ResourcePackageQueryRequest, user_id: int) -> ResourcePackageQueryResponse:
         """执行资源包查询"""
@@ -399,7 +365,7 @@ class ResourcePackageService:
             result_count = len(query_result["data"])
             
         except Exception as e:
-            status = QueryStatus.FAILED
+            status = QueryStatus.ERROR
             error_message = str(e)
             query_result = {
                 "data": [],
@@ -428,137 +394,44 @@ class ResourcePackageService:
     
     async def _execute_sql_query(self, package: ResourcePackage, query_req: ResourcePackageQueryRequest) -> Dict[str, Any]:
         """执行SQL查询"""
-        # 构建SQL查询
-        base_config = package.base_config
-        table_name = base_config.get("table_name")
-        select_fields = base_config.get("select_fields", ["*"])
+        # 获取SQL查询模板
+        template = package.template
+        if not template:
+            raise HTTPException(status_code=400, detail="未找到关联的SQL查询模板")
         
-        if not table_name:
-            raise HTTPException(status_code=400, detail="资源包配置错误：缺少表名")
+        # 获取模板的查询内容
+        template_query = template.query
+        if not template_query:
+            raise HTTPException(status_code=400, detail="查询模板内容为空")
         
-        # 构建SELECT子句
-        if isinstance(select_fields, list) and select_fields:
-            fields_str = ", ".join(select_fields)
-        else:
-            fields_str = "*"
+        # 合并参数：资源包动态参数 + 请求参数
+        effective_params = package.get_effective_params(query_req.dynamic_params)
         
-        sql = f"SELECT {fields_str} FROM {table_name}"
-        
-        # 构建WHERE条件
-        conditions = []
-        params = {}
-        
-        # 添加锁定条件
-        for i, condition in enumerate(package.locked_conditions):
-            field = condition["field"]
-            operator = condition["operator"]
-            value = condition["value"]
-            
-            param_name = f"locked_{i}"
-            if operator == "=":
-                conditions.append(f"{field} = :{param_name}")
-                params[param_name] = value
-            elif operator == "!=":
-                conditions.append(f"{field} != :{param_name}")
-                params[param_name] = value
-            elif operator == ">":
-                conditions.append(f"{field} > :{param_name}")
-                params[param_name] = value
-            elif operator == ">=":
-                conditions.append(f"{field} >= :{param_name}")
-                params[param_name] = value
-            elif operator == "<":
-                conditions.append(f"{field} < :{param_name}")
-                params[param_name] = value
-            elif operator == "<=":
-                conditions.append(f"{field} <= :{param_name}")
-                params[param_name] = value
-            elif operator == "LIKE":
-                conditions.append(f"{field} LIKE :{param_name}")
-                params[param_name] = f"%{value}%"
-            elif operator == "IN":
-                if isinstance(value, list):
-                    placeholders = ", ".join([f":{param_name}_{j}" for j in range(len(value))])
-                    conditions.append(f"{field} IN ({placeholders})")
-                    for j, v in enumerate(value):
-                        params[f"{param_name}_{j}"] = v
-            elif operator == "IS NULL":
-                conditions.append(f"{field} IS NULL")
-            elif operator == "IS NOT NULL":
-                conditions.append(f"{field} IS NOT NULL")
-        
-        # 添加动态条件
-        for i, condition in enumerate(package.dynamic_conditions):
-            field = condition["field"]
-            operator = condition["operator"]
-            
-            # 从请求参数中获取值
-            param_key = field
-            if param_key not in query_req.dynamic_params:
-                if condition.get("required", True):
-                    raise HTTPException(status_code=400, detail=f"缺少必需参数: {param_key}")
-                continue
-            
-            value = query_req.dynamic_params[param_key]
-            param_name = f"dynamic_{i}"
-            
-            if operator == "=":
-                conditions.append(f"{field} = :{param_name}")
-                params[param_name] = value
-            elif operator == "!=":
-                conditions.append(f"{field} != :{param_name}")
-                params[param_name] = value
-            elif operator == ">":
-                conditions.append(f"{field} > :{param_name}")
-                params[param_name] = value
-            elif operator == ">=":
-                conditions.append(f"{field} >= :{param_name}")
-                params[param_name] = value
-            elif operator == "<":
-                conditions.append(f"{field} < :{param_name}")
-                params[param_name] = value
-            elif operator == "<=":
-                conditions.append(f"{field} <= :{param_name}")
-                params[param_name] = value
-            elif operator == "LIKE":
-                conditions.append(f"{field} LIKE :{param_name}")
-                params[param_name] = f"%{value}%"
-            elif operator == "IN":
-                if isinstance(value, list):
-                    placeholders = ", ".join([f":{param_name}_{j}" for j in range(len(value))])
-                    conditions.append(f"{field} IN ({placeholders})")
-                    for j, v in enumerate(value):
-                        params[f"{param_name}_{j}"] = v
-        
-        # 添加WHERE子句
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
-        
-        # 添加排序
-        if package.order_config:
-            order_field = package.order_config.get("field")
-            order_direction = package.order_config.get("direction", "ASC")
-            if order_field:
-                sql += f" ORDER BY {order_field} {order_direction}"
-        
-        # 添加限制
-        limit = query_req.limit or package.limit_config or 100
-        sql += f" LIMIT {limit}"
-        
+        # 处理分页参数
+        if query_req.limit:
+            effective_params['limit'] = query_req.limit
         if query_req.offset:
-            sql += f" OFFSET {query_req.offset}"
+            effective_params['offset'] = query_req.offset
+        
+        # 使用模板引擎渲染查询
+        try:
+            from jinja2 import Template
+            jinja_template = Template(template_query)
+            rendered_query = jinja_template.render(**effective_params)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"查询模板渲染失败: {str(e)}")
         
         # 执行查询
         try:
             # 使用数据资源服务执行查询
             query_result = await self.data_resource_service.execute_sql_query(
-                package.datasource_id, sql, params
+                package.datasource_id, rendered_query, effective_params
             )
             
             return {
                 "data": query_result.get("data", []),
                 "total": len(query_result.get("data", [])),
-                "query": sql
+                "query": rendered_query
             }
         except Exception as e:
             logger.error(f"SQL查询执行失败: {e}")
@@ -566,62 +439,46 @@ class ResourcePackageService:
     
     async def _execute_es_query(self, package: ResourcePackage, query_req: ResourcePackageQueryRequest) -> Dict[str, Any]:
         """执行Elasticsearch查询"""
-        # 构建ES查询
-        base_config = package.base_config
-        index_name = base_config.get("index_name")
+        # 获取查询模板
+        if not package.template:
+            raise HTTPException(status_code=400, detail="资源包未配置查询模板")
         
-        if not index_name:
-            raise HTTPException(status_code=400, detail="资源包配置错误：缺少索引名")
+        # 获取查询内容
+        query_content = package.get_query_content()
+        if not query_content:
+            raise HTTPException(status_code=400, detail="查询模板内容为空")
         
-        # 构建查询体
-        query_body = {
-            "query": {
-                "bool": {
-                    "must": []
-                }
-            }
-        }
+        # 合并动态参数
+        effective_params = package.get_effective_params(query_req.dynamic_params)
         
-        # 添加锁定条件
-        for condition in package.locked_conditions:
-            es_condition = self._build_es_condition(
-                condition["field"], condition["operator"], condition["value"]
-            )
-            if es_condition:
-                query_body["query"]["bool"]["must"].append(es_condition)
-        
-        # 添加动态条件
-        for condition in package.dynamic_conditions:
-            field = condition["field"]
-            operator = condition["operator"]
+        # 渲染查询模板
+        try:
+            template = Template(query_content)
+            rendered_query = template.render(**effective_params)
             
-            # 从请求参数中获取值
-            if field not in query_req.dynamic_params:
-                if condition.get("required", True):
-                    raise HTTPException(status_code=400, detail=f"缺少必需参数: {field}")
-                continue
+            # 解析为JSON
+            query_body = json.loads(rendered_query)
             
-            value = query_req.dynamic_params[field]
-            es_condition = self._build_es_condition(field, operator, value)
-            if es_condition:
-                query_body["query"]["bool"]["must"].append(es_condition)
+        except json.JSONDecodeError as e:
+            logger.error(f"ES查询模板JSON解析失败: {e}")
+            raise HTTPException(status_code=400, detail=f"查询模板JSON格式错误: {str(e)}")
+        except Exception as e:
+            logger.error(f"ES查询模板渲染失败: {e}")
+            raise HTTPException(status_code=400, detail=f"查询模板渲染失败: {str(e)}")
         
-        # 添加排序
-        if package.order_config:
-            order_field = package.order_config.get("field")
-            order_direction = package.order_config.get("direction", "asc").lower()
-            if order_field:
-                query_body["sort"] = [{order_field: {"order": order_direction}}]
-        
-        # 添加分页
-        limit = query_req.limit or package.limit_config or 100
-        query_body["size"] = limit
-        
+        # 添加分页参数
+        if query_req.limit:
+            query_body["size"] = query_req.limit
         if query_req.offset:
             query_body["from"] = query_req.offset
         
         # 执行查询
         try:
+            # 从模板参数中获取索引名
+            index_name = effective_params.get("index_name")
+            if not index_name:
+                raise HTTPException(status_code=400, detail="查询模板缺少索引名参数")
+            
             result = await self.es_service.search(index_name, query_body)
             
             return {
@@ -632,32 +489,7 @@ class ResourcePackageService:
         except Exception as e:
             logger.error(f"ES查询执行失败: {e}")
             raise HTTPException(status_code=500, detail=f"查询执行失败: {str(e)}")
-    
-    def _build_es_condition(self, field: str, operator: str, value: Any) -> Optional[Dict[str, Any]]:
-        """构建ES查询条件"""
-        if operator == "=":
-            return {"term": {field: value}}
-        elif operator == "!=":
-            return {"bool": {"must_not": {"term": {field: value}}}}
-        elif operator == ">":
-            return {"range": {field: {"gt": value}}}
-        elif operator == ">=":
-            return {"range": {field: {"gte": value}}}
-        elif operator == "<":
-            return {"range": {field: {"lt": value}}}
-        elif operator == "<=":
-            return {"range": {field: {"lte": value}}}
-        elif operator == "LIKE":
-            return {"wildcard": {field: f"*{value}*"}}
-        elif operator == "IN":
-            if isinstance(value, list):
-                return {"terms": {field: value}}
-        elif operator == "EXISTS":
-            return {"exists": {"field": field}}
-        elif operator == "NOT EXISTS":
-            return {"bool": {"must_not": {"exists": {"field": field}}}}
-        
-        return None
+
     
     async def _check_permission(self, package_id: int, user_id: int, required_permission: PermissionType) -> bool:
         """检查用户权限"""
@@ -716,7 +548,7 @@ async def create_resource_package(
     return await service.create_package(package_data, current_user.id)
 
 
-@router.get("/{package_id}", response_model=ResourcePackageSchema)
+@router.get("/{package_id}", response_model=ResourcePackageResponse)
 async def get_resource_package(
     package_id: int,
     db: AsyncSession = Depends(get_db),
@@ -765,16 +597,6 @@ async def search_resource_packages(
         message="查询成功"
     )
 
-
-@router.get("/{package_id}/params", response_model=ResourcePackageParamsResponse)
-async def get_package_params(
-    package_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """获取资源包参数信息"""
-    service = ResourcePackageService(db)
-    return await service.get_package_params(package_id, current_user.id)
 
 
 @router.post("/{package_id}/query", response_model=ResourcePackageQueryResponse)

@@ -317,9 +317,13 @@ export function saveESQueryTemplate(template: {
   name: string
   description?: string
   datasourceId: number
+  dataResourceId?: number
   indices: string[]
   query: any
   tags?: string[]
+  conditionLockTypes?: Record<string, string>
+  conditionRanges?: Record<string, { min: string; max: string }>
+  allowedOperators?: Record<string, string[]>
 }): Promise<{ data: { id: number } }> {
   return request({
     url: '/es/templates',
@@ -344,12 +348,39 @@ export function getESQueryTemplates(datasourceId?: number): Promise<{
     tags: string[]
     createdAt: string
     updatedAt: string
+    conditionLockTypes?: Record<string, string>
+    conditionRanges?: Record<string, { min: string; max: string }>
+    allowedOperators?: Record<string, string[]>
   }>
 }> {
   return request({
     url: '/es/templates',
     method: 'get',
     params: datasourceId ? { datasourceId } : {}
+  })
+}
+
+/**
+ * 更新ES查询模板
+ * @param templateId 模板ID
+ * @param template 查询模板数据
+ * @returns 更新结果
+ */
+export function updateESQueryTemplate(templateId: number, template: {
+  name: string
+  description?: string
+  datasourceId: number
+  indices: string[]
+  query: any
+  tags?: string[]
+  conditionLockTypes?: Record<string, string>
+  conditionRanges?: Record<string, { min: string; max: string }>
+  allowedOperators?: Record<string, string[]>
+}): Promise<{ data: { id: number; name: string; description: string; isTemplate: boolean } }> {
+  return request({
+    url: `/es/templates/${templateId}`,
+    method: 'put',
+    data: template
   })
 }
 

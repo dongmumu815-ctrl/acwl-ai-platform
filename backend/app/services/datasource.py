@@ -1666,7 +1666,9 @@ class DatasourceService:
         datasource: Datasource,
         query: str,
         limit: int = 100,
-        timeout: int = 30
+        timeout: int = 30,
+        offset: int = 0,
+        enable_pagination: bool = False
     ) -> Dict[str, Any]:
         """
         执行数据源查询
@@ -1676,23 +1678,25 @@ class DatasourceService:
             query: SQL查询语句
             limit: 结果限制
             timeout: 超时时间（秒）
+            offset: 偏移量（用于分页）
+            enable_pagination: 是否启用真正的分页（计算总数）
             
         Returns:
-            查询结果字典，包含columns、data、row_count等字段
+            查询结果字典，包含columns、data、row_count、total_count等字段
         """
         try:
             if datasource.datasource_type == DatasourceType.MYSQL:
-                return await self._execute_mysql_query(datasource, query, limit, timeout)
+                return await self._execute_mysql_query(datasource, query, limit, timeout, offset, enable_pagination)
             elif datasource.datasource_type == DatasourceType.POSTGRESQL:
-                return await self._execute_postgresql_query(datasource, query, limit, timeout)
+                return await self._execute_postgresql_query(datasource, query, limit, timeout, offset, enable_pagination)
             elif datasource.datasource_type == DatasourceType.DORIS:
-                return await self._execute_doris_query(datasource, query, limit, timeout)
+                return await self._execute_doris_query(datasource, query, limit, timeout, offset, enable_pagination)
             elif datasource.datasource_type == DatasourceType.ORACLE:
-                return await self._execute_oracle_query(datasource, query, limit, timeout)
+                return await self._execute_oracle_query(datasource, query, limit, timeout, offset, enable_pagination)
             elif datasource.datasource_type == DatasourceType.SQLSERVER:
-                return await self._execute_sqlserver_query(datasource, query, limit, timeout)
+                return await self._execute_sqlserver_query(datasource, query, limit, timeout, offset, enable_pagination)
             elif datasource.datasource_type == DatasourceType.CLICKHOUSE:
-                return await self._execute_clickhouse_query(datasource, query, limit, timeout)
+                return await self._execute_clickhouse_query(datasource, query, limit, timeout, offset, enable_pagination)
             else:
                 raise ValidationError(f"不支持的数据源类型: {datasource.datasource_type}")
         except Exception as e:
@@ -1704,10 +1708,20 @@ class DatasourceService:
         datasource: Datasource,
         query: str,
         limit: int,
-        timeout: int
+        timeout: int,
+        offset: int = 0,
+        enable_pagination: bool = False
     ) -> Dict[str, Any]:
         """
         执行MySQL查询
+        
+        Args:
+            datasource: 数据源对象
+            query: SQL查询语句
+            limit: 结果限制
+            timeout: 超时时间（秒）
+            offset: 偏移量（用于分页）
+            enable_pagination: 是否启用真正的分页（计算总数）
         """
         try:
             import aiomysql
@@ -1761,11 +1775,21 @@ class DatasourceService:
                 async with connection.cursor() as cursor:
                     await cursor.execute(f"USE `{target_database}`")
             
-            # 添加LIMIT子句
-            limited_query = self._add_limit_to_query(query, limit)
+            total_count = 0
+            
+            # 如果启用分页，先执行COUNT查询获取总数
+            if enable_pagination:
+                count_query = self._create_count_query(query)
+                async with connection.cursor() as cursor:
+                    await cursor.execute(count_query)
+                    count_result = await cursor.fetchone()
+                    total_count = count_result[0] if count_result else 0
+            
+            # 执行分页查询
+            paginated_query = self._add_pagination_to_query(query, limit, offset)
             
             async with connection.cursor() as cursor:
-                await cursor.execute(limited_query)
+                await cursor.execute(paginated_query)
                 
                 # 获取列名
                 columns = [desc[0] for desc in cursor.description] if cursor.description else []
@@ -1786,11 +1810,19 @@ class DatasourceService:
                             converted_row.append(str(value))
                     data.append(converted_row)
                 
-                return {
+                result = {
                     'columns': columns,
                     'data': data,
                     'row_count': len(data)
                 }
+                
+                # 如果启用分页，添加总数信息
+                if enable_pagination:
+                    result['total_count'] = total_count
+                else:
+                    result['total_count'] = len(data)
+                
+                return result
                 
         except Exception as e:
             self.logger.error(f"MySQL查询执行失败: {str(e)}")
@@ -1820,7 +1852,9 @@ class DatasourceService:
         datasource: Datasource,
         query: str,
         limit: int,
-        timeout: int
+        timeout: int,
+        offset: int = 0,
+        enable_pagination: bool = False
     ) -> Dict[str, Any]:
         """
         执行Doris查询
@@ -1830,9 +1864,11 @@ class DatasourceService:
             query: SQL查询语句
             limit: 结果限制
             timeout: 超时时间（秒）
+            offset: 偏移量（用于分页）
+            enable_pagination: 是否启用真正的分页（计算总数）
             
         Returns:
-            查询结果字典，包含columns、data、row_count等字段
+            查询结果字典，包含columns、data、row_count、total_count等字段
         """
         import aiomysql
         
@@ -1872,11 +1908,21 @@ class DatasourceService:
                 async with connection.cursor() as cursor:
                     await cursor.execute(f"USE `{target_database}`")
             
-            # 添加LIMIT子句
-            limited_query = self._add_limit_to_query(query, limit)
+            total_count = None
+            
+            # 如果启用分页，先执行COUNT查询获取总数
+            if enable_pagination:
+                count_query = self._create_count_query(query)
+                async with connection.cursor() as cursor:
+                    await cursor.execute(count_query)
+                    count_result = await cursor.fetchone()
+                    total_count = count_result[0] if count_result else 0
+            
+            # 执行分页查询
+            paginated_query = self._add_pagination_to_query(query, limit, offset)
             
             async with connection.cursor() as cursor:
-                await cursor.execute(limited_query)
+                await cursor.execute(paginated_query)
                 
                 # 获取列名
                 columns = [desc[0] for desc in cursor.description] if cursor.description else []
@@ -1897,11 +1943,17 @@ class DatasourceService:
                             converted_row.append(str(value))
                     data.append(converted_row)
                 
-                return {
+                result = {
                     'columns': columns,
                     'data': data,
                     'row_count': len(data)
                 }
+                
+                # 如果启用分页，添加总数信息
+                if enable_pagination:
+                    result['total_count'] = total_count
+                
+                return result
                 
         except Exception as e:
             self.logger.error(f"Doris查询执行失败: {str(e)}")
@@ -1954,7 +2006,7 @@ class DatasourceService:
     
     def _add_limit_to_query(self, query: str, limit: int) -> str:
         """
-        为查询添加LIMIT子句
+        为查询添加LIMIT子句（向后兼容方法）
         """
         query = query.strip()
         query_upper = query.upper()
@@ -1965,6 +2017,58 @@ class DatasourceService:
         
         # 添加LIMIT子句
         return f"{query} LIMIT {limit}"
+    
+    def _create_count_query(self, query: str) -> str:
+        """
+        创建COUNT查询以获取总记录数
+        
+        Args:
+            query: 原始SQL查询
+            
+        Returns:
+            COUNT查询语句
+        """
+        query = query.strip()
+        
+        # 移除末尾的分号
+        if query.endswith(';'):
+            query = query[:-1]
+        
+        # 将原查询包装为子查询来计算总数
+        count_query = f"SELECT COUNT(*) FROM ({query}) AS count_subquery"
+        
+        return count_query
+    
+    def _add_pagination_to_query(self, query: str, limit: int, offset: int) -> str:
+        """
+        为查询添加分页子句（LIMIT和OFFSET）
+        
+        Args:
+            query: 原始SQL查询
+            limit: 限制条数
+            offset: 偏移量
+            
+        Returns:
+            带分页的SQL查询
+        """
+        query = query.strip()
+        query_upper = query.upper()
+        
+        # 移除末尾的分号
+        if query.endswith(';'):
+            query = query[:-1]
+        
+        # 如果已经有LIMIT子句，先移除它
+        if 'LIMIT' in query_upper:
+            # 简单的LIMIT移除逻辑，可能需要更复杂的解析
+            import re
+            query = re.sub(r'\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?', '', query, flags=re.IGNORECASE)
+        
+        # 添加新的LIMIT和OFFSET子句
+        if offset > 0:
+            return f"{query} LIMIT {limit} OFFSET {offset}"
+        else:
+            return f"{query} LIMIT {limit}"
     
     def _extract_table_names_from_sql(self, sql: str) -> List[str]:
         """
