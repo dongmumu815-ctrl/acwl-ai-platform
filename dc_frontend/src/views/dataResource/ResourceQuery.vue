@@ -241,9 +241,18 @@ const onSQLQuerySave = async (queryData) => {
     }
     
     // 调用API保存模板
-    await saveSQLTemplate(templateData)
+    const response = await saveSQLTemplate(templateData)
     
     console.log('SQL查询模板保存成功:', templateData)
+    console.log('保存响应:', response)
+    
+    // 获取返回的模板ID并设置到SQLQueryBuilder组件中
+    if (response && response.data && response.data.id && sqlQueryBuilderRef.value) {
+      const templateId = response.data.id
+      console.log('✅ 获取到保存的模板ID:', templateId)
+      sqlQueryBuilderRef.value.setCurrentTemplateId(templateId)
+    }
+    
     ElMessage.success('SQL查询模板保存成功')
   } catch (error) {
     console.error('保存SQL查询模板失败:', error)

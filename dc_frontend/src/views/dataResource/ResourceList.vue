@@ -137,7 +137,7 @@
             </div>
           </template>
         </el-table-column>
-        
+<!--         
         <el-table-column prop="size" label="大小" width="100">
           <template #default="{ row }">
             {{ formatSize(row.size) }}
@@ -149,7 +149,7 @@
             <span v-if="row.records !== null">{{ formatNumber(row.records) }}</span>
             <span v-else class="text-placeholder">-</span>
           </template>
-        </el-table-column>
+        </el-table-column> -->
         
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -157,11 +157,11 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="lastAccessed" label="最后访问" width="150">
-          <template #default="{ row }">
-            {{ formatDate(row.lastAccessed) }}
-          </template>
-        </el-table-column>
+        <el-table-column  label="最后更新时间" width="180" >
+            <template #default="{ row }">
+              {{ row.updatedAt || '-' }}
+            </template>
+          </el-table-column>
         
         <el-table-column prop="owner" label="所有者" width="120" />
         
@@ -1202,8 +1202,19 @@ const formatNumber = (num: number) => {
 /**
  * 格式化日期
  */
-const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleString('zh-CN');
+const formatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '-';
+  
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      return '-';
+    }
+    return date.toLocaleString('zh-CN');
+  } catch (error) {
+    console.error('日期格式化错误:', error, '原始值:', dateStr);
+    return '-';
+  }
 };
 
 /**
@@ -2169,9 +2180,10 @@ const transformApiDataToTableFormat = (apiData: any) => {
     tableName: apiData.table_name || apiData.index_name,
     size: null, // API暂未返回大小信息
     records: null, // API暂未返回记录数信息
+    updatedAt: apiData.updated_at,
     status: apiData.status,
     lastAccessed: apiData.last_accessed_at,
-    owner: '未知', // API暂未返回所有者信息
+    owner: 'admin', // API暂未返回所有者信息
     createdAt: apiData.created_at,
     tags: apiData.tag_list || [],
     category: apiData.category?.name || '未分类',

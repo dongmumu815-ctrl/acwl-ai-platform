@@ -1742,12 +1742,16 @@ const confirmAddToResourcePackage = async () => {
       type: PackageType.ELASTICSEARCH,
       datasource_id: parseInt(esQueryConfig.datasourceId),
       template_type: 'elasticsearch',
-      template_id: selectedTemplateId.value,
+      template_id: currentTemplateId.value, // 使用当前模板ID而不是选中的模板ID
       dynamic_params: {},
       resource_id: props.dataResourceId ? parseInt(props.dataResourceId) : null,
       tags: resourcePackageForm.tags,
       is_active: true
     }
+    
+    console.log('📦 构建ES资源包数据:', packageData)
+    console.log('🔍 当前模板ID:', currentTemplateId.value)
+    console.log('🔍 选中模板ID:', selectedTemplateId.value)
     
     if (props.isInResourcePackage && props.resourcePackageId) {
       // 更新模式

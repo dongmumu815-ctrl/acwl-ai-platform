@@ -5,7 +5,7 @@
       <div class="welcome-content">
         <h1 class="welcome-title">
           <el-icon><Odometer /></el-icon>
-          欢迎使用 ACWL AI 数据平台
+          欢迎使用 CEPIEC  数据中台
         </h1>
         <p class="welcome-subtitle">智能数据管理，助力业务决策</p>
       </div>
@@ -50,12 +50,18 @@
           <div class="chart-header">
             <h3>数据增长趋势</h3>
             <el-button-group size="small">
-              <el-button :type="trendPeriod === '7d' ? 'primary' : ''" @click="trendPeriod = '7d'">7天</el-button>
-              <el-button :type="trendPeriod === '30d' ? 'primary' : ''" @click="trendPeriod = '30d'">30天</el-button>
-              <el-button :type="trendPeriod === '90d' ? 'primary' : ''" @click="trendPeriod = '90d'">90天</el-button>
+              <el-button :type="trendPeriod === '7d' ? 'primary' : ''" @click="changeTrendPeriod('7d')">7天</el-button>
+              <el-button :type="trendPeriod === '30d' ? 'primary' : ''" @click="changeTrendPeriod('30d')">30天</el-button>
+              <el-button :type="trendPeriod === '90d' ? 'primary' : ''" @click="changeTrendPeriod('90d')">90天</el-button>
             </el-button-group>
           </div>
-          <div class="chart-content" ref="trendChartRef"></div>
+          <div class="chart-content" ref="trendChartRef">
+            <v-chart 
+              class="chart" 
+              :option="trendChartOption" 
+              autoresize
+            />
+          </div>
         </div>
 
         <!-- 数据分布图 -->
@@ -66,7 +72,13 @@
               <el-icon><Refresh /></el-icon>
             </el-button>
           </div>
-          <div class="chart-content" ref="distributionChartRef"></div>
+          <div class="chart-content" ref="distributionChartRef">
+            <v-chart 
+              class="chart" 
+              :option="distributionChartOption" 
+              autoresize
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -119,10 +131,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import VChart from 'vue-echarts'
+import { use } from 'echarts/core'
+import {
+  CanvasRenderer
+} from 'echarts/renderers'
+import {
+  LineChart,
+  BarChart,
+  PieChart
+} from 'echarts/charts'
+import {
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent
+} from 'echarts/components'
+
+// 注册必要的组件
+use([
+  CanvasRenderer,
+  LineChart,
+  BarChart,
+  PieChart,
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent
+])
 
 const router = useRouter()
 const route = useRoute()
@@ -133,7 +173,7 @@ const trendChartRef = ref<HTMLElement>()
 const distributionChartRef = ref<HTMLElement>()
 
 // 响应式数据
-const trendPeriod = ref('7d')
+const trendPeriod = ref('90d')
 
 // 统计数据
 const stats = ref([
@@ -238,6 +278,231 @@ const recentActivities = ref([
     status: { type: 'info', text: '待审核' }
   }
 ])
+
+/**
+ * 生成静态数据 - 从2025年9月开始的日增量数据
+ */
+const generateStaticData = (days: number) => {
+  const startDate = new Date('2025-09-01')
+  const dates: string[] = []
+  const erpData: number[] = []
+  const aixueshuData: number[] = []
+  const processingData: number[] = []
+  
+  for (let i = 0; i < days; i++) {
+    const currentDate = new Date(startDate)
+    currentDate.setDate(startDate.getDate() + i)
+    dates.push(currentDate.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }))
+    
+    // 生成模拟数据，带有一定的随机性和趋势
+    const baseErp = 1200 + i * 15 + Math.random() * 200 - 100
+    const baseAixueshu = 800 + i * 12 + Math.random() * 150 - 75
+    const baseProcessing = 600 + i * 8 + Math.random() * 100 - 50
+    
+    erpData.push(Math.max(0, Math.round(baseErp)))
+    aixueshuData.push(Math.max(0, Math.round(baseAixueshu)))
+    processingData.push(Math.max(0, Math.round(baseProcessing)))
+  }
+  
+  return { dates, erpData, aixueshuData, processingData }
+}
+
+/**
+ * 根据时间周期获取数据
+ */
+const getTrendData = computed(() => {
+  const dayMap = {
+    '7d': 7,
+    '30d': 30,
+    '90d': 90
+  }
+  return generateStaticData(dayMap[trendPeriod.value as keyof typeof dayMap])
+})
+
+/**
+ * 趋势图表配置
+ */
+const trendChartOption = computed(() => {
+  const data = getTrendData.value
+  
+  return {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'cross',
+        label: {
+          backgroundColor: '#6a7985'
+        }
+      }
+    },
+    legend: {
+      data: ['ERP系统', '爱学术平台', '加工平台'],
+      top: 10
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: [
+      {
+        type: 'category',
+        boundaryGap: false,
+        data: data.dates,
+        axisLabel: {
+          rotate: 45
+        }
+      }
+    ],
+    yAxis: [
+      {
+        type: 'value',
+        name: '数据增量',
+        axisLabel: {
+          formatter: '{value}'
+        }
+      }
+    ],
+    series: [
+      {
+        name: 'ERP系统',
+        type: 'line',
+        stack: 'Total',
+        smooth: true,
+        lineStyle: {
+          width: 3
+        },
+        areaStyle: {
+          opacity: 0.3
+        },
+        emphasis: {
+          focus: 'series'
+        },
+        data: data.erpData,
+        itemStyle: {
+          color: '#409EFF'
+        }
+      },
+      {
+        name: '爱学术平台',
+        type: 'bar',
+        data: data.aixueshuData,
+        itemStyle: {
+          color: '#67C23A'
+        }
+      },
+      {
+        name: '加工平台',
+        type: 'line',
+        smooth: true,
+        lineStyle: {
+          width: 2,
+          type: 'dashed'
+        },
+        emphasis: {
+          focus: 'series'
+        },
+        data: data.processingData,
+        itemStyle: {
+          color: '#E6A23C'
+        }
+      }
+    ]
+  }
+})
+
+/**
+ * 数据分布图表配置
+ */
+/**
+ * 计算数据类型分布的配置
+ * @returns {Object} ECharts饼图配置对象
+ */
+const distributionChartOption = computed(() => {
+  return {
+    title: {
+      text: '数据类型分布',
+      left: 'center',
+      textStyle: {
+        fontSize: 16,
+        fontWeight: 'bold'
+      }
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c} ({d}%)'
+    },
+    legend: {
+      orient: 'vertical',
+      left: 'left',
+      top: 'middle'
+    },
+    series: [
+      {
+        name: '数据类型',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        center: ['60%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: '#fff',
+          borderWidth: 2
+        },
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 20,
+            fontWeight: 'bold'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data: [
+          { 
+            value: 42, 
+            name: '图书', 
+            itemStyle: { color: '#5470c6' }
+          },
+          { 
+            value: 28, 
+            name: '期刊文章', 
+            itemStyle: { color: '#91cc75' }
+          },
+          { 
+            value: 15, 
+            name: '会议录', 
+            itemStyle: { color: '#fac858' }
+          },
+          { 
+            value: 10, 
+            name: '学术论文', 
+            itemStyle: { color: '#ee6666' }
+          },
+          { 
+            value: 5, 
+            name: '教材', 
+            itemStyle: { color: '#73c0de' }
+          }
+        ]
+      }
+    ]
+  }
+})
+
+/**
+ * 切换趋势周期
+ */
+const changeTrendPeriod = (period: string) => {
+  trendPeriod.value = period
+  ElMessage.success(`已切换到${period === '7d' ? '7天' : period === '30d' ? '30天' : '90天'}视图`)
+}
 
 /**
  * 格式化时间
@@ -487,11 +752,11 @@ onMounted(() => {
       .chart-content {
         height: 300px;
         padding: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--el-text-color-placeholder);
-        background: var(--el-fill-color-lighter);
+        
+        .chart {
+          width: 100%;
+          height: 100%;
+        }
       }
     }
   }

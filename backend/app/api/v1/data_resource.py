@@ -39,6 +39,7 @@ from app.core.response import success_response, error_response
 from app.core.exceptions import BusinessError, AuthorizationError, NotFoundError
 
 router = APIRouter(prefix="/data-resources", tags=["数据资源中心"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/", response_model=DataResourceResponse, status_code=HTTP_201_CREATED)
@@ -168,7 +169,9 @@ async def get_resource(
         if not resource:
             raise HTTPException(status_code=404, detail="数据资源不存在")
         
-        return success_response(data=resource, message="获取数据资源成功")
+        # 将SQLAlchemy对象转换为Pydantic模型
+        resource_response = DataResourceResponse.model_validate(resource)
+        return success_response(data=resource_response, message="获取数据资源成功")
         
     except HTTPException:
         raise

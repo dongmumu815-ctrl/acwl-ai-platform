@@ -2061,7 +2061,7 @@ const confirmAddToResourcePackage = async () => {
       type: PackageType.SQL,
       datasource_id: queryConfig.datasourceId,
       template_type: 'sql',
-      template_id: selectedTemplateId.value,
+      template_id: currentTemplateId.value, // 使用当前模板ID而不是选中的模板ID
       dynamic_params: queryConfig.conditions.reduce((params: any, condition: any) => {
         params[condition.param_name] = condition.default_value || ''
         return params
@@ -2069,6 +2069,10 @@ const confirmAddToResourcePackage = async () => {
       tags: resourcePackageForm.tags,
       is_active: true
     }
+    
+    console.log('📦 构建资源包数据:', packageData)
+    console.log('🔍 当前模板ID:', currentTemplateId.value)
+    console.log('🔍 选中模板ID:', selectedTemplateId.value)
     
     if (props.isInResourcePackage && props.resourcePackageId) {
       // 更新模式
@@ -2225,6 +2229,15 @@ const onTemplateChange = async (templateId: number | null) => {
   }
 }
 
+/**
+ * 设置当前模板ID
+ * @param templateId 模板ID
+ */
+const setCurrentTemplateId = (templateId: number) => {
+  currentTemplateId.value = templateId
+  console.log('✅ 设置当前模板ID:', templateId)
+}
+
 // 暴露方法给父组件
 defineExpose({
   clearQuery,
@@ -2232,7 +2245,8 @@ defineExpose({
   loadTemplate,
   setQueryResults,
   handleQueryError,
-  resetQueryState
+  resetQueryState,
+  setCurrentTemplateId
 })
 </script>
 
