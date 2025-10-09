@@ -11,10 +11,14 @@
           <p class="page-description">管理和部署您的AI模型</p>
         </div>
         <div class="header-right">
-          <el-button type="primary" @click="showUploadDialog">
+          <PermissionButton 
+            permission="model:create"
+            type="primary" 
+            @click="showUploadDialog"
+          >
             <el-icon><Upload /></el-icon>
             上传模型
-          </el-button>
+          </PermissionButton>
           <el-button @click="refreshModels">
             <el-icon><Refresh /></el-icon>
             刷新
@@ -344,47 +348,62 @@
               </template>
             </el-table-column>
             
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column label="操作" width="250" fixed="right">
               <template #default="{ row }">
-                <el-button size="small" @click="viewModel(row)">
-                  查看
-                </el-button>
-                <el-button
-                  v-if="row.is_active"
-                  type="primary"
-                  size="small"
-                  @click="deployModel(row)"
-                >
-                  部署
-                </el-button>
-                <el-dropdown trigger="click">
-                  <el-button size="small" text>
-                    <el-icon><MoreFilled /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item @click="editModel(row)">
-                        <el-icon><Edit /></el-icon>
-                        编辑
-                      </el-dropdown-item>
-                      <el-dropdown-item @click="cloneModel(row)">
-                        <el-icon><CopyDocument /></el-icon>
-                        克隆
-                      </el-dropdown-item>
-                      <el-dropdown-item @click="downloadModel(row)">
-                        <el-icon><Download /></el-icon>
-                        下载
-                      </el-dropdown-item>
-                      <el-dropdown-item
-                        divided
-                        @click="deleteModel(row)"
-                      >
-                        <el-icon><Delete /></el-icon>
-                        删除
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
+                <div class="table-actions">
+                  <PermissionButton 
+                    permission="model:read"
+                    size="small" 
+                    @click="viewModel(row)"
+                  >
+                    查看
+                  </PermissionButton>
+                  <PermissionButton
+                    v-if="row.is_active"
+                    permission="model:deploy"
+                    type="primary"
+                    size="small"
+                    @click="deployModel(row)"
+                  >
+                    部署
+                  </PermissionButton>
+                  <el-dropdown trigger="click">
+                    <el-button size="small" text>
+                      <el-icon><MoreFilled /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <PermissionWrapper permission="model:update">
+                          <el-dropdown-item @click="editModel(row)">
+                            <el-icon><Edit /></el-icon>
+                            编辑
+                          </el-dropdown-item>
+                        </PermissionWrapper>
+                        <PermissionWrapper permission="model:create">
+                          <el-dropdown-item @click="cloneModel(row)">
+                            <el-icon><CopyDocument /></el-icon>
+                            克隆
+                          </el-dropdown-item>
+                        </PermissionWrapper>
+                        <PermissionWrapper permission="model:read">
+                          <el-dropdown-item @click="downloadModel(row)">
+                            <el-icon><Download /></el-icon>
+                            下载
+                          </el-dropdown-item>
+                        </PermissionWrapper>
+                        <PermissionWrapper permission="model:delete">
+                          <el-dropdown-item
+                            divided
+                            @click="deleteModel(row)"
+                          >
+                            <el-icon><Delete /></el-icon>
+                            删除
+                          </el-dropdown-item>
+                        </PermissionWrapper>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -528,6 +547,7 @@ import {
   CopyDocument
 } from '@element-plus/icons-vue'
 import { modelApi, type Model, ModelType } from '@/api/models'
+import { PermissionButton, PermissionWrapper } from '@/components/Permission'
 
 const router = useRouter()
 
@@ -1187,6 +1207,16 @@ onMounted(() => {
       display: flex;
       justify-content: center;
       margin-top: 20px;
+    }
+    
+    .table-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      
+      .el-button {
+        margin: 0;
+      }
     }
   }
 }

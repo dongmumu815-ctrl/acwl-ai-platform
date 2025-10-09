@@ -10,7 +10,7 @@ from app.schemas.instruction_set import (
     InstructionExecuteRequest, InstructionExecuteResponse,
     InstructionTreeNode, InstructionSetListResponse
 )
-from app.schemas.common import ResponseModel
+from app.schemas.common import SimpleResponseModel as ResponseModel
 from app.services.instruction_executor import InstructionExecutor
 
 router = APIRouter()

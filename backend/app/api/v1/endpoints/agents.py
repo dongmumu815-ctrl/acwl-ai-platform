@@ -24,7 +24,7 @@ from app.schemas.agent import (
     AgentConfigValidationResponse
 )
 from app.services.review_content_safety_agent_db import EnhancedContentSafetyAgentDB
-from app.schemas.common import ResponseModel
+from app.schemas.common import SimpleResponseModel as ResponseModel
 from app.core.logger import logger
 
 router = APIRouter()

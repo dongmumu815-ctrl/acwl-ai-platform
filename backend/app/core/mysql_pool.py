@@ -145,6 +145,5 @@ class MySQLConnectionPool:
 # 全局连接池管理器实例
 mysql_pool_manager = MySQLConnectionPool()
 
-# 在应用关闭时清理连接池
-import atexit
-atexit.register(lambda: asyncio.create_task(mysql_pool_manager.close_all_pools()))
+# 注意：连接池的清理应该在应用的lifespan中处理，而不是在atexit中
+# 因为atexit时事件循环可能已经关闭，无法执行异步操作

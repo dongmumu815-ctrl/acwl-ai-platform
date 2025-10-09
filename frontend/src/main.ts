@@ -9,9 +9,13 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import App from './App.vue'
 import router from './router'
 import { useUserStore } from './stores/user'
+import { setupDirectives } from './directives'
+import { setupPermissionComponents } from './components/Permission'
+import { checkRoutePermission } from '@/utils/permission'
 
 // 样式文件
 import './styles/index.scss'
+import './styles/permission.scss'
 
 // 创建应用实例
 const app = createApp(App)
@@ -31,6 +35,12 @@ app.use(ElementPlus, {
   locale: zhCn,
   size: 'default'
 })
+
+// 注册自定义指令
+setupDirectives(app)
+
+// 注册权限组件
+setupPermissionComponents(app)
 
 // 全局错误处理
 app.config.errorHandler = (err, vm, info) => {
@@ -54,6 +64,12 @@ router.beforeEach(async (to, from, next) => {
   
   const userStore = useUserStore()
   
+  // 如果已登录用户访问登录页，重定向到仪表板
+  if (to.path === '/login' && userStore.isLoggedIn) {
+    next('/dashboard')
+    return
+  }
+  
   // 检查是否需要认证
   if (to.meta.requiresAuth && !userStore.isLoggedIn) {
     // 尝试从本地存储恢复用户信息
@@ -68,17 +84,19 @@ router.beforeEach(async (to, from, next) => {
     }
   }
   
-  // 检查管理员权限
-  if (to.meta.requiresAdmin && !userStore.isAdmin) {
-    ElMessage.error('需要管理员权限')
-    next('/dashboard')
-    return
-  }
+  // 使用新的权限检查逻辑
+  const permissionResult = checkRoutePermission(to)
   
-  // 如果已登录用户访问登录页，重定向到仪表板
-  if (to.path === '/login' && userStore.isLoggedIn) {
-    next('/dashboard')
-    return
+  if (!permissionResult.hasPermission) {
+    if (permissionResult.action === 'redirect') {
+      ElMessage.error(permissionResult.message || '权限不足')
+      next(permissionResult.redirectTo || '/403')
+      return
+    } else if (permissionResult.action === 'deny') {
+      ElMessage.error(permissionResult.message || '权限不足')
+      next(false) // 阻止导航
+      return
+    }
   }
   
   next()

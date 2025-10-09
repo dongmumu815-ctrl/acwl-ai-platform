@@ -1,0 +1,132 @@
+/**
+ * 权限指令样式
+ */
+
+/* 权限禁用状态样式 */
+.permission-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  
+  &:hover {
+    opacity: 0.5 !important;
+  }
+}
+
+/* 按钮禁用状态 */
+.el-button.permission-disabled {
+  background-color: var(--el-button-disabled-bg-color);
+  border-color: var(--el-button-disabled-border-color);
+  color: var(--el-button-disabled-text-color);
+}
+
+/* 输入框禁用状态 */
+.el-input.permission-disabled .el-input__wrapper {
+  background-color: var(--el-disabled-bg-color);
+  border-color: var(--el-disabled-border-color);
+  color: var(--el-disabled-text-color);
+  cursor: not-allowed;
+}
+
+/* 选择器禁用状态 */
+.el-select.permission-disabled .el-input__wrapper {
+  background-color: var(--el-disabled-bg-color);
+  border-color: var(--el-disabled-border-color);
+  color: var(--el-disabled-text-color);
+  cursor: not-allowed;
+}
+
+/* 表格行禁用状态 */
+.el-table__row.permission-disabled {
+  opacity: 0.6;
+  background-color: var(--el-table-row-hover-bg-color);
+  
+  .el-table__cell {
+    color: var(--el-disabled-text-color);
+  }
+}
+
+/* 卡片禁用状态 */
+.el-card.permission-disabled {
+  opacity: 0.6;
+  background-color: var(--el-disabled-bg-color);
+  border-color: var(--el-disabled-border-color);
+  
+  .el-card__header,
+  .el-card__body {
+    color: var(--el-disabled-text-color);
+  }
+}
+
+/* 菜单项禁用状态 */
+.el-menu-item.permission-disabled,
+.el-sub-menu.permission-disabled .el-sub-menu__title {
+  opacity: 0.6;
+  color: var(--el-disabled-text-color) !important;
+  cursor: not-allowed;
+  
+  &:hover {
+    background-color: transparent !important;
+  }
+}
+
+/* 标签页禁用状态 */
+.el-tabs__item.permission-disabled {
+  opacity: 0.6;
+  color: var(--el-disabled-text-color) !important;
+  cursor: not-allowed;
+  
+  &:hover {
+    color: var(--el-disabled-text-color) !important;
+  }
+}
+
+/* 权限提示工具提示 */
+.permission-tooltip {
+  .el-tooltip__trigger {
+    cursor: help;
+  }
+}
+
+/* 权限警告样式 */
+.permission-warning {
+  padding: 8px 12px;
+  background-color: var(--el-color-warning-light-9);
+  border: 1px solid var(--el-color-warning-light-7);
+  border-radius: 4px;
+  color: var(--el-color-warning-dark-2);
+  font-size: 12px;
+  margin: 8px 0;
+  
+  .el-icon {
+    margin-right: 4px;
+  }
+}
+
+/* 权限错误样式 */
+.permission-error {
+  padding: 8px 12px;
+  background-color: var(--el-color-danger-light-9);
+  border: 1px solid var(--el-color-danger-light-7);
+  border-radius: 4px;
+  color: var(--el-color-danger-dark-2);
+  font-size: 12px;
+  margin: 8px 0;
+  
+  .el-icon {
+    margin-right: 4px;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .permission-disabled {
+    opacity: 0.4;
+  }
+  
+  .permission-warning,
+  .permission-error {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+}

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { PERMISSIONS, ROLES } from '@/utils/permission'
 
 // 导入布局组件
 const Layout = () => import('@/layout/index.vue')
@@ -79,7 +80,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       title: '模型管理',
       icon: 'Box',
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.MODEL_READ
     },
     children: [
       {
@@ -89,7 +91,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '模型列表',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.MODEL_READ
         }
       },
       {
@@ -99,7 +102,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '模型上传',
           icon: 'Upload',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.MODEL_CREATE
         }
       },
       {
@@ -109,7 +113,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '服务配置',
           icon: 'Setting',
-          requiresAuth: true
+          requiresAuth: true,
+          permissions: [PERMISSIONS.MODEL_READ, PERMISSIONS.MODEL_UPDATE]
         }
       },
       {
@@ -119,7 +124,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '模型详情',
           hidden: true,
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.MODEL_READ
         }
       }
     ]
@@ -131,7 +137,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       title: '部署管理',
       icon: 'Monitor',
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.MODEL_DEPLOY
     },
     children: [
       {
@@ -141,7 +148,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '部署列表',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.MODEL_DEPLOY
         }
       },
       {
@@ -152,7 +160,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '创建部署',
           icon: 'Plus',
           requiresAuth: true,
-          hideInMenu: true
+          hideInMenu: true,
+          permission: PERMISSIONS.MODEL_DEPLOY
         }
       },
       {
@@ -162,7 +171,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '部署详情',
           hidden: true,
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.MODEL_DEPLOY
         }
       },
       {
@@ -172,7 +182,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '部署日志',
           hidden: true,
-          requiresAuth: true
+          requiresAuth: true,
+          permissions: [PERMISSIONS.MODEL_DEPLOY, PERMISSIONS.SYSTEM_MONITOR]
         }
       }
     ]
@@ -184,7 +195,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       title: '数据集管理',
       icon: 'Document',
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.DATASET_READ
     },
     children: [
       {
@@ -194,7 +206,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '数据集列表',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.DATASET_READ
         }
       },
       {
@@ -204,7 +217,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '数据集上传',
           icon: 'Upload',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.DATASET_CREATE
         }
       }
     ]
@@ -238,7 +252,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       title: '项目管理',
       icon: 'Folder',
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.PROJECT_READ
     },
     children: [
       {
@@ -248,7 +263,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '项目列表',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.PROJECT_READ
         }
       }
     ]
@@ -371,7 +387,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '系统管理',
       icon: 'Tools',
       requiresAuth: true,
-      requiresAdmin: true
+      role: ROLES.ADMIN
     },
     children: [
       {
@@ -382,7 +398,29 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '用户管理',
           icon: 'User',
           requiresAuth: true,
-          requiresAdmin: true
+          permission: PERMISSIONS.USER_READ
+        }
+      },
+      {
+        path: 'roles',
+        name: 'SystemRoles',
+        component: () => import('@/views/roles/index.vue'),
+        meta: {
+          title: '角色管理',
+          icon: 'UserFilled',
+          requiresAuth: true,
+          permission: PERMISSIONS.ROLE_READ
+        }
+      },
+      {
+        path: 'permissions',
+        name: 'SystemPermissions',
+        component: () => import('@/views/permissions/index.vue'),
+        meta: {
+          title: '权限管理',
+          icon: 'Key',
+          requiresAuth: true,
+          permission: PERMISSIONS.PERMISSION_READ
         }
       },
       {
@@ -393,7 +431,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '系统设置',
           icon: 'Setting',
           requiresAuth: true,
-          requiresAdmin: true
+          permission: PERMISSIONS.SYSTEM_UPDATE
         }
       },
       {
@@ -404,7 +442,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '系统日志',
           icon: 'Document',
           requiresAuth: true,
-          requiresAdmin: true
+          permission: PERMISSIONS.SYSTEM_MONITOR
         }
       }
     ]
@@ -459,7 +497,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       title: '指令集管理',
       icon: 'Document',
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.INSTRUCTION_SET_READ
     },
     children: [
       {
@@ -469,7 +508,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '指令集管理',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.INSTRUCTION_SET_READ
         }
       }
     ]
@@ -479,7 +519,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     component: Layout,
     meta: {
       hidden: true,
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.INSTRUCTION_SET_READ
     },
     children: [
       {
@@ -488,7 +529,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/instruction-sets/detail.vue'),
         meta: {
           title: '指令集详情',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.INSTRUCTION_SET_READ
         }
       }
     ]
@@ -498,7 +540,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     component: Layout,
     meta: {
       hidden: true,
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.INSTRUCTION_SET_TEST
     },
     children: [
       {
@@ -507,7 +550,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/instruction-sets/test.vue'),
         meta: {
           title: '指令集测试',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.INSTRUCTION_SET_TEST
         }
       }
     ]

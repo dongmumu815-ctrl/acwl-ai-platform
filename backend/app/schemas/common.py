@@ -30,8 +30,17 @@ class PaginatedResponse(BaseModel, Generic[T]):
         return self.page > 1
 
 
-class ResponseModel(BaseModel):
+class ResponseModel(BaseModel, Generic[T]):
     """通用响应模式"""
+    success: bool = Field(True, description="是否成功")
+    message: str = Field("", description="响应消息")
+    data: Optional[T] = Field(None, description="响应数据")
+    timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
+
+
+# 为了向后兼容，创建一个非泛型版本的别名
+class SimpleResponseModel(BaseModel):
+    """简单响应模式（非泛型版本）"""
     success: bool = Field(True, description="是否成功")
     message: str = Field("", description="响应消息")
     data: Optional[Any] = Field(None, description="响应数据")

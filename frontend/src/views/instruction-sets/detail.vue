@@ -18,36 +18,51 @@
         </div>
       </div>
       <div class="header-actions">
-        <el-button @click="handleEdit">
+        <PermissionButton 
+          permission="instruction_set:update"
+          @click="handleEdit"
+        >
           <el-icon><Edit /></el-icon>
           编辑
-        </el-button>
-        <el-button type="primary" @click="handleTest">
+        </PermissionButton>
+        <PermissionButton 
+          permission="instruction_set:test"
+          type="primary" 
+          @click="handleTest"
+        >
           <el-icon><VideoPlay /></el-icon>
           测试
-        </el-button>
+        </PermissionButton>
         <el-dropdown @command="handleDropdownCommand">
           <el-button>
             更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="copy">
-                <el-icon><CopyDocument /></el-icon>
-                复制
-              </el-dropdown-item>
-              <el-dropdown-item command="statistics">
-                <el-icon><DataAnalysis /></el-icon>
-                统计
-              </el-dropdown-item>
-              <el-dropdown-item command="export">
-                <el-icon><Download /></el-icon>
-                导出
-              </el-dropdown-item>
-              <el-dropdown-item command="delete" divided>
-                <el-icon><Delete /></el-icon>
-                删除
-              </el-dropdown-item>
+              <PermissionWrapper permission="instruction_set:create">
+                <el-dropdown-item command="copy">
+                  <el-icon><CopyDocument /></el-icon>
+                  复制
+                </el-dropdown-item>
+              </PermissionWrapper>
+              <PermissionWrapper permission="instruction_set:read">
+                <el-dropdown-item command="statistics">
+                  <el-icon><DataAnalysis /></el-icon>
+                  统计
+                </el-dropdown-item>
+              </PermissionWrapper>
+              <PermissionWrapper permission="instruction_set:read">
+                <el-dropdown-item command="export">
+                  <el-icon><Download /></el-icon>
+                  导出
+                </el-dropdown-item>
+              </PermissionWrapper>
+              <PermissionWrapper permission="instruction_set:delete">
+                <el-dropdown-item command="delete" divided>
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-dropdown-item>
+              </PermissionWrapper>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -245,6 +260,7 @@ import type {
   InstructionTreeNode,
   InstructionSetStatistics
 } from '@/types/instruction-set'
+import { PermissionButton, PermissionWrapper } from '@/components/Permission'
 
 const route = useRoute()
 const router = useRouter()

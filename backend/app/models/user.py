@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from .es_query_template import ESQueryTemplate
     from .sql_query_template import SQLQueryTemplate
     from .resource_package import ResourcePackage, ResourcePackagePermission, ResourcePackageQueryHistory
+    from .role import Role, UserRole, RolePermission
+    from .permission import Permission
 
 
 class User(Base, TimestampMixin):
@@ -206,6 +208,14 @@ class User(Base, TimestampMixin):
         cascade="all, delete-orphan"
     )
     
+    # 角色权限系统关系
+    user_roles: Mapped[List["UserRole"]] = relationship(
+        "UserRole",
+        foreign_keys="[UserRole.user_id]",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    
     # 暂时注释掉不存在的模型关系
     # api_keys: Mapped[List["APIKey"]] = relationship(
     #     "APIKey",
@@ -230,3 +240,53 @@ class User(Base, TimestampMixin):
     def is_active(self) -> bool:
         """用户是否激活（可扩展）"""
         return True
+    
+    # 新的角色权限系统方法
+    def get_roles(self):
+        """获取用户的所有角色"""
+        return [ur.role for ur in self.user_roles if ur.role.status]
+    
+    def get_role_codes(self):
+        """获取用户的所有角色代码"""
+        return [ur.role.code for ur in self.user_roles if ur.role.status]
+    
+    def has_role(self, role_code: str) -> bool:
+        """检查用户是否拥有指定角色"""
+        return role_code in self.get_role_codes()
+    
+    def has_permission(self, permission_code: str) -> bool:
+        """检查用户是否拥有指定权限"""
+        for user_role in self.user_roles:
+            if user_role.role.status and user_role.role.has_permission(permission_code):
+                return True
+        return False
+    
+    def get_permissions(self):
+        """获取用户的所有权限"""
+        permissions = []
+        for user_role in self.user_roles:
+            if user_role.role.status:
+                permissions.extend(user_role.role.get_permissions())
+        # 去重
+        unique_permissions = {}
+        for perm in permissions:
+            unique_permissions[perm.code] = perm
+        return list(unique_permissions.values())
+    
+    def get_permission_codes(self):
+        """获取用户的所有权限代码"""
+        permission_codes = set()
+        for user_role in self.user_roles:
+            if user_role.role.status:
+                permission_codes.update(user_role.role.get_permission_codes())
+        return list(permission_codes)
+    
+    @property
+    def is_super_admin(self) -> bool:
+        """是否为超级管理员（基于新角色系统）"""
+        return self.has_role('super_admin')
+    
+    @property
+    def is_admin_new(self) -> bool:
+        """是否为管理员（基于新角色系统）"""
+        return self.has_role('admin') or self.has_role('super_admin')

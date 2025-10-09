@@ -53,6 +53,11 @@ async def lifespan(app: FastAPI):
     await async_task_service.stop()
     logger.info("✅ 异步任务服务已停止")
     
+    # 关闭MySQL连接池
+    from app.core.mysql_pool import mysql_pool_manager
+    await mysql_pool_manager.close_all_pools()
+    logger.info("✅ MySQL连接池已关闭")
+    
     logger.info("🛑 ACWL-AI 平台关闭完成")
 
 

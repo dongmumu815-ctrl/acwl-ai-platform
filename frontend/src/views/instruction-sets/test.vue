@@ -24,10 +24,13 @@
         </div>
       </div>
       <div class="header-actions">
-        <el-button @click="handleViewDetail">
+        <PermissionButton 
+          permission="instruction_set:read"
+          @click="handleViewDetail"
+        >
           <el-icon><View /></el-icon>
           查看详情
-        </el-button>
+        </PermissionButton>
       </div>
     </div>
 
@@ -300,6 +303,7 @@ import type {
   InstructionTestResult,
   NodeType
 } from '@/types/instruction-set'
+import { PermissionButton } from '@/components/Permission'
 
 // 路由
 const route = useRoute()

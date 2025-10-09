@@ -54,6 +54,8 @@ from .instruction_set import (
 )
 from .es_query_template import ESQueryTemplate
 from .sql_query_template import SQLQueryTemplate
+from .role import Role, UserRole, RolePermission
+from .permission import Permission
 
 # 导出所有模型
 __all__ = [
@@ -162,4 +164,9 @@ __all__ = [
     "ExecutionStatus",
     "ESQueryTemplate",
     "SQLQueryTemplate",
+    # 角色权限系统
+    "Role",
+    "UserRole", 
+    "RolePermission",
+    "Permission",
 ]
