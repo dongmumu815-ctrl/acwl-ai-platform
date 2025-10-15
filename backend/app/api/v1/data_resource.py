@@ -129,8 +129,14 @@ async def search_resources(
         # 计算分页信息
         pages = (total + size - 1) // size
         
+        # 使用自定义序列化方法处理标签信息
+        resource_items = [
+            DataResourceResponse.from_orm_with_tags(resource)
+            for resource in resources
+        ]
+        
         result = DataResourceListResponse(
-            items=resources,
+            items=resource_items,
             total=total,
             page=page,
             size=size,
@@ -169,8 +175,8 @@ async def get_resource(
         if not resource:
             raise HTTPException(status_code=404, detail="数据资源不存在")
         
-        # 将SQLAlchemy对象转换为Pydantic模型
-        resource_response = DataResourceResponse.model_validate(resource)
+        # 使用自定义方法，确保标签信息正确序列化到 tag_list
+        resource_response = DataResourceResponse.from_orm_with_tags(resource)
         return success_response(data=resource_response, message="获取数据资源成功")
         
     except HTTPException:
@@ -201,7 +207,9 @@ async def update_resource(
     try:
         service = DataResourceService(db)
         resource = await service.update_resource(resource_id, resource_data, current_user.id)
-        return success_response(data=resource, message="数据资源更新成功")
+        # 使用自定义方法，确保标签信息正确序列化到 tag_list
+        resource_response = DataResourceResponse.from_orm_with_tags(resource)
+        return success_response(data=resource_response, message="数据资源更新成功")
         
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -210,7 +218,8 @@ async def update_resource(
     except BusinessError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail="更新数据资源失败")
+        logger.error(f"更新数据资源失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"更新数据资源失败: {str(e)}")
 
 
 @router.delete("/{resource_id}", status_code=HTTP_204_NO_CONTENT)
@@ -475,12 +484,18 @@ async def create_category(
 # 标签相关接口
 @router.get("/tags/", response_model=List[DataResourceTagResponse])
 async def get_tags(
+    search: Optional[str] = Query(None, description="搜索关键词"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """获取资源标签列表
     
     Args:
+        search: 搜索关键词
+        page: 页码
+        page_size: 每页数量
         db: 数据库会话
         current_user: 当前用户
         
@@ -488,12 +503,40 @@ async def get_tags(
         标签列表
     """
     try:
-        # 这里需要实现获取标签列表的逻辑
-        tags = []  # 临时返回空列表
-        return success_response(data=tags, message="查询成功")
+        service = DataResourceService(db)
+        tags, total = await service.get_tags(search=search, page=page, page_size=page_size)
+        
+        # 转换为响应格式
+        tag_list = [
+            {
+                "id": tag.id,
+                "name": tag.name,
+                "color": tag.color,
+                "description": tag.description,
+                "status": tag.status.value if tag.status else "active",
+                "usage_count": tag.usage_count,
+                "created_at": tag.created_at.isoformat() if tag.created_at else None,
+                "updated_at": tag.updated_at.isoformat() if tag.updated_at else None,
+                "created_by": tag.created_by,
+                "updated_by": tag.updated_by
+            }
+            for tag in tags
+        ]
+        
+        return success_response(
+            data={
+                "list": tag_list,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total + page_size - 1) // page_size
+            },
+            message="查询成功"
+        )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail="获取标签列表失败")
+        logger.error(f"获取标签列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取标签列表失败: {str(e)}")
 
 
 @router.post("/tags/", response_model=DataResourceTagResponse, status_code=HTTP_201_CREATED)
@@ -513,13 +556,246 @@ async def create_tag(
         创建的标签
     """
     try:
-        # 这里需要实现创建标签的逻辑
-        # service = DataResourceService(db)
-        # tag = service.create_tag(tag_data, current_user.id)
-        return success_response(message="标签创建成功")
+        service = DataResourceService(db)
+        tag = await service.create_tag(tag_data, current_user.id)
+        
+        tag_response = {
+            "id": tag.id,
+            "name": tag.name,
+            "color": tag.color,
+            "description": tag.description,
+            "status": tag.status.value if hasattr(tag.status, 'value') else (tag.status or "active"),
+            "usage_count": tag.usage_count,
+            "created_at": tag.created_at.isoformat() if tag.created_at else None,
+            "updated_at": tag.updated_at.isoformat() if tag.updated_at else None,
+            "created_by": tag.created_by,
+            "updated_by": tag.updated_by
+        }
+        
+        return success_response(data=tag_response, message="标签创建成功")
+        
+    except BusinessError as e:
+        logger.error(f"创建标签失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"创建标签失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"创建标签失败: {str(e)}")
+
+
+@router.get("/tags/{tag_id}", response_model=DataResourceTagResponse)
+async def get_tag(
+    tag_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取标签详情
+    
+    Args:
+        tag_id: 标签ID
+        db: 数据库会话
+        current_user: 当前用户
+        
+    Returns:
+        标签详情
+    """
+    try:
+        service = DataResourceService(db)
+        tag = await service.get_tag_by_id(tag_id)
+        
+        if not tag:
+            raise HTTPException(status_code=404, detail="标签不存在")
+        
+        tag_response = {
+            "id": tag.id,
+            "name": tag.name,
+            "color": tag.color,
+            "description": tag.description,
+            "status": tag.status.value if tag.status else "active",
+            "usage_count": tag.usage_count,
+            "created_at": tag.created_at.isoformat() if tag.created_at else None,
+            "updated_at": tag.updated_at.isoformat() if tag.updated_at else None,
+            "created_by": tag.created_by,
+            "updated_by": tag.updated_by
+        }
+        
+        return success_response(data=tag_response, message="获取标签详情成功")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取标签详情失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取标签详情失败: {str(e)}")
+
+
+@router.put("/tags/{tag_id}", response_model=DataResourceTagResponse)
+async def update_tag(
+    tag_id: int,
+    tag_data: DataResourceTagCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """更新标签
+    
+    Args:
+        tag_id: 标签ID
+        tag_data: 标签更新数据
+        db: 数据库会话
+        current_user: 当前用户
+        
+    Returns:
+        更新后的标签
+    """
+    try:
+        service = DataResourceService(db)
+        tag_dict = tag_data.model_dump(exclude_unset=True)
+        tag = await service.update_tag(tag_id, tag_dict, current_user.id)
+        
+        tag_response = {
+            "id": tag.id,
+            "name": tag.name,
+            "color": tag.color,
+            "description": tag.description,
+            "usage_count": tag.usage_count,
+            "updated_at": tag.updated_at.isoformat() if tag.updated_at else None,
+            "updated_by": tag.updated_by
+        }
+        
+        return success_response(data=tag_response, message="标签更新成功")
+        
+    except (BusinessError, NotFoundError) as e:
+        logger.error(f"更新标签失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"更新标签失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新标签失败: {str(e)}")
+
+
+@router.delete("/tags/{tag_id}", status_code=HTTP_204_NO_CONTENT)
+async def delete_tag(
+    tag_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """删除标签
+    
+    Args:
+        tag_id: 标签ID
+        db: 数据库会话
+        current_user: 当前用户
+    """
+    try:
+        service = DataResourceService(db)
+        await service.delete_tag(tag_id, current_user.id)
+        
+    except (BusinessError, NotFoundError) as e:
+        logger.error(f"删除标签失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"删除标签失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除标签失败: {str(e)}")
+
+
+@router.post("/tags/{tag_id}/toggle-status", response_model=DataResourceTagResponse)
+async def toggle_tag_status(
+    tag_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """切换标签状态
+    
+    Args:
+        tag_id: 标签ID
+        db: 数据库会话
+        current_user: 当前用户
+        
+    Returns:
+        更新后的标签
+    """
+    try:
+        service = DataResourceService(db)
+        tag = await service.toggle_tag_status(tag_id, current_user.id)
+        
+        tag_response = {
+            "id": tag.id,
+            "name": tag.name,
+            "color": tag.color,
+            "description": tag.description,
+            "status": tag.status.value if tag.status else "active",
+            "usage_count": tag.usage_count,
+            "created_at": tag.created_at.isoformat() if tag.created_at else None,
+            "updated_at": tag.updated_at.isoformat() if tag.updated_at else None,
+            "created_by": tag.created_by,
+            "updated_by": tag.updated_by
+        }
+        
+        return success_response(data=tag_response, message="标签状态切换成功")
+        
+    except (BusinessError, NotFoundError) as e:
+        logger.error(f"切换标签状态失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"切换标签状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"切换标签状态失败: {str(e)}")
+
+
+@router.post("/tags/batch-delete", response_model=BatchOperationResponse)
+async def batch_delete_tags(
+    request: BatchOperationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """批量删除标签
+    
+    Args:
+        request: 批量操作请求
+        db: 数据库会话
+        current_user: 当前用户
+        
+    Returns:
+        批量操作结果
+    """
+    try:
+        service = DataResourceService(db)
+        result = await service.batch_delete_tags(request.ids, current_user.id)
+        
+        return success_response(
+            data=result,
+            message=f"批量删除完成，成功: {result['success_count']}, 失败: {result['failed_count']}"
+        )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail="创建标签失败")
+        logger.error(f"批量删除标签失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"批量删除标签失败: {str(e)}")
+
+
+@router.get("/tags/{tag_id}/usage-stats")
+async def get_tag_usage_stats(
+    tag_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取标签使用统计
+    
+    Args:
+        tag_id: 标签ID
+        db: 数据库会话
+        current_user: 当前用户
+        
+    Returns:
+        标签使用统计
+    """
+    try:
+        service = DataResourceService(db)
+        stats = await service.get_tag_usage_stats(tag_id)
+        
+        return success_response(data=stats, message="获取标签使用统计成功")
+        
+    except (BusinessError, NotFoundError) as e:
+        logger.error(f"获取标签使用统计失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"获取标签使用统计失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取标签使用统计失败: {str(e)}")
 
 
 # 统计相关接口

@@ -17,16 +17,16 @@
               <el-icon><CaretRight /></el-icon>
               执行查询
             </el-button>
-            <el-button 
-              :type="props.isInResourcePackage ? 'warning' : 'success'" 
-              @click="addToResourcePackage" 
+            <el-button
+              v-if="!props.isInResourcePackage"
+              type="success"
+              @click="addToResourcePackage"
               :disabled="!queryResults.length || !hasQueryPermission"
             >
               <el-icon>
-                <Edit v-if="props.isInResourcePackage" />
-                <FolderAdd v-else />
+                <FolderAdd />
               </el-icon>
-              {{ props.isInResourcePackage ? '更新到资源包' : '添加到资源包' }}
+              添加到资源包
             </el-button>
           </div>
         </div>
@@ -607,6 +607,10 @@
             />
           </el-select>
         </el-form-item>
+        <!-- 编辑时允许选择保存为新建 -->
+        <el-form-item v-if="currentTemplateId" label="保存方式">
+          <el-checkbox v-model="saveAsNew">保存为新建（不更新当前模板）</el-checkbox>
+        </el-form-item>
       </el-form>
       
       <template #footer>
@@ -869,6 +873,7 @@ const userStore = useUserStore()
 // 响应式数据
 const querying = ref(false)
 const saveQueryVisible = ref(false)
+const saveAsNew = ref(false)
 const resourcePackageVisible = ref(false)
 const creatingResourcePackage = ref(false)
 const currentTemplateId = ref<number | null>(null) // 当前加载的模板ID
@@ -1456,6 +1461,8 @@ const saveQuery = () => {
     ElMessage.warning('请先构建查询条件')
     return
   }
+  // 每次打开保存对话框时重置“保存为新建”选项
+  saveAsNew.value = false
   saveQueryVisible.value = true
 }
 
@@ -1468,6 +1475,11 @@ const confirmSaveQuery = () => {
     return
   }
   
+  // 若选择“保存为新建”，清空当前模板ID以触发新增逻辑
+  if (saveAsNew.value) {
+    currentTemplateId.value = null
+  }
+
   // 构建配置对象，包含当前的条件设置
   const configToSave = {
     ...templateConfig.value,
@@ -2066,6 +2078,8 @@ const confirmAddToResourcePackage = async () => {
         params[condition.param_name] = condition.default_value || ''
         return params
       }, {}),
+      // 关联数据资源ID（若存在）以便后续查询设定能加载资源详情
+      resource_id: queryConfig.resourceId || null,
       tags: resourcePackageForm.tags,
       is_active: true
     }

@@ -43,6 +43,7 @@ from app.core.exceptions import (
 )
 from app.services.datasource import DatasourceService
 from app.utils.query_executor import QueryExecutor
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -234,33 +235,37 @@ class DataResourceService:
             # 更新字段
             update_data = resource_data.model_dump(exclude_unset=True)
             for field, value in update_data.items():
+                # 特殊处理 tags 字段
+                if field == 'tags':
+                    if value == 'null' or value == 'None':
+                        value = None
+                    elif isinstance(value, str) and value.lower() == 'null':
+                        value = None
                 setattr(resource, field, value)
             
             resource.updated_by = user_id
             
             await self.db.commit()
-            
-            try:
-                # 重新查询更新后的资源
-                result = await self.db.execute(
-                    select(DataResource).where(DataResource.id == resource_id)
-                )
-                updated_resource = result.scalar_one_or_none()
-                
-                if not updated_resource:
-                    raise NotFoundError(f"更新后无法找到资源 {resource_id}")
-                    
-                logger.info(f"用户 {user_id} 更新了数据资源 {resource_id}")
-                return updated_resource
-            except Exception as e:
-                logger.error(f"重新查询更新后的资源失败: {str(e)}")
-                # 如果重新查询失败，返回原始资源对象
-                return resource
+            logger.info(f"用户 {user_id} 更新了数据资源 {resource_id}")
             
         except Exception as e:
             await self.db.rollback()
             logger.error(f"更新数据资源失败: {str(e)}")
             raise BusinessError(f"更新数据资源失败: {str(e)}")
+        
+        # 重新查询资源以预加载关联对象，避免 MissingGreenlet 错误
+        result = await self.db.execute(
+            select(DataResource)
+            .options(
+                selectinload(DataResource.category).selectinload(DataResourceCategory.children),
+                selectinload(DataResource.datasource),
+                selectinload(DataResource.tag_relations).selectinload(DataResourceTagRelation.tag)
+            )
+            .where(DataResource.id == resource_id)
+        )
+        updated_resource = result.scalar_one()
+        
+        return updated_resource
     
     async def delete_resource(self, resource_id: int, user_id: int) -> bool:
         """删除数据资源
@@ -633,6 +638,25 @@ class DataResourceService:
         Returns:
             是否有权限
         """
+        # 系统管理员直接拥有所有权限
+        try:
+            user_result = await self.db.execute(select(User).where(User.id == user_id))
+            user = user_result.scalar_one_or_none()
+            if user and getattr(user, "is_admin", False):
+                return True
+        except Exception:
+            pass
+
+        # 资源创建者默认拥有管理权限
+        try:
+            owner_result = await self.db.execute(
+                select(DataResource.created_by).where(DataResource.id == resource_id)
+            )
+            owner_id = owner_result.scalar_one_or_none()
+            if owner_id and owner_id == user_id:
+                return True
+        except Exception:
+            pass
         query = select(DataResourcePermission).where(
             and_(
                 DataResourcePermission.resource_id == resource_id,
@@ -803,3 +827,364 @@ class DataResourceService:
         except Exception as e:
             logger.warning(f"获取资源结构失败: {str(e)}")
             return {}
+    
+    # ==================== 标签管理相关方法 ====================
+    
+    async def get_tags(self, search: Optional[str] = None, page: int = 1, page_size: int = 20) -> Tuple[List[DataResourceTag], int]:
+        """获取标签列表
+        
+        Args:
+            search: 搜索关键词
+            page: 页码
+            page_size: 每页数量
+            
+        Returns:
+            标签列表和总数
+        """
+        try:
+            logger.info(f"获取标签列表，搜索: {search}, 页码: {page}, 每页: {page_size}")
+            
+            # 构建查询
+            query = select(DataResourceTag)
+            count_query = select(func.count(DataResourceTag.id))
+            
+            # 搜索条件
+            if search:
+                search_pattern = f"%{search}%"
+                search_condition = or_(
+                    DataResourceTag.name.like(search_pattern),
+                    DataResourceTag.description.like(search_pattern)
+                )
+                query = query.where(search_condition)
+                count_query = count_query.where(search_condition)
+            
+            # 获取总数
+            count_result = await self.db.execute(count_query)
+            total = count_result.scalar() or 0
+            
+            # 分页和排序
+            query = query.order_by(desc(DataResourceTag.usage_count), DataResourceTag.name)
+            query = query.offset((page - 1) * page_size).limit(page_size)
+            
+            # 执行查询
+            result = await self.db.execute(query)
+            tags = result.scalars().all()
+            
+            logger.info(f"获取标签列表成功，返回 {len(tags)} 个标签，总数: {total}")
+            return list(tags), total
+            
+        except Exception as e:
+            logger.error(f"获取标签列表失败: {str(e)}")
+            raise BusinessError(f"获取标签列表失败: {str(e)}")
+    
+    async def get_tag_by_id(self, tag_id: int) -> Optional[DataResourceTag]:
+        """根据ID获取标签
+        
+        Args:
+            tag_id: 标签ID
+            
+        Returns:
+            标签对象
+        """
+        try:
+            logger.info(f"获取标签详情，ID: {tag_id}")
+            
+            query = select(DataResourceTag).where(DataResourceTag.id == tag_id)
+            result = await self.db.execute(query)
+            tag = result.scalar_one_or_none()
+            
+            if not tag:
+                logger.warning(f"标签不存在，ID: {tag_id}")
+                return None
+                
+            logger.info(f"获取标签详情成功: {tag.name}")
+            return tag
+            
+        except Exception as e:
+            logger.error(f"获取标签详情失败: {str(e)}")
+            raise BusinessError(f"获取标签详情失败: {str(e)}")
+    
+    async def create_tag(self, tag_data: DataResourceTagCreate, user_id: int) -> DataResourceTag:
+        """创建标签
+        
+        Args:
+            tag_data: 标签创建数据
+            user_id: 用户ID
+            
+        Returns:
+            创建的标签
+        """
+        try:
+            logger.info(f"创建标签，用户ID: {user_id}, 标签名: {tag_data.name}")
+            
+            # 检查标签名是否重复
+            existing_query = select(DataResourceTag).where(DataResourceTag.name == tag_data.name)
+            result = await self.db.execute(existing_query)
+            existing = result.scalar_one_or_none()
+            if existing:
+                logger.error(f"标签名已存在: {tag_data.name}")
+                raise BusinessError("标签名已存在")
+            
+            # 创建标签
+            tag_dict = tag_data.model_dump()
+            tag_dict.update({
+                "created_by": user_id,
+                "usage_count": 0
+            })
+            tag = DataResourceTag(**tag_dict)
+            
+            self.db.add(tag)
+            await self.db.commit()
+            await self.db.refresh(tag)
+            
+            logger.info(f"标签创建成功，ID: {tag.id}, 名称: {tag.name}")
+            return tag
+            
+        except BusinessError:
+            raise
+        except Exception as e:
+            logger.error(f"创建标签失败: {str(e)}")
+            await self.db.rollback()
+            raise BusinessError(f"创建标签失败: {str(e)}")
+    
+    async def update_tag(self, tag_id: int, tag_data: Dict[str, Any], user_id: int) -> DataResourceTag:
+        """更新标签
+        
+        Args:
+            tag_id: 标签ID
+            tag_data: 更新数据
+            user_id: 用户ID
+            
+        Returns:
+            更新后的标签
+        """
+        try:
+            logger.info(f"更新标签，ID: {tag_id}, 用户ID: {user_id}")
+            
+            # 获取标签
+            tag = await self.get_tag_by_id(tag_id)
+            if not tag:
+                raise NotFoundError("标签不存在")
+            
+            # 如果更新名称，检查是否重复
+            if "name" in tag_data and tag_data["name"] != tag.name:
+                existing_query = select(DataResourceTag).where(
+                    and_(
+                        DataResourceTag.name == tag_data["name"],
+                        DataResourceTag.id != tag_id
+                    )
+                )
+                result = await self.db.execute(existing_query)
+                existing = result.scalar_one_or_none()
+                if existing:
+                    logger.error(f"标签名已存在: {tag_data['name']}")
+                    raise BusinessError("标签名已存在")
+            
+            # 更新标签
+            for key, value in tag_data.items():
+                if hasattr(tag, key):
+                    setattr(tag, key, value)
+            
+            tag.updated_by = user_id
+            tag.updated_at = datetime.now()
+            
+            await self.db.commit()
+            await self.db.refresh(tag)
+            
+            logger.info(f"标签更新成功，ID: {tag.id}, 名称: {tag.name}")
+            return tag
+            
+        except (BusinessError, NotFoundError):
+            raise
+        except Exception as e:
+            logger.error(f"更新标签失败: {str(e)}")
+            await self.db.rollback()
+            raise BusinessError(f"更新标签失败: {str(e)}")
+    
+    async def delete_tag(self, tag_id: int, user_id: int) -> bool:
+        """删除标签
+        
+        Args:
+            tag_id: 标签ID
+            user_id: 用户ID
+            
+        Returns:
+            是否删除成功
+        """
+        try:
+            logger.info(f"删除标签，ID: {tag_id}, 用户ID: {user_id}")
+            
+            # 获取标签
+            tag = await self.get_tag_by_id(tag_id)
+            if not tag:
+                raise NotFoundError("标签不存在")
+            
+            # 检查是否有关联的资源
+            relation_query = select(func.count(DataResourceTagRelation.id)).where(
+                DataResourceTagRelation.tag_id == tag_id
+            )
+            result = await self.db.execute(relation_query)
+            relation_count = result.scalar() or 0
+            
+            if relation_count > 0:
+                logger.error(f"标签仍有 {relation_count} 个关联资源，无法删除")
+                raise BusinessError(f"标签仍有 {relation_count} 个关联资源，无法删除")
+            
+            # 删除标签
+            await self.db.delete(tag)
+            await self.db.commit()
+            
+            logger.info(f"标签删除成功，ID: {tag_id}")
+            return True
+            
+        except (BusinessError, NotFoundError):
+            raise
+        except Exception as e:
+            logger.error(f"删除标签失败: {str(e)}")
+            await self.db.rollback()
+            raise BusinessError(f"删除标签失败: {str(e)}")
+    
+    async def toggle_tag_status(self, tag_id: int, user_id: int) -> DataResourceTag:
+        """切换标签状态
+        
+        Args:
+            tag_id: 标签ID
+            user_id: 用户ID
+            
+        Returns:
+            更新后的标签
+        """
+        try:
+            logger.info(f"切换标签状态，ID: {tag_id}, 用户ID: {user_id}")
+            
+            # 获取标签
+            tag = await self.get_tag_by_id(tag_id)
+            if not tag:
+                raise NotFoundError("标签不存在")
+            
+            # 切换状态：active <-> disabled
+            from app.models.data_resource import TagStatus
+            new_status = TagStatus.DISABLED if tag.status == TagStatus.ACTIVE else TagStatus.ACTIVE
+            
+            # 更新标签状态
+            tag.status = new_status
+            tag.updated_by = user_id
+            tag.updated_at = func.now()
+            
+            # 提交更改
+            await self.db.commit()
+            await self.db.refresh(tag)
+            
+            logger.info(f"标签状态切换成功，ID: {tag.id}, 新状态: {new_status.value}")
+            return tag
+            
+        except (BusinessError, NotFoundError):
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"切换标签状态失败: {str(e)}")
+            raise BusinessError(f"切换标签状态失败: {str(e)}")
+    
+    async def batch_delete_tags(self, tag_ids: List[int], user_id: int) -> Dict[str, Any]:
+        """批量删除标签
+        
+        Args:
+            tag_ids: 标签ID列表
+            user_id: 用户ID
+            
+        Returns:
+            删除结果统计
+        """
+        try:
+            logger.info(f"批量删除标签，IDs: {tag_ids}, 用户ID: {user_id}")
+            
+            success_count = 0
+            failed_count = 0
+            failed_tags = []
+            
+            for tag_id in tag_ids:
+                try:
+                    await self.delete_tag(tag_id, user_id)
+                    success_count += 1
+                except Exception as e:
+                    failed_count += 1
+                    failed_tags.append({
+                        "id": tag_id,
+                        "error": str(e)
+                    })
+                    logger.warning(f"删除标签失败，ID: {tag_id}, 错误: {str(e)}")
+            
+            result = {
+                "success_count": success_count,
+                "failed_count": failed_count,
+                "failed_tags": failed_tags,
+                "total": len(tag_ids)
+            }
+            
+            logger.info(f"批量删除标签完成，成功: {success_count}, 失败: {failed_count}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"批量删除标签失败: {str(e)}")
+            raise BusinessError(f"批量删除标签失败: {str(e)}")
+    
+    async def get_tag_usage_stats(self, tag_id: int) -> Dict[str, Any]:
+        """获取标签使用统计
+        
+        Args:
+            tag_id: 标签ID
+            
+        Returns:
+            使用统计信息
+        """
+        try:
+            logger.info(f"获取标签使用统计，ID: {tag_id}")
+            
+            # 获取标签
+            tag = await self.get_tag_by_id(tag_id)
+            if not tag:
+                raise NotFoundError("标签不存在")
+            
+            # 获取关联的资源数量
+            resource_query = select(func.count(DataResourceTagRelation.resource_id)).where(
+                DataResourceTagRelation.tag_id == tag_id
+            )
+            result = await self.db.execute(resource_query)
+            resource_count = result.scalar() or 0
+            
+            # 获取关联的资源列表（最近的10个）
+            recent_resources_query = (
+                select(DataResource.id, DataResource.name, DataResource.display_name)
+                .join(DataResourceTagRelation, DataResource.id == DataResourceTagRelation.resource_id)
+                .where(DataResourceTagRelation.tag_id == tag_id)
+                .order_by(desc(DataResourceTagRelation.created_at))
+                .limit(10)
+            )
+            result = await self.db.execute(recent_resources_query)
+            recent_resources = [
+                {
+                    "id": row.id,
+                    "name": row.name,
+                    "display_name": row.display_name
+                }
+                for row in result.fetchall()
+            ]
+            
+            stats = {
+                "tag_id": tag_id,
+                "tag_name": tag.name,
+                "resource_count": resource_count,
+                "usage_count": tag.usage_count,
+                "recent_resources": recent_resources,
+                "created_at": tag.created_at.isoformat() if tag.created_at else None,
+                "updated_at": tag.updated_at.isoformat() if tag.updated_at else None
+            }
+            
+            logger.info(f"获取标签使用统计成功，资源数量: {resource_count}")
+            return stats
+            
+        except (BusinessError, NotFoundError):
+            raise
+        except Exception as e:
+            logger.error(f"获取标签使用统计失败: {str(e)}")
+            raise BusinessError(f"获取标签使用统计失败: {str(e)}")

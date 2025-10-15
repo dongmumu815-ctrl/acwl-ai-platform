@@ -124,15 +124,15 @@
           <template #default="{ row }">
             <div class="tags-container">
               <el-tag
-                v-for="tag in row.tags.slice(0, 2)"
+                v-for="tag in getDisplayTagsForRow(row).slice(0, 2)"
                 :key="tag"
                 size="small"
                 class="tag-item"
               >
                 {{ tag }}
               </el-tag>
-              <el-tooltip v-if="row.tags.length > 2" :content="row.tags.slice(2).join(', ')">
-                <el-tag size="small" type="info">+{{ row.tags.length - 2 }}</el-tag>
+              <el-tooltip v-if="getDisplayTagsForRow(row).length > 2" :content="getDisplayTagsForRow(row).slice(2).join(', ')">
+                <el-tag size="small" type="info">+{{ getDisplayTagsForRow(row).length - 2 }}</el-tag>
               </el-tooltip>
             </div>
           </template>
@@ -375,6 +375,8 @@
           />
         </el-form-item>
         
+        <!-- 暂时禁用：API端点 -->
+        <!--
         <el-form-item label="API端点">
           <el-input
             v-model="newResourceForm.apiEndpoint"
@@ -382,7 +384,10 @@
             clearable
           />
         </el-form-item>
+        -->
         
+        <!-- 暂时禁用：文件大小 -->
+        <!--
         <el-form-item label="文件大小">
           <el-input
             v-model.number="newResourceForm.size"
@@ -393,7 +398,10 @@
             <template #append>字节</template>
           </el-input>
         </el-form-item>
+        -->
         
+        <!-- 暂时禁用：记录数量 -->
+        <!--
         <el-form-item label="记录数量">
           <el-input
             v-model.number="newResourceForm.records"
@@ -404,7 +412,10 @@
             <template #append>条</template>
           </el-input>
         </el-form-item>
+        -->
         
+        <!-- 暂时禁用：状态 -->
+        <!--
         <el-form-item label="状态">
           <el-select v-model="newResourceForm.status" style="width: 100%">
             <el-option label="正常" value="active" />
@@ -412,10 +423,14 @@
             <el-option label="停用" value="inactive" />
           </el-select>
         </el-form-item>
+        -->
         
+        <!-- 暂时禁用：支持预览 -->
+        <!--
         <el-form-item label="支持预览">
           <el-switch v-model="newResourceForm.previewAvailable" />
         </el-form-item>
+        -->
         
         <el-form-item label="所有者">
           <el-input
@@ -546,6 +561,8 @@
           />
         </el-form-item>
         
+        <!-- 暂时禁用：API端点（编辑） -->
+        <!--
         <el-form-item label="API端点">
           <el-input
             v-model="editResourceForm.apiEndpoint"
@@ -553,7 +570,10 @@
             clearable
           />
         </el-form-item>
+        -->
         
+        <!-- 暂时禁用：文件大小（编辑） -->
+        <!--
         <el-form-item label="文件大小">
           <el-input
             v-model.number="editResourceForm.size"
@@ -564,7 +584,10 @@
             <template #append>字节</template>
           </el-input>
         </el-form-item>
+        -->
         
+        <!-- 暂时禁用：记录数量（编辑） -->
+        <!--
         <el-form-item label="记录数量">
           <el-input
             v-model.number="editResourceForm.records"
@@ -575,7 +598,10 @@
             <template #append>条</template>
           </el-input>
         </el-form-item>
+        -->
         
+        <!-- 暂时禁用：状态（编辑） -->
+        <!--
         <el-form-item label="状态">
           <el-select v-model="editResourceForm.status" style="width: 100%">
             <el-option label="正常" value="active" />
@@ -583,10 +609,14 @@
             <el-option label="停用" value="inactive" />
           </el-select>
         </el-form-item>
+        -->
         
+        <!-- 暂时禁用：支持预览（编辑） -->
+        <!--
         <el-form-item label="支持预览">
           <el-switch v-model="editResourceForm.previewAvailable" />
         </el-form-item>
+        -->
         
         <el-form-item label="所有者">
           <el-input
@@ -1011,6 +1041,29 @@ const filteredResources = computed(() => {
   
   return filtered;
 });
+
+/**
+ * 统一获取某一行用于展示的标签数组
+ * 兼容 row.tags 为字符串数组或 JSON 对象 { tags: [...] }，以及 row.tag_list
+ */
+const getDisplayTagsForRow = (row: any): string[] => {
+  if (!row) return []
+  // 已标准化的字符串数组
+  if (Array.isArray(row.tags)) {
+    return row.tags.map((t: any) => String(t)).filter(Boolean)
+  }
+  // 可能是 JSON 对象 { tags: [...] }
+  if (row.tags && typeof row.tags === 'object' && Array.isArray(row.tags.tags)) {
+    return row.tags.tags.map((t: any) => String(t)).filter(Boolean)
+  }
+  // 兜底支持 tag_list
+  if (Array.isArray(row.tag_list)) {
+    return row.tag_list
+      .map((t: any) => t?.name ?? t?.tag_name)
+      .filter((s: any) => typeof s === 'string' && s.length > 0)
+  }
+  return []
+}
 
 /**
  * 选中数据源的类型
@@ -1688,6 +1741,16 @@ const editResource = (resource: any) => {
   // 保存当前编辑的资源
   editingResource.value = resource;
   
+  // 统一处理 tags 字段，兼容数组与 { tags: [...] } 以及 tag_list
+  const tagsArray: string[] = (() => {
+    if (Array.isArray(resource?.tags)) return resource.tags.map((t: any) => String(t)).filter(Boolean)
+    if (resource?.tags && typeof resource.tags === 'object' && Array.isArray(resource.tags.tags)) return resource.tags.tags.map((t: any) => String(t)).filter(Boolean)
+    if (Array.isArray(resource?.tag_list)) return resource.tag_list
+      .map((t: any) => t?.name ?? t?.tag_name)
+      .filter((s: any) => typeof s === 'string' && s.length > 0)
+    return []
+  })()
+
   // 填充编辑表单
   editResourceForm.value = {
     id: resource.id,
@@ -1701,9 +1764,9 @@ const editResource = (resource: any) => {
     records: resource.records,
     status: resource.status,
     owner: resource.owner,
-    tags: [...resource.tags],
-    tagsInput: resource.tags.join(', '),
-    category: resource.category,
+    tags: [...tagsArray],
+    tagsInput: tagsArray.join(', '),
+    category: resource.categoryId,
     apiEndpoint: resource.apiEndpoint,
     previewAvailable: resource.previewAvailable
   };
@@ -2185,8 +2248,25 @@ const transformApiDataToTableFormat = (apiData: any) => {
     lastAccessed: apiData.last_accessed_at,
     owner: 'admin', // API暂未返回所有者信息
     createdAt: apiData.created_at,
-    tags: apiData.tag_list || [],
+    // 统一为字符串数组，兼容后端返回的两种结构：
+    // 1) 关系表：apiData.tag_list: [{ id, name, color, ... }]
+    // 2) 字段JSON：apiData.tags: { tags: ["a", "b"] } 或 apiData.tags: ["a", "b"]
+    tags: (() => {
+      if (Array.isArray(apiData.tag_list)) {
+        return apiData.tag_list
+          .map((t: any) => (typeof t === 'string' ? t : (t?.name || t?.tag_name)))
+          .filter((x: any) => !!x);
+      }
+      if (apiData.tags && Array.isArray(apiData.tags.tags)) {
+        return apiData.tags.tags;
+      }
+      if (Array.isArray(apiData.tags)) {
+        return apiData.tags;
+      }
+      return [];
+    })(),
     category: apiData.category?.name || '未分类',
+    categoryId: apiData.category?.id || null,
     apiEndpoint: `/api/v1/data-resources/${apiData.id}`,
     previewAvailable: true
   };

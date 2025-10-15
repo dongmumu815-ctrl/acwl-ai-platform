@@ -1,7 +1,7 @@
 <template>
   <div class="resource-package-query-page">
     <!-- 页面标题 -->
-    <div class="page-header">
+    <!-- <div class="page-header">
       <div class="header-left">
         <el-button @click="goBack" type="text" class="back-button">
           <el-icon><ArrowLeft /></el-icon>
@@ -17,7 +17,7 @@
           {{ packageData?.type === 'sql' ? 'SQL查询' : 'Elasticsearch' }}
         </el-tag>
       </div>
-    </div>
+    </div> -->
 
     <div v-loading="loading" class="page-content">
       <!-- 资源包信息卡片 -->
@@ -29,8 +29,9 @@
               <el-tag 
                 v-for="tag in packageData.tags" 
                 :key="tag.tag_name" 
-                :color="tag.tag_color"
                 class="tag-item"
+                size="small"
+                :style="getTagStyle(tag.tag_color)"
               >
                 {{ tag.tag_name }}
               </el-tag>
@@ -42,10 +43,10 @@
         <div class="template-info">
           <h4>模板信息</h4>
           <div class="template-details">
-            <el-tag type="primary" class="template-tag">
+            <el-tag type="primary" class="template-tag" size="small">
               类型: {{ packageData.template_type || '未知' }}
             </el-tag>
-            <el-tag v-if="packageData.template_id" type="info" class="template-tag">
+            <el-tag v-if="packageData.template_id" type="info" class="template-tag" size="small">
               模板ID: {{ packageData.template_id }}
             </el-tag>
           </div>
@@ -55,7 +56,7 @@
         <div class="base-config">
           <h4>查询配置</h4>
           <div class="config-info">
-            <el-descriptions :column="2" size="small">
+            <el-descriptions :column="3" size="small">
               <el-descriptions-item label="数据源">{{ getDatasourceName(packageData.datasource_id) }}</el-descriptions-item>
               <el-descriptions-item label="查询类型">{{ packageData.type?.toUpperCase() || '未知' }}</el-descriptions-item>
               <el-descriptions-item label="模板类型">{{ packageData.template_type || '未知' }}</el-descriptions-item>
@@ -87,173 +88,9 @@
         </div>
       </el-card> -->
 
-      <!-- 查询参数表单 -->
-      <el-card class="query-form-card" v-if="packageData?.dynamic_params && Object.keys(packageData.dynamic_params).length">
-        <template #header>
-          
-
-          <div class="card-header">
-           <span class="card-title">查询参数</span>
-            <div class="query-actions">
-              <el-button @click="resetForm">重置</el-button>
-              <el-button type="primary" @click="handleUserQuery" :loading="queryLoading">
-                <el-icon><Search /></el-icon>
-                执行查询
-              </el-button>
-            </div>
-          </div>
-        </template>
-        
-        <el-form
-          ref="queryFormRef"
-          :model="queryForm"
-          :rules="queryRules"
-          label-width="120px"
-          class="query-form"
-        >
-          <el-row :gutter="20">
-            <el-col
-              v-for="(paramValue, paramName) in packageData.dynamic_params"
-              :key="paramName"
-              :span="12"
-            >
-              <el-form-item
-                :label="getConditionLabel(paramName)"
-                :prop="paramName"
-              >
-                <!-- 根据参数类型显示不同的输入组件 -->
-                <template v-if="typeof paramValue === 'boolean'">
-                  <el-switch
-                    v-model="queryForm[paramName]"
-                    active-text="是"
-                    inactive-text="否"
-                    @focus="markFieldTouched(paramName)"
-                    @change="markFieldTouched(paramName)"
-                  />
-                </template>
-                <template v-else-if="typeof paramValue === 'number'">
-                  <el-input-number
-                    v-model="queryForm[paramName]"
-                    :placeholder="`请输入${getConditionLabel(paramName)}`"
-                    style="width: 100%"
-                    @focus="markFieldTouched(paramName)"
-                    @input="markFieldTouched(paramName)"
-                  />
-                </template>
-                <template v-else>
-                  <el-input
-                    v-model="queryForm[paramName]"
-                    :placeholder="`请输入${getConditionLabel(paramName)}`"
-                    @focus="markFieldTouched(paramName)"
-                    @input="markFieldTouched(paramName)"
-                  />
-                </template>
-                
-                <div class="condition-info" v-if="getConditionInfo(paramName)">
-                  <el-text size="small" type="info">
-                    {{ getConditionInfo(paramName) }}
-                  </el-text>
-                </div>
-              </el-form-item>
-            </el-col>
-          </el-row>
-        </el-form>
-      </el-card>
-
-      <!-- 查询选项
-      <el-card class="query-options-card">
-        <template #header>
-          <div class="card-header">
-            <span class="card-title">查询选项</span>
-            <div class="query-actions">
-              <el-button @click="resetForm">重置</el-button>
-              <el-button type="primary" @click="handleUserQuery" :loading="queryLoading">
-                <el-icon><Search /></el-icon>
-                执行查询
-              </el-button>
-            </div>
-          </div>
-        </template>
-        
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="查询条数">
-              <el-input-number
-                v-model="queryOptions.limit"
-                :min="1"
-                :max="10000"
-                style="width: 100%"
-              />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-card> -->
-
-      <!-- 查询结果 -->
-      <el-card class="query-results-card" v-if="queryResults">
-        <template #header>
-          <div class="results-header">
-            <span class="card-title">查询结果</span>
-            <div class="results-meta">
-              <el-text type="info">
-                共 {{ queryResults.total_count || 0 }} 条记录，
-                耗时 {{ queryResults.execution_time }}ms
-              </el-text>
-              <el-button 
-                type="primary" 
-                size="small" 
-                @click="exportResults" 
-                :disabled="!queryResults.data?.length"
-              >
-                <el-icon><Download /></el-icon>
-                导出结果
-              </el-button>
-            </div>
-          </div>
-        </template>
-        
-        <div v-if="queryResults.data?.length">
-          <!-- 数据表格 -->
-          <el-table
-            :data="paginatedData"
-            stripe
-            border
-            max-height="500"
-            style="width: 100%"
-          >
-            <el-table-column
-              v-for="(field, index) in displayFields"
-              :key="field"
-              :prop="index.toString()"
-              :label="field"
-              :min-width="120"
-              show-overflow-tooltip
-            >
-              <template #default="{ row }">
-                <span v-if="typeof row[index] === 'object'">{{ JSON.stringify(row[index]) }}</span>
-                <span v-else>{{ row[index] }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-          
-          <!-- 分页 -->
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              :total="queryResults.total_count || 0"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
-            />
-          </div>
-        </div>
-        
-        <div v-else class="no-data">
-          <el-empty description="暂无查询结果" />
-        </div>
-      </el-card>
+      <!-- 基于查询类型渲染组件 -->
+      <SqlPackageQueryPanel v-if="packageData?.type === 'sql' && packageData" :packageData="packageData" />
+      <EsPackageQueryPanel v-else-if="packageData?.type === 'elasticsearch' && packageData" :packageData="packageData" />
     </div>
   </div>
 </template>
@@ -261,19 +98,18 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { ArrowLeft, Search, Download } from '@element-plus/icons-vue'
-import * as XLSX from 'xlsx'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import { 
   resourcePackageApi, 
-  type ResourcePackage, 
-  type ResourcePackageQueryRequest,
-  type ResourcePackageQueryResponse
+  type ResourcePackage
 } from '@/api/resourcePackage'
 import { datasourceApi } from '@/api/datasource'
 import { type DataSource } from '@/types/datasource'
 import { getSQLTemplate, type SQLTemplateResponse } from '@/api/sqlQuery'
 import { templateApi } from '@/api/template'
+import SqlPackageQueryPanel from '@/views/resourcePackage/components/SqlPackageQueryPanel.vue'
+import EsPackageQueryPanel from '@/views/resourcePackage/components/EsPackageQueryPanel.vue'
 
 // 扩展ResourcePackage接口以包含模板条件
 interface ExtendedResourcePackage extends ResourcePackage {
@@ -291,95 +127,16 @@ const router = useRouter()
  * 响应式数据
  */
 const loading = ref(false)
-const queryLoading = ref(false)
 const packageData = ref<ExtendedResourcePackage | null>(null)
 const datasources = ref<DataSource[]>([])
-const queryResults = ref<ResourcePackageQueryResponse | null>(null)
-const queryFormRef = ref<FormInstance>()
+// 查询相关状态交由子组件管理
 
-// 分页数据
-const currentPage = ref(1)
-const pageSize = ref(20)
-
-// 查询表单数据
-const queryForm = reactive<Record<string, any>>({})
-
-// 跟踪用户是否主动操作过每个输入框
-const fieldTouched = reactive<Record<string, boolean>>({})
-
-// 查询选项
-const queryOptions = reactive({
-  limit: 1000
-})
-
-/**
- * 表单验证规则
- */
-const queryRules = computed(() => {
-  console.log('🔄 计算表单验证规则...')
-  const rules: FormRules = {}
-  
-  if (packageData.value?.template_conditions) {
-    console.log('📋 处理模板条件验证规则:', packageData.value.template_conditions.length)
-    packageData.value.template_conditions.forEach((condition: any) => {
-      // 只为未锁定的条件添加验证规则
-      if (!condition.locked) {
-        const fieldRules: any[] = []
-        
-        // 必填验证
-        if (condition.required) {
-          fieldRules.push({
-            required: true,
-            message: `请输入${condition.label || condition.name}`,
-            trigger: 'blur'
-          })
-        }
-        
-        // 类型验证
-        if (condition.type === 'number') {
-          fieldRules.push({
-            type: 'number',
-            message: `${condition.label || condition.name}必须是数字`,
-            trigger: 'blur',
-            transform: (value: any) => Number(value)
-          })
-        }
-        
-        if (fieldRules.length > 0) {
-          rules[condition.name] = fieldRules
-        }
-      }
-    })
-  } else {
-    console.log('⚠️ 没有模板条件数据，无法生成验证规则')
-  }
-  
-  console.log('📋 最终验证规则:', rules)
-  return rules
-})
+// 表单验证规则交由子组件管理
 
 /**
  * 计算属性
  */
-const displayFields = computed(() => {
-  // 🐛 调试日志：输出计算过程
-  console.log('🔍 displayFields计算中...')
-  console.log('🔍 queryResults.value:', queryResults.value)
-  console.log('🔍 queryResults.value?.columns:', queryResults.value?.columns)
-  console.log('🔍 queryResults.value?.data:', queryResults.value?.data)
-  
-  // 使用API返回的columns作为显示字段
-  const fields = queryResults.value?.columns || []
-  console.log('🔍 最终的displayFields:', fields)
-  
-  return fields
-})
-
-const paginatedData = computed(() => {
-  // 现在使用后端分页，直接返回API返回的数据
-  if (!queryResults.value?.data?.length) return []
-  return queryResults.value.data
-})
+// 查询结果相关计算由子组件管理
 
 const getDatasourceName = computed(() => {
   return (datasourceId: number) => {
@@ -388,41 +145,41 @@ const getDatasourceName = computed(() => {
   }
 })
 
-/**
- * 获取条件标签
- */
-const getConditionLabel = (paramName: string) => {
-  if (!packageData.value?.template_conditions) return paramName
-  const condition = packageData.value.template_conditions.find((c: any) => c.name === paramName)
-  return condition?.label || paramName
+// 计算标签的可读文本颜色，避免文字与背景同色
+const getTagStyle = (bg: string) => {
+  const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+    try {
+      let h = hex.trim()
+      if (h.startsWith('#')) h = h.slice(1)
+      if (h.length === 3) {
+        h = h.split('').map(c => c + c).join('')
+      }
+      if (h.length !== 6) return null
+      const r = parseInt(h.slice(0, 2), 16)
+      const g = parseInt(h.slice(2, 4), 16)
+      const b = parseInt(h.slice(4, 6), 16)
+      return { r, g, b }
+    } catch {
+      return null
+    }
+  }
+  const rgb = hexToRgb(bg)
+  // YIQ 对比度算法：数值越大越亮
+  const yiq = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 255
+  const textColor = yiq >= 186 ? '#111' : '#fff'
+  return {
+    backgroundColor: bg,
+    color: textColor,
+    borderColor: bg
+  }
 }
 
-/**
- * 获取条件信息
- */
-const getConditionInfo = (paramName: string) => {
-  if (!packageData.value?.template_conditions) return ''
-  const condition = packageData.value.template_conditions.find((c: any) => c.name === paramName)
-  if (!condition) return ''
-  
-  let info = `${condition.name} ${condition.operator}`
-  if (condition.default_value) {
-    info += ` (默认: ${condition.default_value})`
-  }
-  return info
-}
+// 条件标签与信息交由子组件处理
 
 /**
  * 方法定义
  */
-
-/**
- * 标记字段为用户主动操作过
- */
-const markFieldTouched = (fieldName: string) => {
-  fieldTouched[fieldName] = true
-  console.log(`🎯 字段 ${fieldName} 被用户操作，已标记为touched`)
-}
+// 表单交互由子组件处理
 
 /**
  * 返回列表页面
@@ -477,7 +234,7 @@ const loadPackageData = async () => {
       })
     }
     
-    initializeForm()
+    // 查询表单初始化由子组件管理
   } catch (error) {
     console.error('❌ 加载资源包详情失败:', error)
     ElMessage.error('加载资源包详情失败')
@@ -508,7 +265,7 @@ const loadTemplateParams = async () => {
     } else if (packageData.value.template_type === 'elasticsearch') {
       // 调用ES模板API
       const response = await templateApi.getByType(packageData.value.template_id, 'es')
-      templateData = response
+      templateData = (response as any)?.data || response
     }
     
     if (templateData && templateData.config) {
@@ -549,237 +306,19 @@ const loadDatasources = async () => {
   }
 }
 
-/**
- * 初始化查询表单
- */
-const initializeForm = () => {
-  console.log('🔄 开始初始化查询表单...')
-  
-  // 重置查询表单
-  Object.keys(queryForm).forEach(key => {
-    delete queryForm[key]
-  })
-  console.log('🧹 查询表单已重置')
-  
-  // 重置字段操作状态
-  Object.keys(fieldTouched).forEach(key => {
-    delete fieldTouched[key]
-  })
-  console.log('🧹 字段操作状态已重置')
-  
-  // 设置默认值
-  if (packageData.value?.template_conditions) {
-    console.log('📝 设置表单默认值...')
-    packageData.value.template_conditions.forEach((condition: any, index: number) => {
-      console.log(`  处理条件 ${index + 1}:`, {
-        name: condition.name,
-        default_value: condition.default_value,
-        type: condition.type,
-        locked: condition.locked
-      })
-      
-      // 只处理未锁定的条件
-      if (!condition.locked) {
-        if (condition.default_value !== undefined && condition.default_value !== null) {
-          queryForm[condition.name] = condition.default_value
-          console.log(`    ✅ 设置默认值: ${condition.name} = ${condition.default_value}`)
-        } else {
-          // 根据类型设置空值
-          switch (condition.type) {
-            case 'string':
-              queryForm[condition.name] = ''
-              break
-            case 'number':
-              queryForm[condition.name] = null
-              break
-            default:
-              queryForm[condition.name] = ''
-          }
-          console.log(`    ⚠️ 设置空值: ${condition.name} = ${queryForm[condition.name]}`)
-        }
-      } else {
-        console.log(`    🔒 跳过锁定条件: ${condition.name}`)
-      }
-    })
-    console.log('📋 最终表单数据:', queryForm)
-  } else {
-    console.warn('⚠️ 没有模板条件数据，无法设置默认值')
-  }
-  
-  // 重置查询结果
-  queryResults.value = null
-  currentPage.value = 1
-  console.log('✅ 查询表单初始化完成')
-}
+// 初始化查询表单交由子组件管理
 
 
 
-/**
- * 重置表单
- */
-const resetForm = () => {
-  queryFormRef.value?.resetFields()
-  initializeForm()
-}
+// 表单重置与主动查询由子组件管理
 
-/**
- * 处理用户主动查询（重置到第一页）
- */
-const handleUserQuery = async () => {
-  // 用户主动查询时，重置到第一页
-  currentPage.value = 1
-  await executeQuery()
-}
-
-/**
- * 执行查询
- */
-const executeQuery = async () => {
-  if (!packageData.value) {
-    ElMessage.error('资源包数据未加载')
-    return
-  }
-
-  // 验证表单
-  if (queryFormRef.value) {
-    try {
-      await queryFormRef.value.validate()
-    } catch (error) {
-      return
-    }
-  }
-  
-  try {
-    queryLoading.value = true
-    
-    // 过滤参数：只包含用户主动操作过的字段
-    const filteredParams: Record<string, any> = {}
-    Object.keys(queryForm).forEach(key => {
-      // 如果用户操作过这个字段，或者字段有非空值，则包含在请求中
-      if (fieldTouched[key] || (queryForm[key] !== '' && queryForm[key] !== null && queryForm[key] !== undefined)) {
-        filteredParams[key] = queryForm[key]
-      }
-    })
-    
-    console.log('🔍 原始表单数据:', queryForm)
-    console.log('🎯 用户操作过的字段:', fieldTouched)
-    console.log('✅ 过滤后的参数:', filteredParams)
-    
-    // 使用新的安全查询接口
-    const queryRequest: ResourcePackageQueryRequest = {
-      dynamic_params: filteredParams,
-      limit: pageSize.value,
-      offset: (currentPage.value - 1) * pageSize.value
-    }
-    
-    console.log('🔄 使用安全查询接口执行查询...')
-    const response = await resourcePackageApi.secureQuery(packageData.value.id, queryRequest)
-    
-    // 🐛 调试日志：输出完整的API响应
-    console.log('📊 API完整响应:', response)
-    console.log('📊 response.data:', response.data)
-    console.log('📊 response.data.columns:', response.data?.columns)
-    console.log('📊 response.data.data:', response.data?.data)
-    
-    // 处理响应数据
-    if (response && response.data) {
-      queryResults.value = {
-        data: response.data.data || [],
-        columns: response.data.columns || [], // 🐛 添加columns字段
-        total_count: response.data.total_count || 0,
-        execution_time: response.data.execution_time || 0,
-        generated_query: response.data.generated_query,
-        status: response.data.status,
-        error_message: response.data.error_message
-      }
-    } else {
-      queryResults.value = response
-    }
-    
-    // 🐛 调试日志：输出处理后的queryResults
-    console.log('📊 处理后的queryResults:', queryResults.value)
-    
-    if (queryResults.value?.error_message) {
-      ElMessage.error(`查询失败: ${queryResults.value.error_message}`)
-    } else {
-      ElMessage.success(`查询成功，共找到 ${queryResults.value?.total_count || 0} 条记录`)
-    }
-    
-  } catch (error) {
-    console.error('查询失败:', error)
-    ElMessage.error('查询失败')
-  } finally {
-    queryLoading.value = false
-  }
-}
+// 查询执行由子组件管理
 
 
 
-/**
- * 分页处理
- */
-const handleSizeChange = (newSize: number) => {
-  pageSize.value = newSize
-  currentPage.value = 1
-  // 重新执行查询
-  if (queryResults.value) {
-    executeQuery()
-  }
-}
+// 分页处理由子组件管理
 
-const handleCurrentChange = (newPage: number) => {
-  currentPage.value = newPage
-  // 重新执行查询
-  if (queryResults.value) {
-    executeQuery()
-  }
-}
-
-/**
- * 导出查询结果
- */
-const exportResults = async () => {
-  if (!queryResults.value?.data?.length) {
-    ElMessage.warning('没有数据可导出')
-    return
-  }
-  
-  try {
-    await ElMessageBox.confirm('确定要导出查询结果吗？', '确认导出', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    })
-    
-    // 创建工作簿
-    const wb = XLSX.utils.book_new()
-    
-    // 准备数据
-    const exportData = queryResults.value.data.map((row: any) => {
-      const newRow: Record<string, any> = {}
-      displayFields.value.forEach((field: string) => {
-        newRow[field] = typeof row[field] === 'object' ? JSON.stringify(row[field]) : row[field]
-      })
-      return newRow
-    })
-    
-    // 创建工作表
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    XLSX.utils.book_append_sheet(wb, ws, '查询结果')
-    
-    // 导出文件
-    const fileName = `${packageData.value?.name || '资源包查询'}_${new Date().toISOString().slice(0, 10)}.xlsx`
-    XLSX.writeFile(wb, fileName)
-    
-    ElMessage.success('导出成功')
-    
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('导出失败:', error)
-      ElMessage.error('导出失败')
-    }
-  }
-}
+// 导出功能由子组件管理
 
 /**
  * 生命周期
@@ -882,7 +421,7 @@ watch(() => route.params.id, () => {
 .package-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tag-item {
@@ -891,14 +430,15 @@ watch(() => route.params.id, () => {
 
 .locked-conditions,
 .base-config {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .locked-conditions h4,
-.base-config h4 {
-  margin: 0 0 12px 0;
+.base-config h4,
+.template-info h4 {
+  margin: 0 0 8px 0;
   color: #303133;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -913,7 +453,7 @@ watch(() => route.params.id, () => {
 }
 
 .config-info {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .query-form {
@@ -952,12 +492,12 @@ watch(() => route.params.id, () => {
 }
 
 :deep(.el-card__header) {
-  padding: 16px 20px;
+  padding: 12px 16px;
   border-bottom: 1px solid #e4e7ed;
 }
 
 :deep(.el-card__body) {
-  padding: 20px;
+  padding: 14px;
 }
 
 :deep(.el-form-item) {
@@ -978,5 +518,11 @@ watch(() => route.params.id, () => {
 
 :deep(.el-descriptions__label) {
   font-weight: 600;
+}
+
+.package-info-card .template-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 </style>

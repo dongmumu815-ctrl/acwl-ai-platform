@@ -19,16 +19,16 @@
               <el-icon><CaretRight /></el-icon>
               执行查询
             </el-button>
-            <el-button 
-              @click="addToResourcePackage" 
+            <el-button
+              v-if="!props.isInResourcePackage"
+              type="success"
+              @click="addToResourcePackage"
               :disabled="!hasValidQuery"
-              :type="props.isInResourcePackage ? 'warning' : 'success'"
             >
               <el-icon>
-                <Edit v-if="props.isInResourcePackage" />
-                <FolderAdd v-else />
+                <FolderAdd />
               </el-icon>
-              {{ props.isInResourcePackage ? '更新到资源包' : '添加到资源包' }}
+              添加到资源包
             </el-button>
           </div>
         </div>
@@ -92,19 +92,19 @@
       <div v-if="queryType === 'visual'" class="visual-query-builder">
         <!-- 索引选择 -->
         <div v-if="!shouldHideIndexSelector" class="query-section">
-          <label class="section-label">索引选择:</label>
+            <!-- <div  class="query-section"> -->
+          <label class="section-label">索引选择:{{ visualQuery.indices }},{{ esQueryConfig.availableIndices }}</label>
           <el-select
             v-model="visualQuery.indices"
-            multiple
             placeholder="请选择索引"
             @change="onIndicesChange"
             style="width: 100%"
           >
             <el-option
               v-for="index in esQueryConfig.availableIndices"
-              :key="index"
-              :label="index"
-              :value="index"
+              :key="index.name"
+              :label="index.name"
+              :value="index.name"
             />
           </el-select>
         </div>

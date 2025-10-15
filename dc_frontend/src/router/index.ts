@@ -57,7 +57,7 @@ const authRoutes: RouteRecordRaw[] = [
         name: 'Dashboard',
         component: () => import('@/views/dashboard/Dashboard.vue'),
         meta: {
-          title: '仪表盘1',
+          title: '仪表盘',
           icon: 'Monitor',
           requiresAuth: true,
           keepAlive: true
@@ -129,26 +129,26 @@ const authRoutes: RouteRecordRaw[] = [
           activeMenu: '/data-resources/list'
         }
       },
-      {
-        path: 'categories',
-        name: 'CategoryManage',
-        component: () => import('@/views/dataResource/CategoryManage.vue'),
-        meta: {
-          title: '资源分类',
-          icon: 'FolderAdd',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'tags',
-        name: 'TagManage',
-        component: () => import('@/views/dataResource/TagManage.vue'),
-        meta: {
-          title: '标签管理',
-          icon: 'PriceTag',
-          requiresAuth: true
-        }
-      },
+      // {
+      //   path: 'categories',
+      //   name: 'CategoryManage',
+      //   component: () => import('@/views/dataResource/CategoryManage.vue'),
+      //   meta: {
+      //     title: '资源分类1',
+      //     icon: 'FolderAdd',
+      //     requiresAuth: true
+      //   }
+      // },
+      // {
+      //   path: 'tags',
+      //   name: 'TagManage',
+      //   component: () => import('@/views/dataResource/TagManage.vue'),
+      //   meta: {
+      //     title: '标签管理',
+      //     icon: 'PriceTag',
+      //     requiresAuth: true
+      //   }
+      // },
       {
         path: 'packages',
         name: 'ResourcePackageList',
@@ -172,155 +172,229 @@ const authRoutes: RouteRecordRaw[] = [
       }
     ]
   },
+  // {
+  //   path: '/users',
+  //   component: Layout,
+  //   redirect: '/users/list',
+  //   meta: {
+  //     title: '权限与用户',
+  //     icon: 'User',
+  //     requiresAuth: true
+  //   },
+  //   children: [
+  //     {
+  //       path: 'list',
+  //       name: 'UserList',
+  //       component: () => import('@/views/user/UserList.vue'),
+  //       meta: {
+  //         title: '用户管理',
+  //         icon: 'UserFilled',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'create',
+  //       name: 'UserCreate',
+  //       component: () => import('@/views/user/UserForm.vue'),
+  //       meta: {
+  //         title: '新建用户',
+  //         requiresAuth: true,
+  //         hideInMenu: true
+  //       }
+  //     },
+  //     {
+  //       path: ':id/edit',
+  //       name: 'UserEdit',
+  //       component: () => import('@/views/user/UserForm.vue'),
+  //       meta: {
+  //         title: '编辑用户',
+  //         requiresAuth: true,
+  //         hideInMenu: true
+  //       }
+  //     },
+  //     {
+  //       path: 'roles',
+  //       name: 'RoleManagement',
+  //       component: () => import('@/views/user/RoleManagement.vue'),
+  //       meta: {
+  //         title: '角色管理',
+  //         icon: 'Avatar',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'permissions',
+  //       name: 'UserPermissionManagement',
+  //       component: () => import('@/views/user/PermissionManagement.vue'),
+  //       meta: {
+  //         title: '权限配置',
+  //         icon: 'Key',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'resource-permissions',
+  //       name: 'ResourcePermissionManage',
+  //       component: () => import('@/views/dataResource/PermissionManage.vue'),
+  //       meta: {
+  //         title: '访问控制',
+  //         icon: 'Lock',
+  //         requiresAuth: true
+  //       }
+  //     }
+  //   ]
+  // },
+  // {
+  //   path: '/system',
+  //   component: Layout,
+  //   redirect: '/system/settings',
+  //   meta: {
+  //     title: '系统管理',
+  //     icon: 'Setting',
+  //     requiresAuth: true
+  //   },
+  //   children: [
+  //     {
+  //       path: 'settings',
+  //       name: 'SystemSettings',
+  //       component: () => import('@/views/settings/Settings.vue'),
+  //       meta: {
+  //         title: '系统设置',
+  //         icon: 'Tools',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'monitor',
+  //       name: 'SystemMonitor',
+  //       component: () => import('@/views/system/Monitor.vue'),
+  //       meta: {
+  //         title: '系统监控',
+  //         icon: 'Monitor',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'logs',
+  //       name: 'SystemLogs',
+  //       component: () => import('@/views/system/Logs.vue'),
+  //       meta: {
+  //         title: '日志管理',
+  //         icon: 'Document',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'backup',
+  //       name: 'SystemBackup',
+  //       component: () => import('@/views/system/Backup.vue'),
+  //       meta: {
+  //         title: '备份管理',
+  //         icon: 'FolderAdd',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'update',
+  //       name: 'SystemUpdate',
+  //       component: () => import('@/views/system/Update.vue'),
+  //       meta: {
+  //         title: '系统更新',
+  //         icon: 'Upload',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'datasources',
+  //       name: 'DataSourceList',
+  //       component: () => import('@/views/datasource/DataSourceList.vue'),
+  //       meta: {
+  //         title: '数据源管理',
+  //         icon: 'Connection',
+  //         requiresAuth: true
+  //       }
+  //     },
+  //     {
+  //       path: 'auth-error-test',
+  //       name: 'AuthErrorTest',
+  //       component: () => import('@/views/test/AuthErrorTest.vue'),
+  //       meta: {
+  //         title: '认证错误测试',
+  //         icon: 'Warning',
+  //         requiresAuth: true
+  //       }
+  //     }
+  //   ]
+  // },
   {
-    path: '/users',
+    path: '/api-management',
     component: Layout,
-    redirect: '/users/list',
+    redirect: '/api-management/customers',
     meta: {
-      title: '权限与用户',
-      icon: 'User',
+      title: 'API接口管理',
+      icon: 'Connection',
       requiresAuth: true
     },
     children: [
       {
-        path: 'list',
-        name: 'UserList',
-        component: () => import('@/views/user/UserList.vue'),
+        path: 'customers',
+        name: 'CustomerManagement',
+        component: () => import('@/views/apiManagement/CustomerList.vue'),
         meta: {
-          title: '用户管理',
+          title: '客户管理',
           icon: 'UserFilled',
           requiresAuth: true
         }
       },
       {
-        path: 'create',
-        name: 'UserCreate',
-        component: () => import('@/views/user/UserForm.vue'),
+        path: 'apis',
+        name: 'ApiManagement',
+        component: () => import('@/views/apiManagement/ApiList.vue'),
         meta: {
-          title: '新建用户',
-          requiresAuth: true,
-          hideInMenu: true
-        }
-      },
-      {
-        path: ':id/edit',
-        name: 'UserEdit',
-        component: () => import('@/views/user/UserForm.vue'),
-        meta: {
-          title: '编辑用户',
-          requiresAuth: true,
-          hideInMenu: true
-        }
-      },
-      {
-        path: 'roles',
-        name: 'RoleManagement',
-        component: () => import('@/views/user/RoleManagement.vue'),
-        meta: {
-          title: '角色管理',
-          icon: 'Avatar',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'permissions',
-        name: 'UserPermissionManagement',
-        component: () => import('@/views/user/PermissionManagement.vue'),
-        meta: {
-          title: '权限配置',
-          icon: 'Key',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'resource-permissions',
-        name: 'ResourcePermissionManage',
-        component: () => import('@/views/dataResource/PermissionManage.vue'),
-        meta: {
-          title: '访问控制',
-          icon: 'Lock',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
-  {
-    path: '/system',
-    component: Layout,
-    redirect: '/system/settings',
-    meta: {
-      title: '系统管理',
-      icon: 'Setting',
-      requiresAuth: true
-    },
-    children: [
-      {
-        path: 'settings',
-        name: 'SystemSettings',
-        component: () => import('@/views/settings/Settings.vue'),
-        meta: {
-          title: '系统设置',
-          icon: 'Tools',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'monitor',
-        name: 'SystemMonitor',
-        component: () => import('@/views/system/Monitor.vue'),
-        meta: {
-          title: '系统监控',
-          icon: 'Monitor',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'logs',
-        name: 'SystemLogs',
-        component: () => import('@/views/system/Logs.vue'),
-        meta: {
-          title: '日志管理',
-          icon: 'Document',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'backup',
-        name: 'SystemBackup',
-        component: () => import('@/views/system/Backup.vue'),
-        meta: {
-          title: '备份管理',
-          icon: 'FolderAdd',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'update',
-        name: 'SystemUpdate',
-        component: () => import('@/views/system/Update.vue'),
-        meta: {
-          title: '系统更新',
-          icon: 'Upload',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'datasources',
-        name: 'DataSourceList',
-        component: () => import('@/views/datasource/DataSourceList.vue'),
-        meta: {
-          title: '数据源管理',
+          title: 'API管理',
           icon: 'Connection',
           requiresAuth: true
         }
       },
       {
-        path: 'auth-error-test',
-        name: 'AuthErrorTest',
-        component: () => import('@/views/test/AuthErrorTest.vue'),
+        path: 'apis/:id/fields',
+        name: 'ApiFields',
+        component: () => import('@/views/apiManagement/ApiFields.vue'),
         meta: {
-          title: '认证错误测试',
-          icon: 'Warning',
+          title: 'API字段配置',
+          requiresAuth: true,
+          hideInMenu: true,
+          activeMenu: '/api-management/apis'
+        }
+      },
+      {
+        path: 'batches',
+        name: 'BatchManagement',
+        component: () => import('@/views/apiManagement/BatchList.vue'),
+        meta: {
+          title: '批次管理',
+          icon: 'DataBoard',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'batches/:id',
+        name: 'BatchDetail',
+        component: () => import('@/views/apiManagement/BatchDetail.vue'),
+        meta: {
+          title: '批次详情',
+          requiresAuth: true,
+          hideInMenu: true,
+          activeMenu: '/api-management/batches'
+        }
+      },
+      {
+        path: 'dashboard',
+        name: 'ApiDashboard',
+        component: () => import('@/views/apiManagement/Dashboard.vue'),
+        meta: {
+          title: 'API仪表板',
+          icon: 'Monitor',
           requiresAuth: true
         }
       }

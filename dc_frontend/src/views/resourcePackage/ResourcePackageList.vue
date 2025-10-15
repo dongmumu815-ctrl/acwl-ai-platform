@@ -11,10 +11,10 @@
           <p class="page-description">管理和配置数据查询资源包，支持SQL和Elasticsearch查询</p>
         </div>
         <div class="header-right">
-          <el-button type="primary" @click="handleCreate">
+          <!-- <el-button type="primary" @click="handleCreate">
             <el-icon><Plus /></el-icon>
             创建资源包
-          </el-button>
+          </el-button> -->
           <el-button @click="refreshPackages">
             <el-icon><Refresh /></el-icon>
             刷新
@@ -260,7 +260,7 @@
                 <div class="package-actions">
                   <el-button
                     size="small"
-                    @click="handleView(pkg)"
+                    @click="showApiEndpoint(pkg)"
                   >
                     API
                   </el-button>
@@ -272,6 +272,13 @@
                   >
                     查询
                   </el-button>
+                  <el-button
+                    type="warning"
+                    size="small"
+                    @click="handleQuerySetting(pkg)"
+                  >
+                    查询设定
+                  </el-button>
                   <el-dropdown trigger="click">
                     <el-button size="small" text>
                       <el-icon><MoreFilled /></el-icon>
@@ -281,10 +288,6 @@
                         <el-dropdown-item @click="handleEdit(pkg)">
                           <el-icon><Edit /></el-icon>
                           编辑
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="handleClone(pkg)">
-                          <el-icon><CopyDocument /></el-icon>
-                          克隆
                         </el-dropdown-item>
                         <el-dropdown-item
                           divided
@@ -308,9 +311,11 @@
             v-loading="loading"
             :data="paginatedPackages"
             style="width: 100%"
+            border
+            @header-dragend="handleColumnResize"
             @sort-change="handleTableSort"
           >
-            <el-table-column prop="name" label="资源包名称" min-width="200" sortable>
+            <el-table-column prop="name" column-key="name" label="资源包名称" :width="getColumnWidth('name', 200)" sortable>
               <template #default="{ row }">
                 <div class="package-name-cell">
                   <div class="package-type-icon">
@@ -330,7 +335,7 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="type" label="类型" width="120">
+            <el-table-column prop="type" column-key="type" label="类型" :width="getColumnWidth('type', 120)">
               <template #default="{ row }">
                 <el-tag :type="row.type === 'sql' ? 'primary' : 'success'">
                   {{ row.type === 'sql' ? 'SQL' : 'Elasticsearch' }}
@@ -338,13 +343,13 @@
               </template>
             </el-table-column>
             
-            <el-table-column label="数据源" width="150">
+            <el-table-column column-key="datasource" label="数据源" :width="getColumnWidth('datasource', 150)">
               <template #default="{ row }">
                 {{ getDatasourceName(row.datasource_id) }}
               </template>
             </el-table-column>
             
-            <el-table-column label="模板信息" width="120">
+            <el-table-column column-key="template" label="模板信息" :width="getColumnWidth('template', 120)">
               <template #default="{ row }">
                 <div class="condition-info">
                   <div>
@@ -357,7 +362,7 @@
               </template>
             </el-table-column>
             
-            <el-table-column label="标签" width="200">
+            <el-table-column column-key="tags" label="标签" :width="getColumnWidth('tags', 200)">
               <template #default="{ row }">
                 <div class="package-tags" v-if="row.tags && row.tags.length > 0">
                   <el-tag
@@ -376,7 +381,7 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="is_active" label="状态" width="80">
+            <el-table-column prop="is_active" column-key="status" label="状态" :width="getColumnWidth('status', 80)">
               <template #default="{ row }">
                 <el-tag :type="getStatusType(row.is_active)">
                   {{ row.is_active ? '启用' : '禁用' }}
@@ -384,34 +389,41 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="created_at" label="创建时间" width="160" sortable>
+            <el-table-column prop="created_at" column-key="created_at" label="创建时间" :width="getColumnWidth('created_at', 160)" sortable>
               <template #default="{ row }">
                 {{ formatDate(row.created_at) }}
               </template>
             </el-table-column>
             
-            <el-table-column label="操作" width="240" fixed="right">
+            <el-table-column column-key="actions" label="操作" :width="getColumnWidth('actions', 240)" fixed="right">
               <template #default="{ row }">
                 <div class="action-buttons">
                   <el-button type="primary" size="small" @click="handleQuery(row)">
                     <el-icon><Search /></el-icon>
                     查询
                   </el-button>
-                  <el-button type="warning" size="small" @click="handleEdit(row)">
+                  <el-button type="warning" size="small" @click="handleQuerySetting(row)">
                     <el-icon><Setting /></el-icon>
-                    设定
+                    查询设定
                   </el-button>
-                  <el-popconfirm
-                    title="确定要删除这个资源包吗？"
-                    @confirm="handleDelete(row)"
-                  >
-                    <template #reference>
-                      <el-button type="danger" size="small">
-                        <el-icon><Delete /></el-icon>
-                        删除
-                      </el-button>
+                  <el-dropdown trigger="click">
+                    <el-button size="small">
+                      更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item @click="showApiEndpoint(row)">
+                          <el-icon><View /></el-icon>API
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="handleEdit(row)">
+                          <el-icon><Edit /></el-icon>编辑
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="handleDelete(row)">
+                          <el-icon><Delete /></el-icon>删除
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
                     </template>
-                  </el-popconfirm>
+                  </el-dropdown>
                 </div>
               </template>
             </el-table-column>
@@ -432,12 +444,77 @@
         </div>
       </el-card>
     </div>
+
+    <!-- 编辑资源包基本信息 -->
+    <ResourcePackageForm
+      v-model:visible="editDialogVisible"
+      :packageData="selectedPackage as any"
+      :isEdit="true"
+      @success="onEditSuccess"
+    />
+
+    <!-- 查询设定：根据资源包类型加载对应查询构建器 -->
+    <el-drawer v-model="querySettingVisible" title="查询设定" size="80%"><p>test{{ initialSchema }}{{ initialTableName }}</p>
+      <template v-if="querySettingPackage && querySettingPackage.type === 'sql'">
+        <SQLQueryBuilder
+          ref="sqlQueryBuilderRef"
+          :sqlResources="sqlResources"
+          :hasQueryPermission="hasQueryPermission"
+          :hasExportPermission="hasExportPermission"
+          :hasSavePermission="hasSavePermission"
+          :initialDatasourceId="querySettingPackage.datasource_id"
+          :initialResourceId="querySettingPackage.resource_id || null"
+          :initialSchema="initialSchema"
+          :initialTableName="initialTableName"
+          :isInResourcePackage="true"
+          :resourcePackageId="querySettingPackage.id"
+          :resourcePackageName="querySettingPackage.name"
+          @execute-query="onSQLQueryExecute"
+          @save-query="onSQLQuerySave"
+          @update-query="onSQLQueryUpdate"
+          @export-results="onSQLResultsExport"
+        />
+      </template>
+      <template v-else-if="querySettingPackage && querySettingPackage.type === 'elasticsearch'">
+        <ESQueryBuilder
+          ref="esQueryBuilderRef"
+          :es-datasources="esDatasources"
+          :initial-datasource-id="String(querySettingPackage.datasource_id)"
+          :initial-indices="initialIndices"
+          :data-resource-id="querySettingPackage.resource_id || null"
+          :has-es-query-permission="hasESQueryPermission"
+          :has-export-permission="hasExportPermission"
+          :has-save-permission="hasSavePermission"
+          :isInResourcePackage="true"
+          :resourcePackageId="querySettingPackage.id"
+          :resourcePackageName="querySettingPackage.name"
+          @execute-query="onESQueryExecute"
+          @save-query="onESQuerySave"
+          @export-results="onESResultsExport"
+          @datasources-loaded="onESDatasourcesLoaded"
+        />
+      </template>
+    </el-drawer>
+
+    <!-- API端点弹窗 -->
+    <el-dialog v-model="apiDialogVisible" title="API端点" width="600px">
+      <p>资源包接口：<code>{{ apiEndpoint }}</code></p>
+      <div style="margin-top: 12px;">
+        <el-button type="primary" @click="copyApiEndpoint">
+          复制端点
+        </el-button>
+      </div>
+      <template #footer>
+        <el-button @click="apiDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Box,
@@ -450,6 +527,7 @@ import {
   List,
   Calendar,
   Setting,
+  ArrowDown,
   MoreFilled,
   Edit,
   CopyDocument,
@@ -458,7 +536,12 @@ import {
   Coin
 } from '@element-plus/icons-vue'
 import { resourcePackageApi, type ResourcePackage, type ResourcePackageSearchRequest } from '@/api/resourcePackage'
+import { dataResourceApi } from '@/api/dataResource'
+import { saveSQLTemplate, updateSQLTemplate, executeSQLQuery } from '@/api/sqlQuery'
 import { formatDate } from '@/utils/date'
+import SQLQueryBuilder from '@/components/SQLQueryBuilder.vue'
+import ESQueryBuilder from '@/components/ESQueryBuilder.vue'
+import ResourcePackageForm from '@/views/resourcePackage/components/ResourcePackageForm.vue'
 
 // 定义数据源接口
 interface Datasource {
@@ -475,14 +558,27 @@ interface Datasource {
   updated_at: string
 }
 
-// 路由
+// 路由和用户状态管理
 const router = useRouter()
+const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)
 const packageList = ref<ResourcePackage[]>([])
 const datasources = ref<Datasource[]>([])
+const esDatasources = ref([])
+const currentDataResource = ref<any>(null)
 const viewMode = ref('grid')
+// SQL资源列表
+const sqlResources = ref<any[]>([])
+
+// 编辑对话框与查询设定抽屉、API端点
+const editDialogVisible = ref(false)
+const selectedPackage = ref<ResourcePackage | null>(null)
+const querySettingVisible = ref(false)
+const querySettingPackage = ref<ResourcePackage | null>(null)
+const apiDialogVisible = ref(false)
+const apiEndpoint = ref('')
 
 // 搜索和筛选
 const filters = reactive({
@@ -514,6 +610,113 @@ const getDatasourceName = computed(() => {
     const ds = datasources.value.find((d: Datasource) => d.id === datasourceId)
     return ds ? ds.name : '数据源'
   }
+})
+
+// 权限控制
+const hasESQueryPermission = computed(() => {
+  return userStore.hasPermission('data:elasticsearch:query') || userStore.hasRole('admin')
+})
+
+const hasExportPermission = computed(() => {
+  return userStore.hasPermission('data:resource:export') || userStore.hasRole('admin')
+})
+
+const hasSavePermission = computed(() => {
+  return userStore.hasPermission('data:resource:save') || userStore.hasRole('admin')
+})
+
+const hasQueryPermission = computed(() => {
+  return userStore.hasPermission('data:resource:query') || userStore.hasRole('admin')
+})
+
+/**
+ * 计算属性：获取初始索引列表
+ * 从当前数据资源的详情中获取索引信息
+ */
+const initialIndices = computed(() => {
+  if (!currentDataResource.value) {
+    return []
+  }
+  
+  // 如果数据资源有 indices 字段，直接返回
+  if (currentDataResource.value.indices && Array.isArray(currentDataResource.value.indices)) {
+    return currentDataResource.value.indices
+  }
+  
+  // 如果数据资源有 table_name 或 index_name，返回对应的名称
+  if (currentDataResource.value.table_name) {
+    return [currentDataResource.value.table_name]
+  }
+  
+  if (currentDataResource.value.index_name) {
+    return [currentDataResource.value.index_name]
+  }
+  
+  return []
+})
+
+// SQL 初始 Schema 与表名（从当前数据资源详情推断）
+const initialSchema = computed(() => {
+  const dr = currentDataResource.value as any
+  // 兼容多种字段来源：schema_name（部分类型）、database_name（后端返回的数据库名）、connection_config.database（旧结构）
+  return (
+    (dr?.schema_name as string) ||
+    (dr?.database_name as string) ||
+    (dr?.connection_config?.database as string) ||
+    ''
+  )
+})
+
+const initialTableName = computed(() => {
+  return (currentDataResource.value?.table_name as string) || (currentDataResource.value?.tableName as string) || ''
+})
+
+// 组件引用
+const esQueryBuilderRef = ref(null)
+const sqlQueryBuilderRef = ref(null)
+
+// 列宽拖拽与持久化
+const COLUMN_WIDTHS_STORAGE_KEY = 'resourcePackageTableColumnWidths'
+const columnWidths = ref<Record<string, number>>({})
+
+function loadColumnWidths() {
+  try {
+    const saved = localStorage.getItem(COLUMN_WIDTHS_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (parsed && typeof parsed === 'object') {
+        columnWidths.value = parsed
+      }
+    }
+  } catch (e) {
+    console.warn('加载列宽失败:', e)
+  }
+}
+
+function saveColumnWidths() {
+  try {
+    localStorage.setItem(COLUMN_WIDTHS_STORAGE_KEY, JSON.stringify(columnWidths.value))
+  } catch (e) {
+    console.warn('保存列宽失败:', e)
+  }
+}
+
+function getColumnWidth(key: string, defaultWidth: number) {
+  const val = columnWidths.value[key]
+  return typeof val === 'number' && val > 0 ? val : defaultWidth
+}
+
+function handleColumnResize(newWidth: number, oldWidth: number, column: any) {
+  const key = column?.columnKey || column?.property || column?.label
+  if (key) {
+    columnWidths.value[key] = newWidth
+    saveColumnWidths()
+  }
+}
+
+onMounted(() => {
+  loadColumnWidths()
+  loadSQLResources()
 })
 
 /**
@@ -606,13 +809,13 @@ const loadPackages = async () => {
       sort_order: 'desc'
     }
     
-    const res = await resourcePackageApi.search(searchParams)
-    console.log('搜索资源包响应:', res)
-    packageList.value = res.data?.items || []
-    pagination.total = res.data?.total || 0 // 更新总数
-    
-    // 更新统计数据
-    updateStats()
+  const res = await resourcePackageApi.search(searchParams)
+  console.log('搜索资源包响应:', res)
+  packageList.value = res.data?.items || []
+  pagination.total = res.data?.total || 0 // 更新总数
+
+  // 更新统计数据
+  updateStats()
     
   } catch (error) {
     console.error('加载资源包列表失败:', error)
@@ -620,6 +823,21 @@ const loadPackages = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 复制API端点
+const copyApiEndpoint = async () => {
+  try {
+    await navigator.clipboard.writeText(apiEndpoint.value)
+    ElMessage.success('已复制API端点')
+  } catch (e) {
+    ElMessage.error('复制失败')
+  }
+}
+
+// 查看详情（当前行为：打开编辑弹窗）
+const handleView = (row: ResourcePackage) => {
+  handleEdit(row)
 }
 
 /**
@@ -642,10 +860,26 @@ const loadDatasources = async () => {
 }
 
 /**
+ * 加载可用于SQL查询的数据资源列表
+ */
+const loadSQLResources = async () => {
+  try {
+  const response: any = await dataResourceApi.getResourceList({ page: 1, page_size: 1000 })
+    // 兼容不同返回结构
+    const items = response?.data?.items || response?.items || response?.data?.list || []
+    sqlResources.value = items
+  } catch (error) {
+    console.error('加载数据资源失败:', error)
+    ElMessage.error('加载数据资源失败')
+  }
+}
+
+/**
  * 更新统计数据
  */
 const updateStats = () => {
-  stats.total = packageList.value.length
+  // 总数使用后端返回的 total（全量数据总数）
+  stats.total = pagination.total
   stats.active = packageList.value.filter(pkg => pkg.is_active).length
   stats.sqlCount = packageList.value.filter(pkg => pkg.type === 'sql').length
   stats.elasticsearchCount = packageList.value.filter(pkg => pkg.type === 'elasticsearch').length
@@ -717,27 +951,32 @@ const handleCreate = () => {
  * 编辑资源包 - 跳转到数据查询页面
  */
 const handleEdit = (row: ResourcePackage) => {
-  // 构建查询页面的URL参数
-  const queryParams: Record<string, any> = {
-    datasourceType: row.type === 'sql' ? 'mysql' : 'elasticsearch',
-    templateId: row.template_id,
-    templateType: row.template_type
+  selectedPackage.value = row
+  editDialogVisible.value = true
+}
+
+/**
+ * 查询设定（打开查询构建器）
+ */
+const handleQuerySetting = async (row: ResourcePackage) => {
+  querySettingPackage.value = row
+  
+  // 如果资源包有关联的数据资源ID，获取数据资源详情
+  if (row.resource_id) {
+    await fetchDataResourceDetail(row.resource_id)
   }
   
-  // 跳转到资源包查询页面
-  router.push({
-    path: `/resource-packages/query/${row.id}`,
-    query: queryParams
-  })
+  querySettingVisible.value = true
 }
 
 /**
  * 查看资源包详情
  */
-const handleView = (row: ResourcePackage) => {
-  // 可以跳转到详情页面或打开详情对话框
-  ElMessage.info('正在努力开发中...')
-  console.log('查看资源包:', row)
+const buildApiEndpoint = (row: ResourcePackage) => `/api/v1/resource-packages/${row.id}`
+
+const showApiEndpoint = (row: ResourcePackage) => {
+  apiEndpoint.value = buildApiEndpoint(row)
+  apiDialogVisible.value = true
 }
 
 /**
@@ -759,12 +998,25 @@ const handleClone = (row: ResourcePackage) => {
  */
 const handleDelete = async (row: ResourcePackage) => {
   try {
+    await ElMessageBox.confirm(
+      `确定要删除资源包 “${row.name}” 吗？`,
+      '确认删除',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
     await resourcePackageApi.delete(row.id)
     ElMessage.success('删除成功')
     loadPackages()
   } catch (error) {
-    console.error('删除失败:', error)
-    ElMessage.error('删除失败')
+    // 取消会抛出错误（通常为 'cancel'），不提示为失败
+    if (error !== 'cancel') {
+      console.error('删除失败:', error)
+      ElMessage.error('删除失败')
+    }
   }
 }
 
@@ -785,11 +1037,187 @@ const handleCurrentChange = (page: number) => {
   loadPackages() // 重新加载数据
 }
 
+/**
+ * 获取数据资源详情
+ * @param resourceId 数据资源ID
+ */
+const fetchDataResourceDetail = async (resourceId: number) => {
+  try {
+    const response = await dataResourceApi.getResourceDetail(resourceId)
+    if (response.success && response.data) {
+      currentDataResource.value = response.data
+      return response.data
+    }
+  } catch (error) {
+    console.error('获取数据资源详情失败:', error)
+    ElMessage.error('获取数据资源详情失败')
+  }
+  return null
+}
+
+/**
+ * ES查询执行处理
+ */
+const onESQueryExecute = (queryData) => {
+  console.log('执行ES查询:', queryData)
+}
+
+/**
+ * SQL 查询模板保存
+ */
+const onSQLQuerySave = async (queryData: any) => {
+  try {
+    const templateData = {
+      name: queryData.name,
+      description: queryData.description,
+      datasourceId: queryData.datasourceId || querySettingPackage.value?.datasource_id,
+      dataResourceId: queryData.queryConfig?.resourceId ? parseInt(queryData.queryConfig.resourceId) : (querySettingPackage.value?.resource_id || null),
+      query: queryData.sql,
+      tags: queryData.tags || [],
+      config: queryData.config || {},
+      isTemplate: true
+    }
+
+    const response: any = await saveSQLTemplate(templateData as any)
+
+    if (response && response.data && response.data.id && sqlQueryBuilderRef.value) {
+      const templateId = response.data.id
+      sqlQueryBuilderRef.value.setCurrentTemplateId(templateId)
+    }
+
+    ElMessage.success('SQL查询模板保存成功')
+  } catch (error) {
+    console.error('保存SQL查询模板失败:', error)
+    ElMessage.error('保存SQL查询模板失败')
+  }
+}
+
+/**
+ * SQL 查询模板更新
+ */
+const onSQLQueryUpdate = async (queryData: any) => {
+  try {
+    const templateData = {
+      name: queryData.name,
+      description: queryData.description,
+      datasourceId: queryData.datasourceId || querySettingPackage.value?.datasource_id,
+      dataResourceId: queryData.queryConfig?.resourceId ? parseInt(queryData.queryConfig.resourceId) : (querySettingPackage.value?.resource_id || null),
+      query: queryData.sql,
+      tags: queryData.tags || [],
+      config: queryData.config || {},
+      isTemplate: true
+    }
+
+    await updateSQLTemplate(queryData.id, templateData as any)
+
+    ElMessage.success('SQL查询模板更新成功')
+  } catch (error) {
+    console.error('更新SQL查询模板失败:', error)
+    ElMessage.error('更新SQL查询模板失败')
+  }
+}
+
+/**
+ * 执行 SQL 查询
+ */
+const onSQLQueryExecute = async (queryData: any) => {
+  try {
+    if (!queryData.datasourceId) {
+      ElMessage.error('缺少数据源ID')
+      return
+    }
+    if (!queryData.sql) {
+      ElMessage.error('缺少SQL查询语句')
+      return
+    }
+
+    const queryRequest = {
+      datasourceId: queryData.datasourceId,
+      query: queryData.sql,
+      limit: queryData.limit || 1000,
+      offset: queryData.offset || 0
+    }
+
+    const response: any = await executeSQLQuery(queryRequest as any)
+
+    if (response && response.success) {
+      const { columns, data, row_count } = response
+      if (columns && data) {
+        const resultColumns = columns.map((col: string) => ({
+          prop: col,
+          label: col,
+          type: 'string',
+          width: 150
+        }))
+        const resultData = data.map((row: any[]) => {
+          const obj: Record<string, any> = {}
+          columns.forEach((col: string, index: number) => { obj[col] = row[index] })
+          return obj
+        })
+        if (sqlQueryBuilderRef.value) {
+          sqlQueryBuilderRef.value.setQueryResults(resultData, resultColumns)
+        }
+        ElMessage.success(`查询执行成功，返回 ${row_count} 条记录`)
+      } else {
+        if (sqlQueryBuilderRef.value) {
+          sqlQueryBuilderRef.value.setQueryResults([], [])
+        }
+        ElMessage.info('查询成功但无数据返回')
+      }
+    } else {
+      const errorMessage = response?.error_details || response?.message || '查询执行失败'
+      if (sqlQueryBuilderRef.value) {
+        sqlQueryBuilderRef.value.handleQueryError(new Error(errorMessage))
+      }
+      ElMessage.error(`查询执行失败: ${errorMessage}`)
+    }
+  } catch (error: any) {
+    if (sqlQueryBuilderRef.value) {
+      sqlQueryBuilderRef.value.handleQueryError(error)
+    }
+    const errorMessage = error.response?.data?.detail || error.message || '查询执行失败'
+    ElMessage.error(`查询执行失败: ${errorMessage}`)
+  }
+}
+
+const onSQLResultsExport = (results: any) => {
+  console.log('导出SQL查询结果:', results)
+}
+
+/**
+ * ES查询保存处理
+ */
+const onESQuerySave = (queryData) => {
+  console.log('保存ES查询:', queryData)
+}
+
+/**
+ * ES查询结果导出处理
+ */
+const onESResultsExport = (results) => {
+  console.log('导出ES查询结果:', results)
+}
+
+/**
+ * ES数据源加载完成处理
+ */
+const onESDatasourcesLoaded = (datasources) => {
+  esDatasources.value = datasources
+  console.log('ES数据源加载完成:', datasources)
+}
+
 // 生命周期
 onMounted(() => {
   loadDatasources()
   loadPackages()
+  loadSQLResources()
 })
+
+/** 编辑成功后刷新列表 */
+const onEditSuccess = () => {
+  editDialogVisible.value = false
+  loadPackages()
+}
 </script>
 
 <style scoped>

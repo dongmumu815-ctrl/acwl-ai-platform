@@ -3,6 +3,7 @@
  */
 
 import { request, post, get, put, del } from '@/utils/request'
+import type { ApiResponse } from '@/types/datasource'
 
 // 资源包类型枚举
 export enum PackageType {
@@ -221,35 +222,35 @@ export const resourcePackageApi = {
   /**
    * 创建资源包
    */
-  create(data: ResourcePackageCreateRequest): Promise<ResourcePackage> {
+  create(data: ResourcePackageCreateRequest): Promise<ApiResponse<ResourcePackage>> {
     return post('/resource-packages/', data)
   },
 
   /**
    * 获取资源包详情
    */
-  get(id: number): Promise<ResourcePackage> {
+  get(id: number): Promise<ApiResponse<ResourcePackage>> {
     return get(`/resource-packages/${id}`)
   },
 
   /**
    * 更新资源包
    */
-  update(id: number, data: ResourcePackageUpdateRequest): Promise<ResourcePackage> {
+  update(id: number, data: ResourcePackageUpdateRequest): Promise<ApiResponse<ResourcePackage>> {
     return put(`/resource-packages/${id}`, data)
   },
 
   /**
    * 删除资源包
    */
-  delete(id: number): Promise<{ message: string }> {
+  delete(id: number): Promise<ApiResponse<{ message: string }>> {
     return del(`/resource-packages/${id}`)
   },
 
   /**
    * 搜索资源包
    */
-  search(params: ResourcePackageSearchRequest): Promise<ResourcePackageListResponse> {
+  search(params: ResourcePackageSearchRequest): Promise<ApiResponse<ResourcePackageListResponse>> {
     return post('/resource-packages/search', params)
   },
 
@@ -258,7 +259,7 @@ export const resourcePackageApi = {
   /**
    * 查询资源包数据
    */
-  query(id: number, params: ResourcePackageQueryRequest): Promise<ResourcePackageQueryResponse> {
+  query(id: number, params: ResourcePackageQueryRequest): Promise<ApiResponse<ResourcePackageQueryResponse>> {
     return post(`/resource-packages/${id}/query`, params)
   },
 
@@ -266,21 +267,21 @@ export const resourcePackageApi = {
    * 安全查询资源包数据 - 增强安全性版本
    * 专为ResourcePackageQueryPage.vue页面设计
    */
-  secureQuery(id: number, params: ResourcePackageQueryRequest): Promise<ResourcePackageQueryResponse> {
+  secureQuery(id: number, params: ResourcePackageQueryRequest): Promise<ApiResponse<ResourcePackageQueryResponse>> {
     return post(`/resource-packages/${id}/secure-query`, params)
   },
 
   /**
    * 获取安全查询历史记录
    */
-  getSecureQueryHistory(id: number, page: number = 1, size: number = 20): Promise<any> {
+  getSecureQueryHistory(id: number, page: number = 1, size: number = 20): Promise<ApiResponse<any>> {
     return get(`/resource-packages/${id}/query-history?page=${page}&size=${size}`)
   },
 
   /**
    * 获取查询历史
    */
-  getHistory(id: number, page: number = 1, size: number = 20): Promise<any> {
+  getHistory(id: number, page: number = 1, size: number = 20): Promise<ApiResponse<any>> {
     return get(`/resource-packages/${id}/history`, {
       page, size
     })
@@ -294,18 +295,29 @@ export const templateApi = {
   /**
    * 获取模板列表
    */
-  list(datasource_id?: number, type?: PackageType): Promise<Template[]> {
-    const params: any = {}
-    if (datasource_id) params.datasource_id = datasource_id
-    if (type) params.type = type
-    return get('/templates/', params)
+  list(params?: { datasource_id?: number; type?: PackageType; data_resource_id?: number; indices?: string[] }): Promise<{ data: Template[] }> {
+    const query: any = {}
+    if (params?.datasource_id) query.datasource_id = params.datasource_id
+    if (params?.data_resource_id) query.data_resource_id = params.data_resource_id
+    if (params?.indices && params.indices.length > 0) query.indices = params.indices.join(',')
+
+    if (params?.type === PackageType.ELASTICSEARCH) {
+      // ES模板端点
+      return get('/es/templates', query)
+    }
+    // 默认SQL模板端点（并标记为模板）
+    query.isTemplate = true
+    return get('/sql/templates', query)
   },
 
   /**
    * 获取模板详情
    */
-  get(id: number): Promise<Template> {
-    return get(`/templates/${id}`)
+  get(id: number, type: PackageType): Promise<{ data: Template }> {
+    if (type === PackageType.ELASTICSEARCH) {
+      return get(`/es/templates/${id}`)
+    }
+    return get(`/sql/templates/${id}`)
   },
 
   /**

@@ -32,13 +32,15 @@ export const dataResourceApi = {
    * @param params 查询参数
    */
   getResourceList(params?: DataResourceListQuery): Promise<ApiResponse<PaginatedResponse<DataResource>>> {
-    // 转换参数名以匹配后端API
+    // 统一参数名为后端期望的 page_size
+    const pageSizeParam = (params as any)?.page_size ?? (params as any)?.pageSize
     const apiParams = params ? {
       ...params,
-      size: params.pageSize, // 后端期望 size 参数
-      pageSize: undefined // 移除前端的 pageSize 参数
+      page_size: pageSizeParam,
+      pageSize: undefined,
+      size: undefined
     } : undefined
-    
+
     return request({
       url: '/data-resources/',
       method: 'GET',
@@ -393,9 +395,10 @@ export const tagApi = {
     search?: string
     page?: number
     page_size?: number
+    status?: string
   }): Promise<ApiResponse<PaginatedResponse<DataResourceTag>>> {
     return request({
-      url: '/tags',
+      url: '/data-resources/tags/',
       method: 'GET',
       params
     })
@@ -406,8 +409,21 @@ export const tagApi = {
    */
   getAllTags(): Promise<ApiResponse<DataResourceTag[]>> {
     return request({
-      url: '/tags/all',
-      method: 'GET'
+      url: '/data-resources/tags/',
+      method: 'GET',
+      params: {
+        page: 1,
+        page_size: 1000 // 设置大的page_size来获取所有标签
+      }
+    }).then(response => {
+      // 转换分页响应为简单数组响应
+      if (response.success && response.data && response.data.list) {
+        return {
+          ...response,
+          data: response.data.list
+        }
+      }
+      return response
     })
   },
 
@@ -417,7 +433,7 @@ export const tagApi = {
    */
   getTagDetail(id: number): Promise<ApiResponse<DataResourceTag>> {
     return request({
-      url: `/tags/${id}`,
+      url: `/data-resources/tags/${id}`,
       method: 'GET'
     })
   },
@@ -432,7 +448,7 @@ export const tagApi = {
     description?: string
   }): Promise<ApiResponse<DataResourceTag>> {
     return request({
-      url: '/tags',
+      url: '/data-resources/tags/',
       method: 'POST',
       data
     })
@@ -449,7 +465,7 @@ export const tagApi = {
     description?: string
   }): Promise<ApiResponse<DataResourceTag>> {
     return request({
-      url: `/tags/${id}`,
+      url: `/data-resources/tags/${id}`,
       method: 'PUT',
       data
     })
@@ -461,8 +477,50 @@ export const tagApi = {
    */
   deleteTag(id: number): Promise<ApiResponse<void>> {
     return request({
-      url: `/tags/${id}`,
+      url: `/data-resources/tags/${id}`,
       method: 'DELETE'
+    })
+  },
+
+  /**
+   * 切换标签状态
+   * @param id 标签ID
+   */
+  toggleTagStatus(id: number): Promise<ApiResponse<DataResourceTag>> {
+    return request({
+      url: `/data-resources/tags/${id}/toggle-status`,
+      method: 'POST'
+    })
+  },
+
+  /**
+   * 批量删除标签
+   * @param ids 标签ID数组
+   */
+  batchDeleteTags(ids: number[]): Promise<ApiResponse<{
+    success_count: number
+    failed_count: number
+    errors: string[]
+  }>> {
+    return request({
+      url: '/data-resources/tags/batch-delete',
+      method: 'POST',
+      data: { tag_ids: ids }
+    })
+  },
+
+  /**
+   * 获取标签使用统计
+   * @param id 标签ID
+   */
+  getTagUsageStats(id: number): Promise<ApiResponse<{
+    tag_id: number
+    tag_name: string
+    resource_count: number
+  }>> {
+    return request({
+      url: `/data-resources/tags/${id}/usage-stats`,
+      method: 'GET'
     })
   }
 }

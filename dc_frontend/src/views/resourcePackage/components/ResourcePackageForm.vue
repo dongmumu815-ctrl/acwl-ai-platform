@@ -335,10 +335,10 @@ const loadDatasources = async () => {
 const loadTemplates = async () => {
   try {
     const response = await templateApi.list({
-      type: form.template_type,
-      datasource_id: form.datasource_id
+      type: form.template_type as any,
+      datasource_id: Number(form.datasource_id)
     })
-    templates.value = response.items || []
+    templates.value = response.data || []
   } catch (error) {
     console.error('加载模板失败:', error)
   }
@@ -435,7 +435,8 @@ const handleTemplateChange = async (templateId: string) => {
 
 const loadTemplateDetails = async (templateId: string) => {
   try {
-    const template = await templateApi.get(templateId)
+    const response = await templateApi.get(Number(templateId), form.template_type as any)
+    const template = response.data
     selectedTemplate.value = template
     
     // 初始化动态参数

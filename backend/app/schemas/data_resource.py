@@ -14,7 +14,8 @@ from app.models.data_resource import (
     ResourceStatus,
     PermissionType,
     AccessType,
-    AccessStatus
+    AccessStatus,
+    TagStatus
 )
 from app.schemas.datasource import DatasourceResponse
 
@@ -111,6 +112,56 @@ class DataResourceResponse(DataResourceBase):
     tag_list: Optional[List["DataResourceTagResponse"]] = Field(None, description="标签列表")
     user_permission: Optional[PermissionType] = Field(None, description="用户权限")
     is_favorited: Optional[bool] = Field(None, description="是否已收藏")
+    
+    @classmethod
+    def from_orm_with_tags(cls, obj):
+        """从ORM对象创建响应对象，包含标签信息
+        
+        Args:
+            obj: DataResource ORM对象
+            
+        Returns:
+            DataResourceResponse对象
+        """
+        # 基础数据
+        data = {
+            'id': obj.id,
+            'name': obj.name,
+            'display_name': obj.display_name,
+            'description': obj.description,
+            'resource_type': obj.resource_type,
+            'datasource_id': obj.datasource_id,
+            'database_name': obj.database_name,
+            'table_name': obj.table_name,
+            'index_name': obj.index_name,
+            'schema_info': obj.schema_info,
+            # 返回数据库中的原始 tags 字段（JSON），以满足前端读取需求
+            'tags': obj.tags if hasattr(obj, 'tags') else None,
+            'category_id': obj.category_id,
+            'is_public': obj.is_public,
+            'status': obj.status,
+            'view_count': obj.view_count,
+            'query_count': obj.query_count,
+            'last_accessed_at': obj.last_accessed_at,
+            'created_at': obj.created_at,
+            'updated_at': obj.updated_at,
+            'created_by': obj.created_by,
+            'updated_by': obj.updated_by,
+            'category': obj.category,
+            'datasource': obj.datasource,
+        }
+        
+        # 处理标签列表
+        if hasattr(obj, 'tag_relations') and obj.tag_relations:
+            data['tag_list'] = [
+                DataResourceTagResponse.model_validate(relation.tag)
+                for relation in obj.tag_relations
+                if relation.tag  # 确保tag存在
+            ]
+        else:
+            data['tag_list'] = []
+            
+        return cls.model_validate(data)
 
 
 class DataResourceListResponse(BaseModel):
@@ -200,8 +251,9 @@ class DataResourcePreviewResponse(BaseModel):
 class DataResourceTagBase(BaseModel):
     """数据资源标签基础模式"""
     name: str = Field(..., description="标签名称", max_length=50)
-    color: str = Field("#409EFF", description="标签颜色", max_length=7)
+    color: str = Field("#409EFF", description="标签颜色", max_length=30)
     description: Optional[str] = Field(None, description="标签描述")
+    status: TagStatus = Field(TagStatus.ACTIVE, description="标签状态")
 
 
 class DataResourceTagCreate(DataResourceTagBase):
@@ -212,8 +264,9 @@ class DataResourceTagCreate(DataResourceTagBase):
 class DataResourceTagUpdate(BaseModel):
     """更新数据资源标签模式"""
     name: Optional[str] = Field(None, description="标签名称", max_length=50)
-    color: Optional[str] = Field(None, description="标签颜色", max_length=7)
+    color: Optional[str] = Field(None, description="标签颜色", max_length=30)
     description: Optional[str] = Field(None, description="标签描述")
+    status: Optional[TagStatus] = Field(None, description="标签状态")
 
 
 class DataResourceTagResponse(DataResourceTagBase):
@@ -222,6 +275,7 @@ class DataResourceTagResponse(DataResourceTagBase):
     
     id: int = Field(..., description="标签ID")
     usage_count: int = Field(..., description="使用次数")
+    status: TagStatus = Field(..., description="标签状态")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
     created_by: int = Field(..., description="创建者ID")

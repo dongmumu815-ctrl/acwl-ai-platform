@@ -10,14 +10,14 @@
         <p class="welcome-subtitle">智能数据管理，助力业务决策</p>
       </div>
       <div class="welcome-actions">
-        <el-button type="primary" size="large" @click="goToDataCenter">
+        <!-- <el-button type="primary" size="large" @click="goToDataCenter">
           <el-icon><DataBoard /></el-icon>
           进入数据中心
         </el-button>
         <el-button size="large" @click="viewQuickStart">
           <el-icon><Guide /></el-icon>
           快速开始
-        </el-button>
+        </el-button> -->
       </div>
     </div>
 

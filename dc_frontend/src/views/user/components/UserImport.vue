@@ -108,9 +108,8 @@
     <!-- 步骤3：数据验证 -->
     <div v-if="currentStep === 2" class="step-content">
       <div class="validation-section">
-        <div v-if="validating" class="validation-loading">
-          <el-loading-spinner />
-          <p>正在验证数据，请稍候...</p>
+        <div v-if="validating" class="validation-loading" v-loading="validating" element-loading-text="正在验证数据，请稍候...">
+          <div class="loading-placeholder" style="height: 200px;"></div>
         </div>
 
         <div v-else-if="validationResult" class="validation-result">

@@ -1877,17 +1877,6 @@ class DatasourceService:
             # 解密密码
             password = decrypt_datasource_password(datasource.password) if datasource.password else None
             
-            # 建立连接 - Doris使用MySQL协议
-            connection = await aiomysql.connect(
-                host=datasource.host,
-                port=datasource.port,
-                user=datasource.username,
-                password=password,
-                db=datasource.database_name,
-                charset='utf8mb4',
-                connect_timeout=timeout
-            )
-            
             # 从查询中提取表名，用于确定目标数据库
             table_names = self._extract_table_names_from_sql(query)
             target_database = datasource.database_name
@@ -1903,10 +1892,22 @@ class DatasourceService:
                 else:
                     logging.info(f"表 {first_table} 使用数据源默认数据库: {target_database}")
             
-            # 如果连接时没有指定数据库，但有目标数据库名称，则使用USE语句
-            if target_database:
-                async with connection.cursor() as cursor:
-                    await cursor.execute(f"USE `{target_database}`")
+            # 确保有目标数据库名称
+            if not target_database:
+                raise ValidationError("无法确定目标数据库，请检查数据源配置或数据资源配置")
+            
+            # 建立连接 - Doris使用MySQL协议，直接连接到目标数据库
+            connection = await aiomysql.connect(
+                host=datasource.host,
+                port=datasource.port,
+                user=datasource.username,
+                password=password,
+                db=target_database,  # 直接连接到目标数据库
+                charset='utf8mb4',
+                connect_timeout=timeout
+            )
+            
+            logging.info(f"成功连接到 Doris 数据库: {target_database}")
             
             total_count = None
             
@@ -2094,11 +2095,19 @@ class DatasourceService:
             stmt = select(DataResource.database_name).where(
                 and_(
                     DataResource.datasource_id == datasource_id,
-                    DataResource.table_name == table_name
+                    DataResource.table_name == table_name,
+                    DataResource.database_name.isnot(None)  # 确保数据库名称不为空
                 )
-            )
+            ).limit(1)  # 限制只返回一条记录
+            
             result = await self.db.execute(stmt)
             database_name = result.scalar_one_or_none()
+            
+            if database_name:
+                logging.info(f"从数据资源表找到表 {table_name} 对应的数据库: {database_name}")
+            else:
+                logging.info(f"数据资源表中未找到表 {table_name} 的数据库配置")
+                
             return database_name
         except Exception as e:
             logging.warning(f"查询表 {table_name} 的数据库名称失败: {e}")

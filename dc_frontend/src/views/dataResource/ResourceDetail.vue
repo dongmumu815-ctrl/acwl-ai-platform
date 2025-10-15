@@ -115,6 +115,19 @@
             <el-descriptions-item label="描述" span="2">
               {{ resource.description || '暂无描述' }}
             </el-descriptions-item>
+            <el-descriptions-item label="标签" span="2">
+              <template v-if="displayTags.length > 0">
+                <el-space wrap>
+                  <el-tag
+                    v-for="tag in displayTags"
+                    :key="tag"
+                    type="info"
+                    size="small"
+                  >{{ tag }}</el-tag>
+                </el-space>
+              </template>
+              <span v-else class="text-placeholder">暂无标签</span>
+            </el-descriptions-item>
           </el-descriptions>
         </div>
 
@@ -289,7 +302,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
@@ -342,6 +355,26 @@ const permissions = ref({
   download: false,
   edit: false,
   delete: false
+})
+
+// 统一展示用标签数组（优先使用数据库 JSON 字段 tags，其次使用关系型 tag_list）
+const displayTags = computed<string[]>(() => {
+  const res = resource.value
+  // 1) 直接数组（如 ["a", "b"])：直接返回字符串数组
+  if (Array.isArray(res?.tags)) {
+    return (res.tags as any[]).map((t) => String(t)).filter(Boolean)
+  }
+  // 2) JSON 对象（如 { tags: ["a", "b"] }）：提取其中的 tags 字段
+  if (res?.tags && typeof res.tags === 'object' && Array.isArray((res.tags as any).tags)) {
+    return ((res.tags as any).tags as any[]).map((t) => String(t)).filter(Boolean)
+  }
+  // 3) 关系型 tag_list（对象数组）：提取 name 或 tag_name
+  if (Array.isArray(res?.tag_list)) {
+    return (res.tag_list as any[])
+      .map((t: any) => t?.name ?? t?.tag_name)
+      .filter((s: any) => typeof s === 'string' && s.length > 0)
+  }
+  return []
 })
 
 // 数据预览
@@ -768,13 +801,7 @@ const getQueryCount = () => {
  * 获取标签数量
  */
 const getTagCount = () => {
-  if (resource.value.tags && Array.isArray(resource.value.tags)) {
-    return resource.value.tags.length
-  }
-  if (resource.value.tag_list && Array.isArray(resource.value.tag_list)) {
-    return resource.value.tag_list.length
-  }
-  return 0
+  return displayTags.value.length
 }
 
 /**

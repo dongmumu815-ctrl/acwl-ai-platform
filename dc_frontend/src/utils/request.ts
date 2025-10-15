@@ -72,7 +72,7 @@ const createAxiosInstance = (): AxiosInstance => {
 
   // 响应拦截器
   instance.interceptors.response.use(
-    (response: AxiosResponse) => {
+    async (response: AxiosResponse) => {
       const config = response.config as RequestConfig
       const data = response.data
       
@@ -81,6 +81,48 @@ const createAxiosInstance = (): AxiosInstance => {
         data: data
       })
       
+      // 检测成功响应中包含的认证错误对象（某些服务可能返回200+错误体）
+      if (data && typeof data === 'object' && (data as any).error === 'AUTHENTICATION_ERROR') {
+        ElMessage.error((data as any)?.message || '无效的认证令牌')
+        
+        // 防止无限循环：如果正在登出过程中，直接清除本地状态
+        if (isLoggingOut) {
+          console.warn('检测到logout过程中的认证错误，直接清除本地状态')
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          localStorage.removeItem('permissions')
+          localStorage.removeItem('roles')
+          window.location.href = '/login'
+          return Promise.reject(new Error('AUTHENTICATION_ERROR'))
+        }
+        
+        // 设置登出标志
+        isLoggingOut = true
+        
+        try {
+          const userStore = useUserStore()
+          // 直接清除本地状态，不调用logout API
+          userStore.reset()
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          localStorage.removeItem('permissions')
+          localStorage.removeItem('roles')
+          router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } })
+        } catch (error) {
+          console.error('清除用户状态失败:', error)
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          localStorage.removeItem('permissions')
+          localStorage.removeItem('roles')
+          window.location.href = '/login'
+        } finally {
+          // 重置标志
+          isLoggingOut = false
+        }
+        // 中断后续处理，向上抛出错误以便调用方感知
+        return Promise.reject(new Error('AUTHENTICATION_ERROR'))
+      }
+
       // 显示成功消息
       if (config.showSuccessMessage && data.success && data.message) {
         ElMessage.success(data.message)
@@ -113,6 +155,9 @@ const createAxiosInstance = (): AxiosInstance => {
   return instance
 }
 
+// 防止无限循环的标志
+let isLoggingOut = false
+
 /**
  * 处理API错误
  * @param error axios错误对象
@@ -125,18 +170,36 @@ const handleApiError = async (error: AxiosError): Promise<void> => {
   // 检查特定的认证错误码
   if (data?.error === 'AUTHENTICATION_ERROR') {
     ElMessage.error(data?.message || '无效的认证令牌')
-    // 使用用户存储的logout方法清除状态
-    try {
-      await userStore.logout()
-      router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } })
-    } catch (error) {
-      console.error('调用用户存储logout方法失败:', error)
-      // 如果用户存储方法失败，手动清除本地存储并跳转
+    
+    // 防止无限循环：如果正在登出过程中，直接清除本地状态
+    if (isLoggingOut) {
+      console.warn('检测到logout过程中的认证错误，直接清除本地状态')
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       localStorage.removeItem('permissions')
       localStorage.removeItem('roles')
       window.location.href = '/login'
+      return
+    }
+    
+    // 设置登出标志
+    isLoggingOut = true
+    
+    try {
+      // 直接清除本地状态，不调用logout API
+      userStore.reset()
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('permissions')
+      localStorage.removeItem('roles')
+      router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } })
+    } catch (error) {
+      console.error('清除用户状态失败:', error)
+      // 如果清除状态失败，强制跳转
+      window.location.href = '/login'
+    } finally {
+      // 重置标志
+      isLoggingOut = false
     }
     return
   }
@@ -149,8 +212,36 @@ const handleApiError = async (error: AxiosError): Promise<void> => {
     case 401:
       // 未认证或token过期
       ElMessage.error('登录已过期，请重新登录')
-      await userStore.logout()
-      router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } })
+      
+      // 防止无限循环：如果正在登出过程中，直接清除本地状态
+      if (isLoggingOut) {
+        console.warn('检测到logout过程中的401错误，直接清除本地状态')
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('permissions')
+        localStorage.removeItem('roles')
+        window.location.href = '/login'
+        break
+      }
+      
+      // 设置登出标志
+      isLoggingOut = true
+      
+      try {
+        // 直接清除本地状态，不调用logout API
+        userStore.reset()
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('permissions')
+        localStorage.removeItem('roles')
+        router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } })
+      } catch (error) {
+        console.error('清除用户状态失败:', error)
+        window.location.href = '/login'
+      } finally {
+        // 重置标志
+        isLoggingOut = false
+      }
       break
       
     case 403:

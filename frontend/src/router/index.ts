@@ -514,6 +514,160 @@ export const asyncRoutes: RouteRecordRaw[] = [
       }
     ]
   },
+  // 数据中心模块
+  {
+    path: '/data-center',
+    component: Layout,
+    redirect: '/data-center/dashboard',
+    meta: {
+      title: '数据中心',
+      icon: 'DataBoard',
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: 'dashboard',
+        name: 'DataCenterDashboard',
+        component: () => import('@/views/data-center/dashboard/index.vue'),
+        meta: {
+          title: '数据概览',
+          icon: 'Monitor',
+          requiresAuth: true,
+          keepAlive: true
+        }
+      },
+      {
+        path: 'statistics',
+        name: 'DataCenterStatistics',
+        component: () => import('@/views/data-center/statistics/index.vue'),
+        meta: {
+          title: '数据统计',
+          icon: 'TrendCharts',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
+    path: '/data-resources',
+    component: Layout,
+    redirect: '/data-resources/list',
+    meta: {
+      title: '数据资源管理',
+      icon: 'FolderOpened',
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: 'list',
+        name: 'DataResourceList',
+        component: () => import('@/views/data-center/data-resources/ResourceList.vue'),
+        meta: {
+          title: '资源列表',
+          icon: 'List',
+          requiresAuth: true,
+          keepAlive: true
+        }
+      },
+      {
+        path: 'create',
+        name: 'DataResourceCreate',
+        component: () => import('@/views/data-center/data-resources/ResourceCreate.vue'),
+        meta: {
+          title: '创建资源',
+          icon: 'Plus',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'detail/:id',
+        name: 'DataResourceDetail',
+        component: () => import('@/views/data-center/data-resources/ResourceDetail.vue'),
+        meta: {
+          title: '资源详情',
+          requiresAuth: true,
+          hideInMenu: true,
+          activeMenu: '/data-resources/list'
+        }
+      },
+      {
+        path: 'query/:id',
+        name: 'DataResourceQuery',
+        component: () => import('@/views/data-center/data-resources/ResourceQuery.vue'),
+        meta: {
+          title: '数据查询',
+          requiresAuth: true,
+          hideInMenu: true,
+          activeMenu: '/data-resources/list'
+        }
+      },
+      {
+        path: 'categories',
+        name: 'DataResourceCategories',
+        component: () => import('@/views/data-center/data-resources/CategoryManage.vue'),
+        meta: {
+          title: '资源分类',
+          icon: 'FolderAdd',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'tags',
+        name: 'DataResourceTags',
+        component: () => import('@/views/data-center/data-resources/TagManage.vue'),
+        meta: {
+          title: '标签管理',
+          icon: 'PriceTag',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
+    path: '/datasources',
+    component: Layout,
+    redirect: '/datasources/list',
+    meta: {
+      title: '数据源管理',
+      icon: 'Connection',
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: 'list',
+        name: 'DatasourceList',
+        component: () => import('@/views/data-center/datasources/DatasourceList.vue'),
+        meta: {
+          title: '数据源列表',
+          icon: 'List',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'create',
+        name: 'DatasourceCreate',
+        component: () => import('@/views/data-center/datasources/DatasourceCreate.vue'),
+        meta: {
+          title: '创建数据源',
+          icon: 'Plus',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'detail/:id',
+        name: 'DatasourceDetail',
+        component: () => import('@/views/data-center/datasources/DatasourceDetail.vue'),
+        meta: {
+          title: '数据源详情',
+          requiresAuth: true,
+          hideInMenu: true,
+          activeMenu: '/datasources/list'
+        }
+      }
+    ]
+  },
   {
     path: '/instruction-sets/:id',
     component: Layout,
@@ -556,6 +710,202 @@ export const asyncRoutes: RouteRecordRaw[] = [
       }
     ]
   }
+  // 工作流模块 - 暂时注释掉，等待后续迁移
+  /*
+  {
+    path: '/workflows',
+    component: Layout,
+    redirect: '/workflows/dashboard',
+    meta: {
+      title: '工作流管理',
+      icon: 'Connection',
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: 'dashboard',
+        name: 'WorkflowDashboard',
+        component: () => import('@/views/workflows/dashboard/index.vue'),
+        meta: {
+          title: '工作流概览',
+          icon: 'Monitor',
+          requiresAuth: true,
+          keepAlive: true
+        }
+      },
+      {
+        path: 'list',
+        name: 'WorkflowList',
+        component: () => import('@/views/workflows/list/index.vue'),
+        meta: {
+          title: '工作流管理',
+          icon: 'List',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'create',
+        name: 'WorkflowCreate',
+        component: () => import('@/views/workflows/create/index.vue'),
+        meta: {
+          title: '创建工作流',
+          icon: 'Plus',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'detail/:id',
+        name: 'WorkflowDetail',
+        component: () => import('@/views/workflows/detail/index.vue'),
+        meta: {
+          title: '工作流详情',
+          icon: 'View',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'edit/:id',
+        name: 'WorkflowEdit',
+        component: () => import('@/views/workflows/edit/index.vue'),
+        meta: {
+          title: '编辑工作流',
+          icon: 'Edit',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'executions/:id',
+        name: 'WorkflowExecutions',
+        component: () => import('@/views/workflows/executions/index.vue'),
+        meta: {
+          title: '执行历史',
+          icon: 'Clock',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'execution-detail/:id/:executionId',
+        name: 'WorkflowExecutionDetail',
+        component: () => import('@/views/workflows/execution-detail/index.vue'),
+        meta: {
+          title: '执行详情',
+          icon: 'View',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'tasks',
+        name: 'TaskList',
+        component: () => import('@/views/workflows/tasks/index.vue'),
+        meta: {
+          title: '任务管理',
+          icon: 'Operation',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'task-create',
+        name: 'TaskCreate',
+        component: () => import('@/views/workflows/task-create/index.vue'),
+        meta: {
+          title: '创建任务',
+          icon: 'Plus',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'task-detail/:id',
+        name: 'TaskDetail',
+        component: () => import('@/views/workflows/task-detail/index.vue'),
+        meta: {
+          title: '任务详情',
+          icon: 'View',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'task-edit/:id',
+        name: 'TaskEdit',
+        component: () => import('@/views/workflows/task-edit/index.vue'),
+        meta: {
+          title: '编辑任务',
+          icon: 'Edit',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'projects',
+        name: 'ProjectList',
+        component: () => import('@/views/workflows/projects/index.vue'),
+        meta: {
+          title: '项目管理',
+          icon: 'Folder',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'project-create',
+        name: 'ProjectCreate',
+        component: () => import('@/views/workflows/project-create/index.vue'),
+        meta: {
+          title: '创建项目',
+          icon: 'Plus',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'project-detail/:id',
+        name: 'ProjectDetail',
+        component: () => import('@/views/workflows/project-detail/index.vue'),
+        meta: {
+          title: '项目详情',
+          icon: 'View',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'project-edit/:id',
+        name: 'ProjectEdit',
+        component: () => import('@/views/workflows/project-edit/index.vue'),
+        meta: {
+          title: '编辑项目',
+          icon: 'Edit',
+          requiresAuth: true,
+          hideInMenu: true
+        }
+      },
+      {
+        path: 'monitoring',
+        name: 'WorkflowMonitoring',
+        component: () => import('@/views/workflows/monitoring/index.vue'),
+        meta: {
+          title: '实时监控',
+          icon: 'Monitor',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'settings',
+        name: 'WorkflowSettings',
+        component: () => import('@/views/workflows/settings/index.vue'),
+        meta: {
+          title: '工作流设置',
+          icon: 'Setting',
+          requiresAuth: true
+        }
+      }
+    ]
+  }
+  */
 ]
 
 // 创建路由实例

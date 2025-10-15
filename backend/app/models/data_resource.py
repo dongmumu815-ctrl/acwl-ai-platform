@@ -49,6 +49,12 @@ class AccessType(str, PyEnum):
     SCHEMA = "schema"          # 查看结构
 
 
+class TagStatus(str, PyEnum):
+    """标签状态枚举"""
+    ACTIVE = "active"          # 启用
+    DISABLED = "disabled"      # 禁用
+
+
 class AccessStatus(str, PyEnum):
     """访问状态枚举"""
     SUCCESS = "success"        # 成功
@@ -613,7 +619,7 @@ class DataResourceTag(Base, TimestampMixin, UserMixin):
     )
     
     color: Mapped[str] = mapped_column(
-        String(7),
+        String(30),
         default="#409EFF",
         comment="标签颜色"
     )
@@ -628,6 +634,12 @@ class DataResourceTag(Base, TimestampMixin, UserMixin):
         Integer,
         default=0,
         comment="使用次数"
+    )
+    
+    status: Mapped[TagStatus] = mapped_column(
+        Enum(TagStatus),
+        default=TagStatus.ACTIVE,
+        comment="标签状态"
     )
     
     # 关系

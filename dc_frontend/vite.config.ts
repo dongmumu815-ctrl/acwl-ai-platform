@@ -31,7 +31,13 @@ export default defineConfig({
     port: 3005,
     open: true,
     proxy: {
-      '/api': {
+      // 只代理以 /api/v1 开头的请求到后端
+      '^/api/v1/.*': {
+        target: 'http://localhost:8082',
+        changeOrigin: true
+      },
+      // 代理其他 /api 开头但不是前端路由的请求
+      '^/api/(?!.*management).*': {
         target: 'http://localhost:8082',
         changeOrigin: true
       }

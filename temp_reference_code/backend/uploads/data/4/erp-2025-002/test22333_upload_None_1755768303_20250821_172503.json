@@ -1,0 +1,23 @@
+{
+  "customer_id": "4",
+  "upload_id": "test22333_upload_None_1755768303",
+  "batch_id": "erp-2025-002",
+  "timestamp": "2025-08-21T17:25:03.216698",
+  "data": {
+    "api_code": "test22333_upload",
+    "api_id": 3,
+    "request_id": null,
+    "data_list": [
+      {
+        "test": "1"
+      },
+      {
+        "test": "2"
+      }
+    ],
+    "processing_info": {
+      "total_count": 2,
+      "processed_at": "2025-08-21T09:25:03.215689"
+    }
+  }
+}

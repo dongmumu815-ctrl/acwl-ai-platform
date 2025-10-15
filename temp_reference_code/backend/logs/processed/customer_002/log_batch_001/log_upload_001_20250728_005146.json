@@ -1,0 +1,18 @@
+{
+  "customer_id": "customer_002",
+  "upload_id": "log_upload_001",
+  "batch_id": "log_batch_001",
+  "timestamp": "2025-07-28T00:51:46.171995",
+  "data": {
+    "level": "INFO",
+    "timestamp": "2025-07-28T00:51:46.170931",
+    "module": "data_processor",
+    "message": "批量数据处理完成",
+    "details": {
+      "batch_size": 1000,
+      "processing_time": 45.67,
+      "memory_usage": "256MB",
+      "cpu_usage": "78%"
+    }
+  }
+}

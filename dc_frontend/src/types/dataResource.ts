@@ -48,6 +48,14 @@ export interface DataResourceCategory {
 }
 
 /**
+ * 标签状态枚举
+ */
+export enum TagStatus {
+  ACTIVE = 'active',
+  DISABLED = 'disabled'
+}
+
+/**
  * 数据资源标签
  */
 export interface DataResourceTag {
@@ -55,9 +63,82 @@ export interface DataResourceTag {
   name: string
   color: string
   description?: string
+  status: TagStatus
+  usage_count: number
   created_at: string
   updated_at: string
+  created_by?: number
+  updated_by?: number
   resource_count?: number
+}
+
+/**
+ * 标签创建请求
+ */
+export interface TagCreateRequest {
+  name: string
+  color: string
+  description?: string
+  status?: TagStatus
+}
+
+/**
+ * 标签更新请求
+ */
+export interface TagUpdateRequest {
+  name?: string
+  color?: string
+  description?: string
+  status?: TagStatus
+}
+
+/**
+ * 标签列表查询参数
+ */
+export interface TagListQuery {
+  page?: number
+  page_size?: number
+  search?: string
+  status?: TagStatus
+  sort_by?: 'name' | 'usage_count' | 'created_at'
+  sort_order?: 'asc' | 'desc'
+}
+
+/**
+ * 标签使用详情
+ */
+export interface TagUsage {
+  id: number
+  resource_id: number
+  resource_name: string
+  resource_type: string
+  category_name: string
+  created_at: string
+}
+
+/**
+ * 标签使用统计
+ */
+export interface TagUsageStats {
+  tag_id: number
+  tag_name: string
+  resource_count: number
+  usage_list: TagUsage[]
+}
+
+/**
+ * 批量删除标签请求
+ */
+export interface TagBatchDeleteRequest {
+  tag_ids: number[]
+}
+
+/**
+ * 下拉菜单命令
+ */
+export interface DropdownCommand {
+  action: 'edit' | 'toggle' | 'delete'
+  data: DataResourceTag
 }
 
 /**

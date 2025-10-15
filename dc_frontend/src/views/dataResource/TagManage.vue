@@ -24,6 +24,10 @@
           <el-icon><Download /></el-icon>
           导出标签
         </el-button>
+        <el-button @click="importTags">
+          <el-icon><Upload /></el-icon>
+          导入标签
+        </el-button>
       </div>
       
       <div class="right-actions">
@@ -39,18 +43,14 @@
         </el-select>
         
         <el-select
-          v-model="filterCategory"
-          placeholder="分类筛选"
+          v-model="sortBy"
+          placeholder="排序方式"
           style="width: 150px"
-          clearable
-          @change="handleFilter"
+          @change="handleSort"
         >
-          <el-option
-            v-for="category in tagCategories"
-            :key="category.value"
-            :label="category.label"
-            :value="category.value"
-          />
+          <el-option label="创建时间" value="createdAt" />
+          <el-option label="使用次数" value="usage_count" />
+          <el-option label="标签名称" value="name" />
         </el-select>
         
         <el-input
@@ -171,24 +171,18 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="category" label="分类" width="120">
-              <template #default="{ row }">
-                <el-tag type="info" size="small">
-                  {{ getCategoryLabel(row.category) }}
-                </el-tag>
-              </template>
-            </el-table-column>
+
             
             <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
             
-            <el-table-column prop="usageCount" label="使用次数" width="100" sortable>
+            <el-table-column prop="usage_count" label="使用次数" width="100" sortable>
               <template #default="{ row }">
                 <el-link
                   type="primary"
                   @click="viewTagUsage(row)"
-                  :disabled="row.usageCount === 0"
+                  :disabled="row.usage_count === 0"
                 >
-                  {{ row.usageCount }}
+                  {{ row.usage_count }}
                 </el-link>
               </template>
             </el-table-column>
@@ -227,7 +221,7 @@
                   type="danger"
                   link
                   @click="deleteTag(row)"
-                  :disabled="row.usageCount > 0"
+                  :disabled="row.usage_count > 0"
                 >
                   <el-icon><Delete /></el-icon>
                   删除
@@ -285,7 +279,7 @@
                       <el-dropdown-item
                         :command="{ action: 'delete', data: tag }"
                         divided
-                        :disabled="tag.usageCount > 0"
+                        :disabled="tag.usage_count > 0"
                       >
                         <el-icon><Delete /></el-icon>
                         删除
@@ -297,20 +291,15 @@
               
               <div class="tag-card-content">
                 <div class="tag-info">
-                  <div class="tag-category">
-                    <el-tag type="info" size="small">
-                      {{ getCategoryLabel(tag.category) }}
-                    </el-tag>
-                  </div>
-                  <div class="tag-description">
-                    {{ tag.description || '暂无描述' }}
-                  </div>
-                </div>
+                 <div class="tag-description">
+                   {{ tag.description || '暂无描述' }}
+                 </div>
+               </div>
                 
                 <div class="tag-stats">
                   <div class="stat-item">
                     <span class="stat-label">使用次数:</span>
-                    <span class="stat-value">{{ tag.usageCount }}</span>
+                    <span class="stat-value">{{ tag.usage_count }}</span>
                   </div>
                   <div class="stat-item">
                     <span class="stat-label">状态:</span>
@@ -360,20 +349,7 @@
           />
         </el-form-item>
         
-        <el-form-item label="标签分类" prop="category">
-          <el-select
-            v-model="tagForm.category"
-            placeholder="请选择标签分类"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="category in tagCategories"
-              :key="category.value"
-              :label="category.label"
-              :value="category.value"
-            />
-          </el-select>
-        </el-form-item>
+
         
         <el-form-item label="标签颜色" prop="color">
           <div class="color-selector">
@@ -438,7 +414,7 @@
           >
             {{ currentTag.name }}
           </el-tag>
-          <span class="usage-count">共被 {{ currentTag.usageCount }} 个资源使用</span>
+          <span class="usage-count">共被 {{ currentTag.usage_count }} 个资源使用</span>
         </div>
         
         <el-table
@@ -477,33 +453,85 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance } from 'element-plus'
+import {
+  PriceTag,
+  Plus,
+  Delete,
+  Download,
+  Upload,
+  Search,
+  Refresh,
+  CircleCheck,
+  Warning,
+  Link,
+  Grid,
+  Edit,
+  Switch,
+  MoreFilled
+} from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { tagApi } from '@/api/dataResource'
+import type {
+  DataResourceTag,
+  TagCreateRequest,
+  TagUpdateRequest,
+  TagListQuery,
+  TagUsageStats,
+  TagBatchDeleteRequest,
+  DropdownCommand,
+  TagStatus
+} from '@/types/dataResource'
+
+/**
+ * 类型定义
+ */
+interface Tag extends DataResourceTag {}
+
+interface TagForm {
+  id: number | string
+  name: string
+  color: string
+  status: TagStatus
+  description: string
+}
+
+interface TagUsage {
+  id: number
+  resourceName: string
+  resourceType: string
+  categoryName?: string
+  createdAt: string
+}
 
 // 路由
 const router = useRouter()
 
 // 响应式数据
 const tagFormRef = ref()
+const uploadRef = ref()
 const loading = ref(false)
 const submitting = ref(false)
+const importing = ref(false)
 const tagDialogVisible = ref(false)
 const usageDialogVisible = ref(false)
+const importDialogVisible = ref(false)
 const isEditMode = ref(false)
 const viewMode = ref('table') // table | card
 const searchKeyword = ref('')
 const filterStatus = ref('')
-const filterCategory = ref('')
+const sortBy = ref('createdAt')
 const currentPage = ref(1)
 const pageSize = ref(20)
 const totalCount = ref(0)
 const selectedTags = ref([])
 const currentTag = ref(null)
+const importPreview = ref([])
 
 // 标签表单
 const tagForm = reactive({
   id: '',
   name: '',
-  category: '',
   color: '#409EFF',
   status: 'active',
   description: ''
@@ -515,25 +543,12 @@ const tagRules = {
     { required: true, message: '请输入标签名称', trigger: 'blur' },
     { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
   ],
-  category: [
-    { required: true, message: '请选择标签分类', trigger: 'change' }
-  ],
   color: [
     { required: true, message: '请选择标签颜色', trigger: 'change' }
   ]
 }
 
-// 标签分类
-const tagCategories = [
-  { label: '数据类型', value: 'data_type' },
-  { label: '业务领域', value: 'business' },
-  { label: '技术栈', value: 'technology' },
-  { label: '重要程度', value: 'priority' },
-  { label: '访问权限', value: 'permission' },
-  { label: '数据质量', value: 'quality' },
-  { label: '更新频率', value: 'frequency' },
-  { label: '其他', value: 'other' }
-]
+
 
 // 颜色预设
 const colorPresets = [
@@ -544,111 +559,27 @@ const colorPresets = [
 ]
 
 // 标签数据
-const tags = ref([
-  {
-    id: 1,
-    name: '用户数据',
-    category: 'data_type',
-    color: '#409EFF',
-    status: 'active',
-    description: '包含用户基本信息的数据',
-    usageCount: 15,
-    createdAt: '2024-01-15 10:30:00'
-  },
-  {
-    id: 2,
-    name: '订单数据',
-    category: 'data_type',
-    color: '#67C23A',
-    status: 'active',
-    description: '电商订单相关数据',
-    usageCount: 12,
-    createdAt: '2024-01-15 11:00:00'
-  },
-  {
-    id: 3,
-    name: '高优先级',
-    category: 'priority',
-    color: '#F56C6C',
-    status: 'active',
-    description: '重要程度较高的数据资源',
-    usageCount: 8,
-    createdAt: '2024-01-15 11:30:00'
-  },
-  {
-    id: 4,
-    name: 'MySQL',
-    category: 'technology',
-    color: '#E6A23C',
-    status: 'active',
-    description: 'MySQL数据库相关资源',
-    usageCount: 20,
-    createdAt: '2024-01-15 12:00:00'
-  },
-  {
-    id: 5,
-    name: '财务数据',
-    category: 'business',
-    color: '#909399',
-    status: 'active',
-    description: '财务相关的业务数据',
-    usageCount: 6,
-    createdAt: '2024-01-15 12:30:00'
-  },
-  {
-    id: 6,
-    name: '实时数据',
-    category: 'frequency',
-    color: '#FF6347',
-    status: 'active',
-    description: '需要实时更新的数据',
-    usageCount: 10,
-    createdAt: '2024-01-15 13:00:00'
-  },
-  {
-    id: 7,
-    name: '已废弃',
-    category: 'other',
-    color: '#C0C4CC',
-    status: 'disabled',
-    description: '已废弃不再使用的标签',
-    usageCount: 0,
-    createdAt: '2024-01-15 13:30:00'
-  },
-  {
-    id: 8,
-    name: '机密数据',
-    category: 'permission',
-    color: '#8A2BE2',
-    status: 'active',
-    description: '需要特殊权限访问的数据',
-    usageCount: 3,
-    createdAt: '2024-01-15 14:00:00'
-  }
-])
+const tags = ref<Tag[]>([])
 
 // 标签使用详情数据
-const tagUsageList = ref([])
+const tagUsageList = ref<TagUsage[]>([])
+
+// 注意：loading、totalCount、currentPage、pageSize 已在上面声明过了
 
 /**
  * 计算属性
  */
-const totalTags = computed(() => tags.value.length)
+const totalTags = computed(() => totalCount.value)
 const activeTags = computed(() => tags.value.filter(tag => tag.status === 'active').length)
 const disabledTags = computed(() => tags.value.filter(tag => tag.status === 'disabled').length)
-const usedTags = computed(() => tags.value.filter(tag => tag.usageCount > 0).length)
+const usedTags = computed(() => tags.value.filter(tag => (tag.usage_count || 0) > 0).length)
 
 const filteredTags = computed(() => {
-  let result = tags.value
+  let result = [...tags.value]
   
   // 状态筛选
   if (filterStatus.value) {
     result = result.filter(tag => tag.status === filterStatus.value)
-  }
-  
-  // 分类筛选
-  if (filterCategory.value) {
-    result = result.filter(tag => tag.category === filterCategory.value)
   }
   
   // 关键词搜索
@@ -660,6 +591,19 @@ const filteredTags = computed(() => {
     )
   }
   
+  // 排序
+  result.sort((a, b) => {
+    switch (sortBy.value) {
+      case 'name':
+        return a.name.localeCompare(b.name)
+      case 'usage_count':
+        return b.usage_count - a.usage_count
+      case 'createdAt':
+      default:
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    }
+  })
+  
   totalCount.value = result.length
   
   // 分页
@@ -668,13 +612,7 @@ const filteredTags = computed(() => {
   return result.slice(start, end)
 })
 
-/**
- * 获取分类标签
- */
-const getCategoryLabel = (category: string) => {
-  const categoryItem = tagCategories.find(item => item.value === category)
-  return categoryItem ? categoryItem.label : category
-}
+
 
 /**
  * 获取资源类型标签
@@ -687,6 +625,167 @@ const getResourceTypeLabel = (type: string) => {
     cache: '缓存'
   }
   return typeMap[type] || type
+}
+
+/**
+ * API调用方法
+ */
+
+/**
+ * 获取标签列表
+ */
+const fetchTagList = async (): Promise<void> => {
+  try {
+    loading.value = true
+    const params: TagListQuery = {
+      page: currentPage.value,
+      page_size: pageSize.value,
+      search: searchKeyword.value || undefined,
+      status: filterStatus.value || undefined
+    }
+    
+    const response = await tagApi.getTagList(params)
+    if (response.success) {
+      tags.value = response.data.list || []
+      totalCount.value = response.data.total || 0
+    } else {
+      ElMessage.error('获取标签列表失败')
+    }
+  } catch (error) {
+    console.error('获取标签列表失败:', error)
+    ElMessage.error('获取标签列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 创建标签
+ */
+const createTag = async (data: TagCreateRequest): Promise<boolean> => {
+  try {
+    const response = await tagApi.createTag(data)
+    if (response.success) {
+      ElMessage.success('标签创建成功')
+      await fetchTagList()
+      return true
+    } else {
+      ElMessage.error('标签创建失败')
+      return false
+    }
+  } catch (error) {
+    console.error('创建标签失败:', error)
+    ElMessage.error('创建标签失败')
+    return false
+  }
+}
+
+/**
+ * 更新标签
+ */
+const updateTag = async (id: number, data: TagUpdateRequest): Promise<boolean> => {
+  try {
+    const response = await tagApi.updateTag(id, data)
+    if (response.success) {
+      ElMessage.success('标签更新成功')
+      await fetchTagList()
+      return true
+    } else {
+      ElMessage.error('标签更新失败')
+      return false
+    }
+  } catch (error) {
+    console.error('更新标签失败:', error)
+    ElMessage.error('更新标签失败')
+    return false
+  }
+}
+
+/**
+ * 删除单个标签
+ */
+const deleteTagById = async (id: number): Promise<boolean> => {
+  try {
+    const response = await tagApi.deleteTag(id)
+    if (response.success) {
+      ElMessage.success('标签删除成功')
+      await fetchTagList()
+      return true
+    } else {
+      ElMessage.error('标签删除失败')
+      return false
+    }
+  } catch (error) {
+    console.error('删除标签失败:', error)
+    ElMessage.error('删除标签失败')
+    return false
+  }
+}
+
+/**
+ * 切换标签状态
+ */
+const toggleTagStatusById = async (id: number): Promise<boolean> => {
+  try {
+    const response = await tagApi.toggleTagStatus(id)
+    if (response.success) {
+      ElMessage.success('标签状态切换成功')
+      await fetchTagList()
+      return true
+    } else {
+      ElMessage.error('标签状态切换失败')
+      return false
+    }
+  } catch (error) {
+    console.error('切换标签状态失败:', error)
+    ElMessage.error('切换标签状态切换失败')
+    return false
+  }
+}
+
+/**
+ * 批量删除标签
+ */
+const batchDeleteTagsByIds = async (ids: number[]): Promise<boolean> => {
+  try {
+    const response = await tagApi.batchDeleteTags(ids)
+    if (response.success) {
+      const { success_count, failed_count } = response.data
+      if (failed_count > 0) {
+        ElMessage.warning(`删除完成，成功 ${success_count} 个，失败 ${failed_count} 个`)
+      } else {
+        ElMessage.success(`成功删除 ${success_count} 个标签`)
+      }
+      await fetchTagList()
+      return true
+    } else {
+      ElMessage.error('批量删除失败')
+      return false
+    }
+  } catch (error) {
+    console.error('批量删除标签失败:', error)
+    ElMessage.error('批量删除标签失败')
+    return false
+  }
+}
+
+/**
+ * 获取标签使用统计
+ */
+const getTagUsageStats = async (id: number): Promise<TagUsageStats | null> => {
+  try {
+    const response = await tagApi.getTagUsageStats(id)
+    if (response.success) {
+      return response.data
+    } else {
+      ElMessage.error('获取标签使用统计失败')
+      return null
+    }
+  } catch (error) {
+    console.error('获取标签使用统计失败:', error)
+    ElMessage.error('获取标签使用统计失败')
+    return null
+  }
 }
 
 /**
@@ -713,54 +812,53 @@ const formatDate = (dateStr: string) => {
 /**
  * 切换视图模式
  */
-const toggleView = () => {
+const toggleView = (): void => {
   viewMode.value = viewMode.value === 'table' ? 'card' : 'table'
 }
 
 /**
  * 处理筛选
  */
-const handleFilter = () => {
+const handleFilter = async (): Promise<void> => {
   currentPage.value = 1
+  await fetchTagList()
+}
+
+/**
+ * 处理排序
+ */
+const handleSort = async (): Promise<void> => {
+  currentPage.value = 1
+  await fetchTagList()
 }
 
 /**
  * 处理搜索
  */
-const handleSearch = () => {
+const handleSearch = async (): Promise<void> => {
   currentPage.value = 1
+  await fetchTagList()
 }
 
 /**
  * 刷新标签
  */
-const refreshTags = () => {
-  loading.value = true
-  // 模拟刷新
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('标签数据已刷新')
-  }, 1000)
+const refreshTags = async (): Promise<void> => {
+  await fetchTagList()
+  ElMessage.success('标签数据已刷新')
 }
 
 /**
  * 处理选择变化
  */
-const handleSelectionChange = (selection: any[]) => {
+const handleSelectionChange = (selection: Tag[]): void => {
   selectedTags.value = selection
 }
 
 /**
  * 切换标签选择（卡片视图）
  */
-const toggleTagSelection = (tag: any) => {
-  console.log('=== 标签选择调试信息 ===');
-  console.log('点击的标签:', tag);
-  console.log('标签ID:', tag.id);
-  console.log('标签名称:', tag.name);
-  console.log('当前已选标签:', selectedTags.value);
-  console.log('========================');
-  
+const toggleTagSelection = (tag: Tag): void => {
   const index = selectedTags.value.findIndex(item => item.id === tag.id)
   if (index > -1) {
     selectedTags.value.splice(index, 1)
@@ -772,28 +870,24 @@ const toggleTagSelection = (tag: any) => {
 /**
  * 处理分页大小变化
  */
-const handleSizeChange = (size: number) => {
+const handleSizeChange = async (size: number): Promise<void> => {
   pageSize.value = size
   currentPage.value = 1
+  await fetchTagList()
 }
 
 /**
  * 处理当前页变化
  */
-const handleCurrentChange = (page: number) => {
+const handleCurrentChange = async (page: number): Promise<void> => {
   currentPage.value = page
+  await fetchTagList()
 }
 
 /**
  * 显示创建对话框
  */
-const showCreateDialog = () => {
-  console.log('=== 创建标签调试信息 ===');
-  console.log('当前路由:', route.path);
-  console.log('用户权限:', userStore.userPermissions);
-  console.log('准备打开创建标签对话框');
-  console.log('========================');
-  
+const showCreateDialog = (): void => {
   isEditMode.value = false
   resetTagForm()
   tagDialogVisible.value = true
@@ -802,23 +896,12 @@ const showCreateDialog = () => {
 /**
  * 显示编辑对话框
  */
-const showEditDialog = (tag: any) => {
-  console.log('=== 编辑标签调试信息 ===');
-  console.log('要编辑的标签:', tag);
-  console.log('标签ID:', tag.id);
-  console.log('标签名称:', tag.name);
-  console.log('标签分类:', tag.category);
-  console.log('当前路由:', route.path);
-  console.log('用户权限:', userStore.userPermissions);
-  console.log('准备打开编辑标签对话框');
-  console.log('========================');
-  
+const showEditDialog = (tag: Tag): void => {
   isEditMode.value = true
   
   Object.assign(tagForm, {
     id: tag.id,
     name: tag.name,
-    category: tag.category,
     color: tag.color,
     status: tag.status,
     description: tag.description
@@ -830,11 +913,10 @@ const showEditDialog = (tag: any) => {
 /**
  * 重置表单
  */
-const resetTagForm = () => {
+const resetTagForm = (): void => {
   Object.assign(tagForm, {
     id: '',
     name: '',
-    category: '',
     color: '#409EFF',
     status: 'active',
     description: ''
@@ -846,33 +928,44 @@ const resetTagForm = () => {
 /**
  * 提交表单
  */
-const submitTagForm = () => {
-  tagFormRef.value?.validate((valid: boolean) => {
+const submitTagForm = (): void => {
+  tagFormRef.value?.validate(async (valid: boolean) => {
     if (!valid) return
     
     submitting.value = true
     
-    // 模拟提交
-    setTimeout(() => {
+    try {
       if (isEditMode.value) {
-        ElMessage.success('标签更新成功')
+        // 更新标签
+        const success = await updateTag(Number(tagForm.id), {
+          name: tagForm.name,
+          color: tagForm.color,
+          description: tagForm.description
+        })
+        if (success) {
+          tagDialogVisible.value = false
+        }
       } else {
-        ElMessage.success('标签创建成功')
+        // 创建新标签
+        const success = await createTag({
+          name: tagForm.name,
+          color: tagForm.color,
+          description: tagForm.description
+        })
+        if (success) {
+          tagDialogVisible.value = false
+        }
       }
-      
-      tagDialogVisible.value = false
+    } finally {
       submitting.value = false
-      
-      // 这里应该刷新标签数据
-      refreshTags()
-    }, 1000)
+    }
   })
 }
 
 /**
  * 处理标签命令（卡片视图）
  */
-const handleTagCommand = (command: any) => {
+const handleTagCommand = (command: DropdownCommand): void => {
   const { action, data } = command
   
   switch (action) {
@@ -891,9 +984,8 @@ const handleTagCommand = (command: any) => {
 /**
  * 切换标签状态
  */
-const toggleTagStatus = (tag: any) => {
-  const newStatus = tag.status === 'active' ? 'disabled' : 'active'
-  const action = newStatus === 'active' ? '启用' : '禁用'
+const toggleTagStatus = (tag: Tag): void => {
+  const action = tag.status === 'active' ? '禁用' : '启用'
   
   ElMessageBox.confirm(
     `确定要${action}标签 "${tag.name}" 吗？`,
@@ -903,10 +995,8 @@ const toggleTagStatus = (tag: any) => {
       cancelButtonText: '取消',
       type: 'warning'
     }
-  ).then(() => {
-    // 模拟状态切换
-    tag.status = newStatus
-    ElMessage.success(`已${action}标签 "${tag.name}"`)
+  ).then(async () => {
+    await toggleTagStatusById(Number(tag.id))
   }).catch(() => {
     // 取消操作
   })
@@ -915,8 +1005,8 @@ const toggleTagStatus = (tag: any) => {
 /**
  * 删除标签
  */
-const deleteTag = (tag: any) => {
-  if (tag.usageCount > 0) {
+const deleteTag = (tag: Tag): void => {
+  if ((tag.usage_count || 0) > 0) {
     ElMessage.warning('该标签正在被使用，无法删除')
     return
   }
@@ -929,10 +1019,8 @@ const deleteTag = (tag: any) => {
       cancelButtonText: '取消',
       type: 'error'
     }
-  ).then(() => {
-    ElMessage.success(`已删除标签 "${tag.name}"`)
-    // 这里应该刷新标签数据
-    refreshTags()
+  ).then(async () => {
+    await deleteTagById(Number(tag.id))
   }).catch(() => {
     // 取消删除
   })
@@ -941,8 +1029,8 @@ const deleteTag = (tag: any) => {
 /**
  * 批量删除
  */
-const batchDelete = () => {
-  const canDeleteTags = selectedTags.value.filter(tag => tag.usageCount === 0)
+const batchDelete = (): void => {
+  const canDeleteTags = selectedTags.value.filter(tag => (tag.usage_count || 0) === 0)
   
   if (canDeleteTags.length === 0) {
     ElMessage.warning('所选标签都在使用中，无法删除')
@@ -961,11 +1049,12 @@ const batchDelete = () => {
       cancelButtonText: '取消',
       type: 'error'
     }
-  ).then(() => {
-    ElMessage.success(`已删除 ${canDeleteTags.length} 个标签`)
-    selectedTags.value = []
-    // 这里应该刷新标签数据
-    refreshTags()
+  ).then(async () => {
+    const tagIds = canDeleteTags.map(tag => Number(tag.id))
+    const success = await batchDeleteTagsByIds(tagIds)
+    if (success) {
+      selectedTags.value = []
+    }
   }).catch(() => {
     // 取消删除
   })
@@ -974,40 +1063,126 @@ const batchDelete = () => {
 /**
  * 导出标签
  */
-const exportTags = () => {
-  ElMessage.success('导出功能开发中...')
+const exportTags = (): void => {
+  const exportData = tags.value.map(tag => ({
+    name: tag.name,
+    color: tag.color,
+    status: tag.status,
+    description: tag.description,
+    usage_count: tag.usage_count,
+    createdAt: tag.createdAt
+  }))
+  
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `tags_export_${new Date().toISOString().split('T')[0]}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  
+  ElMessage.success('标签数据已导出')
+}
+
+/**
+ * 导入标签
+ */
+const importTags = (): void => {
+  importDialogVisible.value = true
+}
+
+/**
+ * 处理文件变化
+ */
+const handleFileChange = (file: any): void => {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const content = e.target?.result as string
+      let data: any[]
+      
+      if (file.name.endsWith('.json')) {
+        data = JSON.parse(content)
+      } else if (file.name.endsWith('.csv')) {
+        // 简单的CSV解析
+        const lines = content.split('\n')
+        const headers = lines[0].split(',')
+        data = lines.slice(1).map(line => {
+          const values = line.split(',')
+          const obj: any = {}
+          headers.forEach((header, index) => {
+            obj[header.trim()] = values[index]?.trim()
+          })
+          return obj
+        }).filter(item => item.name)
+      } else {
+        throw new Error('不支持的文件格式')
+      }
+      
+      importPreview.value = data.map(item => ({
+        name: item.name,
+        color: item.color || '#409EFF',
+        description: item.description || '',
+        status: item.status === 'disabled' ? 'disabled' : 'active'
+      }))
+      
+      ElMessage.success(`成功解析 ${importPreview.value.length} 条标签数据`)
+    } catch (error) {
+      ElMessage.error('文件解析失败，请检查文件格式')
+      importPreview.value = []
+    }
+  }
+  reader.readAsText(file.raw)
+}
+
+/**
+ * 确认导入
+ */
+const confirmImport = (): void => {
+  importing.value = true
+  
+  setTimeout(() => {
+    let successCount = 0
+    importPreview.value.forEach(item => {
+      if (item.name && !tags.value.some(tag => tag.name === item.name)) {
+        const newTag: Tag = {
+          id: Date.now() + Math.random(),
+          name: item.name,
+          color: item.color || '#409EFF',
+          status: item.status || 'active',
+          description: item.description || '',
+          usage_count: 0,
+          createdAt: new Date().toISOString()
+        }
+        tags.value.unshift(newTag)
+        successCount++
+      }
+    })
+    
+    importing.value = false
+    importDialogVisible.value = false
+    importPreview.value = []
+    
+    ElMessage.success(`成功导入 ${successCount} 个标签`)
+  }, 1500)
 }
 
 /**
  * 查看标签使用情况
  */
-const viewTagUsage = (tag: any) => {
+const viewTagUsage = async (tag: Tag): Promise<void> => {
   currentTag.value = tag
   
-  // 模拟加载使用详情
-  tagUsageList.value = [
-    {
-      id: 1,
-      resourceName: '用户基础信息表',
-      resourceType: 'database',
-      categoryName: '数据库资源',
-      createdAt: '2024-01-15 10:30:00'
-    },
-    {
-      id: 2,
-      resourceName: '用户行为分析API',
-      resourceType: 'api',
-      categoryName: 'API接口',
-      createdAt: '2024-01-15 11:00:00'
-    },
-    {
-      id: 3,
-      resourceName: '用户画像数据',
-      resourceType: 'file',
-      categoryName: '文件资源',
-      createdAt: '2024-01-15 11:30:00'
-    }
-  ]
+  // 获取标签使用统计
+  const stats = await getTagUsageStats(Number(tag.id))
+  if (stats) {
+    // 这里可以根据需要显示更详细的使用情况
+    // 目前API只返回统计数据，如果需要详细的资源列表，需要后端提供相应的接口
+    tagUsageList.value = []
+    ElMessage.info(`标签 "${tag.name}" 被 ${stats.resource_count} 个资源使用`)
+  }
   
   usageDialogVisible.value = true
 }
@@ -1015,7 +1190,7 @@ const viewTagUsage = (tag: any) => {
 /**
  * 查看资源
  */
-const viewResource = (resource: any) => {
+const viewResource = (resource: TagUsage): void => {
   router.push({
     name: 'ResourceDetail',
     params: { id: resource.id }
@@ -1025,9 +1200,9 @@ const viewResource = (resource: any) => {
 /**
  * 组件挂载时初始化
  */
-onMounted(() => {
-  // 初始化数据
-  totalCount.value = tags.value.length
+onMounted(async () => {
+  // 初始化加载标签列表
+  await fetchTagList()
 })
 </script>
 
@@ -1235,6 +1410,24 @@ onMounted(() => {
     .usage-count {
       font-size: 14px;
       color: var(--el-text-color-secondary);
+    }
+  }
+}
+
+.import-content {
+  .import-preview {
+    margin-top: 20px;
+    
+    h4 {
+      margin-bottom: 12px;
+      color: var(--el-text-color-primary);
+    }
+    
+    .more-tip {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+      text-align: center;
     }
   }
 }

@@ -757,6 +757,20 @@ async function loadIndices() {
       { name: 'order_data', docsCount: 500000, storeSize: '1.2GB' },
       { name: 'product_info', docsCount: 50000, storeSize: '100MB' }
     ]
+
+    // 确保预选索引出现在选项中
+    const existing = new Set(availableIndices.value.map(i => i.name))
+    const preselected = Array.isArray(queryConfig.index) ? queryConfig.index : []
+    preselected.forEach(name => {
+      if (!existing.has(name)) {
+        availableIndices.value.push({ name, docsCount: 0, storeSize: '-' })
+      }
+    })
+    
+    // 预选索引已确定时，加载字段映射
+    if (queryConfig.index.length > 0) {
+      await loadFields()
+    }
   } catch (error) {
     ElMessage.error('加载索引列表失败')
   }
@@ -938,17 +952,27 @@ watch(
 )
 
 // 组件挂载时初始化
-onMounted(() => {
-  loadDatasources()
+onMounted(async () => {
+  await loadDatasources()
   
-  if (props.datasourceId) {
-    queryConfig.datasourceId = props.datasourceId
-    loadIndices()
+  // 数据源初始化：优先使用 initialDatasourceId
+  if (props.initialDatasourceId || props.datasourceId) {
+    queryConfig.datasourceId = props.initialDatasourceId || props.datasourceId
+    await loadIndices()
   }
   
-  if (props.index.length > 0) {
-    queryConfig.index = [...props.index]
-    loadFields()
+  // 索引初始化：优先使用 initialIndices
+  const preselected = props.initialIndices.length > 0 ? props.initialIndices : props.index
+  if (preselected && preselected.length > 0) {
+    queryConfig.index = [...preselected]
+    // 索引已设置后，保证可选项包含它们，并加载字段
+    const existing = new Set(availableIndices.value.map(i => i.name))
+    preselected.forEach(name => {
+      if (!existing.has(name)) {
+        availableIndices.value.push({ name, docsCount: 0, storeSize: '-' })
+      }
+    })
+    await loadFields()
   }
 })
 

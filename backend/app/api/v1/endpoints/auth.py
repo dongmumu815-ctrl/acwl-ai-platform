@@ -187,3 +187,30 @@ async def refresh_token(
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
+
+
+@router.post("/logout", summary="用户登出")
+async def logout(
+    current_user: User = Depends(get_current_active_user)
+) -> Dict[str, Any]:
+    """
+    用户登出接口
+    
+    在基于JWT的无状态认证系统中，服务端不需要维护会话状态。
+    客户端只需要删除本地存储的token即可实现登出。
+    
+    Args:
+        current_user: 当前认证用户
+        
+    Returns:
+        Dict[str, Any]: 登出成功响应
+    """
+    return {
+        "success": True,
+        "message": "登出成功",
+        "data": {
+            "user_id": current_user.id,
+            "username": current_user.username,
+            "logout_time": datetime.now().isoformat()
+        }
+    }

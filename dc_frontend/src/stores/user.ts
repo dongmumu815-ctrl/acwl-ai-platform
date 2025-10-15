@@ -86,8 +86,17 @@ export const useUserStore = defineStore('user', () => {
     try {
       loading.value = true
       
-      // 调用登出接口
-      await authApi.logout()
+      // 尝试调用登出接口，但跳过认证错误处理以防止循环
+      try {
+        await authApi.logout()
+      } catch (error: any) {
+        // 如果是认证错误，忽略它，因为我们本来就要登出
+        if (error.response?.status === 401 || error.response?.data?.error === 'AUTHENTICATION_ERROR') {
+          console.log('登出时遇到认证错误，这是正常的，继续清除本地状态')
+        } else {
+          console.error('登出接口调用失败:', error)
+        }
+      }
       
       // 清除状态
       user.value = null
@@ -103,9 +112,9 @@ export const useUserStore = defineStore('user', () => {
       
       ElMessage.success('已退出登录')
     } catch (error: any) {
-      console.error('登出接口调用失败:', error)
+      console.error('登出过程失败:', error)
       
-      // 即使接口调用失败，也要清除本地状态
+      // 即使出错，也要清除本地状态
       user.value = null
       token.value = ''
       permissions.value = []

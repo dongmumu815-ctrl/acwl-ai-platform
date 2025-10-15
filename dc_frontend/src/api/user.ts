@@ -48,6 +48,59 @@ export const getUserById = (id: string): Promise<UserResponse<User>> => {
 }
 
 /**
+ * 获取用户详细信息（包含扩展信息）
+ */
+export const getUserDetail = (id: string): Promise<UserResponse<User>> => {
+  return request({
+    url: `/api/users/${id}/detail`,
+    method: 'get'
+  })
+}
+
+/**
+ * 获取用户统计信息
+ */
+export const getUserStats = (id: string): Promise<UserResponse<{
+  loginCount: number
+  lastLoginTime: string
+  sessionCount: number
+  operationCount: number
+  resourceCount: number
+  projectCount: number
+}>> => {
+  return request({
+    url: `/api/users/${id}/stats`,
+    method: 'get'
+  })
+}
+
+/**
+ * 获取用户活动记录
+ */
+export const getUserActivities = (id: string, params?: {
+  page?: number
+  page_size?: number
+  type?: string
+  startDate?: string
+  endDate?: string
+}): Promise<PaginatedUserResponse<{
+  id: string
+  type: string
+  action: string
+  resource: string
+  description: string
+  ip: string
+  userAgent: string
+  createdAt: string
+}>> => {
+  return request({
+    url: `/api/users/${id}/activities`,
+    method: 'get',
+    params
+  })
+}
+
+/**
  * 创建用户
  */
 export const createUser = (data: UserCreateData): Promise<UserResponse<User>> => {
@@ -98,6 +151,17 @@ export const toggleUser = (id: string, enabled: boolean): Promise<UserResponse<v
     url: `/api/users/${id}/toggle`,
     method: 'patch',
     data: { enabled }
+  })
+}
+
+/**
+ * 更新用户状态
+ */
+export const updateUserStatus = (id: string, status: boolean): Promise<UserResponse<void>> => {
+  return request({
+    url: `/api/users/${id}/status`,
+    method: 'patch',
+    data: { is_active: status }
   })
 }
 
@@ -333,6 +397,13 @@ export const terminateUserSessions = (id: string): Promise<UserResponse<void>> =
     url: `/api/users/${id}/sessions/terminate-all`,
     method: 'post'
   })
+}
+
+/**
+ * 终止用户会话（别名）
+ */
+export const terminateUserSession = (sessionId: string): Promise<UserResponse<void>> => {
+  return terminateSession(sessionId)
 }
 
 // 用户日志API
@@ -772,6 +843,41 @@ export const exportUsers = (params: {
     method: 'post',
     data: params,
     responseType: 'blob'
+  })
+}
+
+/**
+ * 验证用户导入文件
+ */
+export const validateUserImport = (formData: FormData): Promise<UserResponse<{
+  total: number
+  valid: number
+  errors: number
+  warnings: number
+  error_details?: Array<{
+    row: number
+    field: string
+    value: string
+    message: string
+    type: 'error' | 'warning'
+  }>
+  preview_data?: Array<{
+    username: string
+    email: string
+    name: string
+    department?: string
+    role?: string
+    status: 'valid' | 'error' | 'warning'
+    errors?: string[]
+  }>
+}>> => {
+  return request({
+    url: '/api/users/import/validate',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
   })
 }
 
