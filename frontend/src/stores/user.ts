@@ -2,10 +2,11 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { authApi } from '@/api/auth'
-import { roleApi } from '@/api/roles'
+import { roleApi, permissionApi } from '@/api/roles'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 import type { User, LoginForm, RegisterForm } from '@/types/auth'
 import type { Permission } from '@/api/roles'
+import { PERMISSIONS, ROLES } from '@/utils/permission'
 
 export const useUserStore = defineStore('user', () => {
   // 状态
@@ -134,9 +135,12 @@ export const useUserStore = defineStore('user', () => {
 
     try {
       // 获取用户权限
-      const permissionsResponse = await roleApi.getUserPermissions(user.value.id)
-      permissionObjects.value = permissionsResponse.data || []
-      permissions.value = permissionObjects.value.map(p => p.code)
+      const permissionsResponse = await permissionApi.getUserPermissions(user.value.id)
+      // 后端返回 ResponseModel，包含 data: { permissions, permission_codes }
+      const respData = (permissionsResponse as any)?.data || {}
+      permissionObjects.value = respData.permissions || []
+      // 优先使用后端直接提供的权限代码列表
+      permissions.value = respData.permission_codes || permissionObjects.value.map((p: any) => p.code)
 
       // 获取用户角色（如果有相关API）
       // 暂时使用用户的role字段
@@ -156,21 +160,57 @@ export const useUserStore = defineStore('user', () => {
    * 设置默认权限（降级方案）
    */
   const setDefaultPermissions = () => {
-    if (user.value?.role === 'admin') {
-      roles.value = ['admin']
+    if (user.value?.role === ROLES.ADMIN) {
+      roles.value = [ROLES.ADMIN]
       permissions.value = [
-        'user:read', 'user:write', 'user:delete',
-        'role:read', 'role:write', 'role:delete',
-        'permission:read', 'permission:write', 'permission:delete',
-        'model:read', 'model:write', 'model:delete',
-        'deployment:read', 'deployment:write', 'deployment:delete',
-        'system:read', 'system:write'
+        // 用户管理
+        PERMISSIONS.USER_READ,
+        PERMISSIONS.USER_CREATE,
+        PERMISSIONS.USER_UPDATE,
+        PERMISSIONS.USER_DELETE,
+        // 角色管理
+        PERMISSIONS.ROLE_READ,
+        PERMISSIONS.ROLE_CREATE,
+        PERMISSIONS.ROLE_UPDATE,
+        PERMISSIONS.ROLE_DELETE,
+        // 权限管理
+        PERMISSIONS.PERMISSION_READ,
+        PERMISSIONS.PERMISSION_CREATE,
+        PERMISSIONS.PERMISSION_UPDATE,
+        PERMISSIONS.PERMISSION_DELETE,
+        // 模型管理
+        PERMISSIONS.MODEL_READ,
+        PERMISSIONS.MODEL_CREATE,
+        PERMISSIONS.MODEL_UPDATE,
+        PERMISSIONS.MODEL_DELETE,
+        PERMISSIONS.MODEL_DEPLOY,
+        // 数据集管理
+        PERMISSIONS.DATASET_READ,
+        PERMISSIONS.DATASET_CREATE,
+        PERMISSIONS.DATASET_UPDATE,
+        PERMISSIONS.DATASET_DELETE,
+        // 项目管理
+        PERMISSIONS.PROJECT_READ,
+        PERMISSIONS.PROJECT_CREATE,
+        PERMISSIONS.PROJECT_UPDATE,
+        PERMISSIONS.PROJECT_DELETE,
+        // 系统管理
+        PERMISSIONS.SYSTEM_READ,
+        PERMISSIONS.SYSTEM_UPDATE,
+        PERMISSIONS.SYSTEM_MONITOR,
+        // 指令集
+        PERMISSIONS.INSTRUCTION_SET_READ,
+        PERMISSIONS.INSTRUCTION_SET_CREATE,
+        PERMISSIONS.INSTRUCTION_SET_UPDATE,
+        PERMISSIONS.INSTRUCTION_SET_DELETE,
+        PERMISSIONS.INSTRUCTION_SET_TEST
       ]
     } else {
-      roles.value = ['user']
+      roles.value = [ROLES.USER]
       permissions.value = [
-        'model:read',
-        'deployment:read', 'deployment:write'
+        PERMISSIONS.MODEL_READ,
+        PERMISSIONS.MODEL_DEPLOY,
+        PERMISSIONS.INSTRUCTION_SET_READ
       ]
     }
   }

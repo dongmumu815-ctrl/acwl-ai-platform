@@ -28,6 +28,9 @@
       </div>
     </div>
     
+    <!-- 移动端遮罩层（侧边栏展开时显示） -->
+    <div class="sidebar-overlay" v-if="showOverlay" @click="toggleSidebar"></div>
+    
     <!-- 主内容区域 -->
     <div class="main-container">
       <!-- 顶部导航栏 -->
@@ -61,7 +64,10 @@
     </div>
     
     <!-- 设置面板 -->
-    <SettingsPanel v-if="showSettings" @close="showSettings = false" />
+    <SettingsPanel 
+      v-model:modelValue="showSettings"
+      @settings-change="handleSettingsChange" 
+    />
   </div>
 </template>
 
@@ -87,6 +93,7 @@ const userStore = useUserStore()
 
 // 响应式状态
 const showSettings = ref(false)
+const isMobile = ref(false)
 
 // 计算属性
 const isCollapsed = computed(() => appStore.sidebar.collapsed)
@@ -103,6 +110,9 @@ const keepAliveComponents = computed(() => {
   return appStore.cachedViews
 })
 
+// 移动端遮罩显示逻辑
+const showOverlay = computed(() => isMobile.value && !isCollapsed.value)
+
 /**
  * 切换侧边栏折叠状态
  */
@@ -115,6 +125,7 @@ const toggleSidebar = (): void => {
  */
 const handleResize = (): void => {
   const width = window.innerWidth
+  isMobile.value = width < 768
   
   if (width < 768) {
     // 移动端自动折叠侧边栏
@@ -139,6 +150,13 @@ const handleKeydown = (event: KeyboardEvent): void => {
     event.preventDefault()
     showSettings.value = true
   }
+}
+
+/**
+ * 设置变更回调（可接入持久化或状态同步）
+ */
+const handleSettingsChange = (settings: any): void => {
+  // 这里可根据设置更新 appStore 或主题变量
 }
 
 // 生命周期
@@ -173,11 +191,15 @@ onUnmounted(() => {
   width: $sidebar-width;
   background-color: var(--el-bg-color);
   border-right: 1px solid var(--el-border-color-light);
-  transition: width 0.3s ease;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+  transition: width 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
   display: flex;
   flex-direction: column;
-  position: relative;
-  z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 1001;
   
   &.is-collapsed {
     width: $sidebar-collapsed-width;
@@ -189,11 +211,23 @@ onUnmounted(() => {
     align-items: center;
     padding: 0 16px;
     border-bottom: 1px solid var(--el-border-color-lighter);
+    background-color: var(--el-bg-color);
+    position: sticky;
+    top: 0;
+    z-index: 2;
     
     .logo {
       display: flex;
       align-items: center;
       gap: 8px;
+      padding: 0 8px;
+      border-radius: $border-radius-lg;
+      cursor: pointer;
+      transition: background-color 0.3s ease, opacity 0.3s ease;
+      
+      &:hover {
+        background-color: var(--el-fill-color-light);
+      }
       
       .logo-img,
       .logo-img-mini {
@@ -207,6 +241,7 @@ onUnmounted(() => {
         font-weight: 600;
         color: var(--el-text-color-primary);
         white-space: nowrap;
+        letter-spacing: 0.2px;
       }
     }
   }
@@ -215,9 +250,10 @@ onUnmounted(() => {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    padding: 8px 4px;
     
     &::-webkit-scrollbar {
-      width: 4px;
+      width: 6px;
     }
     
     &::-webkit-scrollbar-track {
@@ -226,7 +262,7 @@ onUnmounted(() => {
     
     &::-webkit-scrollbar-thumb {
       background-color: var(--el-border-color);
-      border-radius: 2px;
+      border-radius: 3px;
       
       &:hover {
         background-color: var(--el-border-color-dark);
@@ -240,6 +276,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin-left: $sidebar-width;
+  transition: margin-left 0.3s ease;
 }
 
 .header {
@@ -247,6 +285,9 @@ onUnmounted(() => {
   background-color: var(--el-bg-color);
   border-bottom: 1px solid var(--el-border-color-light);
   z-index: 999;
+  position: sticky;
+  top: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .breadcrumb-container {
@@ -286,6 +327,22 @@ onUnmounted(() => {
   text-align: center;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+// 侧边栏与主内容的联动（折叠时收窄主内容左边距）
+.sidebar.is-collapsed + .main-container {
+  margin-left: $sidebar-collapsed-width;
+}
+
+// 移动端遮罩层样式
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 1000;
 }
 
 // 页面切换动画

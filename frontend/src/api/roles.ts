@@ -288,14 +288,16 @@ export const permissionApi = {
    * 获取权限树结构
    */
   getPermissionTree() {
-    return request.get<any[]>('/permissions/tree')
+    // 后端返回 ResponseModel[PermissionTreeListResponse]
+    return request.get<any>('/permissions/tree')
   },
 
   /**
    * 根据模块获取权限
    */
   getPermissionsByModule(module: string) {
-    return request.get<Permission[]>(`/permissions/module/${module}`)
+    // 后端路由为 /permissions/modules/{module}
+    return request.get<any>(`/permissions/modules/${module}`)
   },
 
   /**
@@ -324,6 +326,7 @@ export const permissionApi = {
    * 获取用户所有权限
    */
   getUserPermissions(userId: number) {
-    return request.get<Permission[]>(`/users/${userId}/permissions`)
+    // 后端路由为 /permissions/user/{user_id}，返回 ResponseModel[UserPermissionResponse]
+    return request.get<any>(`/permissions/user/${userId}`)
   }
 }

@@ -172,6 +172,28 @@ const authRoutes: RouteRecordRaw[] = [
       }
     ]
   },
+  {
+    path: '/datasources',
+    component: Layout,
+    redirect: '/datasources/list',
+    meta: {
+      title: '数据源管理',
+      icon: 'Connection',
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: 'list',
+        name: 'DatasourceList',
+        component: () => import('@/views/datasources/index.vue'),
+        meta: {
+          title: '数据源列表',
+          icon: 'List',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
   // {
   //   path: '/users',
   //   component: Layout,
@@ -367,37 +389,37 @@ const authRoutes: RouteRecordRaw[] = [
           activeMenu: '/api-management/apis'
         }
       },
-      {
-        path: 'batches',
-        name: 'BatchManagement',
-        component: () => import('@/views/apiManagement/BatchList.vue'),
-        meta: {
-          title: '批次管理',
-          icon: 'DataBoard',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'batches/:id',
-        name: 'BatchDetail',
-        component: () => import('@/views/apiManagement/BatchDetail.vue'),
-        meta: {
-          title: '批次详情',
-          requiresAuth: true,
-          hideInMenu: true,
-          activeMenu: '/api-management/batches'
-        }
-      },
-      {
-        path: 'dashboard',
-        name: 'ApiDashboard',
-        component: () => import('@/views/apiManagement/Dashboard.vue'),
-        meta: {
-          title: 'API仪表板',
-          icon: 'Monitor',
-          requiresAuth: true
-        }
-      }
+      // {
+      //   path: 'batches',
+      //   name: 'BatchManagement',
+      //   component: () => import('@/views/apiManagement/BatchList.vue'),
+      //   meta: {
+      //     title: '批次管理',
+      //     icon: 'DataBoard',
+      //     requiresAuth: true
+      //   }
+      // },
+      // {
+      //   path: 'batches/:id',
+      //   name: 'BatchDetail',
+      //   component: () => import('@/views/apiManagement/BatchDetail.vue'),
+      //   meta: {
+      //     title: '批次详情',
+      //     requiresAuth: true,
+      //     hideInMenu: true,
+      //     activeMenu: '/api-management/batches'
+      //   }
+      // },
+      // {
+      //   path: 'dashboard',
+      //   name: 'ApiDashboard',
+      //   component: () => import('@/views/apiManagement/Dashboard.vue'),
+      //   meta: {
+      //     title: 'API仪表板',
+      //     icon: 'Monitor',
+      //     requiresAuth: true
+      //   }
+      // }
     ]
   },
   {

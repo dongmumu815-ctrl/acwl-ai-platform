@@ -311,8 +311,13 @@ export const request = async <T = any>(config: RequestConfig): Promise<ApiRespon
   try {
     const response = await axiosInstance.request<T>(config)
     
-    // 检查响应数据是否已经是ApiResponse格式
-    if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+    // 检查响应数据是否已经是ApiResponse格式（必须同时包含success与data字段）
+    if (
+      response.data &&
+      typeof response.data === 'object' &&
+      'success' in response.data &&
+      'data' in response.data
+    ) {
       return response.data as ApiResponse<T>
     }
     
@@ -325,15 +330,19 @@ export const request = async <T = any>(config: RequestConfig): Promise<ApiRespon
   } catch (error) {
     // 如果是axios错误且有响应数据，返回响应数据
     if (axios.isAxiosError(error) && error.response?.data) {
-      // 检查错误响应是否已经是ApiResponse格式
-      if (typeof error.response.data === 'object' && 'success' in error.response.data) {
+      // 检查错误响应是否已经是ApiResponse格式（必须同时包含success与data字段）
+      if (
+        typeof error.response.data === 'object' &&
+        'success' in error.response.data &&
+        'data' in error.response.data
+      ) {
         return error.response.data
       }
       
       // 包装错误响应
       return {
         success: false,
-        message: error.response.data.message || '请求失败',
+        message: (error.response.data && (error.response.data.message || error.response.data.detail)) || '请求失败',
         data: error.response.data
       } as ApiResponse<T>
     }

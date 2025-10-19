@@ -87,7 +87,7 @@
         <el-col :span="12">
           <el-form-item label="数据库名称">
             <el-input
-              v-model="form.database_name"
+              v-model="form.database"
               placeholder="请输入数据库名称"
             />
           </el-form-item>
@@ -206,7 +206,7 @@
       </el-form-item>
     </el-form>
 
-    <template #footer>dx
+    <template #footer>
       <div class="dialog-footer">
         <el-button @click="handleClose">取消</el-button>
         <el-button
@@ -250,7 +250,7 @@ import {
   getDatasourceTypeLabel as getTypeLabel,
   DATASOURCE_TYPES,
   getDefaultPort
-} from '@/api/datasource'
+} from '@/api/datasourceV2'
 
 // Props
 const props = defineProps({
@@ -288,7 +288,7 @@ const form = reactive({
   datasource_type: '',
   host: '',
   port: 3306,
-  database_name: '',
+  database: '',
   username: '',
   password: '',
   connection_params: {},
@@ -367,6 +367,7 @@ const initForm = () => {
     // 编辑模式，填充表单
     Object.assign(form, {
       ...props.datasource,
+      database: props.datasource.database_name,
       password: '' // 密码不回显
     })
     
@@ -382,7 +383,7 @@ const initForm = () => {
       datasource_type: '',
       host: '',
       port: 3306,
-      database_name: '',
+      database: '',
       username: '',
       password: '',
       connection_params: {},
@@ -454,8 +455,7 @@ const handleTest = async () => {
       const response = await testDatasourceConnection(props.datasource.id, {
         timeout: 10
       })
-      // 兼容后端返回结构（可能为 { success, message, data } 包裹）
-      testResult.value = response?.data ?? response
+      testResult.value = response
     } else {
       // 创建模式，使用临时测试API
       const response = await testTempDatasourceConnection({
@@ -463,8 +463,7 @@ const handleTest = async () => {
         datasource_type: form.datasource_type,
         host: form.host,
         port: form.port,
-        // 与后端字段对齐：form 使用 database_name，这里映射为 database
-        database: form.database_name,
+        database: form.database,
         username: form.username,
         password: form.password,
         description: form.description,
@@ -474,8 +473,7 @@ const handleTest = async () => {
       }, {
         timeout: 10
       })
-      // 兼容后端返回结构（可能为 { success, message, data } 包裹）
-      testResult.value = response?.data ?? response
+      testResult.value = response
     }
     
     testDialogVisible.value = true

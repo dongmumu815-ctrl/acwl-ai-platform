@@ -17,8 +17,8 @@
     <!-- 主内容区域 -->
     <div class="main-container" :style="appStore.mainContentStyle">
       <!-- 顶部导航栏 -->
-      <header class="header">
-        <div class="header-left">
+  <header class="header">
+    <div class="header-left">
           <el-button
             type="text"
             class="sidebar-toggle"
@@ -45,16 +45,24 @@
           </el-breadcrumb>
         </div>
         
-        <div class="header-right">
-          <div class="header-actions">
-            <!-- 消息通知 -->
-            <el-badge :value="12" :max="99" class="notification-badge">
-              <el-button type="text" class="action-btn">
-                <el-icon :size="18">
-                  <Bell />
-                </el-icon>
-              </el-button>
-            </el-badge>
+    <div class="header-right">
+      <div class="header-actions">
+        <!-- 消息通知 -->
+        <el-badge :value="12" :max="99" class="notification-badge">
+          <el-button type="text" class="action-btn">
+            <el-icon :size="18">
+              <Bell />
+            </el-icon>
+          </el-button>
+        </el-badge>
+
+        <!-- 帮助文档入口 -->
+        <el-button type="text" class="action-btn" @click="openHelp">
+          <el-icon :size="18">
+            <QuestionFilled />
+          </el-icon>
+          <span style="margin-left:4px">帮助文档</span>
+        </el-button>
             
             <!-- 用户头像下拉菜单 -->
             <el-dropdown trigger="click" @command="handleUserCommand">
@@ -102,7 +110,7 @@
         <div class="footer-content">
           <span>© 2024 ACWL AI. All rights reserved.</span>
           <div class="footer-links">
-            <a href="#" @click.prevent>帮助文档</a>
+            <a href="#" @click.prevent="openHelp">帮助文档</a>
             <a href="#" @click.prevent>API文档</a>
             <a href="#" @click.prevent>联系我们</a>
           </div>
@@ -142,6 +150,7 @@ import {
   Connection,
   Folder
 } from '@element-plus/icons-vue'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import RobotIcon from '@/components/RobotIcon.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -233,6 +242,36 @@ const handleUserCommand = async (command: string) => {
         // 用户取消操作
       }
       break
+  }
+}
+
+// 帮助中心链接：根据当前页面上下文跳转到对应章节
+const helpTopicMap: Record<string, string> = {
+  Dashboard: 'quick-start',
+  DatasourceList: 'datasource-list',
+  DatasetList: 'datasource-list',
+  ModelList: 'template-list',
+  DeploymentList: 'scheduler',
+  ResourceServers: 'security-and-permissions',
+  ResourceGpus: 'security-and-permissions',
+  SystemUsers: 'security-and-permissions',
+  SystemRoles: 'security-and-permissions',
+  SystemPermissions: 'security-and-permissions',
+  SystemSettings: 'security-and-permissions',
+  SystemLogs: 'troubleshooting',
+  Monitoring: 'troubleshooting',
+  InstructionSets: 'template-list',
+  InstructionSetDetail: 'template-list',
+  InstructionSetTest: 'template-list'
+}
+
+const openHelp = () => {
+  const currentName = (route.name as string) || ''
+  const topic = helpTopicMap[currentName] || ''
+  if (topic) {
+    router.push({ path: '/help', query: { topic } })
+  } else {
+    router.push({ path: '/help' })
   }
 }
 

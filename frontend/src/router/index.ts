@@ -51,6 +51,22 @@ export const constantRoutes: RouteRecordRaw[] = [
       title: '服务器错误',
       hidden: true
     }
+  },
+  // 帮助中心（公共路由，默认展示在主布局内）
+  {
+    path: '/help',
+    component: Layout,
+    children: [
+      {
+        path: '',
+        name: 'HelpCenter',
+        component: () => import('@/views/help/index.vue'),
+        meta: {
+          title: '帮助中心',
+          hidden: true
+        }
+      }
+    ]
   }
 ]
 
@@ -81,7 +97,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '模型管理',
       icon: 'Box',
       requiresAuth: true,
-      permission: PERMISSIONS.MODEL_READ
+      permission: PERMISSIONS.MODEL_READ,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -92,7 +109,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '模型列表',
           icon: 'List',
           requiresAuth: true,
-          permission: PERMISSIONS.MODEL_READ
+          permission: PERMISSIONS.MODEL_READ,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -103,7 +121,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '模型上传',
           icon: 'Upload',
           requiresAuth: true,
-          permission: PERMISSIONS.MODEL_CREATE
+          permission: PERMISSIONS.MODEL_CREATE,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -114,7 +133,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '服务配置',
           icon: 'Setting',
           requiresAuth: true,
-          permissions: [PERMISSIONS.MODEL_READ, PERMISSIONS.MODEL_UPDATE]
+          permissions: [PERMISSIONS.MODEL_READ, PERMISSIONS.MODEL_UPDATE],
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -125,7 +145,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '模型详情',
           hidden: true,
           requiresAuth: true,
-          permission: PERMISSIONS.MODEL_READ
+          permission: PERMISSIONS.MODEL_READ,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -138,7 +159,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '部署管理',
       icon: 'Monitor',
       requiresAuth: true,
-      permission: PERMISSIONS.MODEL_DEPLOY
+      permission: PERMISSIONS.MODEL_DEPLOY,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -149,7 +171,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '部署列表',
           icon: 'List',
           requiresAuth: true,
-          permission: PERMISSIONS.MODEL_DEPLOY
+          permission: PERMISSIONS.MODEL_DEPLOY,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -161,7 +184,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           icon: 'Plus',
           requiresAuth: true,
           hideInMenu: true,
-          permission: PERMISSIONS.MODEL_DEPLOY
+          permission: PERMISSIONS.MODEL_DEPLOY,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -172,7 +196,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '部署详情',
           hidden: true,
           requiresAuth: true,
-          permission: PERMISSIONS.MODEL_DEPLOY
+          permission: PERMISSIONS.MODEL_DEPLOY,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -183,7 +208,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '部署日志',
           hidden: true,
           requiresAuth: true,
-          permissions: [PERMISSIONS.MODEL_DEPLOY, PERMISSIONS.SYSTEM_MONITOR]
+          permissions: [PERMISSIONS.MODEL_DEPLOY, PERMISSIONS.SYSTEM_MONITOR],
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -196,7 +222,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '数据集管理',
       icon: 'Document',
       requiresAuth: true,
-      permission: PERMISSIONS.DATASET_READ
+      permission: PERMISSIONS.DATASET_READ,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -207,7 +234,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '数据集列表',
           icon: 'List',
           requiresAuth: true,
-          permission: PERMISSIONS.DATASET_READ
+          permission: PERMISSIONS.DATASET_READ,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -218,7 +246,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '数据集上传',
           icon: 'Upload',
           requiresAuth: true,
-          permission: PERMISSIONS.DATASET_CREATE
+          permission: PERMISSIONS.DATASET_CREATE,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -253,7 +282,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '项目管理',
       icon: 'Folder',
       requiresAuth: true,
-      permission: PERMISSIONS.PROJECT_READ
+      permission: PERMISSIONS.PROJECT_READ,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -264,7 +294,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '项目列表',
           icon: 'List',
           requiresAuth: true,
-          permission: PERMISSIONS.PROJECT_READ
+          permission: PERMISSIONS.PROJECT_READ,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -352,7 +383,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '资源管理',
       icon: 'Cpu',
       requiresAuth: true,
-      requiresAdmin: true
+      requiresAdmin: true,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -363,7 +395,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '服务器资源池',
           icon: 'Monitor',
           requiresAuth: true,
-          requiresAdmin: true
+          requiresAdmin: true,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -374,7 +407,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: 'GPU资源池',
           icon: 'Cpu',
           requiresAuth: true,
-          requiresAdmin: true
+          requiresAdmin: true,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -387,7 +421,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '系统管理',
       icon: 'Tools',
       requiresAuth: true,
-      role: ROLES.ADMIN
+      role: ROLES.ADMIN,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -398,7 +433,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '用户管理',
           icon: 'User',
           requiresAuth: true,
-          permission: PERMISSIONS.USER_READ
+          permission: PERMISSIONS.USER_READ,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -409,7 +445,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '角色管理',
           icon: 'UserFilled',
           requiresAuth: true,
-          permission: PERMISSIONS.ROLE_READ
+          permission: PERMISSIONS.ROLE_READ,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -420,7 +457,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '权限管理',
           icon: 'Key',
           requiresAuth: true,
-          permission: PERMISSIONS.PERMISSION_READ
+          permission: PERMISSIONS.PERMISSION_READ,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -431,7 +469,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '系统设置',
           icon: 'Setting',
           requiresAuth: true,
-          permission: PERMISSIONS.SYSTEM_UPDATE
+          permission: PERMISSIONS.SYSTEM_UPDATE,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -442,7 +481,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '系统日志',
           icon: 'Document',
           requiresAuth: true,
-          permission: PERMISSIONS.SYSTEM_MONITOR
+          permission: PERMISSIONS.SYSTEM_MONITOR,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -455,7 +495,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '系统监控',
       icon: 'Monitor',
       requiresAuth: true,
-      requiresAdmin: true
+      requiresAdmin: true,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -466,7 +507,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '系统监控',
           icon: 'Monitor',
           requiresAuth: true,
-          requiresAdmin: true
+          requiresAdmin: true,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -498,7 +540,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '指令集管理',
       icon: 'Document',
       requiresAuth: true,
-      permission: PERMISSIONS.INSTRUCTION_SET_READ
+      permission: PERMISSIONS.INSTRUCTION_SET_READ,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -509,7 +552,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '指令集管理',
           icon: 'List',
           requiresAuth: true,
-          permission: PERMISSIONS.INSTRUCTION_SET_READ
+          permission: PERMISSIONS.INSTRUCTION_SET_READ,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -522,7 +566,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       hidden: true,
       requiresAuth: true,
-      permission: PERMISSIONS.INSTRUCTION_SET_READ
+      permission: PERMISSIONS.INSTRUCTION_SET_READ,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -532,7 +577,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '指令集详情',
           requiresAuth: true,
-          permission: PERMISSIONS.INSTRUCTION_SET_READ
+          permission: PERMISSIONS.INSTRUCTION_SET_READ,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -543,7 +589,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       hidden: true,
       requiresAuth: true,
-      permission: PERMISSIONS.INSTRUCTION_SET_TEST
+      permission: PERMISSIONS.INSTRUCTION_SET_TEST,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -553,7 +600,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '指令集测试',
           requiresAuth: true,
-          permission: PERMISSIONS.INSTRUCTION_SET_TEST
+          permission: PERMISSIONS.INSTRUCTION_SET_TEST,
+          noPermissionBehavior: 'hide'
         }
       }
     ]

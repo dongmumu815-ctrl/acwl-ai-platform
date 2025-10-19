@@ -19,14 +19,13 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { useUserStore } from '@/stores/user'
 import { asyncRoutes } from '@/router'
+import { filterRoutesByPermission } from '@/utils/permission'
 import SidebarMenuItem from './SidebarMenuItem.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 const route = useRoute()
 const appStore = useAppStore()
-const userStore = useUserStore()
 
 // 当前激活的菜单
 const activeMenu = computed(() => {
@@ -34,35 +33,25 @@ const activeMenu = computed(() => {
   return path
 })
 
-// 过滤菜单路由
+// 过滤菜单路由（按隐藏标记与权限）
 const menuRoutes = computed(() => {
-  return filterMenuRoutes(asyncRoutes)
+  // 先按权限过滤（支持 noPermissionBehavior: 'hide'）
+  const permitted = filterRoutesByPermission(asyncRoutes)
+  // 再移除在菜单中隐藏的项
+  return filterHiddenInMenu(permitted)
 })
 
 // 过滤路由，只显示有权限且不隐藏的路由
-function filterMenuRoutes(routes: RouteRecordRaw[]): RouteRecordRaw[] {
-  return routes.filter(route => {
-    // 检查路由是否隐藏
-    if (route.meta?.hidden) {
-      return false
-    }
-    
-    // 检查权限
-    if (route.meta?.requiresAuth && !userStore.isLoggedIn) {
-      return false
-    }
-    
-    if (route.meta?.requiresAdmin && !userStore.isAdmin) {
-      return false
-    }
-    
-    // 递归过滤子路由
-    if (route.children && route.children.length > 0) {
-      route.children = filterMenuRoutes(route.children)
-    }
-    
-    return true
-  })
+function filterHiddenInMenu(routes: RouteRecordRaw[]): RouteRecordRaw[] {
+  return routes
+    .filter(route => !(route.meta?.hidden || route.meta?.hideInMenu))
+    .map(route => {
+      const r = { ...route }
+      if (r.children && r.children.length > 0) {
+        r.children = filterHiddenInMenu(r.children)
+      }
+      return r
+    })
 }
 </script>
 

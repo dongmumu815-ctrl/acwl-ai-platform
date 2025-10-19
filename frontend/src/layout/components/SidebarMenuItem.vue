@@ -36,6 +36,7 @@
 import { computed, inject } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { checkRoutePermission } from '@/utils/permission'
 import type { RouteRecordRaw } from 'vue-router'
 
 interface Props {
@@ -116,13 +117,17 @@ const visibleChildren = computed(() => {
   if (!props.route.children) return []
   
   return props.route.children.filter(child => {
-    // 检查是否隐藏
-    if (child.meta?.hidden) return false
-    
-    // 检查权限
+    // 菜单隐藏标记
+    if (child.meta?.hidden || child.meta?.hideInMenu) return false
+
+    // 基础认证检查
     if (child.meta?.requiresAuth && !userStore.isLoggedIn) return false
     if (child.meta?.requiresAdmin && !userStore.isAdmin) return false
-    
+
+    // 统一的权限/角色检查
+    const result = checkRoutePermission({ meta: child.meta || {} } as any)
+    if (!result.hasPermission) return false
+
     return true
   })
 })

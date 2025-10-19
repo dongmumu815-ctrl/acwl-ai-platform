@@ -153,18 +153,17 @@
             <div class="cards" :class="{ compact: compactMode }">
               <el-card v-for="(row, idx) in records" :key="idx" class="result-card" shadow="hover">
                 <div class="card-content">
-                  <div class="card-tools">
-                    <el-button size="small" text @click="copyRow(row)">
+                  <el-tooltip content="复制" placement="top">
+                    <el-button size="small" circle class="card-copy-btn" @click="copyRow(row)">
                       <el-icon><CopyDocument /></el-icon>
-                      复制
                     </el-button>
-                  </div>
+                  </el-tooltip>
                   <!-- 短字段优先，多个短字段一行；一致的字段顺序 -->
                   <template v-for="chunk in buildCardChunks(row)">
-                    <div class="card-row">
-                      <div v-for="f in chunk" :key="f" class="kv">
+                    <div class="card-row" :class="{ wide: chunk.wide }">
+                      <div v-for="f in chunk.fields" :key="f" class="kv">
                         <span class="k">{{ f }}</span>
-                        <span class="v" :class="{ wrap: wrapLongText }" :title="formatCell(row[f])">{{ formatText(formatCell(row[f]), 160) }}</span>
+                        <span class="v" :class="{ wrap: wrapLongText }" :title="formatCell(row[f])">{{ formatText(formatCell(row[f]), chunk.wide ? WIDE_MAX_CHARS : DEFAULT_MAX_CHARS) }}</span>
                       </div>
                     </div>
                   </template>
@@ -236,15 +235,22 @@ const totalHits = computed<number>(() => {
 // 按字段值长度构建一致的字段顺序
 const fieldOrder = ref<string[]>([])
 const displayFields = computed<string[]>(() => {
-  if (fieldOrder.value.length) return fieldOrder.value
-  // fallback：使用sourceFields或所有记录的字段并去重
-  const fields = new Set<string>()
+  // 收集所有潜在字段（来源于映射或当前记录）
+  const allFields = new Set<string>()
   if (sourceFields.value.length) {
-    sourceFields.value.forEach(f => fields.add(f))
+    sourceFields.value.forEach(f => allFields.add(f))
   } else {
-    records.value.forEach(r => Object.keys(r || {}).forEach(k => fields.add(k)))
+    records.value.forEach(r => Object.keys(r || {}).forEach(k => allFields.add(k)))
   }
-  return Array.from(fields)
+
+  // 如果有全局排序，先按排序排列，再补充未参与排序的剩余字段
+  if (fieldOrder.value.length) {
+    const ordered = [...fieldOrder.value]
+    const leftover = Array.from(allFields).filter(f => !fieldOrder.value.includes(f))
+    return ordered.concat(leftover)
+  }
+  // 否则直接使用全部字段集合
+  return Array.from(allFields)
 })
 
 // 规范化聚合结果，便于左侧展示
@@ -486,18 +492,43 @@ async function executeQuery() {
 }
 
 function computeFieldOrder() {
+  // 仅基于当前页前10行，空值不参与平均值统计，但需要识别“全为空”的字段以置前
+  const topN = records.value.slice(0, Math.min(10, records.value.length))
   const lenStats: Record<string, { total: number; count: number }> = {}
-  records.value.forEach((row) => {
+  const allFieldsSet = new Set<string>()
+
+  // 收集所有出现过的字段（或映射提供的字段）
+  if (sourceFields.value.length) {
+    sourceFields.value.forEach(f => allFieldsSet.add(f))
+  }
+  topN.forEach((row) => {
+    Object.keys(row || {}).forEach(k => allFieldsSet.add(k))
     Object.entries(row || {}).forEach(([k, v]) => {
+      if (isEmptyValue(v)) return
       const l = getValueLength(v)
       if (!lenStats[k]) lenStats[k] = { total: 0, count: 0 }
       lenStats[k].total += l
       lenStats[k].count += 1
     })
   })
+
+  const allFields = Array.from(allFieldsSet)
+  const nonEmptyFields = Object.keys(lenStats)
+  const emptyFields = allFields.filter(f => !nonEmptyFields.includes(f))
+
   const entries = Object.entries(lenStats).map(([k, s]) => ({ field: k, avg: s.total / (s.count || 1) }))
+  // 按平均长度升序：短字段优先（在“空字段”之后）
   entries.sort((a, b) => a.avg - b.avg)
-  fieldOrder.value = entries.map(e => e.field)
+
+  fieldOrder.value = emptyFields.concat(entries.map(e => e.field))
+}
+
+function isEmptyValue(v: any): boolean {
+  if (v === null || v === undefined) return true
+  if (typeof v === 'string') return v.trim().length === 0
+  if (Array.isArray(v)) return v.length === 0
+  if (typeof v === 'object') return Object.keys(v).length === 0
+  return false
 }
 
 function getValueLength(v: any): number {
@@ -523,7 +554,7 @@ function formatText(text: string, max: number): string {
 function copyRow(row: Record<string, any>) {
   try {
     navigator.clipboard.writeText(JSON.stringify(row, null, 2))
-    ElMessage.success('已复制该记录到剪贴板')
+    ElMessage.success('复制成功')
   } catch (e) {
     ElMessage.error('复制失败')
   }
@@ -540,27 +571,42 @@ function onAggBucketClick(aggName: string, bucket: any) {
   executeQuery()
 }
 
-// 构建卡片行分块：短字段合并一行，长字段放最后；顺序全局一致
-function buildCardChunks(row: Record<string, any>): string[][] {
-  const fields = displayFields.value.filter(f => row && f in row)
-  const short: string[] = []
-  const medium: string[] = []
-  const long: string[] = []
-  fields.forEach(f => {
-    const l = getValueLength(row[f])
-    if (l <= 20) short.push(f)
-    else if (l <= 100) medium.push(f)
-    else long.push(f)
+// 长内容阈值（达到或超过则整行展示）
+const LONG_THRESHOLD = 100
+// 文本截断阈值：普通行与宽行分别使用不同上限
+const DEFAULT_MAX_CHARS = 160
+const WIDE_MAX_CHARS = 500
+
+// 构建卡片行分块：遵循全局顺序，长内容占满一行，其余三等分
+function buildCardChunks(row: Record<string, any>): Array<{ fields: string[]; wide?: boolean }> {
+  const orderedFields = displayFields.value.filter(f => row && f in row)
+  const chunks: Array<{ fields: string[]; wide?: boolean }> = []
+  let currentRow: string[] = []
+
+  orderedFields.forEach((f) => {
+    const len = getValueLength(row[f])
+    const isLong = len >= LONG_THRESHOLD
+
+    if (isLong) {
+      // 先推送当前累积行
+      if (currentRow.length) {
+        chunks.push({ fields: currentRow })
+        currentRow = []
+      }
+      // 长内容独占一行
+      chunks.push({ fields: [f], wide: true })
+    } else {
+      currentRow.push(f)
+      if (currentRow.length >= 3) {
+        chunks.push({ fields: currentRow })
+        currentRow = []
+      }
+    }
   })
-  const chunks: string[][] = []
-  // 多个短字段一行（最多3个）
-  for (let i = 0; i < short.length; i += 3) {
-    chunks.push(short.slice(i, i + 3))
+
+  if (currentRow.length) {
+    chunks.push({ fields: currentRow })
   }
-  // 中等字段每行一个
-  medium.forEach(f => chunks.push([f]))
-  // 长字段最后显示，每行一个
-  long.forEach(f => chunks.push([f]))
   return chunks
 }
 
@@ -670,9 +716,10 @@ function onPageSizeChange(size: number) {
 
 .result-pane { }
 .cards { display: flex; flex-direction: column; gap: 12px; }
-.result-card { width: 100%; }
-.card-content { display: flex; flex-direction: column; gap: 6px; }
+.result-card { width: 100%; position: relative; }
+.card-content { display: flex; flex-direction: column; gap: 6px; padding-bottom: 36px; }
 .card-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.card-row.wide { grid-template-columns: 1fr; }
 .kv { display: flex; gap: 6px; font-size: 13px; }
 .k { color: #606266; min-width: 70px; background: #f5f7fa; padding: 0 6px; border-radius: 4px; }
 .v { color: #303133; word-break: break-word; }
@@ -681,6 +728,13 @@ function onPageSizeChange(size: number) {
 .cell.wrap { white-space: pre-wrap; }
 .cards.compact .kv { font-size: 12px; }
 .cards.compact .card-row { gap: 6px; }
+
+/* 卡片复制按钮固定在右下角 */
+.card-copy-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+}
 
 .no-data { padding: 20px; }
 .pager { margin-top: 12px; display: flex; justify-content: flex-end; }

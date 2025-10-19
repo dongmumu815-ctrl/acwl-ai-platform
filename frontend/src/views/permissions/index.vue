@@ -425,7 +425,24 @@ const loadPermissionTree = async () => {
   treeLoading.value = true
   try {
     const response = await permissionApi.getPermissionTree()
-    permissionTree.value = response.data
+    // 后端返回 ResponseModel，data: { modules: Array<{ module: string; permissions: PermissionTreeNode[] }> }
+    const modules = (response as any)?.data?.modules || []
+    // 统一转换为 el-tree 可用的节点结构
+    permissionTree.value = modules.map((mod: any) => ({
+      id: `module:${mod.module}`,
+      name: mod.module,
+      type: 'module',
+      is_active: true,
+      is_system: false,
+      children: (mod.permissions || []).map((perm: any) => ({
+        id: perm.id,
+        name: perm.name,
+        code: perm.code,
+        type: 'permission',
+        is_active: perm.status,
+        is_system: perm.is_system
+      }))
+    }))
     
     // 计算统计数据
     updateStats()

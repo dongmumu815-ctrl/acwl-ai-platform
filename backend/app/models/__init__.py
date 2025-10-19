@@ -19,6 +19,16 @@ from .datasource import (
     DatasourcePermission, DatasourceTemplate,
     DatasourceType, DatasourceStatus, TestResult, PermissionType
 )
+from .data_resource import (
+    DataResourceCategory,
+    DataResource,
+    DataResourcePermission,
+    DataResourceAccessLog,
+    DataResourceFavorite,
+    DataResourceQueryHistory,
+    DataResourceTag,
+    DataResourceTagRelation,
+)
 from .project import (
     Project, ProjectMember, ProjectDatasource, ProjectQuota, 
     ProjectActivity, ProjectTemplate,
@@ -56,6 +66,12 @@ from .es_query_template import ESQueryTemplate
 from .sql_query_template import SQLQueryTemplate
 from .role import Role, UserRole, RolePermission
 from .permission import Permission
+from .resource_package import (
+    ResourcePackage,
+    ResourcePackagePermission,
+    ResourcePackageQueryHistory,
+    ResourcePackageTag,
+)
 
 # 导出所有模型
 __all__ = [
@@ -83,6 +99,15 @@ __all__ = [
     "DatasourceStatus",
     "TestResult",
     "PermissionType",
+    # 数据资源中心相关
+    "DataResourceCategory",
+    "DataResource",
+    "DataResourcePermission",
+    "DataResourceAccessLog",
+    "DataResourceFavorite",
+    "DataResourceQueryHistory",
+    "DataResourceTag",
+    "DataResourceTagRelation",
     "Project",
     "ProjectMember",
     "ProjectDatasource",
@@ -169,4 +194,9 @@ __all__ = [
     "UserRole", 
     "RolePermission",
     "Permission",
+    # 资源包相关
+    "ResourcePackage",
+    "ResourcePackagePermission",
+    "ResourcePackageQueryHistory",
+    "ResourcePackageTag",
 ]
