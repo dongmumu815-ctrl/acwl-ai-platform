@@ -9,7 +9,7 @@ import sys
 
 # 数据库配置
 DB_CONFIG = {
-    'host': 'localhost',
+    'host': '10.20.1.200',
     'port': 3306,
     'user': 'root',
     'password': 'root123',

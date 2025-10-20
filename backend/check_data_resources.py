@@ -14,7 +14,7 @@ def check_data_resources():
     """检查数据资源表中的记录"""
     try:
         # 使用同步的pymysql连接
-        engine = create_engine('mysql+pymysql://root:2wsx1QAZaczt@localhost:3306/acwl-ai-data')
+        engine = create_engine('mysql+pymysql://root:2wsx1QAZaczt@10.20.1.200:3306/acwl-ai-data')
         SessionLocal = sessionmaker(bind=engine)
         
         with SessionLocal() as db:

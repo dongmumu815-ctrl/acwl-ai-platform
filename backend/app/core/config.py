@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     
     # 数据库配置
     # DB_HOST: str = Field(default="10.20.1.200", description="数据库主机")
-    DB_HOST: str = Field(default="localhost", description="数据库主机")
+    DB_HOST: str = Field(default="10.20.1.200", description="数据库主机")
     DB_PORT: int = Field(default=3306, description="数据库端口")
     DB_USER: str = Field(default="root", description="数据库用户")
     DB_PASSWORD: str = Field(default="2wsx1QAZaczt", description="数据库密码")
@@ -51,8 +51,8 @@ class Settings(BaseSettings):
     REDIS_DB: int = Field(default=0, description="Redis数据库")
     
     # Celery配置
-    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/1", description="Celery代理URL")
-    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/2", description="Celery结果后端")
+    CELERY_BROKER_URL: str = Field(default="redis://10.20.1.200:6379/1", description="Celery代理URL")
+    CELERY_RESULT_BACKEND: str = Field(default="redis://10.20.1.200:6379/2", description="Celery结果后端")
     
     # 文件存储配置
     UPLOAD_DIR: str = Field(default="uploads", description="上传目录")

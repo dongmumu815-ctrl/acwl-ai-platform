@@ -129,7 +129,7 @@ class MultiDatabaseConfig:
         primary_db = DatabaseConfig(
             name="primary",
             type=DatabaseType.MYSQL,
-            host=os.getenv("DB_HOST", "localhost"),
+            host=os.getenv("DB_HOST", "10.20.1.200"),
             port=int(os.getenv("DB_PORT", "3306")),
             username=os.getenv("DB_USER", "root"),
             password=os.getenv("DB_PASSWORD", "2wsx1QAZaczt"),

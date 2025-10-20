@@ -14,7 +14,7 @@ def run_migration():
     """
     # 数据库连接配置
     config = {
-        'host': 'localhost',
+        'host': '10.20.1.200',
         'port': 3306,
         'user': 'root',
         'password': '2wsx1QAZaczt',

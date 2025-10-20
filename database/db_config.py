@@ -33,7 +33,7 @@ class DatabaseConfig:
         load_env_file(env_file)
         
         # 从环境变量读取配置，如果没有则使用默认值
-        self.DB_HOST = os.getenv('DB_HOST', 'localhost')
+        self.DB_HOST = os.getenv('DB_HOST', '10.20.1.200')
         self.DB_PORT = int(os.getenv('DB_PORT', '3306'))
         self.DB_USER = os.getenv('DB_USER', 'root')
         self.DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')

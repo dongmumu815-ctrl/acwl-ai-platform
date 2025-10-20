@@ -3,7 +3,7 @@
     "primary": {
       "name": "primary",
       "type": "mysql",
-      "host": "localhost",
+      "host": "10.20.1.200",
       "port": 3306,
       "username": "root",
       "password": "2wsx1QAZaczt",
@@ -39,7 +39,7 @@
     "analytics": {
       "name": "analytics",
       "type": "mysql",
-      "host": "localhost",
+      "host": "10.20.1.200",
       "port": 3306,
       "username": "root",
       "password": "2wsx1QAZaczt",
@@ -57,7 +57,7 @@
     "logs": {
       "name": "logs",
       "type": "mysql",
-      "host": "localhost",
+      "host": "10.20.1.200",
       "port": 3306,
       "username": "root",
       "password": "2wsx1QAZaczt",

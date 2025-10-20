@@ -349,6 +349,38 @@ const authRoutes: RouteRecordRaw[] = [
   //   ]
   // },
   {
+    path: '/resource-center',
+    component: Layout,
+    redirect: '/resource-center/table-management',
+    meta: {
+      title: '资源中心管理',
+      icon: 'Setting',
+      requiresAuth: true
+    },
+    children: [
+      {
+        path: 'table-management',
+        name: 'CenterTableManagement',
+        component: () => import('@/views/resourceCenter/CenterTableManagement.vue'),
+        meta: {
+          title: '中心表管理',
+          icon: 'Grid',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'table-query',
+        name: 'CenterTableQuery',
+        component: () => import('@/views/resourceCenter/CenterTableQuery.vue'),
+        meta: {
+          title: '中心表查询',
+          icon: 'Search',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
     path: '/api-management',
     component: Layout,
     redirect: '/api-management/customers',
