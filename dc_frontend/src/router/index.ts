@@ -377,6 +377,16 @@ const authRoutes: RouteRecordRaw[] = [
           icon: 'Search',
           requiresAuth: true
         }
+      },
+      {
+        path: 'type-management',
+        name: 'ResourceTypeManagement',
+        component: () => import('@/views/resourceCenter/ResourceTypeManagement.vue'),
+        meta: {
+          title: '资源类型管理',
+          icon: 'Collection',
+          requiresAuth: true
+        }
       }
     ]
   },
