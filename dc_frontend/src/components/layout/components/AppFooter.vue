@@ -3,7 +3,7 @@
     <div class="footer-content">
       <div class="footer-left">
         <div class="copyright">
-          <span>© 2024 ACWL AI 数据平台. All rights reserved.</span>
+          <span>© 2025 ACWL AI 数据平台. All rights reserved.</span>
         </div>
         <div class="links">
           <a href="#" class="footer-link">隐私政策</a>

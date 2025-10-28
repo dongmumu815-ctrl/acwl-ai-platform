@@ -633,6 +633,7 @@ onMounted(() => {
 <style scoped>
 .datasource-container {
   padding: 20px;
+  background: var(--el-bg-color-page);
 }
 
 .page-header {

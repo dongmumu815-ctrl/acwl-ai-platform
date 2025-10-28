@@ -1,51 +1,44 @@
 <template>
   <div class="app-layout" :class="{ 'is-dark': isDark }">
     <!-- 侧边栏 -->
-    <div 
-      class="sidebar" 
-      :class="{ 'is-collapsed': isCollapsed }"
-    >
+    <div class="sidebar" :class="{ 'is-collapsed': isCollapsed }">
       <div class="sidebar-header">
         <div class="logo">
-          <img 
-            v-if="!isCollapsed" 
-            :src="logoUrl" 
-            alt="数据资源中心" 
+          <img
+            v-if="!isCollapsed"
+            :src="logoUrl"
+            alt="数据资源中心"
             class="logo-img"
-          >
-          <img 
-            v-else 
-            :src="logoUrl" 
-            alt="DRC" 
-            class="logo-img-mini"
-          >
+          />
+          <img v-else :src="logoUrl" alt="DRC" class="logo-img-mini" />
           <span v-if="!isCollapsed" class="logo-text">数据资源中心</span>
         </div>
       </div>
-      
+
       <div class="sidebar-content">
         <SidebarMenu :collapsed="isCollapsed" />
       </div>
     </div>
-    
+
     <!-- 移动端遮罩层（侧边栏展开时显示） -->
-    <div class="sidebar-overlay" v-if="showOverlay" @click="toggleSidebar"></div>
-    
+    <div
+      class="sidebar-overlay"
+      v-if="showOverlay"
+      @click="toggleSidebar"
+    ></div>
+
     <!-- 主内容区域 -->
     <div class="main-container">
       <!-- 顶部导航栏 -->
       <div class="header">
-        <AppHeader 
-          :collapsed="isCollapsed" 
-          @toggle-sidebar="toggleSidebar"
-        />
+        <AppHeader :collapsed="isCollapsed" @toggle-sidebar="toggleSidebar" />
       </div>
-      
+
       <!-- 面包屑导航 -->
-      <div class="breadcrumb-container" v-if="showBreadcrumb">
+      <!-- <div class="breadcrumb-container" v-if="showBreadcrumb">
         <Breadcrumb />
-      </div>
-      
+      </div> -->
+
       <!-- 页面内容 -->
       <div class="content">
         <router-view v-slot="{ Component, route }">
@@ -56,133 +49,133 @@
           </transition>
         </router-view>
       </div>
-      
+
       <!-- 底部 -->
       <div class="footer" v-if="showFooter">
         <AppFooter />
       </div>
     </div>
-    
+
     <!-- 设置面板 -->
-    <SettingsPanel 
+    <SettingsPanel
       v-model:modelValue="showSettings"
-      @settings-change="handleSettingsChange" 
+      @settings-change="handleSettingsChange"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { useAppStore } from '@/stores/app'
-import { useUserStore } from '@/stores/user'
-import SidebarMenu from './components/SidebarMenu.vue'
-import AppHeader from './components/AppHeader.vue'
-import AppFooter from './components/AppFooter.vue'
-import Breadcrumb from './components/Breadcrumb.vue'
-import SettingsPanel from './components/SettingsPanel.vue'
-import logoUrl from '@/assets/logo2.png'
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useRoute } from "vue-router";
+import { useAppStore } from "@/stores/app";
+import { useUserStore } from "@/stores/user";
+import SidebarMenu from "./components/SidebarMenu.vue";
+import AppHeader from "./components/AppHeader.vue";
+import AppFooter from "./components/AppFooter.vue";
+import Breadcrumb from "./components/Breadcrumb.vue";
+import SettingsPanel from "./components/SettingsPanel.vue";
+import logoUrl from "@/assets/logo2.png";
 
 /**
  * 布局组件
  * 提供应用的整体布局结构
  */
 
-const route = useRoute()
-const appStore = useAppStore()
-const userStore = useUserStore()
+const route = useRoute();
+const appStore = useAppStore();
+const userStore = useUserStore();
 
 // 响应式状态
-const showSettings = ref(false)
-const isMobile = ref(false)
+const showSettings = ref(false);
+const isMobile = ref(false);
 
 // 计算属性
-const isCollapsed = computed(() => appStore.sidebar.collapsed)
-const isDark = computed(() => appStore.theme === 'dark')
+const isCollapsed = computed(() => appStore.sidebar.collapsed);
+const isDark = computed(() => appStore.theme === "dark");
 const showBreadcrumb = computed(() => {
-  return !route.meta?.hideBreadcrumb && route.name !== 'Dashboard'
-})
+  return !route.meta?.hideBreadcrumb && route.name !== "Dashboard";
+});
 const showFooter = computed(() => {
-  return !route.meta?.hideFooter
-})
+  return !route.meta?.hideFooter;
+});
 
 // 需要缓存的组件
 const keepAliveComponents = computed(() => {
-  return appStore.cachedViews
-})
+  return appStore.cachedViews;
+});
 
 // 移动端遮罩显示逻辑
-const showOverlay = computed(() => isMobile.value && !isCollapsed.value)
+const showOverlay = computed(() => isMobile.value && !isCollapsed.value);
 
 /**
  * 切换侧边栏折叠状态
  */
 const toggleSidebar = (): void => {
-  appStore.toggleSidebar()
-}
+  appStore.toggleSidebar();
+};
 
 /**
  * 处理窗口大小变化
  */
 const handleResize = (): void => {
-  const width = window.innerWidth
-  isMobile.value = width < 768
-  
+  const width = window.innerWidth;
+  isMobile.value = width < 768;
+
   if (width < 768) {
     // 移动端自动折叠侧边栏
     if (!isCollapsed.value) {
-      appStore.toggleSidebar()
+      appStore.toggleSidebar();
     }
   }
-}
+};
 
 /**
  * 监听键盘快捷键
  */
 const handleKeydown = (event: KeyboardEvent): void => {
   // Ctrl/Cmd + K 打开搜索
-  if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
-    event.preventDefault()
+  if ((event.ctrlKey || event.metaKey) && event.key === "k") {
+    event.preventDefault();
     // TODO: 打开全局搜索
   }
-  
+
   // Ctrl/Cmd + , 打开设置
-  if ((event.ctrlKey || event.metaKey) && event.key === ',') {
-    event.preventDefault()
-    showSettings.value = true
+  if ((event.ctrlKey || event.metaKey) && event.key === ",") {
+    event.preventDefault();
+    showSettings.value = true;
   }
-}
+};
 
 /**
  * 设置变更回调（可接入持久化或状态同步）
  */
 const handleSettingsChange = (settings: any): void => {
   // 这里可根据设置更新 appStore 或主题变量
-}
+};
 
 // 生命周期
 onMounted(() => {
-  window.addEventListener('resize', handleResize)
-  window.addEventListener('keydown', handleKeydown)
-  
+  window.addEventListener("resize", handleResize);
+  window.addEventListener("keydown", handleKeydown);
+
   // 初始化检查窗口大小
-  handleResize()
-})
+  handleResize();
+});
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-  window.removeEventListener('keydown', handleKeydown)
-})
+  window.removeEventListener("resize", handleResize);
+  window.removeEventListener("keydown", handleKeydown);
+});
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/variables.scss';
+@use "@/styles/variables.scss" as *;
 
 .app-layout {
   display: flex;
   height: 100vh;
-  background-color: var(--el-bg-color-page);
-  
+  // background-color: var(--el-bg-color-page);
+
   &.is-dark {
     background-color: var(--el-bg-color-page);
   }
@@ -201,11 +194,11 @@ onUnmounted(() => {
   left: 0;
   height: 100vh;
   z-index: 1001;
-  
+
   &.is-collapsed {
     width: $sidebar-collapsed-width;
   }
-  
+
   .sidebar-header {
     height: $header-height;
     display: flex;
@@ -216,7 +209,7 @@ onUnmounted(() => {
     position: sticky;
     top: 0;
     z-index: 2;
-    
+
     .logo {
       display: flex;
       align-items: center;
@@ -225,18 +218,18 @@ onUnmounted(() => {
       border-radius: $border-radius-lg;
       cursor: pointer;
       transition: background-color 0.3s ease, opacity 0.3s ease;
-      
+
       &:hover {
         background-color: var(--el-fill-color-light);
       }
-      
+
       .logo-img,
       .logo-img-mini {
         width: 32px;
         height: 32px;
         object-fit: contain;
       }
-      
+
       .logo-text {
         font-size: 18px;
         font-weight: 600;
@@ -246,25 +239,24 @@ onUnmounted(() => {
       }
     }
   }
-  
+
   .sidebar-content {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: hidden;
     overflow-x: hidden;
-    padding: 8px 4px;
-    
+
     &::-webkit-scrollbar {
       width: 6px;
     }
-    
+
     &::-webkit-scrollbar-track {
       background: transparent;
     }
-    
+
     &::-webkit-scrollbar-thumb {
       background-color: var(--el-border-color);
       border-radius: 3px;
-      
+
       &:hover {
         background-color: var(--el-border-color-dark);
       }
@@ -292,29 +284,28 @@ onUnmounted(() => {
 }
 
 .breadcrumb-container {
-  padding: 12px 16px;
+  padding: 5px 16px;
   background-color: var(--el-bg-color);
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .content {
   flex: 1;
-  padding: 16px;
   overflow-y: auto;
-  background-color: var(--el-bg-color-page);
-  
+  // background-color: var(--el-bg-color-page);
+
   &::-webkit-scrollbar {
     width: 8px;
   }
-  
+
   &::-webkit-scrollbar-track {
-    background: var(--el-bg-color-page);
+    // background: var(--el-bg-color-page);
   }
-  
+
   &::-webkit-scrollbar-thumb {
     background-color: var(--el-border-color);
     border-radius: 4px;
-    
+
     &:hover {
       background-color: var(--el-border-color-dark);
     }
@@ -370,16 +361,16 @@ onUnmounted(() => {
     left: 0;
     height: 100vh;
     z-index: 1001;
-    
+
     &.is-collapsed {
       transform: translateX(-100%);
     }
   }
-  
+
   .main-container {
     margin-left: 0;
   }
-  
+
   .content {
     padding: 12px;
   }
@@ -389,9 +380,9 @@ onUnmounted(() => {
   .content {
     padding: 8px;
   }
-  
+
   .breadcrumb-container {
-    padding: 8px 12px;
+    padding: 3px 12px;
   }
 }
 </style>

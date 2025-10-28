@@ -44,6 +44,13 @@ export default defineConfig({
       }
     }
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern-compiler', // 使用新的 Sass API
+      },
+    },
+  },
   build: {
     outDir: resolve(__dirname, '../backend/ui'),
     emptyOutDir: false,
