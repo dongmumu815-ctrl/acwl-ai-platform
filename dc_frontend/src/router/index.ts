@@ -63,16 +63,16 @@ const authRoutes: RouteRecordRaw[] = [
           keepAlive: true
         }
       },
-      {
-        path: 'statistics',
-        name: 'Statistics',
-        component: () => import('@/views/statistics/Statistics.vue'),
-        meta: {
-          title: '数据统计',
-          icon: 'TrendCharts',
-          requiresAuth: true
-        }
-      }
+      // {
+      //   path: 'statistics',
+      //   name: 'Statistics',
+      //   component: () => import('@/views/statistics/Statistics.vue'),
+      //   meta: {
+      //     title: '数据统计',
+      //     icon: 'TrendCharts',
+      //     requiresAuth: true
+      //   }
+      // }
     ]
   },
   {
@@ -431,6 +431,17 @@ const authRoutes: RouteRecordRaw[] = [
           activeMenu: '/api-management/apis'
         }
       },
+      {
+        path: 'apis/:id/logs',
+        name: 'ApiUsageLogs',
+        component: () => import('@/views/apiManagement/ApiUsageLogs.vue'),
+        meta: {
+          title: 'API日志',
+          requiresAuth: true,
+          hideInMenu: true,
+          activeMenu: '/api-management/apis'
+        }
+      },
       // {
       //   path: 'batches',
       //   name: 'BatchManagement',
@@ -492,6 +503,40 @@ const authRoutes: RouteRecordRaw[] = [
 /**
  * 创建路由实例
  */
+// 添加日志管理 - 用户操作日志菜单
+authRoutes.push({
+  path: '/logs',
+  component: Layout,
+  redirect: '/logs/user-operation-logs',
+  meta: {
+    title: '日志管理',
+    icon: 'Document',
+    requiresAuth: true
+  },
+  children: [
+    {
+      path: 'user-operation-logs',
+      name: 'UserOperationLogs',
+      component: () => import('@/views/userOperationLogs/index.vue'),
+      meta: {
+        title: '用户操作日志',
+        icon: 'List',
+        requiresAuth: true
+      }
+    },
+    {
+      path: 'data-upload-logs',
+      name: 'DataUploadLogs',
+      component: () => import('@/views/dataUploadLogs/index.vue'),
+      meta: {
+        title: '数据上传日志',
+        icon: 'UploadFilled',
+        requiresAuth: true
+      }
+    }
+  ]
+})
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [

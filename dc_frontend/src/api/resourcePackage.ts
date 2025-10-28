@@ -129,8 +129,20 @@ export interface ResourcePackage {
   created_by: number
   created_at: string
   updated_at: string
+  // 新增：生成与下载时间/路径
+  download_time?: string
+  download_url?: string
+  excel_time?: string
   tags: ResourcePackageTag[]
   permissions: ResourcePackagePermission[]
+}
+
+// 历史文件接口
+export interface ResourcePackageFile {
+  id: number
+  filename: string
+  object_path: string
+  generated_at: string
 }
 
 // 创建资源包请求接口
@@ -264,6 +276,20 @@ export const resourcePackageApi = {
   },
 
   /**
+   * 生成Excel（更新excel_time与download_url）
+   */
+  generateExcel(id: number, payload: Record<string, any>): Promise<ApiResponse<any>> {
+    return post(`/resource-packages/${id}/generate-excel`, payload)
+  },
+
+  /**
+   * 下载最新资源包（更新download_time）
+   */
+  downloadLatest(id: number): Promise<ApiResponse<any>> {
+    return post(`/resource-packages/${id}/download-latest`, {})
+  },
+
+  /**
    * 安全查询资源包数据 - 增强安全性版本
    * 专为ResourcePackageQueryPage.vue页面设计
    */
@@ -285,6 +311,20 @@ export const resourcePackageApi = {
     return get(`/resource-packages/${id}/history`, {
       page, size
     })
+  },
+
+  /**
+   * 列出历史Excel文件
+   */
+  listFiles(id: number, page: number = 1, size: number = 20): Promise<ApiResponse<{ items: ResourcePackageFile[]; total: number; page: number; size: number }>> {
+    return get(`/resource-packages/${id}/files`, { page, size })
+  },
+
+  /**
+   * 下载指定历史文件（返回预签名URL）
+   */
+  downloadFile(id: number, fileId: number): Promise<ApiResponse<{ download_url: string; filename: string; object_path: string }>> {
+    return post(`/resource-packages/${id}/files/${fileId}/download`, {})
   }
 }
 

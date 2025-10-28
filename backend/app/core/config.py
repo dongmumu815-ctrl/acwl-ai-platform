@@ -28,8 +28,8 @@ class Settings(BaseSettings):
     # 安全配置
     SECRET_KEY: str = Field(default="acwl-ai-secret-key-change-in-production", description="密钥")
     ALGORITHM: str = Field(default="HS256", description="JWT算法")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="访问令牌过期时间(分钟)")
-    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, description="刷新令牌过期时间(天)")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=1440, description="访问令牌过期时间(分钟)")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="刷新令牌过期时间(天)")
     
     # CORS配置
     ALLOWED_HOSTS: List[str] = Field(default=["*"], description="允许的主机")
@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     # DB_PASSWORD: str = Field(default="12345678", description="数据库密码")
     DB_NAME: str = Field(default="acwl-ai-data", description="数据库名称")
     DB_CHARSET: str = Field(default="utf8mb4", description="数据库字符集")
+    
+    # Doris配置（用于数据上传日志展示）
+    DORIS_HOST: str = Field(default=os.getenv("DORIS_HOST", "10.20.1.201"), description="Doris主机")
+    DORIS_PORT: int = Field(default=int(os.getenv("DORIS_PORT", "9030")), description="Doris查询端口")
+    DORIS_USER: str = Field(default=os.getenv("DORIS_USER", "root"), description="Doris用户")
+    DORIS_PASSWORD: str = Field(default=os.getenv("DORIS_PWD", "2wsx1QAZaczt"), description="Doris密码")
+    DORIS_DATABASE: str = Field(default=os.getenv("DORIS_DB", "cepiec-logs"), description="Doris数据库")
     
     # Redis配置
     REDIS_HOST: str = Field(default="10.20.1.200", description="Redis主机")
@@ -81,6 +88,14 @@ class Settings(BaseSettings):
     
     # 缓存配置
     CACHE_TTL: int = Field(default=3600, description="缓存TTL(秒)")
+    
+    # MinIO配置
+    MINIO_ENDPOINT: str = Field(default="10.20.1.200:9000", description="MinIO服务地址")
+    MINIO_ACCESS_KEY: str = Field(default="acwl", description="MinIO访问密钥")
+    MINIO_SECRET_KEY: str = Field(default="1qaz2WSXaczt", description="MinIO秘密密钥")
+    MINIO_SECURE: bool = Field(default=False, description="是否使用HTTPS")
+    MINIO_BUCKET_NAME: str = Field(default="cepiec-read-data", description="存储桶名称")
+    MINIO_REGION: str = Field(default="us-east-1", description="区域设置")
     
     # GPU配置
     ENABLE_GPU_MONITORING: bool = Field(default=True, description="启用GPU监控")

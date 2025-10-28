@@ -29,7 +29,7 @@ export const listResourceTypes = (
   return get<ResourceTypeListResponse>(`${BASE}/list`, { page, page_size, name })
 }
 
-export const getResourceType = (id: number): Promise<ApiResponse<ResourceTypeItem>> => {
+export const getResourceType = (id: string): Promise<ApiResponse<ResourceTypeItem>> => {
   return get<ResourceTypeItem>(`${BASE}/${id}`)
 }
 
@@ -37,10 +37,10 @@ export const createResourceType = (data: CreatePayload): Promise<ApiResponse<Res
   return post<ResourceTypeItem>(`${BASE}/create`, data)
 }
 
-export const updateResourceType = (id: number, data: UpdatePayload): Promise<ApiResponse<ResourceTypeItem>> => {
+export const updateResourceType = (id: string, data: UpdatePayload): Promise<ApiResponse<ResourceTypeItem>> => {
   return put<ResourceTypeItem>(`${BASE}/${id}`, data)
 }
 
-export const deleteResourceType = (id: number): Promise<ApiResponse<void>> => {
+export const deleteResourceType = (id: string): Promise<ApiResponse<void>> => {
   return del<void>(`${BASE}/${id}`)
 }

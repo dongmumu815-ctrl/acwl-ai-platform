@@ -6,6 +6,7 @@ API v1 模块初始化
 
 from fastapi import APIRouter
 from . import multi_database
+from .endpoints import user_operation_logs
 
 # 创建API v1路由器
 api_router = APIRouter()
@@ -17,5 +18,9 @@ api_router.include_router(
     tags=["多数据库管理"]
 )
 
-# 如果有其他路由模块，也可以在这里包含
-# api_router.include_router(other_router, prefix="/other", tags=["其他"])
+# 包含用户操作日志路由
+api_router.include_router(
+    user_operation_logs.router,
+    prefix="/user-operation-logs",
+    tags=["用户操作日志"]
+)

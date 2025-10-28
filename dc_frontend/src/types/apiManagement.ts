@@ -67,6 +67,7 @@ export interface CustomApi {
   updated_at: string
   customer?: Customer
   fields?: ApiField[]
+  resource_type_id?: string
 }
 
 /**
@@ -76,10 +77,14 @@ export interface CustomApiCreate {
   customer_id: number
   api_name: string
   api_code: string
-  description?: string
+  api_description?: string
   http_method: string
-  request_format?: 'json' | 'form' | 'xml'
-  response_format?: 'json' | 'xml' | 'text'
+  response_format: 'json' | 'xml' | 'text'
+  status?: boolean
+  rate_limit?: number
+  require_authentication?: boolean
+  link_read_id?: string | number
+  resource_type_id?: string
 }
 
 /**
@@ -87,10 +92,11 @@ export interface CustomApiCreate {
  */
 export interface CustomApiUpdate {
   api_name?: string
-  description?: string
+  api_description?: string
   http_method?: string
   request_format?: 'json' | 'form' | 'xml'
   response_format?: 'json' | 'xml' | 'text'
+  resource_type_id?: string
   is_active?: boolean
 }
 
@@ -103,10 +109,12 @@ export interface ApiField {
   field_name: string
   field_type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object'
   is_required: boolean
+  // 是否上传：1 为勾选，0 为不勾选
+  is_upload?: number
   default_value?: string
   description?: string
   validation_rules?: string
-  field_order: number
+  sort_order: number
   created_at: string
   updated_at: string
 }
@@ -118,10 +126,12 @@ export interface ApiFieldCreate {
   field_name: string
   field_type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object'
   is_required?: boolean
+  // 是否上传：1 为勾选，0 为不勾选
+  is_upload?: number
   default_value?: string
   description?: string
   validation_rules?: string
-  field_order?: number
+  sort_order?: number
 }
 
 /**
@@ -131,10 +141,12 @@ export interface ApiFieldUpdate {
   field_name?: string
   field_type?: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object'
   is_required?: boolean
+  // 是否上传：1 为勾选，0 为不勾选
+  is_upload?: number
   default_value?: string
   description?: string
   validation_rules?: string
-  field_order?: number
+  sort_order?: number
 }
 
 /**
@@ -272,6 +284,16 @@ export interface PaginationParams {
   status?: string
   start_date?: string
   end_date?: string
+}
+
+/**
+ * 资源类型信息
+ */
+export interface ResourceType {
+  id: string
+  name: string
+  describe?: string
+  metadata?: any
 }
 
 /**

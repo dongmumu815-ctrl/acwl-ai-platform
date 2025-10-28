@@ -1322,18 +1322,38 @@ const buildVisualQuery = () => {
     
     let clause = {}
     
+    // 获取字段信息，判断是否需要添加 .keyword 后缀
+    const fieldInfo = esQueryConfig.availableFields.find(f => f.name === condition.field)
+    let fieldName = condition.field
+    
+    // 对于 text 类型字段，在 term 查询时自动添加 .keyword 后缀
+    if (fieldInfo && fieldInfo.type === 'text' && condition.operator === 'term') {
+      fieldName = `${condition.field}.keyword`
+      console.log(`🔧 为 text 字段 ${condition.field} 的 term 查询添加 .keyword 后缀: ${fieldName}`)
+    }
+    
     switch (condition.operator) {
       case 'term':
-        clause = { term: { [condition.field]: condition.value } }
+        clause = { term: { [fieldName]: condition.value } }
         break
       case 'match':
         clause = { match: { [condition.field]: condition.value } }
         break
       case 'prefix':
-        clause = { prefix: { [condition.field]: condition.value } }
+        // prefix 查询对 text 字段也需要使用 .keyword 后缀
+        if (fieldInfo && fieldInfo.type === 'text') {
+          fieldName = `${condition.field}.keyword`
+          console.log(`🔧 为 text 字段 ${condition.field} 的 prefix 查询添加 .keyword 后缀: ${fieldName}`)
+        }
+        clause = { prefix: { [fieldName]: condition.value } }
         break
       case 'wildcard':
-        clause = { wildcard: { [condition.field]: condition.value } }
+        // wildcard 查询对 text 字段也需要使用 .keyword 后缀
+        if (fieldInfo && fieldInfo.type === 'text') {
+          fieldName = `${condition.field}.keyword`
+          console.log(`🔧 为 text 字段 ${condition.field} 的 wildcard 查询添加 .keyword 后缀: ${fieldName}`)
+        }
+        clause = { wildcard: { [fieldName]: condition.value } }
         break
       case 'exists':
         clause = { exists: { field: condition.field } }
@@ -1378,9 +1398,21 @@ const buildVisualQuery = () => {
   
   // 添加排序
   if (visualQuery.sorts.length > 0) {
-    query.sort = visualQuery.sorts.map(sort => ({
-      [sort.field]: { order: sort.order }
-    }))
+    query.sort = visualQuery.sorts.map(sort => {
+      // 获取字段信息，判断是否需要添加 .keyword 后缀
+      const fieldInfo = esQueryConfig.availableFields.find(f => f.name === sort.field)
+      let fieldName = sort.field
+      
+      // 对于 text 类型字段，在排序时自动添加 .keyword 后缀
+      if (fieldInfo && fieldInfo.type === 'text') {
+        fieldName = `${sort.field}.keyword`
+        console.log(`🔧 为 text 字段 ${sort.field} 添加 .keyword 后缀: ${fieldName}`)
+      }
+      
+      return {
+        [fieldName]: { order: sort.order }
+      }
+    })
   }
   
   // 添加分页
@@ -1396,6 +1428,16 @@ const buildVisualQuery = () => {
       
       let aggConfig = {}
       
+      // 获取字段信息，判断是否需要添加 .keyword 后缀
+      const fieldInfo = esQueryConfig.availableFields.find(f => f.name === agg.field)
+      let fieldName = agg.field
+      
+      // 对于 text 类型字段，在聚合时自动添加 .keyword 后缀
+      if (fieldInfo && fieldInfo.type === 'text') {
+        fieldName = `${agg.field}.keyword`
+        console.log(`🔧 为 text 字段 ${agg.field} 添加 .keyword 后缀: ${fieldName}`)
+      }
+      
       switch (agg.type) {
         case 'value_count':
         case 'sum':
@@ -1404,14 +1446,14 @@ const buildVisualQuery = () => {
         case 'min':
           aggConfig = {
             [agg.type]: {
-              field: agg.field
+              field: fieldName
             }
           }
           break
         case 'terms':
           aggConfig = {
             terms: {
-              field: agg.field,
+              field: fieldName,
               size: agg.params.size || 10
             }
           }
@@ -1419,7 +1461,7 @@ const buildVisualQuery = () => {
         case 'date_histogram':
           aggConfig = {
             date_histogram: {
-              field: agg.field,
+              field: fieldName,
               calendar_interval: agg.params.calendar_interval || '1d'
             }
           }
@@ -1427,7 +1469,7 @@ const buildVisualQuery = () => {
         case 'histogram':
           aggConfig = {
             histogram: {
-              field: agg.field,
+              field: fieldName,
               interval: agg.params.interval || 1
             }
           }
@@ -1436,7 +1478,7 @@ const buildVisualQuery = () => {
           if (agg.params.ranges && agg.params.ranges.length > 0) {
             aggConfig = {
               range: {
-                field: agg.field,
+                field: fieldName,
                 ranges: agg.params.ranges.map(range => ({
                   from: range.from,
                   to: range.to

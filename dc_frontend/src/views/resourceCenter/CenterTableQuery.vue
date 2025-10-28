@@ -1,14 +1,15 @@
 <template>
   <div class="center-table-query-page">
-    <div class="page-header">
+    <!-- <div class="page-header">
       <h2>中心表查询</h2>
       <el-tag :type="packageData?.type === 'sql' ? 'primary' : 'success'">
         {{ packageData?.type === 'sql' ? 'SQL查询' : 'Elasticsearch' }}
       </el-tag>
-    </div>
+    </div> 
+    -->
 
     <div v-loading="loading" class="page-content">
-      <!-- 资源包信息卡片 -->
+      <!-- 
       <el-card class="package-info-card" v-if="packageData">
         <template #header>
           <div class="card-header">
@@ -48,7 +49,8 @@
             </el-descriptions>
           </div>
         </div>
-      </el-card>
+      </el-card> 
+      -->
 
       <!-- 查询面板（基于包类型） -->
       <SqlPackageQueryPanel v-if="packageData?.type === 'sql' && packageData" :packageData="packageData" />

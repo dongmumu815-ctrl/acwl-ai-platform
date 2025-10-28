@@ -675,3 +675,327 @@ async def get_datasource_table_fields(
         raise
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取表字段列表失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/stats/")
+async def get_elasticsearch_cluster_stats(
+    datasource_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取Elasticsearch集群统计信息
+    
+    - **datasource_id**: 数据源ID
+    
+    返回集群健康、节点、分片和索引总体统计
+    """
+    try:
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"数据源 ID {datasource_id} 不存在")
+        if datasource.datasource_type != DatasourceType.ELASTICSEARCH:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该数据源不是Elasticsearch类型")
+        
+        timeout = datasource.connection_params.get('timeout', 30) if datasource.connection_params else 30
+        max_retries = datasource.connection_params.get('max_retries', 3) if datasource.connection_params else 3
+        
+        from elasticsearch import AsyncElasticsearch
+        
+        if datasource.username and datasource.password:
+            es = AsyncElasticsearch(
+                [{
+                    'scheme': 'http',
+                    'host': datasource.host,
+                    'port': datasource.port
+                }],
+                basic_auth=(datasource.username, datasource.password),
+                request_timeout=timeout,
+                max_retries=max_retries,
+                retry_on_timeout=True,
+                verify_certs=False
+            )
+        else:
+            es = AsyncElasticsearch(
+                [{
+                    'scheme': 'http',
+                    'host': datasource.host,
+                    'port': datasource.port
+                }],
+                request_timeout=timeout,
+                max_retries=max_retries,
+                retry_on_timeout=True,
+                verify_certs=False
+            )
+        
+        try:
+            health = await es.cluster.health()
+            cluster_stats = await es.cluster.stats()
+            indices_stats = cluster_stats.get('indices', {})
+            documents = indices_stats.get('docs', {})
+            store = indices_stats.get('store', {})
+            
+            def format_size(num_bytes: int) -> str:
+                try:
+                    b = int(num_bytes or 0)
+                except Exception:
+                    b = 0
+                for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                    if b < 1024.0:
+                        return f"{b:.1f}{unit}" if unit != 'B' else f"{b}B"
+                    b /= 1024.0
+                return f"{b:.1f}PB"
+            
+            data = {
+                "clusterName": health.get('cluster_name') or cluster_stats.get('cluster_name'),
+                "status": health.get('status'),
+                "nodeCount": health.get('number_of_nodes', 0),
+                "dataNodeCount": health.get('number_of_data_nodes', 0),
+                "activeShards": health.get('active_shards', 0),
+                "relocatingShards": health.get('relocating_shards', 0),
+                "initializingShards": health.get('initializing_shards', 0),
+                "unassignedShards": health.get('unassigned_shards', 0),
+                "indices": {
+                    "count": indices_stats.get('count', 0),
+                    "docsCount": documents.get('count', 0),
+                    "storeSize": format_size(store.get('size_in_bytes', 0))
+                }
+            }
+            return success_response(data=data, message="获取集群统计信息成功")
+        finally:
+            await es.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取集群统计信息失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/tables/")
+async def get_datasource_tables(
+    datasource_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取数据源的表/视图/索引列表
+    
+    - **datasource_id**: 数据源ID
+    
+    对于Elasticsearch：直接返回索引列表
+    对于关系型数据库：需要先通过schemas API获取Schema，再通过schemas/{schema_name}/tables API获取表列表
+    """
+    try:
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"数据源 ID {datasource_id} 不存在")
+        
+        # 根据数据源类型返回不同结果
+        if datasource.datasource_type == DatasourceType.ELASTICSEARCH:
+            # ES直接返回索引列表
+            tables = await service._get_elasticsearch_indices(datasource)
+            return {"success": True, "data": tables, "message": "获取索引列表成功"}
+        else:
+            # 关系型数据库需要先选择Schema
+            return {
+                "success": False, 
+                "data": [], 
+                "message": "关系型数据库需要先选择Schema，请使用 /api/v1/datasources/{datasource_id}/schemas/ 获取Schema列表，然后使用 /api/v1/datasources/{datasource_id}/schemas/{schema_name}/tables/ 获取表列表"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取表列表失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/schemas/")
+async def get_datasource_schemas(
+    datasource_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取数据源的Schema列表
+    
+    - **datasource_id**: 数据源ID
+    
+    返回数据源中所有可用的Schema信息
+    """
+    try:
+        service = DatasourceService(db)
+        schemas = await service.get_datasource_schemas(datasource_id)
+        
+        return {"success": True, "data": schemas, "message": "获取Schema列表成功"}
+        
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取Schema列表失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/schemas/{schema_name}/tables/")
+async def get_datasource_tables_by_schema(
+    datasource_id: int,
+    schema_name: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取指定数据源指定Schema下的表和视图列表
+    
+    - **datasource_id**: 数据源ID
+    - **schema_name**: Schema名称
+    
+    返回指定Schema中所有可用的表和视图信息
+    """
+    try:
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"数据源 ID {datasource_id} 不存在")
+        
+        # 调用服务层方法获取指定Schema下的表列表
+        tables = await service.get_datasource_tables_by_schema(datasource_id, schema_name)
+        
+        return {"success": True, "data": tables, "message": f"获取Schema '{schema_name}' 下的表列表成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取Schema下表列表失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/schemas/{schema_name}/tables/{table_name}/fields/")
+async def get_datasource_table_fields(
+    datasource_id: int,
+    schema_name: str,
+    table_name: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取指定数据源指定Schema下指定表的字段列表
+    
+    - **datasource_id**: 数据源ID
+    - **schema_name**: Schema名称
+    - **table_name**: 表名称
+    
+    返回指定表中所有字段的详细信息
+    """
+    try:
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"数据源 ID {datasource_id} 不存在")
+        
+        # 调用服务层方法获取指定表的字段列表
+        fields = await service.get_datasource_table_fields(datasource_id, schema_name, table_name)
+        
+        return {"success": True, "data": fields, "message": f"获取表 '{table_name}' 的字段列表成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取表字段列表失败: {str(e)}")
+
+
+@router.get("/{datasource_id}/tables/{index_name}/stats/")
+async def get_elasticsearch_index_stats(
+    datasource_id: int,
+    index_name: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取Elasticsearch指定索引的统计信息
+    
+    - **datasource_id**: 数据源ID
+    - **index_name**: 索引名称
+    
+    返回索引的健康、状态、文档数量、存储大小等信息
+    """
+    try:
+        service = DatasourceService(db)
+        datasource = await service.get_datasource(datasource_id)
+        
+        if not datasource:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"数据源 ID {datasource_id} 不存在")
+        if datasource.datasource_type != DatasourceType.ELASTICSEARCH:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该数据源不是Elasticsearch类型")
+        
+        # 读取连接参数
+        timeout = datasource.connection_params.get('timeout', 30) if datasource.connection_params else 30
+        max_retries = datasource.connection_params.get('max_retries', 3) if datasource.connection_params else 3
+        
+        # 延迟导入，避免非ES路径不必要依赖
+        from elasticsearch import AsyncElasticsearch
+        
+        # 创建ES客户端（适配 8.x）
+        if datasource.username and datasource.password:
+            es = AsyncElasticsearch(
+                [{
+                    'scheme': 'http',
+                    'host': datasource.host,
+                    'port': datasource.port
+                }],
+                basic_auth=(datasource.username, datasource.password),
+                request_timeout=timeout,
+                max_retries=max_retries,
+                retry_on_timeout=True,
+                verify_certs=False
+            )
+        else:
+            es = AsyncElasticsearch(
+                [{
+                    'scheme': 'http',
+                    'host': datasource.host,
+                    'port': datasource.port
+                }],
+                request_timeout=timeout,
+                max_retries=max_retries,
+                retry_on_timeout=True,
+                verify_certs=False
+            )
+        
+        try:
+            # 使用 cat indices 获取统计（JSON 格式）
+            indices = await es.cat.indices(index=index_name, format='json')
+            if not indices:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"索引 {index_name} 不存在")
+            index_info = indices[0]
+            
+            def to_int(v, default=0):
+                try:
+                    return int(v)
+                except Exception:
+                    return default
+            
+            stats = {
+                "health": index_info.get("health"),
+                "status": index_info.get("status"),
+                "index": index_info.get("index"),
+                "uuid": index_info.get("uuid"),
+                "pri": to_int(index_info.get("pri")),
+                "rep": to_int(index_info.get("rep")),
+                # 兼容不同版本字段命名
+                "docsCount": to_int(index_info.get("docs.count", index_info.get("docs"))),
+                "docsDeleted": to_int(index_info.get("docs.deleted")),
+                "storeSize": index_info.get("store.size"),
+                "priStoreSize": index_info.get("pri.store.size")
+            }
+            
+            return success_response(data=stats, message="获取索引统计信息成功")
+        finally:
+            await es.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"获取索引统计信息失败: {str(e)}")

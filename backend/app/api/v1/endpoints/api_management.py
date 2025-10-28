@@ -10,10 +10,11 @@ API管理端点
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, text
 from sqlalchemy.orm import selectinload, joinedload
 from datetime import datetime, timedelta
 import uuid
+import json
 
 from app.core.database import get_db
 from app.core.response import success_response
@@ -21,9 +22,10 @@ from app.api.v1.endpoints.auth import get_current_active_user
 from app.models.user import User
 from app.core.security import get_password_hash
 from app.schemas.common import PaginatedResponse
-from app.schemas.api import CustomApiCopy, CustomApiResponse, ApiFieldUpdate, ApiFieldCreate
+from app.schemas.api import CustomApiCopy, CustomApiResponse, ApiFieldUpdate, ApiFieldCreate, CustomApiUpdate
 from app.core.multi_db_manager import get_db_session
 from app.models.api_management import Customer, CustomApi, ApiField, DataBatch, ApiUsageLog, DataUpload
+from app.models.resource_type import DataResourceType
 from app.core.config import settings
 import redis
 
@@ -528,6 +530,7 @@ async def get_apis(
                     "http_method": api.http_method,
                     "request_format": getattr(api, 'request_format', 'json'),  # 安全访问
                     "response_format": api.response_format,
+                    "resource_type_id": getattr(api, 'resource_type_id', None),
                     "is_active": api.status == 1,        # 正确的状态转换
                     "total_calls": api.total_calls or 0,
                     "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,
@@ -578,6 +581,9 @@ async def get_api(
             if not api:
                 raise HTTPException(status_code=404, detail="API不存在")
             
+            # 刷新数据以确保获取最新值
+            await api_db.refresh(api)
+            
             # 构建返回数据
             api_data = {
                 "id": api.id,
@@ -589,6 +595,7 @@ async def get_api(
                 "http_method": api.http_method,
                 "request_format": getattr(api, 'request_format', 'json'),
                 "response_format": api.response_format,
+                "resource_type_id": getattr(api, 'resource_type_id', None),
                 "is_active": api.status == 1,
                 "total_calls": api.total_calls or 0,
                 "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,
@@ -616,27 +623,32 @@ async def get_api(
 
 @router.post("/apis", summary="创建API")
 async def create_api(
-    customer_id: int = Form(...),
-    api_name: str = Form(...),
-    api_code: str = Form(...),
-    description: Optional[str] = Form(None),
-    http_method: str = Form("POST"),  # 默认值：POST
-    request_format: str = Form("json"),  # 默认值：json
-    response_format: str = Form("json"),  # 默认值：json
+    api_data: dict = Body(...),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
     创建API
     
-    默认配置：
-    - 请求方法：POST
-    - 请求格式：json
-    - 响应格式：json
+    接收JSON格式的API创建数据，如果指定了resource_type_id，
+    会自动从资源类型的metadata字段中解析并创建API字段
     """
     
     try:
         async for api_db in get_db_session(db_name="api_system"):
+            # 从请求体中提取数据
+            customer_id = api_data.get("customer_id")
+            api_name = api_data.get("api_name")
+            api_code = api_data.get("api_code")
+            api_description = api_data.get("api_description")
+            http_method = api_data.get("http_method", "POST")
+            response_format = api_data.get("response_format", "json")
+            resource_type_id = api_data.get("resource_type_id")
+            
+            # 验证必需字段
+            if not all([customer_id, api_name, api_code]):
+                raise HTTPException(status_code=422, detail="缺少必需字段: customer_id, api_name, api_code")
+            
             # 检查客户是否存在
             customer_query = select(Customer).where(Customer.id == customer_id)
             customer_result = await api_db.execute(customer_query)
@@ -650,11 +662,11 @@ async def create_api(
                 customer_id=customer_id,
                 api_name=api_name,
                 api_code=api_code,
-                api_description=description,
+                api_description=api_description,
                 api_url=f"/api/custom/{api_code}",
                 http_method=http_method,
-                request_format=request_format,
                 response_format=response_format,
+                resource_type_id=resource_type_id,
                 status=1,  # 默认激活
                 total_calls=0,
                 created_at=datetime.now(),
@@ -665,6 +677,10 @@ async def create_api(
             await api_db.commit()
             await api_db.refresh(new_api)
             
+            # 如果指定了resource_type_id，自动创建字段
+            if resource_type_id:
+                await _create_fields_from_resource_type(api_db, new_api.id, resource_type_id)
+            
             # 构建返回数据
             api_data = {
                 "id": new_api.id,
@@ -674,8 +690,8 @@ async def create_api(
                 "description": new_api.api_description,
                 "endpoint_url": new_api.api_url,
                 "http_method": new_api.http_method,
-                "request_format": new_api.request_format,
                 "response_format": new_api.response_format,
+                "resource_type_id": new_api.resource_type_id,
                 "is_active": new_api.status == 1,
                 "total_calls": new_api.total_calls,
                 "created_at": new_api.created_at.isoformat(),
@@ -700,12 +716,7 @@ async def create_api(
 @router.put("/apis/{api_id}", summary="更新API")
 async def update_api(
     api_id: int,
-    api_name: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    http_method: Optional[str] = Form(None),
-    request_format: Optional[str] = Form(None),
-    response_format: Optional[str] = Form(None),
-    is_active: Optional[bool] = Form(None),
+    update_data: CustomApiUpdate,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -719,6 +730,13 @@ async def update_api(
     """
     
     try:
+        print('11111111111111111111111111111111111111111111111111111111111111')
+        print(f"DEBUG: 接收到的参数 - update_data: {update_data}")
+        if update_data:
+            print(f"DEBUG: update_data 类型: {type(update_data)}")
+            print(f"DEBUG: update_data 内容: {update_data.__dict__ if hasattr(update_data, '__dict__') else 'No __dict__'}")
+            print(f"DEBUG: update_data.api_name: {getattr(update_data, 'api_name', 'ATTR_NOT_FOUND')}")
+            print(f"DEBUG: update_data.api_description: {getattr(update_data, 'api_description', 'ATTR_NOT_FOUND')}")
         async for api_db in get_db_session(db_name="api_system"):
             # 查找要更新的API
             query = select(CustomApi).options(joinedload(CustomApi.customer)).where(CustomApi.id == api_id)
@@ -728,25 +746,42 @@ async def update_api(
             if not api:
                 raise HTTPException(status_code=404, detail="API不存在")
             
-            # 更新字段（只更新提供的字段）
-            if api_name is not None:
-                api.api_name = api_name
-            if description is not None:
-                api.api_description = description
-            if http_method is not None:
-                api.http_method = http_method
-            if request_format is not None:
-                api.request_format = request_format
-            if response_format is not None:
-                api.response_format = response_format
-            if is_active is not None:
-                api.status = 1 if is_active else 0
+            # 更新字段（使用JSON Body）
+            print(f"DEBUG: 收到的更新数据: api_name={getattr(update_data, 'api_name', None)}, api_description={getattr(update_data, 'api_description', None)}")
+            print(f"DEBUG: 更新前的值: api_name={api.api_name}, api_description={api.api_description}")
+            
+            if update_data.api_name is not None:
+                print(f"DEBUG: 正在更新 api_name 从 '{api.api_name}' 到 '{update_data.api_name}'")
+                api.api_name = update_data.api_name
+            if update_data.api_description is not None:
+                print(f"DEBUG: 正在更新 api_description 从 '{api.api_description}' 到 '{update_data.api_description}'")
+                api.api_description = update_data.api_description
+            if update_data.http_method is not None:
+                api.http_method = update_data.http_method
+            if update_data.response_format is not None:
+                api.response_format = update_data.response_format
+            if hasattr(update_data, 'request_format') and getattr(update_data, 'request_format') is not None:
+                api.request_format = getattr(update_data, 'request_format')
+            # 支持 is_active 与 status 两种字段
+            if update_data.is_active is not None:
+                api.status = 1 if update_data.is_active else 0
+            elif update_data.status is not None:
+                api.status = 1 if update_data.status else 0
+            if update_data.resource_type_id is not None:
+                api.resource_type_id = update_data.resource_type_id
             
             # 更新时间戳
             api.updated_at = datetime.now()
             
+            print(f"DEBUG: 提交前的值: api_name={api.api_name}, api_description={api.api_description}")
+            
             await api_db.commit()
+            
+            print(f"DEBUG: 提交后，刷新前的值: api_name={api.api_name}, api_description={api.api_description}")
+            
             await api_db.refresh(api)
+            
+            print(f"DEBUG: 刷新后的值: api_name={api.api_name}, api_description={api.api_description}")
             
             # 构建返回数据
             api_data = {
@@ -759,6 +794,7 @@ async def update_api(
                 "http_method": api.http_method,
                 "request_format": getattr(api, 'request_format', 'json'),
                 "response_format": api.response_format,
+                "resource_type_id": getattr(api, 'resource_type_id', None),
                 "is_active": api.status == 1,
                 "total_calls": api.total_calls or 0,
                 "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,
@@ -844,6 +880,7 @@ async def copy_api(
                 response_format=source_api.response_format,
                 require_authentication=source_api.require_authentication,
                 link_read_id=source_api.link_read_id,
+                resource_type_id=getattr(source_api, 'resource_type_id', None),
                 total_calls=0,  # 重置调用次数
                 last_called_at=None,  # 重置最后调用时间
                 created_at=datetime.now(),
@@ -862,6 +899,7 @@ async def copy_api(
                         field_label=source_field.field_label,
                         field_type=source_field.field_type,
                         is_required=source_field.is_required,
+                        is_upload=getattr(source_field, 'is_upload', 1),
                         default_value=source_field.default_value,
                         max_length=source_field.max_length,
                         min_length=source_field.min_length,
@@ -891,6 +929,7 @@ async def copy_api(
                 "http_method": new_api.http_method,
                 "request_format": getattr(new_api, 'request_format', 'json'),
                 "response_format": new_api.response_format,
+                "resource_type_id": getattr(new_api, 'resource_type_id', None),
                 "is_active": new_api.status == 1,
                 "total_calls": new_api.total_calls or 0,
                 "last_called_at": new_api.last_called_at.isoformat() if new_api.last_called_at else None,
@@ -913,6 +952,55 @@ async def copy_api(
         print(f"复制API失败: {e}")
         raise HTTPException(status_code=500, detail=f"复制API失败: {str(e)}")
 
+
+@router.delete("/apis/{api_id}", summary="删除API")
+async def delete_api(
+    api_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    删除API
+    
+    删除指定的API及其相关的字段定义和使用日志
+    """
+    
+    try:
+        async for api_db in get_db_session(db_name="api_system"):
+            # 先检查API是否存在（不加载关联关系避免字段不匹配问题）
+            api_exists_query = select(CustomApi.id).where(CustomApi.id == api_id)
+            api_exists_result = await api_db.execute(api_exists_query)
+            api_exists = api_exists_result.scalar_one_or_none()
+            
+            if not api_exists:
+                raise HTTPException(status_code=404, detail="API不存在")
+            
+            # 1. 先删除相关的使用日志记录（使用原生SQL）
+            try:
+                await api_db.execute(text("DELETE FROM api_usage_logs WHERE api_id = :api_id"), {"api_id": api_id})
+            except Exception as log_delete_error:
+                print(f"删除使用日志时出错（可能表不存在或字段不匹配）: {log_delete_error}")
+                # 继续执行，不因为日志删除失败而中断API删除
+            
+            # 2. 删除相关的字段定义（使用原生SQL）
+            try:
+                await api_db.execute(text("DELETE FROM api_fields WHERE api_id = :api_id"), {"api_id": api_id})
+            except Exception as field_delete_error:
+                print(f"删除API字段时出错: {field_delete_error}")
+            
+            # 3. 删除API本身（使用原生SQL）
+            await api_db.execute(text("DELETE FROM custom_apis WHERE id = :api_id"), {"api_id": api_id})
+            await api_db.commit()
+            
+            return success_response({"id": api_id}, message="API删除成功")
+            break
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"删除API失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除API失败: {str(e)}")
+
 # ==================== 批次管理 ====================
 
 @router.get("/batches", summary="获取批次列表")
@@ -930,24 +1018,24 @@ async def get_batches(
     try:
         async for api_db in get_db_session(db_name="api_system"):
             # 构建查询条件
-            query = select(Batch).options(joinedload(Batch.customer))
+            query = select(DataBatch).options(joinedload(DataBatch.customer))
             
             # 添加搜索条件
             if search:
-                query = query.where(Batch.batch_name.ilike(f"%{search}%"))
+                query = query.where(DataBatch.batch_name.ilike(f"%{search}%"))
             if customer_id:
-                query = query.where(Batch.customer_id == customer_id)
+                query = query.where(DataBatch.customer_id == customer_id)
             if status:
-                query = query.where(Batch.status == status)
+                query = query.where(DataBatch.status == status)
             
             # 获取总数
-            count_query = select(func.count(Batch.id))
+            count_query = select(func.count(DataBatch.id))
             if search:
-                count_query = count_query.where(Batch.batch_name.ilike(f"%{search}%"))
+                count_query = count_query.where(DataBatch.batch_name.ilike(f"%{search}%"))
             if customer_id:
-                count_query = count_query.where(Batch.customer_id == customer_id)
+                count_query = count_query.where(DataBatch.customer_id == customer_id)
             if status:
-                count_query = count_query.where(Batch.status == status)
+                count_query = count_query.where(DataBatch.status == status)
             
             total_result = await api_db.execute(count_query)
             total = total_result.scalar()
@@ -1010,7 +1098,7 @@ async def get_batch(
     try:
         async for api_db in get_db_session(db_name="api_system"):
             # 查询批次详情，包含客户信息
-            query = select(Batch).options(joinedload(Batch.customer)).where(Batch.id == batch_id)
+            query = select(DataBatch).options(joinedload(DataBatch.customer)).where(DataBatch.id == batch_id)
             result = await api_db.execute(query)
             batch = result.scalar_one_or_none()
             
@@ -1079,7 +1167,7 @@ async def create_batch(
                 # 这里可以添加实际的文件保存逻辑
             
             # 创建新批次
-            new_batch = Batch(
+            new_batch = DataBatch(
                 customer_id=customer_id,
                 batch_name=batch_name,
                 description=description,
@@ -1144,10 +1232,8 @@ async def get_system_stats(
             total_customers_result = await api_db.execute(total_customers_query)
             total_customers = total_customers_result.scalar()
             
-            # 统计活跃客户数量
-            active_customers_query = select(func.count(Customer.id)).where(Customer.is_active == True)
-            active_customers_result = await api_db.execute(active_customers_query)
-            active_customers = active_customers_result.scalar()
+            # 统计活跃客户数量（按需求：等于 customers 表总数）
+            active_customers = total_customers
             
             # 统计API数量
             total_apis_query = select(func.count(CustomApi.id))
@@ -1155,31 +1241,31 @@ async def get_system_stats(
             total_apis = total_apis_result.scalar()
             
             # 统计批次数量
-            total_batches_query = select(func.count(Batch.id))
+            total_batches_query = select(func.count(DataBatch.id))
             total_batches_result = await api_db.execute(total_batches_query)
             total_batches = total_batches_result.scalar()
             
             # 统计不同状态的批次数量
-            pending_batches_query = select(func.count(Batch.id)).where(Batch.status == 'pending')
+            pending_batches_query = select(func.count(DataBatch.id)).where(DataBatch.status == 'pending')
             pending_batches_result = await api_db.execute(pending_batches_query)
             pending_batches = pending_batches_result.scalar()
             
-            processing_batches_query = select(func.count(Batch.id)).where(Batch.status == 'processing')
+            processing_batches_query = select(func.count(DataBatch.id)).where(DataBatch.status == 'processing')
             processing_batches_result = await api_db.execute(processing_batches_query)
             processing_batches = processing_batches_result.scalar()
             
-            completed_batches_query = select(func.count(Batch.id)).where(Batch.status == 'completed')
+            completed_batches_query = select(func.count(DataBatch.id)).where(DataBatch.status == 'completed')
             completed_batches_result = await api_db.execute(completed_batches_query)
             completed_batches = completed_batches_result.scalar()
             
-            failed_batches_query = select(func.count(Batch.id)).where(Batch.status == 'failed')
+            failed_batches_query = select(func.count(DataBatch.id)).where(DataBatch.status == 'failed')
             failed_batches_result = await api_db.execute(failed_batches_query)
             failed_batches = failed_batches_result.scalar()
             
-            # 统计总API调用次数
-            total_api_calls_query = select(func.sum(Customer.total_api_calls))
+            # 统计总API调用次数（按需求：custom_apis.total_calls 的总和）
+            total_api_calls_query = select(func.sum(CustomApi.total_calls))
             total_api_calls_result = await api_db.execute(total_api_calls_query)
-            total_api_calls = total_api_calls_result.scalar() or 0
+            total_api_calls = int(total_api_calls_result.scalar() or 0)
             
             stats = {
                 "totalCustomers": total_customers,
@@ -2025,19 +2111,19 @@ async def get_batch_status_stats(
     try:
         async for api_db in get_db_session(db_name="api_system"):
             # 统计不同状态的批次数量
-            pending_query = select(func.count(Batch.id)).where(Batch.status == 'pending')
+            pending_query = select(func.count(DataBatch.id)).where(DataBatch.status == 'pending')
             pending_result = await api_db.execute(pending_query)
             pending_count = pending_result.scalar()
             
-            processing_query = select(func.count(Batch.id)).where(Batch.status == 'processing')
+            processing_query = select(func.count(DataBatch.id)).where(DataBatch.status == 'processing')
             processing_result = await api_db.execute(processing_query)
             processing_count = processing_result.scalar()
             
-            completed_query = select(func.count(Batch.id)).where(Batch.status == 'completed')
+            completed_query = select(func.count(DataBatch.id)).where(DataBatch.status == 'completed')
             completed_result = await api_db.execute(completed_query)
             completed_count = completed_result.scalar()
             
-            failed_query = select(func.count(Batch.id)).where(Batch.status == 'failed')
+            failed_query = select(func.count(DataBatch.id)).where(DataBatch.status == 'failed')
             failed_result = await api_db.execute(failed_query)
             failed_count = failed_result.scalar()
             
@@ -2078,6 +2164,332 @@ async def get_api_call_stats(
         })
     
     return success_response(stats)
+
+@router.get("/stats/type-count-trend", summary="获取数据增长趋势(type_count)")
+async def get_type_count_trend(
+    days: int = Query(90, ge=1, le=365, description="查询天数"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        start_date = datetime.now().date() - timedelta(days=days - 1)
+        dates: List[str] = []
+        series_map: dict = {}
+
+        async for api_db in get_db_session(db_name="primary"):
+            query = text(
+                """
+                SELECT `date`, `type_count`
+                FROM acwl_type_count
+                WHERE `date` >= :start_date
+                ORDER BY `date` ASC
+                """
+            )
+            result = await api_db.execute(query, {"start_date": start_date})
+            rows = result.fetchall()
+
+        for row in rows:
+            d = getattr(row, "date", None)
+            tc = getattr(row, "type_count", None)
+            if d is None and isinstance(row, (tuple, list)):
+                d = row[0]
+                tc = row[1]
+
+            if isinstance(d, datetime):
+                date_str = d.date().isoformat()
+            elif hasattr(d, "isoformat"):
+                date_str = d.isoformat()
+            else:
+                date_str = str(d)
+            dates.append(date_str)
+
+            if isinstance(tc, list):
+                items = tc
+            else:
+                try:
+                    items = json.loads(tc) if tc else []
+                except Exception:
+                    items = []
+
+            current_keys = set()
+            for item in items:
+                key = str(item.get("key", "")).strip()
+                count = int(item.get("doc_count", 0) or 0)
+                current_keys.add(key)
+
+                if key not in series_map:
+                    series_map[key] = [0] * (len(dates) - 1)
+                series_map[key].append(count)
+
+            for existing_key in list(series_map.keys()):
+                if existing_key not in current_keys:
+                    series_map[existing_key].append(0)
+
+        return success_response({"dates": dates, "series": series_map})
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"查询数据增长趋势失败: {e}")
+
+@router.get("/logs/api-usage", summary="获取API使用日志")
+async def get_api_usage_logs(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    api_id: Optional[int] = Query(None, description="API ID"),
+    customer_id: Optional[int] = Query(None, description="客户ID"),
+    status_code: Optional[int] = Query(None, description="HTTP状态码"),
+    search: Optional[str] = Query(None, description="搜索关键词"),
+    start_date: Optional[str] = Query(None, description="开始日期(YYYY-MM-DD或ISO格式)"),
+    end_date: Optional[str] = Query(None, description="结束日期(YYYY-MM-DD或ISO格式)"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取API使用日志，支持过滤和分页（兼容实际表结构）"""
+    try:
+        async for api_db in get_db_session(db_name="api_system"):
+            # 构建过滤条件
+            where_clauses = []
+            params: dict = {
+                "offset": (page - 1) * page_size,
+                "limit": page_size
+            }
+            if api_id:
+                where_clauses.append("l.api_id = :api_id")
+                params["api_id"] = api_id
+            if customer_id:
+                where_clauses.append("l.customer_id = :customer_id")
+                params["customer_id"] = customer_id
+            if status_code:
+                # 映射前端的 status_code 到实际表字段 response_status
+                where_clauses.append("l.response_status = :status_code")
+                params["status_code"] = status_code
+            if search:
+                params["pattern"] = f"%{search}%"
+                where_clauses.append(
+                    "(l.request_url LIKE :pattern OR l.error_message LIKE :pattern OR l.client_ip LIKE :pattern OR l.user_agent LIKE :pattern)"
+                )
+
+            def parse_date(s: Optional[str]) -> Optional[datetime]:
+                if not s:
+                    return None
+                try:
+                    return datetime.fromisoformat(s)
+                except Exception:
+                    try:
+                        return datetime.strptime(s, "%Y-%m-%d")
+                    except Exception:
+                        return None
+            start_dt = parse_date(start_date)
+            end_dt = parse_date(end_date)
+            if start_dt:
+                where_clauses.append("l.created_at >= :start_dt")
+                params["start_dt"] = start_dt
+            if end_dt:
+                where_clauses.append("l.created_at <= :end_dt")
+                params["end_dt"] = end_dt
+
+            where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+            # 统计总数
+            count_sql = text("SELECT COUNT(*) AS cnt FROM api_usage_logs l" + where_sql)
+            total_result = await api_db.execute(count_sql, params)
+            total = total_result.scalar() or 0
+
+            # 查询列表（包含客户与API信息）
+            select_sql = text(
+                """
+                SELECT 
+                  l.id, l.customer_id, l.api_id,
+                  l.request_params, l.response_headers, l.encrypted_data,
+                  l.response_status, l.processing_time, l.client_ip, l.user_agent,
+                  l.error_message, l.created_at,
+                  c.id AS c_id, c.name AS c_name, c.company AS c_company, c.email AS c_email,
+                  a.id AS a_id, a.api_name AS a_api_name, a.api_code AS a_api_code, a.api_url AS a_api_url, a.http_method AS a_http_method
+                FROM api_usage_logs l
+                LEFT JOIN customers c ON l.customer_id = c.id
+                LEFT JOIN custom_apis a ON l.api_id = a.id
+                """ + where_sql + " ORDER BY l.created_at DESC LIMIT :offset, :limit"
+            )
+            rows = await api_db.execute(select_sql, params)
+            results = rows.fetchall()
+
+            items = []
+            import json
+            for r in results:
+                # 处理请求数据与响应数据的展示
+                req_params = getattr(r, "request_params", None)
+                if isinstance(req_params, (dict, list)):
+                    request_data = json.dumps(req_params, ensure_ascii=False)
+                else:
+                    request_data = req_params
+
+                encrypted_data = getattr(r, "encrypted_data", None)
+                response_data = None
+                if encrypted_data is not None:
+                    try:
+                        response_data = str(encrypted_data)
+                        if len(response_data) > 1000:
+                            response_data = response_data[:1000] + "..."
+                    except Exception:
+                        response_data = None
+
+                processing = getattr(r, "processing_time", 0) or 0
+                response_time_ms = int(float(processing) * 1000)
+
+                item = {
+                    "id": getattr(r, "id", None),
+                    "customer_id": getattr(r, "customer_id", None),
+                    "api_id": getattr(r, "api_id", None),
+                    "request_data": request_data,
+                    "response_data": response_data,
+                    "status_code": getattr(r, "response_status", None),
+                    "response_time": response_time_ms,
+                    "ip_address": getattr(r, "client_ip", None),
+                    "user_agent": getattr(r, "user_agent", None),
+                    "error_message": getattr(r, "error_message", None),
+                    "created_at": r.created_at.isoformat() if getattr(r, "created_at", None) else None,
+                    "customer": None,
+                    "api": None
+                }
+
+                if getattr(r, "c_id", None):
+                    item["customer"] = {
+                        "id": getattr(r, "c_id", None),
+                        "name": getattr(r, "c_name", None),
+                        "company": getattr(r, "c_company", None),
+                        "email": getattr(r, "c_email", None)
+                    }
+                if getattr(r, "a_id", None):
+                    item["api"] = {
+                        "id": getattr(r, "a_id", None),
+                        "api_name": getattr(r, "a_api_name", None),
+                        "api_code": getattr(r, "a_api_code", None),
+                        "endpoint_url": getattr(r, "a_api_url", None),
+                        "http_method": getattr(r, "a_http_method", None)
+                    }
+
+                items.append(item)
+
+            total_pages = (total + page_size - 1) // page_size
+            return success_response({
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages
+            })
+    except Exception as e:
+        print(f"获取API使用日志失败: {e}")
+        raise HTTPException(status_code=500, detail="获取API使用日志失败")
+
+@router.get("/logs/data-uploads", summary="获取数据上传记录")
+async def get_data_upload_logs(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    batch_id: Optional[int] = Query(None, description="批次ID"),
+    customer_id: Optional[int] = Query(None, description="客户ID"),
+    upload_status: Optional[str] = Query(None, description="上传状态(uploading/completed/failed)"),
+    search: Optional[str] = Query(None, description="搜索文件名关键词"),
+    start_date: Optional[str] = Query(None, description="开始日期(YYYY-MM-DD或ISO格式)"),
+    end_date: Optional[str] = Query(None, description="结束日期(YYYY-MM-DD或ISO格式)"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取数据上传记录，支持过滤和分页"""
+    try:
+        async for api_db in get_db_session(db_name="api_system"):
+            query = select(DataUpload).options(
+                selectinload(DataUpload.customer),
+                selectinload(DataUpload.batch)
+            )
+            count_query = select(func.count(DataUpload.id))
+
+            conditions = []
+            if batch_id:
+                conditions.append(DataUpload.batch_id == batch_id)
+            if customer_id:
+                conditions.append(DataUpload.customer_id == customer_id)
+            if upload_status:
+                conditions.append(DataUpload.upload_status == upload_status)
+            if search:
+                conditions.append(DataUpload.file_name.like(f"%{search}%"))
+
+            def parse_date(s: Optional[str]) -> Optional[datetime]:
+                if not s:
+                    return None
+                try:
+                    return datetime.fromisoformat(s)
+                except Exception:
+                    try:
+                        return datetime.strptime(s, "%Y-%m-%d")
+                    except Exception:
+                        return None
+            start_dt = parse_date(start_date)
+            end_dt = parse_date(end_date)
+            if start_dt:
+                conditions.append(DataUpload.created_at >= start_dt)
+            if end_dt:
+                conditions.append(DataUpload.created_at <= end_dt)
+
+            if conditions:
+                query = query.where(and_(*conditions))
+                count_query = count_query.where(and_(*conditions))
+
+            total_result = await api_db.execute(count_query)
+            total = total_result.scalar() or 0
+
+            query = query.order_by(DataUpload.created_at.desc())\
+                .offset((page - 1) * page_size)\
+                .limit(page_size)
+            uploads_result = await api_db.execute(query)
+            uploads = uploads_result.scalars().all()
+
+            items = []
+            for up in uploads:
+                item = {
+                    "id": up.id,
+                    "customer_id": up.customer_id,
+                    "batch_id": up.batch_id,
+                    "file_name": up.file_name,
+                    "file_size": up.file_size,
+                    "file_type": up.file_type,
+                    "file_path": up.file_path,
+                    "upload_status": up.upload_status,
+                    "error_message": up.error_message,
+                    "created_at": up.created_at.isoformat() if getattr(up, "created_at", None) else None,
+                    "updated_at": up.updated_at.isoformat() if getattr(up, "updated_at", None) else None
+                }
+                if getattr(up, "customer", None):
+                    item["customer"] = {
+                        "id": getattr(up.customer, "id", None),
+                        "name": getattr(up.customer, "name", None),
+                        "company": getattr(up.customer, "company", None),
+                        "email": getattr(up.customer, "email", None)
+                    }
+                if getattr(up, "batch", None):
+                    item["batch"] = {
+                        "id": getattr(up.batch, "id", None),
+                        "batch_name": getattr(up.batch, "batch_name", None),
+                        "status": getattr(up.batch, "status", None),
+                        "total_records": getattr(up.batch, "total_records", 0),
+                        "processed_records": getattr(up.batch, "processed_records", 0),
+                        "failed_records": getattr(up.batch, "failed_records", 0),
+                        "created_at": up.batch.created_at.isoformat() if getattr(up.batch, "created_at", None) else None
+                    }
+                items.append(item)
+
+            total_pages = (total + page_size - 1) // page_size
+            return success_response({
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages
+            })
+            break
+    except Exception as e:
+        print(f"获取数据上传记录失败: {e}")
+        raise HTTPException(status_code=500, detail="获取数据上传记录失败")
 
 @router.get("/stats/customer-activity", summary="获取客户活跃度统计")
 async def get_customer_activity_stats(
@@ -2147,6 +2559,7 @@ async def get_api_fields(api_id: int):
                     "field_name": field.field_name,
                     "field_type": field.field_type,
                     "is_required": field.is_required,
+                    "is_upload": getattr(field, 'is_upload', 0),
                     "default_value": field.default_value,
                     "description": field.description,
                     "sort_order": field.sort_order,
@@ -2212,6 +2625,7 @@ async def create_api_field(
                 field_label=field_data.field_label or field_data.field_name,  # 如果没有提供 field_label，使用 field_name
                 field_type=field_data.field_type,
                 is_required=field_data.is_required,
+                is_upload=getattr(field_data, 'is_upload', 0),
                 default_value=field_data.default_value,
                 description=field_data.description,
                 sort_order=field_data.sort_order,
@@ -2233,6 +2647,7 @@ async def create_api_field(
                 "field_label": new_field.field_label,
                 "field_type": new_field.field_type,
                 "is_required": new_field.is_required,
+                "is_upload": getattr(new_field, 'is_upload', 0),
                 "default_value": new_field.default_value,
                 "description": new_field.description,
                 "sort_order": new_field.sort_order,
@@ -2331,6 +2746,9 @@ async def update_api_field(
                 field.field_type = field_data.field_type
             if field_data.is_required is not None:
                 field.is_required = field_data.is_required
+            # 是否上传：1 为勾选，0 为不勾选
+            if getattr(field_data, 'is_upload', None) is not None:
+                field.is_upload = field_data.is_upload
             if field_data.default_value is not None:
                 field.default_value = field_data.default_value
             if field_data.description is not None:
@@ -2352,6 +2770,7 @@ async def update_api_field(
                 "field_name": field.field_name,
                 "field_type": field.field_type,
                 "is_required": field.is_required,
+                "is_upload": getattr(field, 'is_upload', 0),
                 "default_value": field.default_value,
                 "description": field.description,
                 "sort_order": field.sort_order,
@@ -2407,3 +2826,109 @@ async def delete_api_field(api_id: int, field_id: int):
     except Exception as e:
         print(f"删除API字段失败: {e}")
         raise HTTPException(status_code=500, detail="数据库连接失败")
+
+
+@router.get("/resource-types", summary="获取资源类型列表")
+async def get_resource_types():
+    """
+    获取资源类型列表，用于API创建时选择
+    
+    Returns:
+        资源类型列表
+    """
+    try:
+        async for db in get_db_session(db_name="primary"):
+            # 查询所有资源类型
+            query = select(DataResourceType).order_by(DataResourceType.name)
+            result = await db.execute(query)
+            resource_types = result.scalars().all()
+            
+            # 构造返回数据
+            resource_type_list = []
+            for rt in resource_types:
+                resource_type_list.append({
+                    "id": rt.id,
+                    "name": rt.name,
+                    "describe": rt.describe,
+                    "metadata": rt.meta  # 使用meta属性而不是metadata
+                })
+            
+            return success_response({
+                "resource_types": resource_type_list,
+                "total": len(resource_type_list)
+            })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取资源类型列表失败: {str(e)}")
+
+
+async def _create_fields_from_resource_type(api_db: AsyncSession, api_id: int, resource_type_id: int):
+    """
+    从资源类型的metadata字段中解析并创建API字段
+    
+    Args:
+        api_db: API数据库会话
+        api_id: API ID
+        resource_type_id: 资源类型ID
+    """
+    try:
+        # 从主数据库获取资源类型的metadata
+        async for primary_db in get_db_session(db_name="primary"):
+            resource_type_query = select(DataResourceType).where(DataResourceType.id == resource_type_id)
+            resource_type_result = await primary_db.execute(resource_type_query)
+            resource_type = resource_type_result.scalar_one_or_none()
+            
+            if not resource_type or not resource_type.meta:
+                return
+            
+            # 解析metadata JSON
+            metadata_fields = resource_type.meta
+            if isinstance(metadata_fields, str):
+                import json
+                metadata_fields = json.loads(metadata_fields)
+            
+            # 为每个字段创建API字段
+            sort_order = 1
+            for field_info in metadata_fields:
+                field_name = field_info.get("key")
+                field_type = field_info.get("type", "string")
+                is_required = field_info.get("required", False)
+                description = field_info.get("description", "")
+                
+                if not field_name:
+                    continue
+                
+                # 检查字段是否已存在
+                existing_field_query = select(ApiField).where(
+                    ApiField.api_id == api_id,
+                    ApiField.field_name == field_name
+                )
+                existing_field_result = await api_db.execute(existing_field_query)
+                existing_field = existing_field_result.scalar_one_or_none()
+                
+                if existing_field:
+                    continue  # 跳过已存在的字段
+                
+                # 创建新字段
+                new_field = ApiField(
+                    api_id=api_id,
+                    field_name=field_name,
+                    field_label=field_name,
+                    field_type=field_type,
+                    is_required=is_required,
+                    # 新创建的API字段默认可上传
+                    is_upload=1,
+                    description=description,
+                    sort_order=sort_order,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                
+                api_db.add(new_field)
+                sort_order += 1
+            
+            await api_db.commit()
+            
+    except Exception as e:
+        # 如果字段创建失败，记录错误但不影响API创建
+        print(f"创建字段时出错: {str(e)}")
+        await api_db.rollback()

@@ -193,7 +193,6 @@
           <el-table-column label="格式" min-width="160">
             <template #default="{ row }">
               <div class="format-tags">
-                <el-tag size="small" type="info">REQ: {{ row.request_format.toUpperCase() }}</el-tag>
                 <el-tag size="small" type="success">RES: {{ row.response_format.toUpperCase() }}</el-tag>
               </div>
             </template>
@@ -231,7 +230,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="操作" min-width="280" fixed="right">
+          <el-table-column label="操作" min-width="428" fixed="right">
             <template #default="{ row }">
               <div class="action-buttons">
                 <el-button size="small" type="primary" @click="showEditDialog(row)">
@@ -245,6 +244,10 @@
                 <el-button size="small" type="success" @click="testApi(row)">
                   <el-icon><VideoPlay /></el-icon>
                   测试
+                </el-button>
+                <el-button size="small" @click="viewLogs(row)">
+                  <el-icon><View /></el-icon>
+                  查看日志
                 </el-button>
                 <el-dropdown @command="(command) => handleDocumentCommand(command, row)" size="small">
                   <el-button size="small" type="info">
@@ -347,10 +350,6 @@
                       <span>{{ api.customer?.name || '-' }}</span>
                     </div>
                     <div class="meta-item">
-                      <span class="config-label">请求:</span>
-                      <el-tag size="small" type="info">{{ api.request_format.toUpperCase() }}</el-tag>
-                    </div>
-                    <div class="meta-item">
                       <span class="config-label">响应:</span>
                       <el-tag size="small" type="success">{{ api.response_format.toUpperCase() }}</el-tag>
                     </div>
@@ -386,6 +385,10 @@
                         <el-dropdown-item @click="testApi(api)">
                           <el-icon><VideoPlay /></el-icon>
                           测试
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="viewLogs(api)">
+                          <el-icon><View /></el-icon>
+                          日志
                         </el-dropdown-item>
                         <el-dropdown-item @click="copyApi(api)">
                           <el-icon><CopyDocument /></el-icon>
@@ -461,9 +464,31 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="描述" prop="description">
+        <el-form-item label="资源类型" prop="resource_type_id">
+          <el-select
+            v-model="form.resource_type_id"
+            placeholder="请选择资源类型"
+            style="width: 100%"
+            filterable
+            clearable
+          >
+            <el-option
+              v-for="resourceType in resourceTypes"
+              :key="resourceType.id"
+              :label="resourceType.name"
+              :value="String(resourceType.id)"
+            >
+              <div style="display: flex; justify-content: space-between;">
+                <span>{{ resourceType.name }}</span>
+                <span style="color: #8492a6; font-size: 13px;">{{ resourceType.describe }}</span>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="描述" prop="api_description">
           <el-input
-            v-model="form.description"
+            v-model="form.api_description"
             type="textarea"
             :rows="3"
             placeholder="请输入API描述"
@@ -482,17 +507,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="请求格式" prop="request_format">
-              <el-select v-model="form.request_format" style="width: 100%" disabled>
-                <el-option label="JSON" value="json" />
-                <el-option label="Form" value="form" />
-                <el-option label="XML" value="xml" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
             <el-form-item label="响应格式" prop="response_format">
-              <el-select v-model="form.response_format" style="width: 100%" disabled>
+              <el-select v-model="form.response_format" style="width: 100%">
                 <el-option label="JSON" value="json" />
                 <el-option label="XML" value="xml" />
                 <el-option label="Text" value="text" />
@@ -692,10 +708,11 @@ import {
   updateApi,
   deleteApi as deleteApiRequest,
   copyApi as copyApiRequest,
-  testApiConnection
+  testApiConnection,
+  getResourceTypes
 } from '@/api/apiManagement'
 import { getCustomers } from '@/api/apiManagement'
-import type { CustomApi, CustomApiCreate, CustomApiUpdate, Customer } from '@/types/apiManagement'
+import type { CustomApi, CustomApiCreate, CustomApiUpdate, Customer, ResourceType } from '@/types/apiManagement'
 
 /**
  * 路由
@@ -708,6 +725,7 @@ const router = useRouter()
 const loading = ref(false)
 const apis = ref<CustomApi[]>([])
 const customers = ref<Customer[]>([])
+const resourceTypes = ref<ResourceType[]>([])
 const searchQuery = ref('')
 const customerFilter = ref<number | ''>('')
 const statusFilter = ref('')
@@ -732,13 +750,13 @@ const pagination = reactive({
 
 // 表单数据
 const form = reactive<CustomApiCreate & { is_active?: boolean; id?: number }>({
-  customer_id: 0,
+  customer_id: undefined as any,
   api_name: '',
   api_code: '',
-  description: '',
+  api_description: '',
   http_method: 'POST',
-  request_format: 'json',
   response_format: 'json',
+  resource_type_id: undefined as any,
   is_active: true
 })
 
@@ -762,7 +780,17 @@ const formRules: FormRules = {
     { pattern: /^[a-zA-Z0-9_]+$/, message: '只能包含字母、数字和下划线', trigger: 'blur' }
   ],
   customer_id: [
-    { required: true, message: '请选择客户', trigger: 'change' }
+    { required: true, message: '请选择客户', trigger: 'change' },
+    { 
+      validator: (rule: any, value: any, callback: any) => {
+        if (value === undefined || value === null || value === '' || value === 0) {
+          callback(new Error('请选择客户'))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: 'change' 
+    }
   ],
   http_method: [
     { required: true, message: '请选择请求方法', trigger: 'change' }
@@ -889,6 +917,20 @@ const loadCustomers = async () => {
 }
 
 /**
+ * 加载资源类型列表
+ */
+const loadResourceTypes = async () => {
+  try {
+    const response = await getResourceTypes()
+    if (response.success) {
+      resourceTypes.value = response.data.resource_types
+    }
+  } catch (error) {
+    console.error('加载资源类型列表失败:', error)
+  }
+}
+
+/**
  * 获取请求方法标签类型
  */
 const getMethodTagType = (
@@ -917,6 +959,7 @@ const showCreateDialog = () => {
   isEdit.value = false
   dialogVisible.value = true
   resetForm()
+  loadResourceTypes() // 加载资源类型列表
 }
 
 /**
@@ -925,16 +968,18 @@ const showCreateDialog = () => {
 const showEditDialog = (api: CustomApi) => {
   isEdit.value = true
   dialogVisible.value = true
+  loadResourceTypes() // 加载资源类型列表
   
   // 填充表单数据
   Object.assign(form, {
     customer_id: api.customer_id,
     api_name: api.api_name,
     api_code: api.api_code,
-    description: api.description,
+    api_description: api.description || '', // 使用后端返回的description字段
     http_method: api.http_method,
-    request_format: api.request_format,
     response_format: api.response_format,
+    // 资源类型ID统一为字符串，避免选择器匹配失败
+    resource_type_id: api.resource_type_id != null ? String(api.resource_type_id) : undefined,
     is_active: api.is_active
   })
   
@@ -950,13 +995,13 @@ const resetForm = () => {
   }
   
   Object.assign(form, {
-    customer_id: 0,
+    customer_id: undefined as any,
     api_name: '',
     api_code: '',
-    description: '',
+    api_description: '',
     http_method: 'POST',
-    request_format: 'json',
     response_format: 'json',
+    resource_type_id: undefined as any,
     is_active: true
   })
   
@@ -977,10 +1022,10 @@ const submitForm = async () => {
       // 更新API
       const updateData: CustomApiUpdate = {
         api_name: form.api_name,
-        description: form.description,
+        api_description: form.api_description,
         http_method: form.http_method,
-        request_format: form.request_format,
         response_format: form.response_format,
+        resource_type_id: form.resource_type_id,
         is_active: form.is_active
       }
 
@@ -993,17 +1038,23 @@ const submitForm = async () => {
         ElMessage.error(response.message || 'API更新失败')
       }
     } else {
-      // 创建API
+      // 创建API - 验证必填字段
+      if (!form.customer_id || form.customer_id === 0) {
+        ElMessage.error('请选择客户')
+        return
+      }
+
       const createData: CustomApiCreate = {
         customer_id: form.customer_id,
         api_name: form.api_name,
         api_code: form.api_code,
-        description: form.description,
+        api_description: form.api_description,
         http_method: form.http_method,
-        request_format: form.request_format,
-        response_format: form.response_format
+        response_format: form.response_format,
+        resource_type_id: form.resource_type_id
       }
 
+      console.log('创建API数据:', createData)
       const response = await createApi(createData)
       if (response.success) {
         ElMessage.success('API创建成功')
@@ -1027,6 +1078,9 @@ const manageFields = (api: CustomApi) => {
   router.push(`/api-management/apis/${api.id}/fields`)
 }
 
+const viewLogs = (api: CustomApi) => {
+  router.push(`/api-management/apis/${api.id}/logs`)
+}
 /**
  * 测试API
  */

@@ -81,6 +81,8 @@
               共 {{ queryResults?.total_count || 0 }} 条记录，
               耗时 {{ queryResults?.execution_time || 0 }}ms
             </el-text>
+            <!-- 新增：全字段搜索 -->
+            <el-input v-model="globalKeyword" size="small" placeholder="按所有字段搜索" clearable :prefix-icon="Search" style="width: 240px" />
             <el-button 
               type="primary" 
               size="small" 
@@ -97,11 +99,13 @@
       <div v-if="queryResults?.data?.length">
         <!-- 数据表格 -->
         <el-table
-          :data="paginatedData"
+          :data="processedData"
           stripe
           border
           max-height="500"
           style="width: 100%"
+          @sort-change="onSortChange"
+          @row-click="openRowDetail"
         >
           <el-table-column
             v-for="(field, index) in displayFields"
@@ -110,6 +114,7 @@
             :label="field"
             :min-width="120"
             show-overflow-tooltip
+            sortable="custom"
           >
             <template #default="{ row }">
               <span v-if="typeof row[index] === 'object'">{{ JSON.stringify(row[index]) }}</span>
@@ -117,6 +122,33 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 新增：行详情弹窗 -->
+        <el-dialog v-model="detailVisible" title="数据详情" width="600px">
+          <el-descriptions column="1" border>
+            <el-descriptions-item v-for="(field, idx) in displayFields" :key="field" :label="field">
+              <span v-if="typeof selectedRow?.[idx] === 'object'">{{ JSON.stringify(selectedRow?.[idx], null, 2) }}</span>
+              <span v-else>{{ selectedRow?.[idx] }}</span>
+            </el-descriptions-item>
+          </el-descriptions>
+          <template #footer>
+            <span class="dialog-footer">
+              <el-button @click="detailVisible = false">关闭</el-button>
+              <el-button
+                v-if="displayFields.includes('pdf_url') && selectedRow && selectedRow[displayFields.indexOf('pdf_url')] && selectedRow[displayFields.indexOf('pdf_url')] !== 'null'"
+                type="primary"
+                @click="openPdf"
+              >
+                打开全文
+              </el-button>
+            </span>
+          </template>
+        </el-dialog>
+
+        <!-- PDF 预览弹窗 -->
+        <el-dialog v-model="pdfDialogVisible" title="全文预览" width="80%">
+          <PdfViewer :src="pdfUrl || ''" />
+        </el-dialog>
 
         <!-- 分页 -->
         <div class="pagination-wrapper">
@@ -145,6 +177,7 @@ import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Search, Download } from '@element-plus/icons-vue'
 import * as XLSX from 'xlsx'
+import PdfViewer from '@/components/PdfViewer.vue'
 import { 
   resourcePackageApi, 
   type ResourcePackage, 
@@ -168,6 +201,10 @@ const queryLoading = ref(false)
 const queryResults = ref<ResourcePackageQueryResponse | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(20)
+// 新增：全字段搜索关键词
+const globalKeyword = ref('')
+// 新增：排序状态
+const sortState = ref<{ index: number | null; order: 'ascending' | 'descending' | null }>({ index: null, order: null })
 
 // 查询表单数据
 const queryForm = reactive<Record<string, any>>({})
@@ -212,6 +249,34 @@ const queryRules = computed(() => {
  */
 const displayFields = computed(() => {
   return queryResults.value?.columns || []
+})
+
+const processedData = computed(() => {
+  const rows = queryResults.value?.data || []
+  // 过滤
+  const kw = globalKeyword.value.trim().toLowerCase()
+  let filtered = kw
+    ? rows.filter((row: any[]) => row.some((cell: any) => String(cell ?? '').toLowerCase().includes(kw)))
+    : rows
+  // 排序
+  const { index, order } = sortState.value
+  if (index !== null && order) {
+    filtered = [...filtered].sort((a: any[], b: any[]) => {
+      const va = a[index]
+      const vb = b[index]
+      // 数字优先比较，其次字符串自然排序
+      const na = typeof va === 'number' ? va : Number.isFinite(Number(va)) ? Number(va) : null
+      const nb = typeof vb === 'number' ? vb : Number.isFinite(Number(vb)) ? Number(vb) : null
+      let cmp = 0
+      if (na !== null && nb !== null) {
+        cmp = na - nb
+      } else {
+        cmp = String(va ?? '').localeCompare(String(vb ?? ''), 'zh-CN', { numeric: true, sensitivity: 'base' })
+      }
+      return order === 'ascending' ? cmp : -cmp
+    })
+  }
+  return filtered
 })
 
 const paginatedData = computed(() => {
@@ -389,6 +454,35 @@ const exportResults = async () => {
 }
 
 // 初始化与监听
+// 表格排序事件
+const onSortChange = (payload: { prop: string; order: 'ascending' | 'descending' | null }) => {
+  const idx = payload?.prop ? Number(payload.prop) : null
+  sortState.value = { index: Number.isFinite(idx) ? idx : null, order: payload.order || null }
+}
+
+// 行详情弹窗
+const detailVisible = ref(false)
+const selectedRow = ref<any[] | null>(null)
+const pdfDialogVisible = ref(false)
+const pdfUrl = ref<string | null>(null)
+
+const openRowDetail = (row: any[]) => {
+  selectedRow.value = row
+  detailVisible.value = true
+}
+
+const openPdf = () => {
+  const idx = displayFields.value.indexOf('pdf_url')
+  const val = idx >= 0 ? selectedRow.value?.[idx] : null
+  const url = val ? String(val) : ''
+  if (url && url !== 'null') {
+    pdfUrl.value = url
+    pdfDialogVisible.value = true
+  } else {
+    ElMessage.warning('未找到有效的 pdf_url 字段')
+  }
+}
+
 watch(() => props.packageData, (newVal) => {
   if (newVal) {
     initializeForm()

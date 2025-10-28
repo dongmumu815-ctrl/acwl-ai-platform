@@ -7,8 +7,8 @@
 export const DATA_INSIGHT_CONFIG = {
   // 基础URL - 可以根据环境进行配置
   baseURL: process.env.NODE_ENV === 'production' 
-    ? 'http://localhost:8001/dataainsight/api'  // 生产环境地址
-    : 'http://localhost:8001/dataainsight/api',         // 开发环境地址
+    ? 'http://10.20.1.200:8001/dataainsight/api'  // 生产环境地址
+    : 'http://10.20.1.200:8001/dataainsight/api',         // 开发环境地址
   
   // 请求超时时间
   timeout: 600000, // 10分钟

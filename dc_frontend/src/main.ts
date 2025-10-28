@@ -10,6 +10,7 @@ import App from './App.vue'
 import router from './router'
 import { useUserStore } from '@/stores/user'
 import './styles/index.scss'
+import { initUITracker } from '@/utils/uiTracker'
 
 /**
  * 初始化应用
@@ -36,6 +37,9 @@ async function initApp() {
   app.use(ElementPlus, {
     locale: zhCn
   })
+
+  // 初始化全局埋点（路由与点击）
+  initUITracker(router)
 
   app.mount('#app')
 }

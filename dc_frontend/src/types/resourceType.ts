@@ -10,7 +10,7 @@ export interface ResourceField {
 }
 
 export interface ResourceTypeItem {
-  id: number
+  id: string
   name: string
   describe?: string
   metadata?: ResourceField[]

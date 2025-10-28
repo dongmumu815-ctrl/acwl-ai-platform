@@ -23,7 +23,10 @@
             <el-icon><Plus /></el-icon>
             添加字段
           </el-button>
-          <el-button @click="loadFields">
+          <el-button @click="openCenterDrawer">
+            从资源类型添加
+          </el-button>
+          <el-button @click="loadFields()">
             <el-icon><Refresh /></el-icon>
             刷新
           </el-button>
@@ -61,6 +64,21 @@
               <el-tag :type="apiInfo.is_active ? 'success' : 'danger'">
                 {{ apiInfo.is_active ? '激活' : '禁用' }}
               </el-tag>
+            </div>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20" style="margin-top: 8px;">
+          <el-col :span="6">
+            <div class="info-item">
+              <span class="label">资源类型:</span>
+              <span class="value">
+                <template v-if="resourceTypeName">
+                  {{ resourceTypeName }}
+                </template>
+                <template v-else>
+                  未配置
+                </template>
+              </span>
             </div>
           </el-col>
         </el-row>
@@ -109,22 +127,21 @@
         <el-table-column prop="default_value" label="默认值" width="120" show-overflow-tooltip />
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
         <el-table-column prop="validation_rules" label="验证规则" width="150" show-overflow-tooltip />
-        <el-table-column prop="field_order" label="排序" width="80" sortable />
+        <el-table-column prop="sort_order" label="排序" width="80" sortable />
         <el-table-column prop="created_at" label="创建时间" width="150">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <!-- 是否上传勾选 -->
+        <el-table-column prop="is_upload" label="是否上传" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="showEditDialog(row)">
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
-            <el-button size="small" type="danger" @click="deleteField(row)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
+            <el-checkbox
+              v-model="row.is_upload"
+              :true-value="1"
+              :false-value="0"
+              @change="onUploadChange(row, $event)"
+            >上传</el-checkbox>
           </template>
         </el-table-column>
       </el-table>
@@ -174,9 +191,9 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="排序" prop="field_order">
+            <el-form-item label="排序" prop="sort_order">
               <el-input-number
-                v-model="form.field_order"
+                v-model="form.sort_order"
                 :min="1"
                 :max="999"
                 style="width: 100%"
@@ -217,6 +234,52 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 资源类型字段选择抽屉 -->
+    <el-drawer
+      v-model="centerDrawerVisible"
+      title="从资源类型选择字段"
+      direction="rtl"
+      size="800px"
+    >
+      <div class="panel-header">
+        <h4>资源类型字段</h4>
+        <el-button @click="loadResourceTypeFields" :loading="centerFieldsLoading" size="small">
+          <el-icon><Refresh /></el-icon>
+          刷新字段
+        </el-button>
+      </div>
+      <div class="center-fields-list">
+        <el-table
+          :data="centerTableFields"
+          @selection-change="handleCenterFieldSelection"
+          v-loading="centerFieldsLoading"
+          size="small"
+        >
+          <el-table-column type="selection" width="55" :selectable="selectableCenterField" />
+          <el-table-column prop="column_name" label="字段名" width="150" />
+          <el-table-column prop="data_type" label="数据类型" width="120" />
+          <el-table-column prop="column_comment" label="字段说明" show-overflow-tooltip>
+            <template #default="{ row }">
+              {{ row.column_comment || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="isExistingCenterField(row) ? 'info' : 'success'" size="small">
+                {{ isExistingCenterField(row) ? '已存在' : '可添加' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button @click="centerDrawerVisible = false">取消</el-button>
+        <el-button type="primary" @click="addSelectedFields" :disabled="selectedCenterFields.length === 0" :loading="addingFromCenter">
+          添加选中字段 ({{ selectedCenterFields.length }})
+        </el-button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -231,10 +294,10 @@ import {
   getApiFields,
   createApiField,
   updateApiField,
-  deleteApiField,
-  updateFieldsOrder
+  deleteApiField
 } from '@/api/apiManagement'
 import type { CustomApi, ApiField, ApiFieldCreate, ApiFieldUpdate } from '@/types/apiManagement'
+import { getResourceType } from '@/api/resourceType'
 
 /**
  * 路由
@@ -248,6 +311,7 @@ const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const apiInfo = ref<CustomApi | null>(null)
+const resourceTypeName = ref('')
 const fields = ref<ApiField[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -262,7 +326,7 @@ const form = reactive<ApiFieldCreate & { id?: number }>({
   default_value: '',
   description: '',
   validation_rules: '',
-  field_order: 1
+  sort_order: 1
 })
 
 // 表单验证规则
@@ -275,10 +339,26 @@ const formRules: FormRules = {
   field_type: [
     { required: true, message: '请选择字段类型', trigger: 'change' }
   ],
-  field_order: [
+  sort_order: [
     { required: true, message: '请输入排序', trigger: 'blur' }
   ]
 }
+
+// 新增：中心表字段选择相关
+interface CenterTableField {
+  column_name: string
+  data_type: string
+  column_comment: string
+  is_nullable: boolean
+}
+
+const centerDrawerVisible = ref(false)
+const centerTableFields = ref<CenterTableField[]>([])
+const selectedCenterFields = ref<CenterTableField[]>([])
+const centerFieldsLoading = ref(false)
+const addingFromCenter = ref(false)
+
+// 资源类型字段选择依赖于当前 API 的 resource_type_id
 
 /**
  * 生命周期钩子
@@ -303,6 +383,22 @@ const loadApiInfo = async (apiId: number) => {
     const response = await getApi(apiId)
     if (response.success) {
       apiInfo.value = response.data
+      // 加载资源类型名称
+      try {
+        const rid = apiInfo.value?.resource_type_id
+        if (rid) {
+          const rtResp = await getResourceType(String(rid))
+          if (rtResp?.success && rtResp.data) {
+            resourceTypeName.value = rtResp.data.name || ''
+          } else {
+            resourceTypeName.value = ''
+          }
+        } else {
+          resourceTypeName.value = ''
+        }
+      } catch (e) {
+        resourceTypeName.value = ''
+      }
     } else {
       ElMessage.error(response.message || '加载API信息失败')
     }
@@ -316,7 +412,7 @@ const loadApiInfo = async (apiId: number) => {
  * 加载字段列表
  */
 const loadFields = async (apiId?: number) => {
-  const id = apiId || parseInt(route.params.id as string)
+  const id = typeof apiId === 'number' ? apiId : parseInt(route.params.id as string)
   
   try {
     loading.value = true
@@ -325,10 +421,20 @@ const loadFields = async (apiId?: number) => {
     if (response.success) {
       // 处理分页响应结构，获取items数组
       const items = response.data.items || response.data || []
-      // 兼容后端返回的sort_order和前端期望的field_order
-      fields.value = items.sort((a, b) => {
-        const orderA = a.sort_order || a.field_order || 0
-        const orderB = b.sort_order || b.field_order || 0
+      // 归一化 is_upload 类型，确保为数字 0/1，避免 '1'/'0' 导致复选框不勾选
+      const normalized = items.map((item: any) => ({
+        ...item,
+        is_upload:
+          item?.is_upload === undefined || item?.is_upload === null
+            ? 0
+            : typeof item.is_upload === 'string'
+              ? Number(item.is_upload)
+              : item.is_upload
+      }))
+      // 根据后端返回的 sort_order 排序
+      fields.value = normalized.sort((a, b) => {
+        const orderA = a.sort_order || 0
+        const orderB = b.sort_order || 0
         return orderA - orderB
       })
     } else {
@@ -401,8 +507,128 @@ const showCreateDialog = () => {
   resetForm()
   
   // 设置默认排序为最大值+1
-  const maxOrder = Math.max(...fields.value.map(f => f.field_order), 0)
-  form.field_order = maxOrder + 1
+  const maxOrder = Math.max(...fields.value.map(f => f.sort_order || 0), 0)
+  form.sort_order = maxOrder + 1
+}
+
+// 打开资源类型字段选择抽屉
+const openCenterDrawer = () => {
+  if (!apiInfo.value?.resource_type_id) {
+    ElMessage.warning('请先在 API 基础信息中选择资源类型')
+    return
+  }
+  centerDrawerVisible.value = true
+  if (centerTableFields.value.length === 0) {
+    loadResourceTypeFields()
+  }
+}
+
+// 加载资源类型字段（基于当前API的 resource_type_id）
+const loadResourceTypeFields = async () => {
+  try {
+    centerFieldsLoading.value = true
+    const rtid = apiInfo.value?.resource_type_id
+    if (!rtid) {
+      ElMessage.warning('当前 API 未配置资源类型，无法加载字段')
+      return
+    }
+    const response = await getResourceType(String(rtid))
+    if (response?.success && response.data) {
+      const meta = (response.data.metadata || []) as any[]
+      centerTableFields.value = meta.map((m: any) => ({
+        column_name: m.key,
+        data_type: m.type || 'string',
+        column_comment: m.description || '',
+        is_nullable: !(m.required === true)
+      }))
+    } else {
+      centerTableFields.value = []
+      ElMessage.warning(response?.message || '资源类型未包含字段元数据')
+    }
+  } catch (e: any) {
+    console.error('加载资源类型字段失败:', e)
+    ElMessage.error(e?.message || '加载资源类型字段失败')
+  } finally {
+    centerFieldsLoading.value = false
+  }
+}
+
+// 新增：处理中心表字段选择
+const handleCenterFieldSelection = (selection: CenterTableField[]) => {
+  selectedCenterFields.value = selection
+}
+
+// 新增：中心表字段是否可选择（已存在则禁选）
+const selectableCenterField = (row: CenterTableField) => {
+  return !fields.value.some(f => f.field_name === row.column_name)
+}
+
+// 新增：判断中心表字段在当前API中是否已存在
+const isExistingCenterField = (row: CenterTableField) => {
+  return fields.value.some(f => f.field_name === row.column_name)
+}
+// 将资源类型字段的类型映射为 API 字段类型
+const mapDataTypeToApiFieldType = (dataType: string): ApiFieldCreate['field_type'] => {
+  const t = (dataType || '').toLowerCase()
+  if (t === 'integer' || t === 'number' || t.includes('int') || t.includes('decimal') || t.includes('float') || t.includes('double') || t.includes('numeric')) {
+    return 'number'
+  }
+  if (t === 'boolean' || t.includes('bool')) {
+    return 'boolean'
+  }
+  if (t === 'date' || t.includes('date') || t.includes('time')) {
+    return 'date'
+  }
+  if (t === 'array') {
+    return 'array'
+  }
+  if (t === 'object') {
+    return 'object'
+  }
+  return 'string'
+}
+
+// 新增：批量添加选中中心表字段到当前API
+const addSelectedFields = async () => {
+  if (selectedCenterFields.value.length === 0) {
+    ElMessage.warning('请先选择要添加的字段')
+    return
+  }
+  const existingNames = new Set(fields.value.map(f => f.field_name))
+  const unique = selectedCenterFields.value.filter(f => !existingNames.has(f.column_name))
+  if (unique.length === 0) {
+    ElMessage.warning('所选字段已存在，无需重复添加')
+    return
+  }
+
+  const apiId = parseInt(route.params.id as string)
+  let order = Math.max(...fields.value.map(f => f.sort_order || 0), 0)
+
+  try {
+    addingFromCenter.value = true
+    for (const f of unique) {
+      const createData: ApiFieldCreate = {
+        field_name: f.column_name,
+        field_type: mapDataTypeToApiFieldType(f.data_type),
+        is_required: !f.is_nullable,
+        description: f.column_comment || '',
+        sort_order: ++order
+      }
+      const resp = await createApiField(apiId, createData)
+      if (!resp.success) {
+        ElMessage.error(resp.message || `添加字段失败：${f.column_name}`)
+      }
+    }
+    ElMessage.success(`成功添加 ${unique.length} 个字段`)
+    centerDrawerVisible.value = false
+    await loadFields(apiId)
+  } catch (e) {
+    console.error('批量添加字段失败:', e)
+    ElMessage.error('批量添加字段失败')
+  } finally {
+    addingFromCenter.value = false
+    selectedCenterFields.value = []
+  }
 }
 
 /**
@@ -420,7 +646,7 @@ const showEditDialog = (field: ApiField) => {
     default_value: field.default_value,
     description: field.description,
     validation_rules: field.validation_rules,
-    field_order: field.field_order
+    sort_order: field.sort_order
   })
   
   form.id = field.id
@@ -441,7 +667,7 @@ const resetForm = () => {
     default_value: '',
     description: '',
     validation_rules: '',
-    field_order: 1
+    sort_order: 1
   })
   
   delete form.id
@@ -468,7 +694,7 @@ const submitForm = async () => {
         default_value: form.default_value,
         description: form.description,
         validation_rules: form.validation_rules,
-        field_order: form.field_order
+        sort_order: form.sort_order
       }
 
       const response = await updateApiField(apiId, form.id, updateData)
@@ -489,7 +715,7 @@ const submitForm = async () => {
         default_value: form.default_value,
         description: form.description,
         validation_rules: form.validation_rules,
-        field_order: form.field_order
+        sort_order: form.sort_order
       }
 
       const response = await createApiField(apiId, createData)
@@ -551,18 +777,18 @@ const saveFieldsOrder = async () => {
     saving.value = true
     const apiId = parseInt(route.params.id as string)
     
-    const fieldsOrder = fields.value.map((field, index) => ({
-      id: field.id,
-      field_order: index + 1
-    }))
+    // 逐字段更新排序到后端
+    const updates = fields.value.map((field, index) =>
+      updateApiField(apiId, field.id, { sort_order: index + 1 })
+    )
 
-    const response = await updateFieldsOrder(apiId, fieldsOrder)
-    if (response.success) {
+    const results = await Promise.all(updates)
+    const failed = results.filter(r => !r.success)
+    if (failed.length === 0) {
       ElMessage.success('排序保存成功')
-      // 强制重新加载字段列表
       await loadFields(apiId)
     } else {
-      ElMessage.error(response.message || '排序保存失败')
+      ElMessage.error(`部分字段排序保存失败：${failed.length} 项`)
     }
   } catch (error) {
     console.error('保存排序失败:', error)
@@ -577,6 +803,30 @@ const saveFieldsOrder = async () => {
  */
 const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
   console.log('排序:', prop, order)
+}
+
+/**
+ * 勾选是否上传状态并同步更新到后端
+ */
+const onUploadChange = async (field: ApiField, value: number | boolean) => {
+  const apiId = parseInt(route.params.id as string)
+  const newVal = typeof value === 'boolean' ? (value ? 1 : 0) : value
+  const prev = field.is_upload ?? 0
+  try {
+    const resp = await updateApiField(apiId, field.id, { is_upload: newVal })
+    if (resp.success) {
+      ElMessage.success('上传状态已更新')
+      field.is_upload = newVal
+    } else {
+      // 回滚界面状态
+      field.is_upload = prev
+      ElMessage.error(resp.message || '更新上传状态失败')
+    }
+  } catch (e) {
+    field.is_upload = prev
+    console.error('更新上传状态失败:', e)
+    ElMessage.error('更新上传状态失败')
+  }
 }
 </script>
 
@@ -664,5 +914,17 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
     cursor: move;
     color: var(--el-text-color-regular);
   }
+}
+
+// 新增：中心表字段抽屉样式
+.panel-header {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+.center-fields-list {
+  padding: 16px;
 }
 </style>

@@ -80,10 +80,10 @@
         
         <el-table-column prop="database" label="数据库" width="120" show-overflow-tooltip />
         
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusTagType(row.status)">
-              {{ getStatusLabel(row.status) }}
+            <el-tag :type="getStatusTagType(getDataSourceStatus(row))">
+              {{ getStatusLabel(getDataSourceStatus(row)) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -413,6 +413,19 @@ function getTypeLabel(type: string) {
 }
 
 /**
+ * 获取数据源状态
+ */
+function getDataSourceStatus(dataSource: DataSource): 'active' | 'error' | 'disabled' {
+  if (!dataSource.is_active) {
+    return 'disabled'
+  }
+  if (dataSource.last_test_status === 'failed') {
+    return 'error'
+  }
+  return 'active'
+}
+
+/**
  * 获取状态标签类型
  */
 function getStatusTagType(status: string) {
@@ -554,7 +567,10 @@ async function submitForm() {
       ElMessage.success('数据源更新成功')
     } else {
       // 创建数据源
-      const response = await datasourceApi.createDataSource(formData.value)
+      const response = await datasourceApi.createDataSource({
+        ...formData.value,
+        port: Number(formData.value.port),
+      })
       if (response.success) {
         ElMessage.success('数据源创建成功')
         await loadDataSources()
@@ -579,7 +595,7 @@ async function testConnection(dataSource: DataSource) {
   try {
     const response = await datasourceApi.testDataSourceConnection(dataSource.id)
     
-    if (response.success && response.data.success) {
+    if (response.success && response.data.status === 'success') {
       ElMessage.success(`${dataSource.name} 连接测试成功`)
       // 更新数据源状态
       const index = dataSources.value.findIndex(ds => ds.id === dataSource.id)

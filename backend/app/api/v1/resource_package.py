@@ -1,6 +1,6 @@
 """资源包API路由"""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,8 +12,8 @@ from app.core.response import success_response
 from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
 from app.models.resource_package import (
-    ResourcePackage, ResourcePackagePermission, 
-    ResourcePackageQueryHistory, ResourcePackageTag
+    ResourcePackage, ResourcePackagePermission,
+    ResourcePackageQueryHistory, ResourcePackageTag, ResourcePackageFile
 )
 from app.schemas.resource_package import (
     ResourcePackageCreate, ResourcePackageUpdate, ResourcePackage as ResourcePackageSchema,
@@ -23,6 +23,10 @@ from app.schemas.resource_package import (
 )
 from app.services.data_resource_service import DataResourceService
 from app.services.elasticsearch_service import ElasticsearchService
+from app.services.excel_service import ExcelService
+from app.core.config import settings
+from minio import Minio
+from minio.error import S3Error
 import json
 import time
 import logging
@@ -652,3 +656,266 @@ async def get_query_history(
         "page": page,
         "size": size
     }
+
+
+@router.post("/{package_id}/download")
+async def download_resource_package(
+    package_id: int,
+    query_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """下载资源包Excel文件"""
+    service = ResourcePackageService(db)
+    
+    # 检查权限
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+    
+    try:
+        excel_service = ExcelService()
+        result = await excel_service.generate_and_upload_excel(
+            package_id=package_id,
+            query_data=query_data,
+            db=db
+        )
+        
+        if result["status"] == "no_new_data":
+            return success_response(
+                data={"has_new_data": False},
+                message=result["message"]
+            )
+        
+        return success_response(
+            data={
+                "has_new_data": True,
+                "download_url": result["download_url"],
+                "filename": result["filename"],
+                "minio_path": result["minio_path"]
+            },
+            message="Excel文件生成成功"
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"下载资源包失败: {e}")
+        raise HTTPException(status_code=500, detail="下载失败，请稍后重试")
+
+
+@router.post("/{package_id}/generate-excel")
+async def generate_excel_for_package(
+    package_id: int,
+    query_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """生成Excel并上传到MinIO（更新excel_time与download_url）"""
+    service = ResourcePackageService(db)
+    
+    # 权限检查
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+    
+    try:
+        excel_service = ExcelService()
+        result = await excel_service.generate_and_upload_excel(
+            package_id=package_id,
+            query_data=query_data,
+            db=db
+        )
+        
+        if result["status"] == "no_new_data":
+            return success_response(
+                data={"has_new_data": False},
+                message=result["message"]
+            )
+        
+        return success_response(
+            data={
+                "has_new_data": True,
+                "download_url": result["download_url"],
+                "filename": result["filename"],
+                "minio_path": result["minio_path"]
+            },
+            message="Excel文件生成成功"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"生成Excel失败: {e}")
+        raise HTTPException(status_code=500, detail="生成失败，请稍后重试")
+
+
+@router.post("/{package_id}/download-latest")
+async def download_latest_resource_package(
+    package_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取最新资源包的预签名下载链接，并更新download_time"""
+    service = ResourcePackageService(db)
+    
+    # 权限检查
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+    
+    # 获取资源包
+    result = await db.execute(select(ResourcePackage).where(ResourcePackage.id == package_id))
+    package = result.scalar_one_or_none()
+    if not package:
+        raise HTTPException(status_code=404, detail="资源包不存在")
+    
+    if not package.download_url:
+        return success_response(data={"has_file": False}, message="尚未生成Excel文件")
+    
+    # 解析MinIO对象路径
+    try:
+        prefix = f"minio://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET_NAME}/"
+        if package.download_url.startswith(prefix):
+            object_path = package.download_url[len(prefix):]
+        else:
+            # 兜底：尝试从URL最后的路径段作为对象名
+            object_path = package.download_url.split('/')[-1]
+        
+        minio_client = Minio(
+            endpoint=settings.MINIO_ENDPOINT,
+            access_key=settings.MINIO_ACCESS_KEY,
+            secret_key=settings.MINIO_SECRET_KEY,
+            secure=settings.MINIO_SECURE,
+            region=settings.MINIO_REGION
+        )
+        
+        presigned_url = minio_client.presigned_get_object(
+            bucket_name=settings.MINIO_BUCKET_NAME,
+            object_name=object_path,
+            expires=timedelta(seconds=3600)
+        )
+        
+        # 更新下载时间
+        package.download_time = datetime.now()
+        await db.commit()
+        
+        return success_response(
+            data={
+                "has_file": True,
+                "download_url": presigned_url,
+                "object_path": object_path,
+                "excel_time": package.excel_time,
+                "download_time": package.download_time
+            },
+            message="下载链接生成成功"
+        )
+    except S3Error as e:
+        logger.error(f"获取预签名链接失败: {e}")
+        raise HTTPException(status_code=500, detail="获取下载链接失败")
+
+
+@router.get("/{package_id}/files")
+async def list_resource_package_files(
+    package_id: int,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """列出资源包历史生成的Excel文件"""
+    service = ResourcePackageService(db)
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+
+    # 统计总数
+    total_result = await db.execute(
+        select(func.count(ResourcePackageFile.id)).where(ResourcePackageFile.package_id == package_id)
+    )
+    total = total_result.scalar()
+
+    # 查询分页数据
+    offset = (page - 1) * size
+    query = (
+        select(ResourcePackageFile)
+        .where(ResourcePackageFile.package_id == package_id)
+        .order_by(ResourcePackageFile.generated_at.desc())
+        .offset(offset)
+        .limit(size)
+    )
+    result = await db.execute(query)
+    files = result.scalars().all()
+
+    items = [
+        {
+            "id": f.id,
+            "filename": f.filename,
+            "object_path": f.object_path,
+            "generated_at": f.generated_at,
+        }
+        for f in files
+    ]
+
+    return success_response(
+        data={"items": items, "total": total, "page": page, "size": size},
+        message="历史文件列表获取成功",
+    )
+
+
+@router.post("/{package_id}/files/{file_id}/download")
+async def download_resource_package_file(
+    package_id: int,
+    file_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """下载指定历史Excel文件，返回预签名URL"""
+    service = ResourcePackageService(db)
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+
+    # 获取文件记录
+    result = await db.execute(
+        select(ResourcePackageFile).where(
+            and_(
+                ResourcePackageFile.id == file_id,
+                ResourcePackageFile.package_id == package_id,
+            )
+        )
+    )
+    file_rec = result.scalar_one_or_none()
+    if not file_rec:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    # 生成预签名URL
+    minio_client = Minio(
+        endpoint=settings.MINIO_ENDPOINT,
+        access_key=settings.MINIO_ACCESS_KEY,
+        secret_key=settings.MINIO_SECRET_KEY,
+        secure=settings.MINIO_SECURE,
+        region=settings.MINIO_REGION,
+    )
+
+    try:
+        presigned_url = minio_client.presigned_get_object(
+            bucket_name=settings.MINIO_BUCKET_NAME,
+            object_name=file_rec.object_path,
+            expires=timedelta(seconds=3600),
+        )
+    except S3Error as e:
+        logger.error(f"生成预签名链接失败: {e}")
+        raise HTTPException(status_code=500, detail="获取下载链接失败")
+
+    # 更新下载时间（与最新下载保持一致）
+    pkg_result = await db.execute(select(ResourcePackage).where(ResourcePackage.id == package_id))
+    package = pkg_result.scalar_one_or_none()
+    if package:
+        package.download_time = datetime.now()
+        await db.commit()
+
+    return success_response(
+        data={
+            "has_file": True,
+            "download_url": presigned_url,
+            "object_path": file_rec.object_path,
+            "filename": file_rec.filename,
+            "generated_at": file_rec.generated_at,
+        },
+        message="下载链接生成成功",
+    )

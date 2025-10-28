@@ -30,9 +30,15 @@ class ElasticsearchService:
             查询结果
         """
         try:
+            # 新版本elasticsearch客户端使用直接参数而不是body
             result = await self.client.search(
                 index=index_name,
-                body=query_body
+                query=query_body.get("query", {"match_all": {}}),
+                size=query_body.get("size", 10),
+                from_=query_body.get("from", 0),
+                source=query_body.get("_source"),
+                sort=query_body.get("sort"),
+                aggs=query_body.get("aggs")
             )
             return result
         except Exception as e:

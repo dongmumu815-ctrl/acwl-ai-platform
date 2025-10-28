@@ -12,6 +12,12 @@
   "compilerOptions": {
     "composite": true,
     "baseUrl": ".",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false,
+    "ignoreDeprecations": "5.0",
     "paths": {
       "@/*": [
         "./src/*"

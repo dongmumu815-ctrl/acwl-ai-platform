@@ -202,14 +202,30 @@ class ResourcePackageUpdate(BaseModel):
     dynamic_params: Optional[Dict[str, Any]] = Field(None, description="动态参数")
     is_active: Optional[bool] = Field(None, description="是否启用")
     tags: Optional[List[str]] = Field(None, description="标签列表")
+    # 新增：允许更新下载与生成时间/地址（用于专用接口内部调用）
+    download_time: Optional[datetime] = Field(None, description="最后下载时间")
+    download_url: Optional[str] = Field(None, description="MinIO对象路径")
+    excel_time: Optional[datetime] = Field(None, description="最后Excel生成时间")
 
 
-class ResourcePackage(ResourcePackageBase):
+class ResourcePackage(BaseModel):
     """资源包模式"""
     id: int
+    name: str = Field(..., max_length=255, description="资源包名称")
+    description: Optional[str] = Field(None, description="资源包描述")
+    type: PackageType = Field(..., description="资源包类型")
+    datasource_id: int = Field(..., description="数据源ID")
+    resource_id: Optional[int] = Field(None, description="数据资源ID")
+    template_id: Optional[int] = Field(None, description="查询模板ID")
+    template_type: str = Field(..., description="模板类型(sql/elasticsearch)")
+    is_active: bool = Field(True, description="是否启用")
     created_by: int
     created_at: datetime
     updated_at: datetime
+    # 展示下载与生成信息
+    download_time: Optional[datetime] = Field(None, description="最后下载时间")
+    download_url: Optional[str] = Field(None, description="MinIO对象路径")
+    excel_time: Optional[datetime] = Field(None, description="最后Excel生成时间")
     tags: List[ResourcePackageTag] = Field(default_factory=list, description="标签列表")
     permissions: List[ResourcePackagePermission] = Field(default_factory=list, description="权限列表")
     
@@ -231,6 +247,10 @@ class ResourcePackageResponse(BaseModel):
     created_by: int
     created_at: datetime
     updated_at: datetime
+    # 展示下载与生成信息
+    download_time: Optional[datetime] = Field(None, description="最后下载时间")
+    download_url: Optional[str] = Field(None, description="MinIO对象路径")
+    excel_time: Optional[datetime] = Field(None, description="最后Excel生成时间")
     tags: List[ResourcePackageTag] = Field(default_factory=list, description="标签列表")
     permissions: List[ResourcePackagePermission] = Field(default_factory=list, description="权限列表")
     

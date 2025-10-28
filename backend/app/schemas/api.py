@@ -101,6 +101,7 @@ class CustomApiCreate(CustomApiBase):
     """
     
     customer_id: int = Field(..., description="客户ID")
+    resource_type_id: Optional[str] = Field(None, description="资源类型ID")
     status: bool = Field(default=True, description="状态：True-开放，False-停用")
     rate_limit: Optional[int] = Field(None, ge=1, le=10000, description="频率限制（每分钟）")
     require_authentication: bool = Field(default=True, description="是否需要认证")
@@ -131,6 +132,8 @@ class CustomApiUpdate(BaseModel):
     api_description: Optional[str] = Field(None, max_length=1000, description="API描述")
     http_method: Optional[HttpMethodEnum] = Field(None, description="HTTP方法")
     response_format: Optional[ResponseFormatEnum] = Field(None, description="响应格式")
+    resource_type_id: Optional[str] = Field(None, description="资源类型ID")
+    is_active: Optional[bool] = Field(None, description="是否激活（前端兼容字段）")
     status: Optional[bool] = Field(None, description="状态")
     rate_limit: Optional[int] = Field(None, ge=1, le=10000, description="频率限制")
     require_authentication: Optional[bool] = Field(None, description="是否需要认证")
@@ -147,6 +150,7 @@ class CustomApiResponse(CustomApiBase):
     
     id: int = Field(description="API ID")
     customer_id: int = Field(description="客户ID")
+    resource_type_id: Optional[str] = Field(None, description="资源类型ID")
     status: bool = Field(description="状态")
     rate_limit: Optional[int] = Field(description="频率限制")
     require_authentication: bool = Field(description="是否需要认证")
@@ -196,6 +200,8 @@ class ApiFieldBase(BaseModel):
     field_label: Optional[str] = Field(None, min_length=1, max_length=100, description="字段标签")
     field_type: FieldTypeEnum = Field(..., description="字段类型")
     is_required: bool = Field(default=False, description="是否必填")
+    # 是否上传：1 为勾选，0 为不勾选
+    is_upload: Optional[int] = Field(default=0, description="是否上传(1/0)")
     default_value: Optional[str] = Field(None, description="默认值")
     max_length: Optional[int] = Field(None, description="最大长度")
     min_length: Optional[int] = Field(None, description="最小长度")
@@ -245,6 +251,8 @@ class ApiFieldUpdate(BaseModel):
     field_label: Optional[str] = Field(None, max_length=100, description="字段标签")
     field_type: Optional[FieldTypeEnum] = Field(None, description="字段类型")
     is_required: Optional[bool] = Field(None, description="是否必填")
+    # 是否上传：1 为勾选，0 为不勾选
+    is_upload: Optional[int] = Field(None, description="是否上传(1/0)")
     default_value: Optional[str] = Field(None, description="默认值")
     max_length: Optional[int] = Field(None, description="最大长度")
     min_length: Optional[int] = Field(None, description="最小长度")

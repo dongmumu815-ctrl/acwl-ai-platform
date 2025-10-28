@@ -11,10 +11,12 @@ from contextlib import asynccontextmanager
 from app.api.v1.api import api_router
 from app.api.v1.multi_database import router as multi_db_router
 from app.core.config import settings
-from app.core.database import init_db, close_db
+from app.core.database import init_db, close_db, engine
 from app.core.multi_db_manager import get_multi_db_manager
 from app.core.exceptions import ACWLException
 import logging
+from app.core.middleware.user_operation_logging import UserOperationLoggingMiddleware
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,45 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
         logger.info("主数据库初始化成功")
+        # 确保用户操作日志相关表存在（MySQL）
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS user_operation_logs (
+                  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                  request_id VARCHAR(64),
+                  user_id BIGINT NULL,
+                  username VARCHAR(255),
+                  method VARCHAR(16),
+                  path TEXT,
+                  url TEXT,
+                  status_code INT,
+                  result_status VARCHAR(32),
+                  ip_address VARCHAR(64),
+                  duration_ms INT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """
+            ))
+            await conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS user_operation_log_details (
+                  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                  log_id BIGINT,
+                  request_headers TEXT,
+                  query_params TEXT,
+                  request_body TEXT,
+                  response_body TEXT,
+                  error_message TEXT,
+                  stack_trace TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  CONSTRAINT fk_user_operation_log_details_log
+                    FOREIGN KEY (log_id) REFERENCES user_operation_logs(id)
+                    ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """
+            ))
+        logger.info("用户操作日志表检查/创建完成")
     except Exception as e:
         logger.warning(f"主数据库初始化失败，应用将继续启动: {e}")
         logger.info("应用将使用多数据库功能，主数据库功能可能不可用")
@@ -94,11 +135,14 @@ async def acwl_exception_handler(request: Request, exc: ACWLException):
 # Set up CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 添加用户操作日志中间件
+app.add_middleware(UserOperationLoggingMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)

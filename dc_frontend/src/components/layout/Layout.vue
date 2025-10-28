@@ -9,13 +9,13 @@
         <div class="logo">
           <img 
             v-if="!isCollapsed" 
-            src="/logo.svg" 
+            :src="logoUrl" 
             alt="数据资源中心" 
             class="logo-img"
           >
           <img 
             v-else 
-            src="/logo-mini.svg" 
+            :src="logoUrl" 
             alt="DRC" 
             class="logo-img-mini"
           >
@@ -81,6 +81,7 @@ import AppHeader from './components/AppHeader.vue'
 import AppFooter from './components/AppFooter.vue'
 import Breadcrumb from './components/Breadcrumb.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import logoUrl from '@/assets/logo2.png'
 
 /**
  * 布局组件

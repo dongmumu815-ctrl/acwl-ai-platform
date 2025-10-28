@@ -59,6 +59,7 @@ class DataResourceType(Base):
     create_time: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),
+        default=func.current_timestamp(),
         nullable=True,
         comment="创建时间"
     )
@@ -66,6 +67,7 @@ class DataResourceType(Base):
     update_time: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),
+        default=func.current_timestamp(),
         onupdate=func.current_timestamp(),
         nullable=True,
         comment="更新时间"

@@ -395,8 +395,10 @@ const dataTablePagination = reactive({
 // 计算属性
 const filteredColumns = computed(() => {
   if (!tableDetail.value?.columns) return []
-  // 过滤掉列名为 batch_id 的列
-  return tableDetail.value.columns.filter(column => column.column_name !== 'batch_id')
+  // 过滤掉列名为 batch_id 和 batch_code 的列
+  return tableDetail.value.columns.filter(column => 
+    column.column_name !== 'batch_id' && column.column_name !== 'batch_code'
+  )
 })
 
 const paginatedTableData = computed(() => {
