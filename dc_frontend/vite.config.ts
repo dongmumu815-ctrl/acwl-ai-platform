@@ -34,15 +34,22 @@ export default defineConfig({
     proxy: {
       // 只代理以 /api/v1 开头的请求到后端
       '^/api/v1/.*': {
-        target: 'http://localhost:8082',
+        target: 'http://10.20.1.200:8082',
         changeOrigin: true
       },
       // 代理其他 /api 开头但不是前端路由的请求
       '^/api/(?!.*management).*': {
-        target: 'http://localhost:8082',
+        target: 'http://10.20.1.200:8082',
         changeOrigin: true
       }
     }
+  },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern-compiler', // 使用新的 Sass API
+      },
+    },
   },
   build: {
     outDir: resolve(__dirname, '../backend/ui'),

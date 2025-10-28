@@ -7,8 +7,8 @@
           <h1 class="page-title">
             <el-icon><Box /></el-icon>
             资源包管理
+            <span class="page-description">管理和配置数据查询资源包，支持SQL和Elasticsearch查询</span>
           </h1>
-          <p class="page-description">管理和配置数据查询资源包，支持SQL和Elasticsearch查询</p>
         </div>
         <div class="header-right">
           <!-- <el-button type="primary" @click="handleCreate">
@@ -1440,13 +1440,13 @@ const onEditSuccess = () => {
 <style scoped>
 .resource-package-page {
   padding: 20px;
-  background-color: #f5f7fa;
+  background-color: var(--el-bg-color-page);
   min-height: 100vh;
 }
 
 /* 页面头部 */
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .header-content {
@@ -1462,7 +1462,7 @@ const onEditSuccess = () => {
 .page-title {
   margin: 0 0 8px 0;
   color: #303133;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -1470,10 +1470,12 @@ const onEditSuccess = () => {
 }
 
 .page-description {
+  /* flex中靠下 */
+  align-self: flex-end; 
   margin: 0;
   color: #606266;
   font-size: 14px;
-  line-height: 1.5;
+  font-weight: 400;
 }
 
 .header-right {
@@ -1483,12 +1485,12 @@ const onEditSuccess = () => {
 
 /* 统计卡片 */
 .stats-cards {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .stat-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 24px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   border: 1px solid #ebeef5;
@@ -1550,7 +1552,7 @@ const onEditSuccess = () => {
 
 /* 筛选区域 */
 .filter-section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 /* 资源包列表 */
@@ -1579,7 +1581,7 @@ const onEditSuccess = () => {
 
 .package-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid #ebeef5;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -1793,6 +1795,9 @@ const onEditSuccess = () => {
 }
 
 /* Element Plus 样式覆盖 */
+:deep(.el-card) {
+  border-radius: 10px;
+}
 :deep(.el-card__body) {
   padding: 24px;
 }

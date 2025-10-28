@@ -702,7 +702,7 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/variables.scss';
+@use "@/styles/variables.scss" as *;
 
 .statistics-dashboard {
   height: 100%;

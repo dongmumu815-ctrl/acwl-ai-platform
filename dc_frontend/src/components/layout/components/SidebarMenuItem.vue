@@ -117,7 +117,7 @@ function isExternalLink(path: string): boolean {
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/variables.scss';
+@use "@/styles/variables.scss" as *;
 
 .sidebar-menu-item {
   // 外部链接图标样式
