@@ -14,7 +14,7 @@
               placeholder="选择字段"
               :disabled="availableFieldNames.length === 0"
             >
-              <el-option v-for="f in availableFieldNames" :key="f" :label="f" :value="f" />
+              <el-option v-for="f in availableFieldNames" :key="f" :label="getFieldDisplayName(f)" :value="f" />
             </el-select>
             <el-input
               v-model="defaultSearchValue"
@@ -72,7 +72,7 @@
             </el-select>
 
             <el-select v-model="c.field" size="small" style="width: 180px" filterable :disabled="availableFieldNames.length===0">
-              <el-option v-for="f in availableFieldNames" :key="f" :label="f" :value="f" />
+              <el-option v-for="f in availableFieldNames" :key="f" :label="getFieldDisplayName(f)" :value="f" />
             </el-select>
 
             <el-select v-model="c.type" size="small" style="width: 140px">
@@ -173,7 +173,7 @@
             <div class="table-container">
               <el-table :data="processedRecords" border stripe :size="compactMode ? 'small' : 'default'" style="width: 100%" @sort-change="onSortChange" @row-click="openRowDetail">
                 <el-table-column type="index" label="#" width="60" />
-                <el-table-column v-for="col in displayFields" :key="col" :prop="col" :label="col" min-width="160" :show-overflow-tooltip="!wrapLongText" sortable="custom">
+                <el-table-column v-for="col in displayFields" :key="col" :prop="col" :label="getFieldDisplayName(col)" min-width="160" :show-overflow-tooltip="!wrapLongText" sortable="custom">
                   <template #default="{ row }">
                     <span 
                       class="cell" 
@@ -186,7 +186,7 @@
               </el-table>
               <el-dialog v-model="detailVisible" title="数据详情" width="600px">
                 <el-descriptions column="1" border>
-                  <el-descriptions-item v-for="f in displayFields" :key="f" :label="f">
+                  <el-descriptions-item v-for="f in displayFields" :key="f" :label="getFieldDisplayName(f)">
                     <span v-if="typeof selectedRow?.[f] === 'object'">{{ JSON.stringify(selectedRow?.[f], null, 2) }}</span>
                     <span v-else>{{ selectedRow?.[f] }}</span>
                   </el-descriptions-item>
@@ -226,7 +226,7 @@
                     <template v-for="chunk in buildCardChunks(row)">
                       <div class="card-row" :class="{ wide: chunk.wide }">
                         <div v-for="f in chunk.fields" :key="f" class="kv">
-                          <span class="k">{{ f }}</span>
+                          <span class="k">{{ getFieldDisplayName(f) }}</span>
                           <span 
                             class="v" 
                             :class="{ wrap: wrapLongText }" 
@@ -322,10 +322,29 @@ const historyDownloadLoading = ref(false)
 const templateDetail = ref<any | null>(null)
 const fixedConditions = ref<any[]>([])
 const sourceFields = ref<string[]>([])
-const availableFields = ref<Array<{ name: string; type?: string }>>([])
+const availableFields = ref<Array<{ name: string; type?: string; comment?: string; display_name?: string }>>([])
+const fieldMappings = ref<Record<string, { name: string; type: string; comment?: string; display_name: string }>>({})
 const availableFieldNames = computed(() => sourceFields.value.length > 0 
   ? sourceFields.value 
   : availableFields.value.map(f => f.name))
+
+// 获取字段显示名称的函数
+const getFieldDisplayName = (fieldName: string): string => {
+  console.log(`getFieldDisplayName 被调用，fieldName: ${fieldName}`)
+  
+  if (fieldMappings.value && fieldMappings.value[fieldName]) {
+    const fieldMapping = fieldMappings.value[fieldName]
+    console.log(`找到字段映射:`, fieldMapping)
+    
+    if (fieldMapping.comment) {
+      console.log(`返回 comment: ${fieldMapping.comment}`)
+      return fieldMapping.comment
+    }
+  }
+  
+  console.log(`返回原始字段名: ${fieldName}`)
+  return fieldName
+}
 const selectedIndices = ref<string[]>([])
 
 type Logic = 'must' | 'should' | 'must_not'
@@ -670,7 +689,21 @@ async function executeQuery() {
     if (dsl._source) req._source = dsl._source
     if (dsl.aggs) req.aggs = dsl.aggs
     const resp = await executeESQuery(req)
-    results.value = resp?.data || resp
+    
+    // 处理字段映射信息 - 后端返回的完整数据在 resp 中，ES查询结果在 resp.data 中
+    console.log('完整的 API 响应:', resp)
+    
+    // 从 resp.data 中获取 fieldMappings（现在包含在 data 字段中）
+    if (resp?.data?.fieldMappings) {
+      fieldMappings.value = resp.data.fieldMappings
+      console.log('fieldMappings 已更新:', fieldMappings.value)
+    } else {
+      console.log('未收到 fieldMappings 数据')
+    }
+    
+    // ES查询结果数据（从 resp.data 中获取，排除 stats 和 fieldMappings）
+    const { stats, fieldMappings: _, ...esData } = resp?.data || {}
+    results.value = esData
 
     // 计算全局字段顺序（基于值长度的升序）
     computeFieldOrder()

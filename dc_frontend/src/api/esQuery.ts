@@ -187,6 +187,7 @@ export function getESFieldMapping(datasourceId: number, indices: string[]): Prom
 export function executeESQuery(queryRequest: ESQueryRequest): Promise<{ 
   data: ESQueryResponse
   stats: ESQueryStats
+  fieldMappings?: Record<string, { name: string; type: string; comment?: string; display_name: string }>
 }> {
   return request({
     url: '/es/query',
