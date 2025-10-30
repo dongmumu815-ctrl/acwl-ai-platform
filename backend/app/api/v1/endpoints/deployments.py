@@ -12,7 +12,7 @@ from typing import List, Optional
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError, ValidationError
 from app.models.user import User
-from app.models.deployment import Deployment, DeploymentStatus, DeploymentType, DeploymentGPU
+from app.models.deployment import Deployment, DeploymentStatus, DeploymentType, DeploymentGPU, DeploymentTemplate, DeploymentMetrics
 from app.models.server import Server, GPUResource
 from app.schemas.common import PaginatedResponse, IDResponse
 from app.schemas.deployment import DeploymentCreate, DeploymentUpdate, DeploymentResponse, DeploymentListResponse
@@ -28,19 +28,67 @@ async def get_deployments(
     search: str = Query(None, description="搜索关键词"),
     deployment_type: Optional[DeploymentType] = Query(None, description="部署类型"),
     status: Optional[DeploymentStatus] = Query(None, description="部署状态"),
+    environment: str = Query(None, description="环境筛选"),
+    sort_by: str = Query("created_at", description="排序字段"),
+    sort_order: str = Query("desc", description="排序方向"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """获取部署列表"""
+    from app.models.model import Model
+    from sqlalchemy import and_, or_, desc, asc
+    from sqlalchemy.orm import selectinload
     
-    # 构建查询
-    query = select(Deployment)
-    
-    # 搜索条件
-    if search:
-        query = query.where(
-            Deployment.deployment_name.contains(search)
+    # 构建三表关联查询
+    # 主查询：部署表关联模型表，左连接最新的metrics数据
+    latest_metrics_subquery = (
+        select(
+            DeploymentMetrics.deployment_id,
+            DeploymentMetrics.cpu_utilization,
+            DeploymentMetrics.memory_used,
+            DeploymentMetrics.gpu_utilization,
+            DeploymentMetrics.request_count,
+            DeploymentMetrics.average_latency,
+            DeploymentMetrics.error_count,
+            func.row_number().over(
+                partition_by=DeploymentMetrics.deployment_id,
+                order_by=DeploymentMetrics.timestamp.desc()
+            ).label('rn')
         )
+        .subquery()
+    )
+    
+    latest_metrics = (
+        select(latest_metrics_subquery)
+        .where(latest_metrics_subquery.c.rn == 1)
+        .subquery()
+    )
+    
+    # 主查询
+    query = (
+        select(
+            Deployment,
+            Model.name.label('model_name'),
+            Model.version.label('model_version'),
+            Model.model_type.label('model_type'),
+            latest_metrics.c.cpu_utilization,
+            latest_metrics.c.memory_used,
+            latest_metrics.c.gpu_utilization,
+            latest_metrics.c.request_count,
+            latest_metrics.c.average_latency,
+            latest_metrics.c.error_count
+        )
+        .join(Model, Deployment.model_id == Model.id)
+        .outerjoin(latest_metrics, Deployment.id == latest_metrics.c.deployment_id)
+    )
+    
+    # 搜索条件 - 支持搜索部署名称和模型名称
+    if search:
+        search_condition = or_(
+            Deployment.deployment_name.contains(search),
+            Model.name.contains(search)
+        )
+        query = query.where(search_condition)
     
     # 类型筛选
     if deployment_type:
@@ -50,14 +98,41 @@ async def get_deployments(
     if status:
         query = query.where(Deployment.status == status)
     
-    # 获取总数
-    count_query = select(func.count(Deployment.id))
+    # 环境筛选
+    # if environment:
+    #     query = query.where(Deployment.runtime_env == environment)
+    
+    # 排序
+    if sort_by == "created_at":
+        order_column = Deployment.created_at
+    elif sort_by == "request_count":
+        order_column = latest_metrics.c.request_count
+    elif sort_by == "cpu_usage" or sort_by == "cpu_utilization":
+        order_column = latest_metrics.c.cpu_utilization
+    else:
+        order_column = Deployment.created_at
+    
+    if sort_order.lower() == "asc":
+        query = query.order_by(asc(order_column))
+    else:
+        query = query.order_by(desc(order_column))
+    
+    # 获取总数 - 使用相同的筛选条件
+    count_query = (
+        select(func.count(Deployment.id))
+        .join(Model, Deployment.model_id == Model.id)
+    )
+    
     if search:
-        count_query = count_query.where(
-            Deployment.deployment_name.contains(search)
+        search_condition = or_(
+            Deployment.deployment_name.contains(search),
+            Model.name.contains(search)
         )
+        count_query = count_query.where(search_condition)
+    
     if deployment_type:
         count_query = count_query.where(Deployment.deployment_type == deployment_type)
+    
     if status:
         count_query = count_query.where(Deployment.status == status)
     
@@ -66,10 +141,53 @@ async def get_deployments(
     
     # 分页查询
     offset = (page - 1) * size
-    query = query.offset(offset).limit(size).order_by(Deployment.created_at.desc())
+    query = query.offset(offset).limit(size)
     
     result = await db.execute(query)
-    deployments = result.scalars().all()
+    rows = result.all()
+    
+    # 构建响应数据
+    deployments = []
+    for row in rows:
+        deployment = row.Deployment
+        # 构建包含关联数据的部署对象
+        deployment_dict = {
+            "id": deployment.id,
+            "deployment_name": deployment.deployment_name,
+            "deployment_type": deployment.deployment_type,
+            "model_id": deployment.model_id,
+            "server_id": deployment.server_id,
+            "status": deployment.status,
+            "endpoint_url": deployment.endpoint_url,
+            "deploy_path": deployment.deploy_path,
+            "config": deployment.config,
+            "gpu_config": deployment.gpu_config,
+            "runtime_env": deployment.runtime_env,
+            "restart_policy": deployment.restart_policy,
+            "max_concurrent_requests": deployment.max_concurrent_requests,
+            "deployment_logs": deployment.deployment_logs,
+            "created_at": deployment.created_at,
+            "updated_at": deployment.updated_at,
+            "created_by": deployment.created_by,
+            "updated_by": deployment.updated_by,
+            # 关联的模型信息
+            "model": {
+                "id": deployment.model_id,
+                "name": row.model_name,
+                "version": row.model_version,
+                "model_type": row.model_type
+            },
+            # 最新的metrics数据
+            "latest_metrics": {
+                "cpu_utilization": row.cpu_utilization,
+                "memory_used": row.memory_used,
+                "gpu_utilization": row.gpu_utilization,
+                "request_count": row.request_count or 0,
+                "average_latency": row.average_latency,
+                "error_count": row.error_count or 0
+            }
+        }
+        deployments.append(deployment_dict)
     
     return DeploymentListResponse(
         items=deployments,
@@ -78,6 +196,57 @@ async def get_deployments(
         size=size,
         pages=(total + size - 1) // size
     )
+
+
+@router.get("/stats", summary="获取部署统计信息")
+async def get_deployment_stats(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取部署统计信息"""
+    
+    # 获取总部署数
+    total_result = await db.execute(select(func.count(Deployment.id)))
+    total_count = total_result.scalar() or 0
+    
+    # 获取运行中的部署数
+    running_result = await db.execute(
+        select(func.count(Deployment.id)).where(Deployment.status == DeploymentStatus.RUNNING)
+    )
+    running_count = running_result.scalar() or 0
+    
+    # 获取已停止的部署数
+    stopped_result = await db.execute(
+        select(func.count(Deployment.id)).where(Deployment.status == DeploymentStatus.STOPPED)
+    )
+    stopped_count = stopped_result.scalar() or 0
+    
+    # 获取错误状态的部署数
+    error_result = await db.execute(
+        select(func.count(Deployment.id)).where(Deployment.status == DeploymentStatus.FAILED)
+    )
+    error_count = error_result.scalar() or 0
+    
+    # 获取部署中的部署数
+    deploying_result = await db.execute(
+        select(func.count(Deployment.id)).where(Deployment.status == DeploymentStatus.DEPLOYING)
+    )
+    deploying_count = deploying_result.scalar() or 0
+    
+    # 获取总请求数（从acwl_deployment_metrics表的request_count字段求和）
+    total_requests_result = await db.execute(
+        select(func.sum(DeploymentMetrics.request_count)).where(DeploymentMetrics.request_count.is_not(None))
+    )
+    total_requests = total_requests_result.scalar() or 0
+    
+    return {
+        "total_count": total_count,
+        "running_count": running_count,
+        "stopped_count": stopped_count,
+        "failed_count": error_count,
+        "deploying_count": deploying_count,
+        "total_requests": total_requests
+    }
 
 
 @router.get("/{deployment_id}", summary="获取部署详情", response_model=DeploymentResponse)
@@ -384,6 +553,7 @@ async def get_server_gpus(
     }
     
     return {"gpus": gpu_data.get(server_id, [])}
+
 
 
 @router.get("/{deployment_id}/logs", summary="获取部署日志")

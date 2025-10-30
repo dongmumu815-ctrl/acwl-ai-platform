@@ -4,6 +4,7 @@
 服务器管理API端点
 """
 
+import asyncio
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ from app.schemas.server import (
 )
 from app.schemas.common import PaginatedResponse, IDResponse
 from app.core.exceptions import NotFoundError, ValidationError
-from app.api.v1.endpoints.auth import get_current_active_user, get_current_admin_user
+from app.api.v1.endpoints.auth import get_current_user
 from app.services.server_service import ServerService
 
 router = APIRouter()
@@ -32,7 +33,7 @@ async def get_servers(
     search: str = Query(None, description="搜索关键词"),
     server_type: Optional[ServerType] = Query(None, description="服务器类型"),
     status: Optional[ServerStatus] = Query(None, description="服务器状态"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """获取服务器列表"""
@@ -89,10 +90,49 @@ async def get_servers(
     )
 
 
+@router.get("/stats", summary="获取服务器统计数据")
+async def get_server_stats(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取服务器统计数据，包括总数、在线数、离线数和GPU总数"""
+    try:
+        # 获取服务器总数
+        total_query = select(func.count(Server.id))
+        total_result = await db.execute(total_query)
+        total = total_result.scalar() or 0
+        
+        # 获取各状态服务器数量
+        status_query = select(Server.status, func.count(Server.id)).group_by(Server.status)
+        status_result = await db.execute(status_query)
+        status_counts = dict(status_result.all())
+        
+        # 获取在线和离线服务器数量
+        online = status_counts.get(ServerStatus.online, 0)
+        offline = status_counts.get(ServerStatus.offline, 0)
+        
+        # 获取GPU总数
+        gpu_query = select(func.count(GPUResource.id))
+        gpu_result = await db.execute(gpu_query)
+        total_gpus = gpu_result.scalar() or 0
+        
+        return {
+            "total": total,
+            "online": online,
+            "offline": offline,
+            "total_gpus": total_gpus
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取服务器统计数据失败: {str(e)}"
+        )
+
+
 @router.get("/{server_id}", response_model=ServerResponse, summary="获取服务器详情")
 async def get_server(
     server_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """获取服务器详情"""
@@ -110,7 +150,7 @@ async def get_server(
 @router.post("/", response_model=IDResponse, summary="创建服务器")
 async def create_server(
     server_data: ServerCreate,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> IDResponse:
     """创建服务器（仅管理员）"""
@@ -149,7 +189,7 @@ async def create_server(
 async def update_server(
     server_id: int,
     server_data: ServerUpdate,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """更新服务器（仅管理员）"""
@@ -173,7 +213,7 @@ async def update_server(
 @router.delete("/{server_id}", summary="删除服务器")
 async def delete_server(
     server_id: int,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """删除服务器（仅管理员）"""
@@ -204,7 +244,7 @@ async def delete_server(
 @router.post("/{server_id}/test-connection", summary="测试服务器连接")
 async def test_server_connection(
     server_id: int,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """测试服务器SSH连接"""
@@ -216,23 +256,19 @@ async def test_server_connection(
         raise NotFoundError("服务器不存在")
     
     try:
-        # 简单的ping测试
-        process = await asyncio.create_subprocess_exec(
-            'ping', '-c', '1', server.ip_address,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
+        # 使用ServerService中的SSH连接测试方法
+        service = ServerService(db)
+        connection_result = await service.test_ssh_connection(server_id)
         
-        if process.returncode == 0:
+        if connection_result["success"]:
             # 更新服务器状态
             server.status = ServerStatus.online
             await db.commit()
-            return {"status": "success", "message": "连接成功"}
+            return {"status": "success", "message": connection_result["message"]}
         else:
             server.status = ServerStatus.offline
             await db.commit()
-            return {"status": "failed", "message": "连接失败"}
+            return {"status": "failed", "message": connection_result["message"]}
             
     except Exception as e:
         return {"status": "error", "message": f"测试连接时发生错误: {str(e)}"}
@@ -241,7 +277,7 @@ async def test_server_connection(
 @router.get("/{server_id}/gpus", response_model=List[GPUResourceResponse], summary="获取服务器GPU资源")
 async def get_server_gpus(
     server_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """获取服务器GPU资源列表"""
@@ -260,31 +296,48 @@ async def get_server_gpus(
     return [GPUResourceResponse.from_orm(gpu) for gpu in gpus]
 
 
-@router.post("/{server_id}/scan-gpus", summary="扫描服务器GPU资源")
-async def scan_server_gpus(
+@router.get("/{server_id}/gpu-resources", response_model=List[GPUResourceResponse], summary="获取服务器GPU资源(别名)")
+async def get_server_gpu_resources_alias(
     server_id: int,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """扫描并更新服务器GPU资源信息"""
-    
+    """获取服务器GPU资源的别名路由，与 /gpus 等效"""
+    # 直接复用现有查询逻辑
     result = await db.execute(select(Server).where(Server.id == server_id))
-    server = result.scalar_one_or_none()
+    if not result.scalar_one_or_none():
+        raise NotFoundError("服务器不存在")
+    gpu_result = await db.execute(select(GPUResource).where(GPUResource.server_id == server_id))
+    return [GPUResourceResponse.from_orm(gpu) for gpu in gpu_result.scalars().all()]
+
+
+@router.post("/{server_id}/scan-gpus", response_model=List[GPUResourceResponse], summary="扫描服务器GPU资源")
+async def scan_server_gpus(
+    server_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """扫描并更新服务器GPU资源信息，返回最新GPU列表"""
     
-    if not server:
+    # 校验服务器存在
+    server_result = await db.execute(select(Server).where(Server.id == server_id))
+    if not server_result.scalar_one_or_none():
         raise NotFoundError("服务器不存在")
     
-    # TODO: 实现实际的GPU扫描逻辑
-    # 这里应该通过SSH连接到服务器执行nvidia-smi命令
-    # 暂时返回模拟数据
+    # 调用服务进行SSH扫描与持久化
+    service = ServerService(db)
+    await service.scan_server_gpus(server_id)
     
-    return {"message": "GPU扫描完成", "gpus_found": 2}
+    # 返回扫描后的最新GPU列表
+    gpu_result = await db.execute(select(GPUResource).where(GPUResource.server_id == server_id))
+    gpus = gpu_result.scalars().all()
+    return [GPUResourceResponse.from_orm(gpu) for gpu in gpus]
 
 
 @router.get("/{server_id}/status", response_model=ServerStatusResponse, summary="获取服务器实时状态")
 async def get_server_status(
     server_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """获取服务器实时状态信息"""

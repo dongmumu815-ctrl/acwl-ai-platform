@@ -32,7 +32,7 @@
               <el-icon><Monitor /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stats.total }}</div>
+              <div class="stat-value">{{ stats.total_count }}</div>
               <div class="stat-label">总部署数</div>
             </div>
           </div>
@@ -44,7 +44,7 @@
               <el-icon><VideoPlay /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stats.running }}</div>
+              <div class="stat-value">{{ stats.running_count }}</div>
               <div class="stat-label">运行中</div>
             </div>
           </div>
@@ -56,7 +56,7 @@
               <el-icon><VideoPause /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stats.stopped }}</div>
+              <div class="stat-value">{{ stats.stopped_count }}</div>
               <div class="stat-label">已停止</div>
             </div>
           </div>
@@ -82,8 +82,8 @@
         <el-form :model="filters" inline>
           <el-form-item label="搜索">
             <el-input
-              v-model="filters.search"
-              placeholder="搜索部署名称或模型"
+              v-model="filters.keyword"
+              placeholder="搜索部署名称"
               clearable
               style="width: 250px"
               @input="handleSearch"
@@ -106,22 +106,24 @@
               <el-option label="运行中" value="running" />
               <el-option label="已停止" value="stopped" />
               <el-option label="部署中" value="deploying" />
-              <el-option label="错误" value="error" />
+              <el-option label="失败" value="failed" />
             </el-select>
           </el-form-item>
           
           <el-form-item label="环境">
             <el-select
-              v-model="filters.environment"
-              placeholder="选择环境"
+              v-model="filters.env_id"
+              placeholder="全部环境"
               clearable
-              style="width: 120px"
+              style="width: 180px"
               @change="handleFilter"
             >
-              <el-option label="全部" value="" />
-              <el-option label="开发" value="development" />
-              <el-option label="测试" value="testing" />
-              <el-option label="生产" value="production" />
+              <el-option
+                v-for="env in environments"
+                :key="env.id"
+                :label="env.name"
+                :value="env.id"
+              />
             </el-select>
           </el-form-item>
           
@@ -132,7 +134,6 @@
               @change="handleSort"
             >
               <el-option label="创建时间" value="created_at" />
-              <el-option label="更新时间" value="updated_at" />
               <el-option label="请求数" value="request_count" />
               <el-option label="CPU使用率" value="cpu_usage" />
             </el-select>
@@ -203,7 +204,7 @@
                     </div>
                     <div class="meta-item">
                       <el-icon><Location /></el-icon>
-                      <span>{{ getEnvironmentText(deployment.environment) }}</span>
+                      <span>{{ getEnvironmentNameById(deployment.env_id) }}</span>
                     </div>
                     <div class="meta-item">
                       <el-icon><Connection /></el-icon>
@@ -375,9 +376,9 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="environment" label="环境" width="100">
+            <el-table-column prop="env_id" label="环境" width="100">
               <template #default="{ row }">
-                <el-tag size="small">{{ getEnvironmentText(row.environment) }}</el-tag>
+                <el-tag size="small">{{ getEnvironmentNameById(row.env_id) }}</el-tag>
               </template>
             </el-table-column>
             
@@ -484,7 +485,7 @@
             v-model:current-page="pagination.currentPage"
             v-model:page-size="pagination.pageSize"
             :page-sizes="[10, 20, 50, 100]"
-            :total="filteredDeployments.length"
+            :total="totalCount"
             layout="total, sizes, prev, pager, next, jumper"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
@@ -503,13 +504,13 @@ import {
   Monitor,
   Plus,
   Refresh,
+  RefreshLeft,
+  Search,
+  Grid,
+  List,
   VideoPlay,
   VideoPause,
   Connection,
-  Search,
-  RefreshLeft,
-  Grid,
-  List,
   Calendar,
   Location,
   Cpu,
@@ -522,6 +523,8 @@ import {
   ScaleToOriginal,
   Delete
 } from '@element-plus/icons-vue'
+import { deploymentApi, type DeploymentStats } from '@/api/deployments'
+import { environmentApi } from '@/api/environments'
 
 const router = useRouter()
 
@@ -530,17 +533,27 @@ const viewMode = ref('grid')
 
 // 统计数据
 const stats = reactive({
-  total: 0,
-  running: 0,
-  stopped: 0,
-  totalRequests: 0
+  total_count: 0,
+  running_count: 0,
+  stopped_count: 0,
+  failed_count: 0,
+  deploying_count: 0,
+  total_requests: 0,
+  type_stats: {} as Record<string, number>,
+  status_distribution: {
+    running: 0,
+    stopped: 0,
+    failed: 0,
+    deploying: 0
+  },
+  totalRequests: 0 // 保留用于显示，从部署列表计算
 })
 
 // 筛选条件
 const filters = reactive({
-  search: '',
+  keyword: '',
   status: '',
-  environment: '',
+  env_id: '',
   sortBy: 'created_at'
 })
 
@@ -550,48 +563,19 @@ const pagination = reactive({
   pageSize: 20
 })
 
-// 部署列表
+// 响应式数据
 const deployments = ref<any[]>([])
+const totalCount = ref(0)
+const environments = ref<any[]>([])
 
-// 计算属性
+// 计算属性 - 现在直接使用API返回的数据，不需要本地过滤
 const filteredDeployments = computed(() => {
-  let result = [...deployments.value]
-  
-  // 搜索过滤
-  if (filters.search) {
-    const search = filters.search.toLowerCase()
-    result = result.filter(deployment => 
-      deployment.name.toLowerCase().includes(search) ||
-      deployment.model_name.toLowerCase().includes(search)
-    )
-  }
-  
-  // 状态过滤
-  if (filters.status) {
-    result = result.filter(deployment => deployment.status === filters.status)
-  }
-  
-  // 环境过滤
-  if (filters.environment) {
-    result = result.filter(deployment => deployment.environment === filters.environment)
-  }
-  
-  // 排序
-  result.sort((a, b) => {
-    const field = filters.sortBy
-    if (field === 'created_at' || field === 'updated_at') {
-      return new Date(b[field]).getTime() - new Date(a[field]).getTime()
-    }
-    return b[field] - a[field]
-  })
-  
-  return result
+  return deployments.value
 })
 
 const paginatedDeployments = computed(() => {
-  const start = (pagination.currentPage - 1) * pagination.pageSize
-  const end = start + pagination.pageSize
-  return filteredDeployments.value.slice(start, end)
+  // 由于API已经处理了分页，直接返回所有数据
+  return deployments.value
 })
 
 // 方法
@@ -637,6 +621,11 @@ const getEnvironmentText = (environment: string) => {
   return envMap[environment] || environment
 }
 
+const getEnvironmentNameById = (id: string | number) => {
+  const env = environments.value.find((e: any) => e.id === id)
+  return env ? env.name : String(id || '')
+}
+
 const getUsageColor = (usage: number) => {
   if (usage >= 80) return '#f56c6c'
   if (usage >= 60) return '#e6a23c'
@@ -645,104 +634,79 @@ const getUsageColor = (usage: number) => {
 
 const handleSearch = () => {
   pagination.currentPage = 1
+  refreshDeployments()
 }
 
 const handleFilter = () => {
   pagination.currentPage = 1
+  refreshDeployments()
 }
 
 const handleSort = () => {
   pagination.currentPage = 1
+  refreshDeployments()
 }
 
 const resetFilters = () => {
-  filters.search = ''
+  filters.keyword = ''
   filters.status = ''
-  filters.environment = ''
+  filters.env_id = ''
   filters.sortBy = 'created_at'
   pagination.currentPage = 1
+  refreshDeployments()
 }
 
 const handleTableSort = ({ prop, order }: any) => {
   if (order) {
     filters.sortBy = prop
+    refreshDeployments()
   }
 }
 
 const handleSizeChange = (size: number) => {
   pagination.pageSize = size
   pagination.currentPage = 1
+  refreshDeployments()
 }
 
 const handleCurrentChange = (page: number) => {
   pagination.currentPage = page
+  refreshDeployments()
 }
 
 const refreshDeployments = async () => {
   try {
-    // 这里应该调用实际的API
-    // const response = await deploymentApi.getDeployments()
-    // deployments.value = response.data
+    const queryParams = {
+      page: pagination.currentPage,
+      size: pagination.pageSize,
+      keyword: filters.keyword || undefined,
+      status: filters.status || undefined,
+      env_id: filters.env_id || undefined,
+      sort_by: filters.sortBy || 'created_at',
+      sort_order: 'desc'
+    }
     
-    // 模拟数据
-    deployments.value = [
-      {
-        id: '1',
-        name: 'chatgpt-api-prod',
-        model_name: 'ChatGPT-3.5-Turbo',
-        status: 'running',
-        environment: 'production',
-        cpu_usage: 45,
-        memory_usage: 62,
-        gpu_usage: 78,
-        request_count: 125430,
-        endpoint: 'https://api.example.com/v1/chat/completions',
-        created_at: '2024-01-15T10:30:00Z',
-        updated_at: '2024-01-20T15:45:00Z'
-      },
-      {
-        id: '2',
-        name: 'bert-classifier-test',
-        model_name: 'BERT-Base-Chinese',
-        status: 'stopped',
-        environment: 'testing',
-        cpu_usage: 0,
-        memory_usage: 0,
-        request_count: 8560,
-        endpoint: 'https://test-api.example.com/v1/classify',
-        created_at: '2024-01-10T08:20:00Z',
-        updated_at: '2024-01-18T12:30:00Z'
-      },
-      {
-        id: '3',
-        name: 'resnet-image-dev',
-        model_name: 'ResNet-50',
-        status: 'deploying',
-        environment: 'development',
-        cpu_usage: 25,
-        memory_usage: 35,
-        request_count: 432,
-        endpoint: 'https://dev-api.example.com/v1/image/classify',
-        created_at: '2024-01-08T14:15:00Z',
-        updated_at: '2024-01-16T09:20:00Z'
-      },
-      {
-        id: '4',
-        name: 'whisper-transcribe',
-        model_name: 'Whisper-Large',
-        status: 'error',
-        environment: 'production',
-        cpu_usage: 0,
-        memory_usage: 0,
-        gpu_usage: 0,
-        request_count: 2340,
-        endpoint: 'https://api.example.com/v1/audio/transcribe',
-        created_at: '2024-01-05T16:45:00Z',
-        updated_at: '2024-01-19T11:10:00Z'
-      }
-    ]
+    const response = await deploymentApi.getDeployments(queryParams)
     
-    // 更新统计数据
+    deployments.value = (response.items || []).map((deployment: any) => ({
+      id: deployment.id?.toString?.() ?? String(deployment.id),
+      name: deployment.deployment_name || deployment.name,
+      model_name: deployment.model?.name || deployment.model_name || 'Unknown Model',
+      status: deployment.status,
+      env_id: deployment.env_id,
+      cpu_usage: deployment.latest_metrics?.cpu_utilization || 0,
+      memory_usage: parseFloat(deployment.latest_metrics?.memory_used?.replace(/[^\d.]/g, '') || '0'),
+      gpu_usage: deployment.latest_metrics?.gpu_utilization ? 
+        Object.values(deployment.latest_metrics.gpu_utilization)[0] || 0 : 0,
+      request_count: deployment.latest_metrics?.request_count || 0,
+      endpoint: deployment.endpoint_url || '',
+      created_at: deployment.created_at,
+      updated_at: deployment.updated_at,
+      _original: deployment
+    }))
+    
+    totalCount.value = response.total || deployments.value.length
+    
     updateStats()
     
     ElMessage.success('部署列表已刷新')
@@ -752,15 +716,48 @@ const refreshDeployments = async () => {
   }
 }
 
-const updateStats = () => {
-  stats.total = deployments.value.length
-  stats.running = deployments.value.filter(d => d.status === 'running').length
-  stats.stopped = deployments.value.filter(d => d.status === 'stopped').length
-  stats.totalRequests = deployments.value.reduce((sum, d) => sum + d.request_count, 0)
+// 获取统计数据
+const fetchStats = async () => {
+  try {
+    const statsData = await deploymentApi.getDeploymentStats()
+    Object.assign(stats, statsData)
+    
+    // 使用API返回的总请求数
+    stats.totalRequests = statsData.total_requests || 0
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+    ElMessage.error('获取统计数据失败')
+  }
 }
 
-const createDeployment = () => {
-  router.push('/deployments/create')
+const updateStats = () => {
+  stats.total_count = deployments.value.length
+  stats.running_count = deployments.value.filter(d => d.status === 'running').length
+  stats.stopped_count = deployments.value.filter(d => d.status === 'stopped').length
+  stats.failed_count = deployments.value.filter(d => d.status === 'failed').length
+  stats.deploying_count = deployments.value.filter(d => d.status === 'deploying').length
+  stats.totalRequests = deployments.value.reduce((sum, d) => sum + (d.request_count || 0), 0)
+  
+  // 更新状态分布
+  stats.status_distribution = {
+    running: stats.running_count,
+    stopped: stats.stopped_count,
+    failed: stats.failed_count,
+    deploying: stats.deploying_count
+  }
+}
+
+const createDeployment = async () => {
+  try {
+    const res = await environmentApi.getEnvironments({ page: 1, size: 100 })
+    const items = (res as any).items || []
+    sessionStorage.setItem('cachedEnvironments', JSON.stringify(items))
+  } catch (e) {
+    console.error('查询环境失败:', e)
+    // 不中断跳转，保障创建流程
+  } finally {
+    router.push('/deployments/create')
+  }
 }
 
 const viewDeployment = (deployment: any) => {
@@ -885,8 +882,23 @@ const copyEndpoint = async (endpoint: string) => {
   }
 }
 
-onMounted(() => {
-  refreshDeployments()
+onMounted(async () => {
+  const cached = sessionStorage.getItem('cachedEnvironments')
+  if (cached) {
+    try {
+      environments.value = JSON.parse(cached) || []
+    } catch {}
+  }
+  if (!environments.value || environments.value.length === 0) {
+    try {
+      const res = await environmentApi.getEnvironments({ page: 1, size: 100 })
+      environments.value = (res as any).items || []
+    } catch (e) {
+      console.error('加载环境列表失败:', e)
+      ElMessage.error('加载环境列表失败')
+    }
+  }
+  await refreshDeployments()
 })
 </script>
 

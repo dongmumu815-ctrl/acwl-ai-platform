@@ -4,7 +4,7 @@
 部署相关数据库模型
 """
 
-from sqlalchemy import Integer, String, Text, Boolean, TIMESTAMP, JSON, ForeignKey, Enum
+from sqlalchemy import Integer, String, Text, Boolean, TIMESTAMP, JSON, ForeignKey, Enum, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
 import enum
@@ -26,7 +26,7 @@ class DeploymentType(str, enum.Enum):
 
 class DeploymentStatus(str, enum.Enum):
     """部署状态枚举"""
-    PENDING = "pending"
+    DEPLOYING = "deploying"
     RUNNING = "running"
     STOPPED = "stopped"
     FAILED = "failed"
@@ -59,7 +59,11 @@ class Deployment(Base, TimestampMixin, UserMixin):
     )
     
     deployment_type: Mapped[DeploymentType] = mapped_column(
-        Enum(DeploymentType),
+        Enum(
+            DeploymentType,
+            values_callable=lambda x: [e.value for e in x],
+            native_enum=False
+        ),
         nullable=False,
         comment="部署类型：vLLM、Ollama、HuggingFace或其他"
     )
@@ -72,9 +76,9 @@ class Deployment(Base, TimestampMixin, UserMixin):
     )
     
     status: Mapped[DeploymentStatus] = mapped_column(
-        Enum(DeploymentStatus),
+        Enum(DeploymentStatus, values_callable=lambda x: [e.value for e in x], native_enum=False),
         nullable=False,
-        comment="部署状态：待处理、运行中、已停止、失败"
+        comment="部署状态：部署中、运行中、已停止、失败"
     )
     
     endpoint_url: Mapped[Optional[str]] = mapped_column(
@@ -138,6 +142,12 @@ class Deployment(Base, TimestampMixin, UserMixin):
     
     deployment_gpus: Mapped[List["DeploymentGPU"]] = relationship(
         "DeploymentGPU",
+        back_populates="deployment",
+        cascade="all, delete-orphan"
+    )
+    
+    metrics: Mapped[List["DeploymentMetrics"]] = relationship(
+        "DeploymentMetrics",
         back_populates="deployment",
         cascade="all, delete-orphan"
     )
@@ -229,7 +239,11 @@ class DeploymentTemplate(Base, TimestampMixin, UserMixin):
     )
     
     deployment_type: Mapped[DeploymentType] = mapped_column(
-        Enum(DeploymentType),
+        Enum(
+            DeploymentType,
+            values_callable=lambda x: [e.value for e in x],
+            native_enum=False
+        ),
         nullable=False,
         comment="部署类型"
     )
@@ -242,3 +256,93 @@ class DeploymentTemplate(Base, TimestampMixin, UserMixin):
     
     def __repr__(self) -> str:
         return f"<DeploymentTemplate(id={self.id}, name='{self.name}', type='{self.deployment_type}')>"
+
+
+class DeploymentMetrics(Base):
+    """部署监控表"""
+    
+    __tablename__ = "acwl_deployment_metrics"
+    __table_args__ = {"comment": "部署监控表，记录部署实例的性能指标"}
+    
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+        comment="指标ID，自增主键"
+    )
+    
+    deployment_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("acwl_deployments.id"),
+        nullable=False,
+        comment="部署ID"
+    )
+    
+    timestamp: Mapped[TIMESTAMP] = mapped_column(
+        TIMESTAMP,
+        server_default="CURRENT_TIMESTAMP",
+        comment="记录时间"
+    )
+    
+    gpu_utilization: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="GPU利用率"
+    )
+    
+    gpu_memory_used: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="GPU内存使用"
+    )
+    
+    cpu_utilization: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        comment="CPU利用率"
+    )
+    
+    memory_used: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="内存使用"
+    )
+    
+    request_count: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="请求数"
+    )
+    
+    average_latency: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="平均延迟(毫秒)"
+    )
+    
+    p95_latency: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="95%延迟(毫秒)"
+    )
+    
+    p99_latency: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="99%延迟(毫秒)"
+    )
+    
+    error_count: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="错误数"
+    )
+    
+    # 关联关系
+    deployment: Mapped["Deployment"] = relationship(
+        "Deployment",
+        back_populates="metrics"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<DeploymentMetrics(id={self.id}, deployment_id={self.deployment_id}, timestamp={self.timestamp})>"

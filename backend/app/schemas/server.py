@@ -29,7 +29,7 @@ class ServerStatus(str, Enum):
 class ServerBase(BaseModel):
     """服务器基础模型"""
     name: str = Field(..., description="服务器名称", max_length=100)
-    ip_address: str = Field(..., description="服务器IP地址", max_length=45)
+    ip_address: str = Field(..., description="服务器地址（IP或域名）", max_length=253)
     ssh_port: int = Field(default=22, description="SSH端口")
     ssh_username: Optional[str] = Field(None, description="SSH用户名", max_length=50)
     ssh_key_path: Optional[str] = Field(None, description="SSH密钥路径")
@@ -48,12 +48,30 @@ class ServerCreate(ServerBase):
     
     @validator('ip_address')
     def validate_ip_address(cls, v):
+        import re
         import ipaddress
+        v = (v or '').strip()
+        if not v:
+            raise ValueError('请输入地址')
+        if v.lower() == 'localhost':
+            return v
+        # 协议/路径不允许
+        if '://' in v or '/' in v:
+            raise ValueError('请输入主机名（IP或域名），不要包含协议或路径')
+        # 先尝试作为 IP（支持 IPv4/IPv6）
         try:
             ipaddress.ip_address(v)
+            return v
         except ValueError:
-            raise ValueError('无效的IP地址格式')
-        return v
+            pass
+        # 如果包含冒号但不是 IPv6，可能是端口，拒绝（端口应使用独立字段）
+        if ':' in v and not re.fullmatch(r'[0-9a-fA-F:]+', v):
+            raise ValueError('请不要在地址中包含端口')
+        # 主机名（允许单标签或 FQDN），每个标签 1-63，总长 <= 253
+        hostname_pattern = re.compile(r'^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*$')
+        if hostname_pattern.fullmatch(v):
+            return v
+        raise ValueError('无效的地址格式（需为IP或域名）')
     
     @validator('ssh_port')
     def validate_ssh_port(cls, v):
@@ -65,6 +83,7 @@ class ServerCreate(ServerBase):
 class ServerUpdate(BaseModel):
     """更新服务器模型"""
     name: Optional[str] = Field(None, description="服务器名称")
+    ip_address: Optional[str] = Field(None, description="服务器IP地址")
     ssh_port: Optional[int] = Field(None, description="SSH端口")
     ssh_username: Optional[str] = Field(None, description="SSH用户名")
     ssh_key_path: Optional[str] = Field(None, description="SSH密钥路径")
@@ -75,6 +94,39 @@ class ServerUpdate(BaseModel):
     total_memory: Optional[str] = Field(None, description="总内存")
     total_storage: Optional[str] = Field(None, description="总存储空间")
     total_cpu_cores: Optional[int] = Field(None, description="总CPU核心数")
+
+    @validator('ip_address')
+    def validate_ip_address(cls, v):
+        import re
+        import ipaddress
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            return v
+        if v.lower() == 'localhost':
+            return v
+        if '://' in v or '/' in v:
+            raise ValueError('请输入主机名（IP或域名），不要包含协议或路径')
+        try:
+            ipaddress.ip_address(v)
+            return v
+        except ValueError:
+            pass
+        if ':' in v and not re.fullmatch(r'[0-9a-fA-F:]+', v):
+            raise ValueError('请不要在地址中包含端口')
+        hostname_pattern = re.compile(r'^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*$')
+        if hostname_pattern.fullmatch(v):
+            return v
+        raise ValueError('无效的地址格式（需为IP或域名）')
+
+    @validator('ssh_port')
+    def validate_ssh_port(cls, v):
+        if v is None:
+            return v
+        if not 1 <= v <= 65535:
+            raise ValueError('SSH端口必须在1-65535之间')
+        return v
 
 
 class GPUResourceResponse(BaseModel):

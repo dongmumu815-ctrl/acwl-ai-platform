@@ -66,6 +66,7 @@ from .es_query_template import ESQueryTemplate
 from .sql_query_template import SQLQueryTemplate
 from .role import Role, UserRole, RolePermission
 from .permission import Permission
+from .environment import Environment
 from .resource_package import (
     ResourcePackage,
     ResourcePackagePermission,
@@ -199,4 +200,5 @@ __all__ = [
     "ResourcePackagePermission",
     "ResourcePackageQueryHistory",
     "ResourcePackageTag",
+    "Environment",
 ]

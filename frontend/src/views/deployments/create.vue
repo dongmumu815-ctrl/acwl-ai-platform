@@ -53,11 +53,14 @@
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item label="环境" prop="environment">
-                  <el-select v-model="formData.basic.environment" style="width: 100%">
-                    <el-option label="开发环境" value="development" />
-                    <el-option label="测试环境" value="testing" />
-                    <el-option label="生产环境" value="production" />
+                <el-form-item label="环境" prop="env_id">
+                  <el-select v-model="formData.basic.env_id" style="width: 100%">
+                    <el-option
+                      v-for="env in environments"
+                      :key="env.id"
+                      :label="env.name"
+                      :value="env.id"
+                    />
                   </el-select>
                 </el-form-item>
               </el-col>
@@ -228,11 +231,11 @@
                   </div>
                   <div class="spec-item">
                     <span class="label">GPU:</span>
-                    <span class="value">{{ server.gpu_count }} 个</span>
+                    <span class="value">{{ server.gpu_resources?.length || 0 }} 个</span>
                   </div>
                   <div class="spec-item">
                     <span class="label">可用GPU:</span>
-                    <span class="value">{{ server.available_gpu_count }} 个</span>
+                    <span class="value">{{ (server.gpu_resources || []).filter(r => r.is_available).length }} 个</span>
                   </div>
                 </div>
                 
@@ -309,14 +312,18 @@
                 
                 <div v-if="formData.gpus.some(g => g.id === gpu.id)" class="gpu-config">
                   <el-form-item label="显存限制" size="small">
-                    <el-input-number
-                      v-model="getGpuConfig(gpu.id).memory_limit"
-                      :min="1"
-                      :max="parseInt(gpu.memory_size)"
-                      size="small"
-                      style="width: 100%"
-                    />
-                    <span class="unit">GB</span>
+                    <div class="memory-limit-input">
+                      <el-input-number
+                        v-model="getGpuConfig(gpu.id).memory_limit"
+                        :min="1"
+                        :max="parseInt(gpu.memory_size)"
+                        size="small"
+                        controls-position="right"
+                        :precision="0"
+                        style="width: 100%"
+                      />
+                      <span class="unit">GB</span>
+                    </div>
                   </el-form-item>
                 </div>
               </div>
@@ -469,7 +476,7 @@
                 {{ formData.basic.name }}
               </el-descriptions-item>
               <el-descriptions-item label="环境">
-                {{ getEnvironmentText(formData.basic.environment) }}
+                {{ getEnvironmentNameById(formData.basic.env_id) }}
               </el-descriptions-item>
               <el-descriptions-item label="模型">
                 {{ formData.model.name }}
@@ -551,7 +558,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -564,6 +571,9 @@ import {
   CircleCheckFilled,
   CircleCloseFilled
 } from '@element-plus/icons-vue'
+import { environmentApi, type Environment } from '@/api/environments'
+import { modelApi, type Model } from '@/api/models'
+import { getServers, type ServerResponse } from '@/api/servers'
 
 const router = useRouter()
 
@@ -574,12 +584,13 @@ const modelSearchQuery = ref('')
 const tagInputVisible = ref(false)
 const tagInputValue = ref('')
 const tagInputRef = ref()
+const environments = ref<Environment[]>([])
 
 // 表单数据
 const formData = reactive({
   basic: {
     name: '',
-    environment: 'development',
+    env_id: '',
     description: '',
     tags: [] as string[]
   },
@@ -617,7 +628,7 @@ const basicRules = {
     { required: true, message: '请输入部署名称', trigger: 'blur' },
     { min: 3, max: 50, message: '长度在 3 到 50 个字符', trigger: 'blur' }
   ],
-  environment: [
+  env_id: [
     { required: true, message: '请选择环境', trigger: 'change' }
   ]
 }
@@ -641,107 +652,77 @@ const basicFormRef = ref()
 const deployFormRef = ref()
 
 // 模拟数据
-const models = ref([
-  {
-    id: '1',
-    name: 'ChatGPT-3.5-Turbo',
-    description: '强大的对话AI模型，适用于聊天机器人和问答系统',
-    type: 'Language Model',
-    framework: 'PyTorch',
-    size: '13GB',
-    status: 'ready',
-    created_at: '2024-01-15T10:30:00Z',
-    requirements: {
-      cpu: '4核',
-      memory: '16GB',
-      gpu: '1x A100'
-    }
-  },
-  {
-    id: '2',
-    name: 'BERT-Base-Chinese',
-    description: '中文文本分类和情感分析模型',
-    type: 'Classification',
-    framework: 'TensorFlow',
-    size: '1.2GB',
-    status: 'ready',
-    created_at: '2024-01-10T08:20:00Z',
-    requirements: {
-      cpu: '2核',
-      memory: '8GB'
-    }
-  },
-  {
-    id: '3',
-    name: 'ResNet-50',
-    description: '图像分类和特征提取模型',
-    type: 'Computer Vision',
-    framework: 'PyTorch',
-    size: '98MB',
-    status: 'ready',
-    created_at: '2024-01-08T14:15:00Z',
-    requirements: {
-      cpu: '2核',
-      memory: '4GB',
-      gpu: '1x RTX 3080'
-    }
-  }
-])
+const models = ref<any[]>([])
 
-const availableServers = ref([
-  {
-    id: 1,
-    name: 'GPU-Server-01',
-    ip_address: '10.20.1.201',
-    status: 'online',
-    total_cpu_cores: 32,
-    total_memory: '128GB',
-    gpu_count: 2,
-    available_gpu_count: 1,
-    cpu_usage: 45,
-    memory_usage: 62
-  },
-  {
-    id: 2,
-    name: 'GPU-Server-02',
-    ip_address: '10.20.1.202',
-    status: 'online',
-    total_cpu_cores: 64,
-    total_memory: '256GB',
-    gpu_count: 4,
-    available_gpu_count: 3,
-    cpu_usage: 30,
-    memory_usage: 45
-  },
-  {
-    id: 3,
-    name: 'Cloud-Server-01',
-    ip_address: '10.20.1.203',
-    status: 'offline',
-    total_cpu_cores: 16,
-    total_memory: '64GB',
-    gpu_count: 1,
-    available_gpu_count: 0,
-    cpu_usage: 0,
-    memory_usage: 0
+// 服务端查询模型并映射到UI需要的结构
+const mapToUiModel = (m: Model) => ({
+  id: m.id,
+  name: m.name,
+  description: m.description || '',
+  type: m.model_type,
+  framework: m.framework || '',
+  size: m.model_size ? `${m.model_size}MB` : '',
+  status: m.is_active ? 'ready' : 'inactive',
+  created_at: m.created_at,
+  requirements: null
+})
+
+const fetchModels = async (search?: string) => {
+  try {
+    const res = await modelApi.getModels({ page: 1, size: 50, search: search || undefined, is_active: true })
+    models.value = (res.items || []).map(mapToUiModel)
+  } catch (e) {
+    console.error('加载模型列表失败:', e)
+    ElMessage.error('加载模型列表失败')
   }
-])
+}
+
+// 替换静态服务器列表为接口数据
+const availableServers = ref<any[]>([])
+
+// 修复重复定义与语法错误：确保只有一个 mapServerToUi 且无多余符号
+const mapServerToUi = (s: ServerResponse) => ({
+  id: s.id,
+  name: s.name,
+  ip_address: s.ip_address,
+  status: s.status || 'offline',
+  total_cpu_cores: s.total_cpu_cores ?? 0,
+  total_memory: s.total_memory || '',
+  gpu_count: (s as any).gpu_resources?.length ?? (s.gpu_count ?? 0),
+  available_gpu_count: ((s as any).gpu_resources || []).filter((r: any) => r.is_available).length,
+  gpu_resources: (s as any).gpu_resources || [],
+  cpu_usage: 0,
+  memory_usage: 0
+})
+
+const fetchServers = async () => {
+  try {
+    const res: any = await getServers({ page: 1, size: 100, status: 'online' })
+    const list = (res?.data?.data) || (res?.items) || (res?.data?.items) || (res?.data) || []
+    availableServers.value = (list || []).map(mapServerToUi)
+  } catch (e) {
+    console.error('加载服务器列表失败:', e)
+    ElMessage.error('加载服务器列表失败')
+  }
+}
 
 const serverGpus = ref<any[]>([])
 
 // 计算属性
 const filteredModels = computed(() => {
+  // 服务端搜索已返回结果，保持原有本地过滤以增强体验
   if (!modelSearchQuery.value) return models.value
-  return models.value.filter(model => 
-    model.name.toLowerCase().includes(modelSearchQuery.value.toLowerCase()) ||
-    model.description.toLowerCase().includes(modelSearchQuery.value.toLowerCase())
+  const q = modelSearchQuery.value.toLowerCase()
+  return models.value.filter(model =>
+    (model.name || '').toLowerCase().includes(q) ||
+    (model.description || '').toLowerCase().includes(q)
   )
 })
 
 const canProceed = computed(() => {
   switch (currentStep.value) {
     case 0:
-      return formData.basic.name && formData.basic.environment
+      return formData.basic.name && formData.basic.env_id
     case 1:
       return formData.model.id
     case 2:
@@ -798,8 +779,8 @@ const selectServer = async (server: any) => {
   formData.server = { ...server }
   formData.gpus = [] // 清空已选择的GPU
   
-  // 加载服务器的GPU资源
-  await loadServerGpus(server.id)
+  // 直接展示该服务器的GPU资源（来源于服务器对象）
+  serverGpus.value = server.gpu_resources || []
 }
 
 const loadServerGpus = async (serverId: number) => {
@@ -965,37 +946,60 @@ const getServerStatusText = (status: string) => {
   return statusMap[status] || status
 }
 
+// 给进度条选择颜色
+const getUsageColor = (percentage: number) => {
+  if (percentage < 50) return '#10b981' // 绿色，低使用率
+  if (percentage < 80) return '#f59e0b' // 橙色，中等使用率
+  return '#ef4444' // 红色，高使用率
+}
+
 const getEnvironmentText = (environment: string) => {
-  const envMap: Record<string, string> = {
-    development: '开发环境',
-    testing: '测试环境',
-    production: '生产环境'
-  }
-  return envMap[environment] || environment
+  // 动态环境名称直接返回
+  return environment
 }
 
-const getDeploymentTypeText = (type: string) => {
-  const typeMap: Record<string, string> = {
-    docker: 'Docker容器',
-    k8s: 'Kubernetes',
-    direct: '直接部署'
-  }
-  return typeMap[type] || type
-}
-
-const getUsageColor = (usage: number) => {
-  if (usage >= 80) return '#f56c6c'
-  if (usage >= 60) return '#e6a23c'
-  return '#67c23a'
+const getEnvironmentNameById = (id: string | number) => {
+  const env = environments.value.find((e: any) => e.id === id)
+  return env ? env.name : String(id || '')
 }
 
 // 生命周期
-onMounted(() => {
-  // 初始化数据
+onMounted(async () => {
+  // 优先使用列表页预取的缓存
+  const cached = sessionStorage.getItem('cachedEnvironments')
+  if (cached) {
+    try {
+      environments.value = JSON.parse(cached)
+      sessionStorage.removeItem('cachedEnvironments')
+    } catch {}
+  }
+  // 若无缓存或解析失败，主动查询环境列表
+  if (environments.value.length === 0) {
+    try {
+      const res = await environmentApi.getEnvironments({ page: 1, size: 100 })
+      environments.value = res.items || []
+    } catch (e) {
+      console.error('加载环境列表失败:', e)
+      ElMessage.error('加载环境列表失败')
+    }
+  }
+  // 加载模型列表（初始不带搜索）
+  await fetchModels()
+  // 加载在线服务器列表
+  await fetchServers()
+})
+
+// 监听搜索框输入，做防抖并触发服务端搜索
+let searchTimer: any
+watch(modelSearchQuery, (val) => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    fetchModels(val)
+  }, 300)
 })
 </script>
-
-<style scoped>
+ 
+ <style scoped>
 .create-deployment-page {
   padding: 20px;
   max-width: 1200px;

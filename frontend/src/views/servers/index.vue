@@ -115,6 +115,15 @@
             <el-option label="维护中" value="maintenance" />
           </el-select>
         </el-col>
+        <!-- 搜索与重置按钮区域（已移除搜索按钮，仅保留重置） -->
+        <el-col :xs="24" :sm="8">
+          <div class="search-actions">
+            <el-button @click="resetSearch">
+              <el-icon><Refresh /></el-icon>
+              重置
+            </el-button>
+          </div>
+        </el-col>
       </el-row>
     </div>
 
@@ -184,7 +193,7 @@
               </div>
               <div class="detail-item">
                 <span class="label">GPU:</span>
-                <span class="value">{{ server.gpu_count || 0 }} 个</span>
+                <span class="value">{{ server.gpu_resources?.length || 0 }} 个</span>
               </div>
               <div class="detail-item">
                 <span class="label">部署:</span>
@@ -387,8 +396,8 @@
           <el-input v-model="formData.name" placeholder="请输入服务器名称" />
         </el-form-item>
         
-        <el-form-item label="IP地址" prop="ip_address">
-          <el-input v-model="formData.ip_address" placeholder="请输入IP地址" />
+        <el-form-item label="IP地址或域名" prop="ip_address">
+          <el-input v-model="formData.ip_address" placeholder="请输入IP或域名" />
         </el-form-item>
         
         <el-form-item label="SSH端口" prop="ssh_port">
@@ -405,7 +414,16 @@
         </el-form-item>
 
         <el-form-item label="SSH密码" prop="ssh_password">
-          <el-input v-model="formData.ssh_password" placeholder="请输入SSH密码" />
+          <el-input 
+            v-model="formData.ssh_password" 
+            type="password" 
+            placeholder="请输入SSH密码" 
+            show-password 
+          />
+        </el-form-item>
+        
+        <el-form-item label="SSH密钥路径" prop="ssh_key_path">
+          <el-input v-model="formData.ssh_key_path" placeholder="如: ~/.ssh/id_rsa" />
         </el-form-item>
         
         <el-form-item label="服务器类型" prop="server_type">
@@ -496,8 +514,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { createServer, updateServer } from '@/api/servers'
+import { ElMessage, ElMessageBox, ElTable } from 'element-plus'
+import { getServers, createServer, updateServer, deleteServer, getServerStats, getServerGpuResources, scanServerGpus, testServerConnection } from '@/api/servers'
 
 import {
   Monitor,
@@ -529,6 +547,7 @@ const gpuDialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const submitting = ref(false)
 const currentServer = ref<any>(null)
+const serverId = ref<number>(0)
 const viewMode = ref('grid')
 
 // 分页
@@ -557,6 +576,7 @@ const formData = reactive({
   ssh_port: 22,
   ssh_username: '',
   ssh_password:'',
+  ssh_key_path: '',
   server_type: 'physical',
   os_info: '',
   total_memory: '',
@@ -565,8 +585,25 @@ const formData = reactive({
 })
 
 // 表单验证规则
+const validateIpOrDomain = (rule: any, value: string, callback: (error?: Error) => void) => {
+  const v = (value || '').trim()
+  const hasProtocol = v.includes('://')
+  const hasSlash = v.includes('/')
+  const hasPort = v.includes(':')
+  const ipv4 = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/
+  const hostname = /^(localhost|(?:[a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,63})$/
+  if (!v) return callback(new Error('请输入IP或域名'))
+  if (hasProtocol || hasSlash || hasPort) return callback(new Error('请不要包含协议、路径或端口'))
+  if (ipv4.test(v) || hostname.test(v)) return callback()
+  return callback(new Error('请输入有效的IP或域名'))
+}
+
 const formRules = {
   name: [{ required: true, message: '请输入服务器名称', trigger: 'blur' }],
+  ip_address: [
+    { required: true, message: '请输入IP或域名', trigger: 'blur' },
+    { validator: validateIpOrDomain, trigger: 'blur' }
+  ],
   ssh_port: [{ required: true, message: '请输入SSH端口', trigger: 'blur' }],
   server_type: [{ required: true, message: '请选择服务器类型', trigger: 'change' }]
 }
@@ -588,68 +625,86 @@ const filteredServers = computed(() => {
 })
 
 // 方法
-const loadServers = async () => {
+// 新增：独立统计数据获取方法，保证与列表查询解耦
+const fetchStats = async () => {
   try {
-    // TODO: 调用API获取服务器列表
-    // 模拟数据
-    servers.value = [
-      {
-        id: 1,
-        name: 'GPU-Server-01',
-        ip_address: '10.20.1.201',
-        server_type: 'physical',
-        status: 'online',
-        os_info: 'Ubuntu 22.04 LTS',
-        total_memory: '128GB',
-        total_cpu_cores: 32,
-        gpu_count: 2,
-        deployment_count: 3,
-        testing: false
-      },
-      {
-        id: 2,
-        name: 'GPU-Server-02',
-        ip_address: '10.20.1.202',
-        server_type: 'physical',
-        status: 'online',
-        os_info: 'Ubuntu 22.04 LTS',
-        total_memory: '256GB',
-        total_cpu_cores: 64,
-        gpu_count: 4,
-        deployment_count: 1,
-        testing: false
-      },
-      {
-        id: 3,
-        name: 'Cloud-Server-01',
-        ip_address: '10.20.1.203',
-        server_type: 'cloud',
-        status: 'offline',
-        os_info: 'Ubuntu 20.04 LTS',
-        total_memory: '64GB',
-        total_cpu_cores: 16,
-        gpu_count: 1,
-        deployment_count: 0,
-        testing: false
-      }
-    ]
-    
-    // 更新统计数据
-    stats.total = servers.value.length
-    stats.online = servers.value.filter(s => s.status === 'online').length
-    stats.offline = servers.value.filter(s => s.status === 'offline').length
-    stats.totalGpus = servers.value.reduce((sum, s) => sum + (s.gpu_count || 0), 0)
-    
-    pagination.total = servers.value.length
+    const statsResponse = await getServerStats()
+    console.log('服务器统计数据:', statsResponse)
+    const s = (statsResponse && (statsResponse as any).data) ? (statsResponse as any).data : statsResponse
+    stats.total = (s as any)?.total ?? 0
+    stats.online = (s as any)?.online ?? 0
+    stats.offline = (s as any)?.offline ?? 0
+    stats.totalGpus = (s as any)?.total_gpus ?? 0
   } catch (error) {
-    ElMessage.error('加载服务器列表失败')
+    console.error('获取服务器统计数据失败:', error)
   }
 }
 
-const refreshServers = () => {
-  loadServers()
-  ElMessage.success('刷新成功')
+const loadServers = async (opts?: { fetchStats?: boolean }) => {
+  try {
+    // 根据选项决定是否刷新统计
+    if ((opts?.fetchStats ?? true) === true) {
+      await fetchStats()
+    }
+
+    // 获取分页列表数据（携带查询参数）
+    const params = {
+      page: pagination.currentPage,
+      size: pagination.pageSize,
+      search: (searchQuery.value?.trim() || undefined),
+      server_type: (filterType.value || undefined),
+      status: (filterStatus.value || undefined)
+    }
+    console.log('列表查询参数:', params)
+
+    const response = await getServers(params)
+    console.log('服务器列表数据:', response)
+
+    // 适配多种可能的API响应结构
+    let serverList = []
+    if (response.data?.items) {
+      serverList = response.data.items
+    } else if (Array.isArray(response.data)) {
+      serverList = response.data
+    } else if (response.items) {
+      serverList = response.items
+    } else if (response.data?.data) {
+      serverList = response.data.data
+    }
+
+    console.log('解析后的服务器列表:', serverList)
+    servers.value = serverList || []
+
+    // 如果有分页信息，使用分页总数
+    pagination.total = response.data?.total || response.total || serverList?.length || 0
+  } catch (error) {
+    ElMessage.error('加载服务器列表失败')
+    console.error('加载服务器列表错误:', error)
+  }
 }
+
+const handleSearch = () => {
+  pagination.currentPage = 1
+  // 只刷新列表，不刷新统计
+  loadServers({ fetchStats: false })
+}
+
+const handleFilter = () => {
+  pagination.currentPage = 1
+  // 只刷新列表，不刷新统计
+  loadServers({ fetchStats: false })
+}
+
+const refreshServers = () => {
+  // 刷新按钮完整刷新统计与列表
+  loadServers({ fetchStats: true })
+}
+
+// 生命周期
+onMounted(() => {
+  // 首次进入页面，获取统计与列表
+  loadServers({ fetchStats: true })
+})
 
 const showCreateDialog = () => {
   dialogMode.value = 'create'
@@ -664,6 +719,7 @@ const resetForm = () => {
     ssh_port: 22,
     ssh_username: '',
     ssh_password: '',
+    ssh_key_path: '',
     server_type: 'physical',
     os_info: '',
     total_memory: '',
@@ -679,9 +735,9 @@ const submitForm = async () => {
     submitting.value = true
     
     if (dialogMode.value === 'create') {
-      await createServer(formData.value) // formData为表单数据对象
+      await createServer(formData) // 传递 reactive 对象本身
     } else {
-      await updateServer(serverId.value, formData.value) // serverId为要更新的ID
+      await updateServer(serverId.value, formData)
     }
     
     ElMessage.success(dialogMode.value === 'create' 
@@ -701,12 +757,19 @@ const submitForm = async () => {
 const testConnection = async (server: any) => {
   server.testing = true
   try {
-    // TODO: 调用API测试连接
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    ElMessage.success('连接测试成功')
-    server.status = 'online'
-  } catch (error) {
-    ElMessage.error('连接测试失败')
+    // 调用API测试连接
+    const response = await testServerConnection(server.id)
+    
+    // 直接使用响应中的数据，不需要通过response.data访问
+    if (response.status === 'success') {
+      ElMessage.success(response.message || '连接测试成功')
+      server.status = 'online'
+    } else {
+      ElMessage.error(`连接测试失败: ${response.message || '未知错误'}`)
+      server.status = 'offline'
+    }
+  } catch (error: any) {
+    ElMessage.error(`连接测试失败: ${error.response?.data?.message || error.message || '未知错误'}`)
     server.status = 'offline'
   } finally {
     server.testing = false
@@ -721,41 +784,29 @@ const viewGpus = (server: any) => {
 
 const loadGpuResources = async (serverId: number) => {
   try {
-    // TODO: 调用API获取GPU资源
-    // 模拟数据
-    gpuResources.value = [
-      {
-        id: 1,
-        gpu_name: 'NVIDIA A100',
-        gpu_type: 'A100',
-        memory_size: '80GB',
-        cuda_version: '12.1',
-        device_id: '0',
-        is_available: true
-      },
-      {
-        id: 2,
-        gpu_name: 'NVIDIA A100',
-        gpu_type: 'A100',
-        memory_size: '80GB',
-        cuda_version: '12.1',
-        device_id: '1',
-        is_available: false
-      }
-    ]
-  } catch (error) {
-    ElMessage.error('加载GPU资源失败')
+    const res: any = await getServerGpuResources(serverId)
+    const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+    gpuResources.value = list || []
+  } catch (error: any) {
+    console.error('加载GPU资源失败:', error)
+    ElMessage.error(error?.response?.data?.message || '加载GPU资源失败')
   }
 }
 
 const scanGpus = async () => {
   try {
-    // TODO: 调用API扫描GPU
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const serverId = currentServer.value?.id
+    if (!serverId) {
+      ElMessage.warning('请先选择服务器')
+      return
+    }
+    const res: any = await scanServerGpus(serverId)
+    const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+    gpuResources.value = list || []
     ElMessage.success('GPU扫描完成')
-    loadGpuResources(currentServer.value.id)
-  } catch (error) {
-    ElMessage.error('GPU扫描失败')
+  } catch (error: any) {
+    console.error('GPU扫描失败:', error)
+    ElMessage.error(error?.response?.data?.message || 'GPU扫描失败')
   }
 }
 
@@ -763,6 +814,7 @@ const handleServerAction = async ({ action, server }: any) => {
   switch (action) {
     case 'edit':
       dialogMode.value = 'edit'
+      serverId.value = server.id
       Object.assign(formData, server)
       dialogVisible.value = true
       break
@@ -771,6 +823,7 @@ const handleServerAction = async ({ action, server }: any) => {
       router.push('/monitoring')
       break
     case 'scan':
+      currentServer.value = server
       await scanGpus()
       break
     case 'delete':
@@ -778,11 +831,13 @@ const handleServerAction = async ({ action, server }: any) => {
         await ElMessageBox.confirm('确定要删除这个服务器吗？', '确认删除', {
           type: 'warning'
         })
-        // TODO: 调用API删除服务器
+        await deleteServer(server.id)
         ElMessage.success('服务器删除成功')
         loadServers()
       } catch (error) {
-        // 用户取消删除
+        if (error !== 'cancel') {
+          ElMessage.error('删除服务器失败')
+        }
       }
       break
   }
@@ -793,22 +848,23 @@ const viewServerDetail = (server: any) => {
   console.log('查看服务器详情:', server)
 }
 
-const handleSearch = () => {
+// 新增：重置搜索与筛选
+const resetSearch = () => {
+  searchQuery.value = ''
+  filterType.value = ''
+  filterStatus.value = ''
   pagination.currentPage = 1
-}
-
-const handleFilter = () => {
-  pagination.currentPage = 1
+  loadServers()
 }
 
 const handleSizeChange = (size: number) => {
   pagination.pageSize = size
-  loadServers()
+  loadServers({ fetchStats: false })
 }
 
 const handleCurrentChange = (page: number) => {
   pagination.currentPage = page
-  loadServers()
+  loadServers({ fetchStats: false })
 }
 
 const getStatusText = (status: string) => {
@@ -829,10 +885,7 @@ const getTypeText = (type: string) => {
   return typeMap[type] || type
 }
 
-// 生命周期
-onMounted(() => {
-  loadServers()
-})
+// 生命周期（已上移并统一为加载统计+列表）
 </script>
 
 <style scoped>
