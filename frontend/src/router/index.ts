@@ -805,7 +805,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
 
 // 创建路由实例
 const router = createRouter({
-  history: createWebHistory('/ui/'),
+  history: createWebHistory('/ai/'),
   routes: [...constantRoutes, ...asyncRoutes],
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) {
