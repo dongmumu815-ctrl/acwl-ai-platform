@@ -125,7 +125,7 @@
 
         <!-- 新增：行详情弹窗 -->
         <el-dialog v-model="detailVisible" title="数据详情" width="600px">
-          <el-descriptions column="1" border>
+          <el-descriptions :column="1" border>
             <el-descriptions-item v-for="(field, idx) in displayFields" :key="field" :label="field">
               <!-- 如果是PDF字段且有值，显示为可点击链接 -->
               <template v-if="field === 'pdf_url' && selectedRow?.[idx] && selectedRow?.[idx] !== 'null'">
@@ -133,7 +133,7 @@
                   :href="selectedRow[idx]" 
                   target="_blank" 
                   class="pdf-link"
-                  style="color: #409EFF; text-decoration: underline; cursor: pointer;"
+                  style="color: #409EFF; text-decoration: none; cursor: pointer;"
                 >
                   查看PDF文档
                 </a>

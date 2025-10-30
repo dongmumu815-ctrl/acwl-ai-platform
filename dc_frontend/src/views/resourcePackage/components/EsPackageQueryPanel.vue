@@ -38,10 +38,7 @@
                     filterable
                     :disabled="availableFieldNames.length === 0"
                   >
-                    <el-option
-                      label="全部字段"
-                      value=""
-                    />
+                    <el-option label="全部字段" value="" />
                     <el-option
                       v-for="f in availableFieldNames"
                       :key="f"
@@ -58,7 +55,14 @@
                   />
                 </template>
               </el-input>
-              <el-button class="advanced-toggle-btn" size="default" plain type="info" text @click="toggleAdvanced">
+              <el-button
+                class="advanced-toggle-btn"
+                size="default"
+                plain
+                type="info"
+                text
+                @click="toggleAdvanced"
+              >
                 >>高级搜索
               </el-button>
             </div>
@@ -83,13 +87,28 @@
             <div class="qb-header">
               <span class="section-title">高级检索</span>
               <div class="qb-actions">
-                <el-button plain type="primary" size="small" :loading="loading" @click="executeQuery">查询</el-button>
-                <el-button size="small" @click="resetConditions">重置</el-button>
-                <el-button plain type="primary" size="small" @click="addCondition" :disabled="availableFieldNames.length === 0">
+                <el-button
+                  plain
+                  type="primary"
+                  size="small"
+                  :loading="loading"
+                  @click="executeQuery"
+                  >查询</el-button
+                >
+                <el-button size="small" @click="resetConditions"
+                  >重置</el-button
+                >
+                <el-button
+                  plain
+                  type="primary"
+                  size="small"
+                  @click="addCondition"
+                  :disabled="availableFieldNames.length === 0"
+                >
                   <el-icon><Plus /></el-icon>
                   添加条件
                 </el-button>
-                <el-button  size="small" @click="toggleAdvanced">收起</el-button>
+                <el-button size="small" @click="toggleAdvanced">收起</el-button>
               </div>
             </div>
             <div class="conditions" v-show="!conditionsCollapsed">
@@ -243,8 +262,14 @@
                               class="agg-row clickable"
                               @click="onAggBucketClick(String(aggName), bucket)"
                             >
-                              <span class="agg-key">{{ getValueLength(bucket.key) > 40 ? formatText(String(bucket.key), 40) : String(bucket.key) }}</span>
-                              <span class="agg-count">{{ bucket.doc_count }}</span>
+                              <span class="agg-key">{{
+                                getValueLength(bucket.key) > 40
+                                  ? formatText(String(bucket.key), 40)
+                                  : String(bucket.key)
+                              }}</span>
+                              <span class="agg-count">{{
+                                bucket.doc_count
+                              }}</span>
                             </div>
                           </template>
                           <template
@@ -298,7 +323,9 @@
                         >
                           <template #default="{ row }">
                             <span
-                              :class="wrapLongText ? 'cell wrap' : 'cell ellipsis'"
+                              :class="
+                                wrapLongText ? 'cell wrap' : 'cell ellipsis'
+                              "
                               v-html="
                                 formatTextWithHighlight(
                                   formatCell(row[col]),
@@ -323,7 +350,9 @@
                   </template>
 
                   <template v-else>
-                    <div class="result-summary">检索结果：为您检索到 {{ totalHits }} 条结果</div>
+                    <!-- <div class="result-summary">
+                      检索结果：为您检索到 {{ totalHits }} 条结果
+                    </div> -->
                     <div class="cards-container">
                       <div class="cards" :class="{ compact: compactMode }">
                         <el-card
@@ -361,7 +390,9 @@
                                 :key="f"
                                 class="kv"
                               >
-                                <span class="k">{{ getFieldDisplayName(f) }}：</span>
+                                <span class="k"
+                                  >{{ getFieldDisplayName(f) }}：</span
+                                >
                                 <span
                                   class="v"
                                   :class="{ wrap: wrapLongText }"
@@ -376,9 +407,19 @@
                               </div>
                             </div>
                             <!-- 描述字段单独展示（如果存在），使用宽行显示更易读 -->
-                            <div class="card-row wide" v-if="row && 'description' in row && row['description'] !== undefined && row['description'] !== null">
+                            <div
+                              class="card-row wide"
+                              v-if="
+                                row &&
+                                'description' in row &&
+                                row['description'] !== undefined &&
+                                row['description'] !== null
+                              "
+                            >
                               <div class="kv">
-                                <span class="k">{{ getFieldDisplayName('description') }}</span>
+                                <span class="k">{{
+                                  getFieldDisplayName("description")
+                                }}</span>
                                 <span
                                   class="v"
                                   :class="{ wrap: wrapLongText }"
@@ -412,18 +453,26 @@
                   <el-drawer
                     v-model="detailVisible"
                     :with-header="false"
-                    size="80%"
+                    size="60%"
                     class="detail-drawer"
                   >
                     <div class="detail-header">
-                      <el-page-header content="数据详情" @back="detailVisible = false">
+                      <el-page-header
+                        @back="detailVisible = false"
+                      >
                         <template #icon>
-                          <el-icon><ArrowLeft /></el-icon>
+                          <el-icon style="font-size: 22px;"><ArrowLeft /></el-icon>
+                        </template>
+                        <template #title> 
+                          <span style="font-size: 22px;">数据详情</span>  
                         </template>
                       </el-page-header>
                     </div>
                     <div class="detail-body narrow-content">
-                      <el-collapse v-model='activeInfos' class="detail-collapse">
+                      <el-collapse
+                        v-model="activeInfos"
+                        class="detail-collapse"
+                      >
                         <el-collapse-item name="basic">
                           <template #title>
                             <div class="collapse-title">
@@ -432,19 +481,33 @@
                             </div>
                           </template>
                           <div class="collapse-content">
-                            <el-form label-position="left" label-width="180px" class="detail-form">
+                            <el-form
+                              label-position="left"
+                              label-width="180px"
+                              class="detail-form"
+                            >
                               <el-form-item
                                 v-for="f in displayFields"
                                 :key="f"
-                                :label="getFieldDisplayName(f)+'：'"
+                                :label="getFieldDisplayName(f) + '：'"
                               >
                                 <!-- 如果是PDF字段且有值，显示为可点击链接 -->
-                                <template v-if="f === 'pdf_url' && selectedRow?.[f] && selectedRow?.[f] !== 'null'">
-                                  <a 
-                                    :href="selectedRow[f]" 
-                                    target="_blank" 
+                                <template
+                                  v-if="
+                                    f === 'pdf_url' &&
+                                    selectedRow?.[f] &&
+                                    selectedRow?.[f] !== 'null'
+                                  "
+                                >
+                                  <a
+                                    :href="selectedRow[f]"
+                                    target="_blank"
                                     class="pdf-link"
-                                    style="color: #409EFF; text-decoration: underline; cursor: pointer;"
+                                    style="
+                                      color: #409eff;
+                                      text-decoration: none;
+                                      cursor: pointer;
+                                    "
                                   >
                                     查看PDF文档
                                   </a>
@@ -452,9 +515,26 @@
                                 <!-- 其他字段正常显示 -->
                                 <span
                                   v-else
-                                  :class="wrapLongText ? 'cell wrap' : 'cell ellipsis'"
-                                  style="white-space: pre-wrap; word-break: break-word;"
-                                  v-html="formatTextWithHighlight(typeof selectedRow?.[f] === 'object' ? JSON.stringify(selectedRow?.[f], null, 2) : selectedRow?.[f], 500, executedSearchValue)"
+                                  :class="
+                                    wrapLongText ? 'cell wrap' : 'cell ellipsis'
+                                  "
+                                  style="
+                                    white-space: pre-wrap;
+                                    word-break: break-word;
+                                  "
+                                  v-html="
+                                    formatTextWithHighlight(
+                                      typeof selectedRow?.[f] === 'object'
+                                        ? JSON.stringify(
+                                            selectedRow?.[f],
+                                            null,
+                                            2
+                                          )
+                                        : selectedRow?.[f],
+                                      500,
+                                      executedSearchValue
+                                    )
+                                  "
                                 ></span>
                               </el-form-item>
                             </el-form>
@@ -608,7 +688,12 @@ const availableFieldNames = computed(() =>
 const selectedIndices = ref<string[]>([]);
 
 // 字段映射信息，用于显示字段注释
-const fieldMappings = ref<Record<string, { name: string; type: string; comment?: string; display_name: string }>>({});
+const fieldMappings = ref<
+  Record<
+    string,
+    { name: string; type: string; comment?: string; display_name: string }
+  >
+>({});
 
 type Logic = "must" | "should" | "must_not";
 type Cond = { field: string; type: string; value: any; logic: Logic };
@@ -633,7 +718,7 @@ const isFullscreen = ref(false);
 // 左侧聚合展开项（使用 Collapse 组件）
 const activeAggs = ref<string[]>([]);
 // 抽屉内展开项
-const activeInfos = ref<string[]>(['basic','pdfInfo']);
+const activeInfos = ref<string[]>(["basic", "pdfInfo"]);
 const results = ref<any | null>(null);
 const records = computed<any[]>(() => {
   const hits = results.value?.hits?.hits || [];
@@ -854,11 +939,11 @@ async function loadInitialFieldMappings() {
     // 兼容不同返回结构：优先从 resp.data 读取
     const data: any = resp?.data || resp;
     const mappings = data?.fieldMappings || resp?.fieldMappings;
-    if (mappings && typeof mappings === 'object') {
+    if (mappings && typeof mappings === "object") {
       fieldMappings.value = mappings;
     }
   } catch (e) {
-    console.warn('初始化加载字段映射失败:', e);
+    console.warn("初始化加载字段映射失败:", e);
   }
 }
 
@@ -1064,20 +1149,20 @@ async function executeQuery() {
     if (dsl._source) req._source = dsl._source;
     if (dsl.aggs) req.aggs = dsl.aggs;
     const resp = await executeESQuery(req);
-    
+
     // 处理响应数据
     if (resp?.data) {
       // 从 resp.data 中提取 fieldMappings 和 stats
       const { fieldMappings: respFieldMappings, stats, ...esData } = resp.data;
-      
+
       // 更新 fieldMappings
       if (respFieldMappings) {
         fieldMappings.value = respFieldMappings;
-        console.log('fieldMappings 已更新:', fieldMappings.value);
+        console.log("fieldMappings 已更新:", fieldMappings.value);
       } else {
-        console.log('响应中未收到 fieldMappings');
+        console.log("响应中未收到 fieldMappings");
       }
-      
+
       // 设置 ES 查询结果
       results.value = esData;
     } else {
@@ -1235,7 +1320,7 @@ const KEY_FIELDS = [
   "publisher",
   "data_source",
   "publication_category",
-  "abstract",
+  "abstract"
 ];
 function getKeyFields(row: Record<string, any>): string[] {
   const r = row || {};
@@ -1292,7 +1377,7 @@ function onAggBucketClick(aggName: string, bucket: any) {
 // 长内容阈值（达到或超过则整行展示）
 const LONG_THRESHOLD = 100;
 // 文本截断阈值：普通行与宽行分别使用不同上限
-const DEFAULT_MAX_CHARS = 160;
+const DEFAULT_MAX_CHARS = 300;
 const WIDE_MAX_CHARS = 500;
 
 // 构建卡片行分块：遵循全局顺序，长内容占满一行，其余三等分
@@ -1592,7 +1677,7 @@ async function handleDownloadLatest() {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: 100vh;
+  // height: 100vh;
   overflow: hidden;
   :deep(.el-card) {
     border: none;
@@ -1621,7 +1706,7 @@ async function handleDownloadLatest() {
   display: flex;
   align-items: center;
   gap: 8px;
-  justify-content: center
+  justify-content: center;
 }
 .advanced-toggle-btn {
   margin-left: 8px;
@@ -1648,7 +1733,7 @@ async function handleDownloadLatest() {
   border-bottom: 1px dashed #ebeef5;
 }
 .section-body {
-  padding: 10px 8px;
+  padding: 10px 8px 5px;
 
   :deep(.el-input-group__prepend) {
     background-color: white;
@@ -1698,8 +1783,8 @@ async function handleDownloadLatest() {
   padding: 12px 0px;
 }
 .narrow-content {
-  max-width: 1100px;
-  margin: 0 auto;
+  // max-width: 1100px;
+  margin: 0 40px;
 }
 .detail-collapse {
   /* 让每个 item 内部内容更有内边距感 */
@@ -1712,14 +1797,14 @@ async function handleDownloadLatest() {
   color: #303133;
 }
 .collapse-title .left-bar {
-  width: 4px;
-  height: 18px;
-  background: #409EFF;
+  width: 5px;
+  height: 23px;
+  background: #409eff;
   border-radius: 2px;
   margin-right: 8px;
 }
 .collapse-content {
-  padding: 8px 4px;
+  padding: 8px 20px;
 }
 .detail-form {
   :deep(.el-form-item) {
@@ -1812,14 +1897,14 @@ async function handleDownloadLatest() {
   display: grid;
   grid-template-columns: 1fr 4fr; /* 20% / 80% */
   gap: 16px;
-  height: 100%;
+  height: 100vh;
 }
 
 .agg-pane {
   border-right: 1px solid #ebeef5;
   padding-right: 8px;
-  // max-height: 650px;
   overflow-y: auto;
+  height: 100%;
 }
 .agg-header {
   font-weight: 600;
@@ -1833,9 +1918,7 @@ async function handleDownloadLatest() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: calc(100vh - 380px);
   min-height: 300px;
-  overflow-y: auto;
   padding-right: 6px;
 }
 .agg-card {
@@ -1886,7 +1969,6 @@ async function handleDownloadLatest() {
 /* 表格容器样式 */
 .table-container {
   width: 100%;
-  height: calc(100vh - 380px);
   min-height: 300px;
   overflow: auto;
   border: 1px solid #e4e7ed;
@@ -1900,10 +1982,9 @@ async function handleDownloadLatest() {
 /* 卡片容器样式 */
 .cards-container {
   width: 100%;
-  height: calc(100vh - 460px);
   min-height: 300px;
   overflow-y: auto;
-  padding: 8px;
+  // padding: 8px;
 }
 
 .result-summary {
@@ -1919,25 +2000,26 @@ async function handleDownloadLatest() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100%;
 }
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  // gap: 6px;
   :deep(.el-card) {
-    border-bottom: 1px solid #e4e7ed;
+    border-top: 1px solid #e4e7ed;
   }
 }
 .result-card {
   width: 100%;
   position: relative;
-  height: 180px;
+  // height: 180px;
 }
 .card-content {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-bottom: 15px;
+  padding-bottom: 5px;
 }
 .card-row {
   display: grid;
@@ -1949,7 +2031,7 @@ async function handleDownloadLatest() {
 }
 .kv {
   display: flex;
-  gap: 6px;
+  // gap: 6px;
   font-size: 13px;
 }
 .k {
@@ -1997,12 +2079,12 @@ async function handleDownloadLatest() {
   height: 500px;
 }
 .pager {
-  margin-top: 16px;
-  margin-bottom: 16px;
+  height: 50px;
   padding: 8px 0;
   display: flex;
   justify-content: flex-end;
   flex-shrink: 0;
+  border-top: 1px solid #e4e7ed;
 }
 
 @media (max-width: 1024px) {
@@ -2066,19 +2148,10 @@ async function handleDownloadLatest() {
 }
 
 .results-card.fullscreen-mode :deep(.el-card__body) {
-  height: calc(100vh - 60px);
   overflow: auto;
 }
 
-.results-card.fullscreen-mode .results-grid {
-  height: 100%;
-}
-
-.results-card.fullscreen-mode .table-container {
-  height: calc(100vh - 160px);
-}
-
-.results-card.fullscreen-mode .cards-container {
-  height: calc(100vh - 160px);
+.results-card.fullscreen-mode .result-grid {
+  height: 93vh;
 }
 </style>
