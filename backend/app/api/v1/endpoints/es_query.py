@@ -112,12 +112,55 @@ async def execute_es_query(
             if request.timeout:
                 search_params["timeout"] = request.timeout
             
-            # 执行查询
+            # 先执行count查询获取准确的总数
+            count_params = {
+                "index": request.index,
+                "body": {
+                    "query": request.query
+                }
+            }
+            
+            # 执行count查询
+            logger.info(f"执行count查询，索引: {request.index}")
+            count_response = await es_client.count(**count_params)
+            total_count = count_response["count"]
+            logger.info(f"count查询结果: {total_count}")
+            
+            # 执行主查询
             response = await es_client.search(**search_params)
+            
+            # 将count查询的结果替换到response中的total值
+            if "hits" in response and "total" in response["hits"]:
+                original_total = response["hits"]["total"]["value"]
+                response["hits"]["total"]["value"] = total_count
+                logger.info(f"替换total值: {original_total} -> {total_count}")
+            
+            # 获取字段映射信息
+            field_mappings = {}
+            try:
+                mapping_response = await es_client.indices.get_mapping(index=request.index)
+                for index_name, index_data in mapping_response.items():
+                    if 'mappings' in index_data and 'properties' in index_data['mappings']:
+                        properties = index_data['mappings']['properties']
+                        for field_name, field_info in properties.items():
+                            # 获取字段注释，优先从meta.description获取，其次从meta.comment获取
+                            field_comment = None
+                            if 'meta' in field_info:
+                                field_comment = field_info['meta'].get('description') or field_info['meta'].get('comment')
+                            
+                            field_mappings[field_name] = {
+                                'name': field_name,
+                                'type': field_info.get('type', 'unknown'),
+                                'comment': field_comment if field_comment else '暂无字段注释',
+                                'display_name': field_comment if field_comment else field_name
+                            }
+            except Exception as e:
+                logger.warning(f"获取字段映射失败: {str(e)}")
+                field_mappings = {}
             
             # 构建统计信息
             stats = {
-                "totalHits": response["hits"]["total"]["value"],
+                "totalHits": total_count,  # 使用count查询的准确结果
                 "took": response["took"],
                 "maxScore": response["hits"].get("max_score", 0),
                 "shardsInfo": {
@@ -129,8 +172,11 @@ async def execute_es_query(
             
             return {
                 "success": True,
-                "data": response,
-                "stats": stats,
+                "data": {
+                    **response,
+                    "stats": stats,
+                    "fieldMappings": field_mappings
+                },
                 "message": f"查询完成，共找到 {stats['totalHits']} 条记录"
             }
             
@@ -379,10 +425,17 @@ async def get_es_field_mapping(
                 if 'mappings' in index_data and 'properties' in index_data['mappings']:
                     properties = index_data['mappings']['properties']
                     for field_name, field_info in properties.items():
+                        # 获取字段注释，优先从meta.description获取，其次从meta.comment获取
+                        field_comment = None
+                        if 'meta' in field_info:
+                            field_comment = field_info['meta'].get('description') or field_info['meta'].get('comment')
+                        
                         fields.append({
                             'name': field_name,
                             'type': field_info.get('type', 'unknown'),
-                            'index': index_name
+                            'index': index_name,
+                            'comment': field_comment if field_comment else '暂无字段注释',
+                            'display_name': field_comment if field_comment else field_name
                         })
             
             return {

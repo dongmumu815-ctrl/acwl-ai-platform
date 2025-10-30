@@ -1,398 +1,331 @@
 <template>
-  <div class="center-table-query">
-    <div class="page-header">
+  <div class="center-table-query-page">
+    <!-- <div class="page-header">
       <h2>中心表查询</h2>
-      <p class="page-description">查询和浏览数据中心表的数据内容</p>
-    </div>
+      <el-tag :type="packageData?.type === 'sql' ? 'primary' : 'success'">
+        {{ packageData?.type === 'sql' ? 'SQL查询' : 'Elasticsearch' }}
+      </el-tag>
+    </div> 
+    -->
 
-    <div class="content-wrapper">
-      <!-- 查询配置区域 -->
-      <el-card class="query-config-card">
+    <div v-loading="loading" :class="['page-content', { 'loading-center': loading }]">
+      <!-- 
+      <el-card class="package-info-card" v-if="packageData">
         <template #header>
           <div class="card-header">
-            <span>查询配置</span>
-          </div>
-        </template>
-
-        <el-form :model="queryForm" label-width="100px">
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item label="选择表">
-                <el-select
-                  v-model="queryForm.selectedTable"
-                  placeholder="请选择要查询的表"
-                  style="width: 100%"
-                  @change="handleTableChange"
-                >
-                  <el-option
-                    v-for="table in availableTables"
-                    :key="table.value"
-                    :label="table.label"
-                    :value="table.value"
-                  />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="查询条件">
-                <el-input
-                  v-model="queryForm.condition"
-                  placeholder="请输入查询条件 (SQL WHERE 子句)"
-                  clearable
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="限制条数">
-                <el-input-number
-                  v-model="queryForm.limit"
-                  :min="1"
-                  :max="1000"
-                  style="width: 100%"
-                />
-              </el-form-item>
-            </el-col>
-          </el-row>
-
-          <el-row>
-            <el-col :span="24">
-              <el-form-item label="选择字段">
-                <el-checkbox-group v-model="queryForm.selectedFields">
-                  <el-checkbox
-                    v-for="field in tableFields"
-                    :key="field.name"
-                    :label="field.name"
-                  >
-                    {{ field.label }} ({{ field.type }})
-                  </el-checkbox>
-                </el-checkbox-group>
-              </el-form-item>
-            </el-col>
-          </el-row>
-
-          <el-row>
-            <el-col :span="24">
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  :loading="queryLoading"
-                  @click="handleQuery"
-                >
-                  执行查询
-                </el-button>
-                <el-button @click="handleReset">重置</el-button>
-                <el-button
-                  type="success"
-                  :disabled="!queryResult.length"
-                  @click="handleExport"
-                >
-                  导出结果
-                </el-button>
-              </el-form-item>
-            </el-col>
-          </el-row>
-        </el-form>
-      </el-card>
-
-      <!-- SQL预览区域 -->
-      <el-card v-if="generatedSQL" class="sql-preview-card">
-        <template #header>
-          <div class="card-header">
-            <span>生成的SQL语句</span>
-            <el-button size="small" @click="copySQLToClipboard">
-              复制SQL
-            </el-button>
-          </div>
-        </template>
-        <div class="sql-content">
-          <pre><code>{{ generatedSQL }}</code></pre>
-        </div>
-      </el-card>
-
-      <!-- 查询结果区域 -->
-      <el-card v-if="queryResult.length" class="result-card">
-        <template #header>
-          <div class="card-header">
-            <span>查询结果 ({{ queryResult.length }} 条记录)</span>
-            <div class="result-actions">
-              <el-button size="small" @click="handleRefreshQuery">
-                刷新
-              </el-button>
+            <span class="card-title">资源包信息</span>
+            <div class="package-tags">
+              <el-tag 
+                v-for="tag in packageData.tags" 
+                :key="tag.tag_name" 
+                class="tag-item"
+                size="small"
+                :style="getTagStyle(tag.tag_color)"
+              >
+                {{ tag.tag_name }}
+              </el-tag>
             </div>
           </div>
         </template>
-
-        <div class="result-table">
-          <el-table
-            :data="queryResult"
-            stripe
-            border
-            style="width: 100%"
-            max-height="500"
-          >
-            <el-table-column
-              v-for="column in resultColumns"
-              :key="column.prop"
-              :prop="column.prop"
-              :label="column.label"
-              :width="column.width"
-              show-overflow-tooltip
-            />
-          </el-table>
+        <div class="template-info">
+          <h4>模板信息</h4>
+          <div class="template-details">
+            <el-tag type="primary" class="template-tag" size="small">
+              类型: {{ packageData.template_type || '未知' }}
+            </el-tag>
+            <el-tag v-if="packageData.template_id" type="info" class="template-tag" size="small">
+              模板ID: {{ packageData.template_id }}
+            </el-tag>
+          </div>
         </div>
-      </el-card>
+        <div class="base-config">
+          <h4>查询配置</h4>
+          <div class="config-info">
+            <el-descriptions :column="3" size="small">
+              <el-descriptions-item label="数据源">{{ getDatasourceName(packageData.datasource_id) }}</el-descriptions-item>
+              <el-descriptions-item label="查询类型">{{ packageData.type?.toUpperCase() || '未知' }}</el-descriptions-item>
+              <el-descriptions-item label="模板类型">{{ packageData.template_type || '未知' }}</el-descriptions-item>
+              <el-descriptions-item label="模板ID">{{ packageData.template_id || '无' }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+        </div>
+      </el-card> 
+      -->
 
-      <!-- 空状态 -->
-      <el-empty
-        v-if="!queryResult.length && !queryLoading"
-        description="请选择表并执行查询"
-        :image-size="120"
-      />
+      <!-- 查询面板（基于包类型） -->
+      <SqlPackageQueryPanel v-if="packageData?.type === 'sql' && packageData" :packageData="packageData" />
+      <EsPackageQueryPanel v-else-if="packageData?.type === 'elasticsearch' && packageData" :packageData="packageData" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { resourcePackageApi, type ResourcePackage } from '@/api/resourcePackage'
+import { datasourceApi } from '@/api/datasource'
+import type { DataSource } from '@/types/datasource'
+import { getSQLTemplate, type SQLTemplateResponse } from '@/api/sqlQuery'
+import { templateApi } from '@/api/template'
+import SqlPackageQueryPanel from '@/views/resourcePackage/components/SqlPackageQueryPanel.vue'
+import EsPackageQueryPanel from '@/views/resourcePackage/components/EsPackageQueryPanel.vue'
 
-// 查询表单
-const queryForm = reactive({
-  selectedTable: '',
-  condition: '',
-  limit: 100,
-  selectedFields: [] as string[]
-})
-
-// 可用表列表
-const availableTables = ref([
-  { label: '用户中心表 (user_center_table)', value: 'user_center_table' },
-  { label: '产品中心表 (product_center_table)', value: 'product_center_table' },
-  { label: '订单中心表 (order_center_table)', value: 'order_center_table' }
-])
-
-// 表字段信息
-const tableFields = ref([])
-
-// 查询结果
-const queryResult = ref([])
-const queryLoading = ref(false)
-
-// 结果表格列配置
-const resultColumns = ref([])
-
-// 生成的SQL语句
-const generatedSQL = computed(() => {
-  if (!queryForm.selectedTable || !queryForm.selectedFields.length) {
-    return ''
-  }
-
-  const fields = queryForm.selectedFields.join(', ')
-  let sql = `SELECT ${fields} FROM ${queryForm.selectedTable}`
-  
-  if (queryForm.condition) {
-    sql += ` WHERE ${queryForm.condition}`
-  }
-  
-  sql += ` LIMIT ${queryForm.limit}`
-  
-  return sql
-})
-
-// 获取表字段信息
-const fetchTableFields = async (tableName: string) => {
-  try {
-    // TODO: 调用API获取表字段信息
-    // 模拟数据
-    const mockFields = {
-      user_center_table: [
-        { name: 'id', label: 'ID', type: 'INT' },
-        { name: 'username', label: '用户名', type: 'VARCHAR' },
-        { name: 'email', label: '邮箱', type: 'VARCHAR' },
-        { name: 'create_time', label: '创建时间', type: 'DATETIME' }
-      ],
-      product_center_table: [
-        { name: 'id', label: 'ID', type: 'INT' },
-        { name: 'product_name', label: '产品名称', type: 'VARCHAR' },
-        { name: 'price', label: '价格', type: 'DECIMAL' },
-        { name: 'category', label: '分类', type: 'VARCHAR' }
-      ],
-      order_center_table: [
-        { name: 'id', label: 'ID', type: 'INT' },
-        { name: 'order_no', label: '订单号', type: 'VARCHAR' },
-        { name: 'user_id', label: '用户ID', type: 'INT' },
-        { name: 'total_amount', label: '总金额', type: 'DECIMAL' }
-      ]
-    }
-
-    tableFields.value = mockFields[tableName] || []
-    queryForm.selectedFields = tableFields.value.map(field => field.name)
-  } catch (error) {
-    ElMessage.error('获取表字段信息失败')
-  }
+interface ExtendedResourcePackage extends ResourcePackage {
+  template_conditions?: any[]
+  query?: string
 }
 
-// 表选择改变
-const handleTableChange = (tableName: string) => {
-  if (tableName) {
-    fetchTableFields(tableName)
-  } else {
-    tableFields.value = []
-    queryForm.selectedFields = []
+const FIXED_PACKAGE_ID = 2
+const loading = ref(false)
+const packageData = ref<ExtendedResourcePackage | null>(null)
+const datasources = ref<DataSource[]>([])
+
+const getDatasourceName = computed(() => {
+  return (datasourceId: number) => {
+    const ds = datasources.value.find((d: DataSource) => d.id === datasourceId)
+    return ds ? ds.name : '未知数据源'
   }
-}
+})
 
-// 执行查询
-const handleQuery = async () => {
-  if (!queryForm.selectedTable) {
-    ElMessage.warning('请选择要查询的表')
-    return
-  }
-
-  if (!queryForm.selectedFields.length) {
-    ElMessage.warning('请选择要查询的字段')
-    return
-  }
-
-  queryLoading.value = true
-  try {
-    // TODO: 调用API执行查询
-    // 模拟数据
-    const mockData = {
-      user_center_table: [
-        { id: 1, username: 'admin', email: 'admin@example.com', create_time: '2024-01-15 10:30:00' },
-        { id: 2, username: 'user1', email: 'user1@example.com', create_time: '2024-01-16 14:20:00' }
-      ],
-      product_center_table: [
-        { id: 1, product_name: '产品A', price: 99.99, category: '电子产品' },
-        { id: 2, product_name: '产品B', price: 199.99, category: '家居用品' }
-      ],
-      order_center_table: [
-        { id: 1, order_no: 'ORD001', user_id: 1, total_amount: 299.98 },
-        { id: 2, order_no: 'ORD002', user_id: 2, total_amount: 99.99 }
-      ]
-    }
-
-    queryResult.value = mockData[queryForm.selectedTable] || []
-    
-    // 生成表格列配置
-    resultColumns.value = queryForm.selectedFields.map(fieldName => {
-      const field = tableFields.value.find(f => f.name === fieldName)
-      return {
-        prop: fieldName,
-        label: field?.label || fieldName,
-        width: fieldName === 'id' ? 80 : undefined
+const getTagStyle = (bg: string) => {
+  const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+    try {
+      let h = hex.trim()
+      if (h.startsWith('#')) h = h.slice(1)
+      if (h.length === 3) {
+        h = h.split('').map(c => c + c).join('')
       }
-    })
+      if (h.length !== 6) return null
+      const r = parseInt(h.slice(0, 2), 16)
+      const g = parseInt(h.slice(2, 4), 16)
+      const b = parseInt(h.slice(4, 6), 16)
+      return { r, g, b }
+    } catch {
+      return null
+    }
+  }
+  const rgb = hexToRgb(bg)
+  const yiq = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 255
+  const textColor = yiq >= 186 ? '#111' : '#fff'
+  return { backgroundColor: bg, color: textColor, borderColor: bg }
+}
 
-    ElMessage.success(`查询完成，共 ${queryResult.value.length} 条记录`)
+const loadFixedPackageData = async () => {
+  try {
+    loading.value = true
+    const response = await resourcePackageApi.get(FIXED_PACKAGE_ID)
+    packageData.value = (response && 'data' in response) ? (response as any).data : (response as any)
+    if (packageData.value?.template_id && packageData.value?.template_type) {
+      await loadTemplateParams()
+    }
   } catch (error) {
-    ElMessage.error('查询失败')
+    console.error('加载资源包详情失败:', error)
+    ElMessage.error('加载资源包详情失败')
   } finally {
-    queryLoading.value = false
+    loading.value = false
   }
 }
 
-// 重置表单
-const handleReset = () => {
-  Object.assign(queryForm, {
-    selectedTable: '',
-    condition: '',
-    limit: 100,
-    selectedFields: []
-  })
-  tableFields.value = []
-  queryResult.value = []
-  resultColumns.value = []
-}
-
-// 刷新查询
-const handleRefreshQuery = () => {
-  handleQuery()
-}
-
-// 导出结果
-const handleExport = () => {
-  ElMessage.info('导出功能待实现')
-}
-
-// 复制SQL到剪贴板
-const copySQLToClipboard = async () => {
+const loadTemplateParams = async () => {
+  if (!packageData.value?.template_id || !packageData.value?.template_type) return
   try {
-    await navigator.clipboard.writeText(generatedSQL.value)
-    ElMessage.success('SQL已复制到剪贴板')
-  } catch {
-    ElMessage.error('复制失败')
+    let templateData: SQLTemplateResponse | any = null
+    if (packageData.value.template_type === 'sql') {
+      const response = await getSQLTemplate(packageData.value.template_id)
+      templateData = response.data
+    } else if (packageData.value.template_type === 'elasticsearch') {
+      const response = await templateApi.getByType(packageData.value.template_id, 'es')
+      templateData = (response as any)?.data || response
+    }
+    if (templateData && templateData.config) {
+      const conditions = templateData.config.conditions || []
+      const unlockedConditions = conditions.filter((condition: any) => !condition.locked)
+      const dynamicParams: Record<string, any> = {}
+      unlockedConditions.forEach((condition: any) => {
+        dynamicParams[condition.name] = condition.default_value || ''
+      })
+      if (packageData.value) {
+        packageData.value.dynamic_params = dynamicParams
+        packageData.value.template_conditions = unlockedConditions
+      }
+    }
+  } catch (error) {
+    console.error('加载模板参数失败:', error)
+  }
+}
+
+const loadDatasources = async () => {
+  try {
+    const response = await datasourceApi.getDataSourceList()
+    datasources.value = response.data?.items || []
+  } catch (error) {
+    console.error('加载数据源列表失败:', error)
   }
 }
 
 onMounted(() => {
-  // 初始化
+  loadDatasources()
+  loadFixedPackageData()
 })
 </script>
 
-<style scoped lang="scss">
-.center-table-query {
+<style scoped>
+.center-table-query-page {
+  padding: 10px;
+  min-height: 100vh;
+  background-color: white;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
   padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
 
-  .page-header {
-    margin-bottom: 20px;
+.page-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: calc(100vh - 40px); /* 减去页面padding */
+}
 
-    h2 {
-      margin: 0 0 8px 0;
-      color: #303133;
-      font-size: 24px;
-      font-weight: 600;
-    }
+/* 当处于加载状态时，内容居中显示 */
+.page-content.loading-center {
+  justify-content: center;
+  align-items: center;
+}
 
-    .page-description {
-      margin: 0;
-      color: #606266;
-      font-size: 14px;
-    }
-  }
+.package-info-card,
+.query-form-card,
+.query-options-card,
+.query-results-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
 
-  .content-wrapper {
-    .query-config-card,
-    .sql-preview-card,
-    .result-card {
-      margin-bottom: 20px;
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-    }
+.card-title {
+  font-weight: 600;
+  color: #303133;
+  font-size: 16px;
+}
 
-    .sql-preview-card {
-      .sql-content {
-        background-color: #f8f9fa;
-        border-radius: 6px;
-        padding: 16px;
+.package-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 
-        pre {
-          margin: 0;
-          font-family: 'Courier New', monospace;
-          font-size: 14px;
-          line-height: 1.5;
-          color: #303133;
-        }
-      }
-    }
+.tag-item {
+  margin: 0;
+}
 
-    .result-card {
-      .result-actions {
-        display: flex;
-        gap: 8px;
-      }
+.locked-conditions,
+.base-config {
+  margin-top: 12px;
+}
 
-      .result-table {
-        :deep(.el-table) {
-          font-size: 14px;
-        }
-      }
-    }
-  }
+.locked-conditions h4,
+.base-config h4,
+.template-info h4 {
+  margin: 0 0 8px 0;
+  color: #303133;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.condition-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.condition-tag {
+  margin: 0;
+}
+
+.config-info {
+  margin-top: 6px;
+}
+
+.query-form {
+  padding: 0;
+}
+
+.condition-info {
+  margin-top: 4px;
+}
+
+.query-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.results-meta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.pagination-wrapper {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+}
+
+:deep(.el-card__header) {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+:deep(.el-card__body) {
+  padding: 14px;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+
+:deep(.el-input-number) {
+  width: 100%;
+}
+
+:deep(.el-table) {
+  font-size: 12px;
+}
+
+:deep(.el-table th) {
+  background-color: #fafafa;
+}
+
+:deep(.el-descriptions__label) {
+  font-weight: 600;
+}
+
+.package-info-card .template-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 </style>

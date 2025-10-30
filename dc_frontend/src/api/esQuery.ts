@@ -28,6 +28,7 @@ export interface ESIndex {
 export interface ESField {
   name: string
   type: string
+  comment?: string
   analyzer?: string
   searchAnalyzer?: string
   properties?: Record<string, ESField>
@@ -187,6 +188,7 @@ export function getESFieldMapping(datasourceId: number, indices: string[]): Prom
 export function executeESQuery(queryRequest: ESQueryRequest): Promise<{ 
   data: ESQueryResponse
   stats: ESQueryStats
+  fieldMappings?: Record<string, { name: string; type: string; comment?: string; display_name: string }>
 }> {
   return request({
     url: '/es/query',
@@ -268,7 +270,13 @@ export function getESQuerySuggestions(datasourceId: number, index: string, field
  * @param aggregations 聚合查询配置
  * @returns 聚合查询结果
  */
-export function getESAggregations(datasourceId: number, indices: string[], aggregations: any): Promise<{ 
+export function getESAggregations(
+  datasourceId: number,
+  indices: string[],
+  aggregations: any,
+  query?: any,
+  timeout?: string
+): Promise<{ 
   data: {
     aggregations: any
     took: number
@@ -285,7 +293,9 @@ export function getESAggregations(datasourceId: number, indices: string[], aggre
     data: {
       datasourceId,
       indices,
-      aggregations
+      aggregations,
+      query,
+      timeout
     }
   })
 }

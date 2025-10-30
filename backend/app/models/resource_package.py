@@ -29,9 +29,15 @@ class ResourcePackage(Base):
     
     # 系统字段
     is_active = Column(Boolean, default=True, comment="是否启用")
+    is_lock = Column(String(1), default="0", comment="是否锁定（禁止删除）0-否，1-是")
     created_by = Column(Integer, ForeignKey("acwl_users.id", ondelete="CASCADE"), nullable=False, comment="创建者ID")
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
+    
+    # 下载/生成相关字段
+    download_time = Column(DateTime, nullable=True, comment="最后下载时间")
+    download_url = Column(String(500), nullable=True, comment="MinIO对象路径（minio://host/bucket/object）")
+    excel_time = Column(DateTime, nullable=True, comment="最后Excel生成时间")
 
     # 关联关系
     datasource = relationship("Datasource", back_populates="resource_packages")
@@ -40,6 +46,7 @@ class ResourcePackage(Base):
     permissions = relationship("ResourcePackagePermission", back_populates="package", cascade="all, delete-orphan")
     query_histories = relationship("ResourcePackageQueryHistory", back_populates="package", cascade="all, delete-orphan")
     tags = relationship("ResourcePackageTag", back_populates="package", cascade="all, delete-orphan")
+    files = relationship("ResourcePackageFile", back_populates="package", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<ResourcePackage(id={self.id}, name='{self.name}', type='{self.type}', template_id={self.template_id})>"
@@ -154,3 +161,20 @@ class ResourcePackageTag(Base):
 
     def __repr__(self):
         return f"<ResourcePackageTag(package_id={self.package_id}, tag_name='{self.tag_name}')>"
+
+
+class ResourcePackageFile(Base):
+    """资源包Excel文件历史模型"""
+    __tablename__ = "resource_package_files"
+
+    id = Column(Integer, primary_key=True, index=True)
+    package_id = Column(Integer, ForeignKey("resource_packages.id", ondelete="CASCADE"), nullable=False, comment="资源包ID")
+    filename = Column(String(255), nullable=False, comment="文件名")
+    object_path = Column(String(500), nullable=False, comment="MinIO对象路径")
+    generated_at = Column(DateTime, default=func.now(), comment="生成时间")
+
+    # 关联关系
+    package = relationship("ResourcePackage", back_populates="files")
+
+    def __repr__(self):
+        return f"<ResourcePackageFile(id={self.id}, package_id={self.package_id}, filename='{self.filename}')>"

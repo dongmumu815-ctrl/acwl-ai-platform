@@ -374,7 +374,7 @@
             </template>
           </el-table-column>
           
-          <el-table-column label="操作" min-width="200" fixed="right">
+          <el-table-column label="操作" min-width="350" fixed="right">
             <template #default="{ row }">
               <div class="action-buttons">
                 <el-button size="small" type="primary" @click="showEditDialog(row)">

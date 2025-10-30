@@ -20,7 +20,8 @@ import type {
   ApiCallStats,
   CustomerActivityStats,
   PaginationParams,
-  PaginatedResponse
+  PaginatedResponse,
+  ResourceType
 } from '@/types/apiManagement'
 
 /**
@@ -364,6 +365,17 @@ export const getSystemStats = (): Promise<ApiResponse<SystemStats>> => {
 }
 
 /**
+ * 获取数据增长趋势（acwl_type_count）
+ */
+export const getTypeCountTrend = (params?: { days?: number; start_date?: string; end_date?: string }): Promise<ApiResponse<{ dates: string[]; series: Record<string, number[]> }>> => {
+  return request({
+    url: '/stats/type-count-trend',
+    method: 'get',
+    params
+  })
+}
+
+/**
  * 获取批次状态统计
  */
 export const getBatchStatusStats = (): Promise<ApiResponse<BatchStatusStats>> => {
@@ -441,5 +453,20 @@ export const testApiConnection = (apiId: number, testData?: Record<string, any>)
     url: `/apis/${apiId}/test`,
     method: 'post',
     data: testData || {}
+  })
+}
+
+// ==================== 资源类型管理 ====================
+
+/**
+ * 获取资源类型列表
+ */
+export const getResourceTypes = (): Promise<ApiResponse<{
+  resource_types: ResourceType[]
+  total: number
+}>> => {
+  return request({
+    url: '/resource-types',
+    method: 'get'
   })
 }

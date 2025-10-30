@@ -30,13 +30,14 @@
           </el-icon>
         </div>
         <div class="stat-content">
-          <div class="stat-value">{{ stat.value }}</div>
           <div class="stat-label">{{ stat.label }}</div>
+          <div class="stat-value">{{ stat.value }}</div>
+          
           <div class="stat-trend" :class="stat.trend.type">
-            <el-icon>
+            <!-- <el-icon>
               <component :is="stat.trend.icon" />
             </el-icon>
-            <span>{{ stat.trend.value }}</span>
+            <span>{{ stat.trend.value }}</span> -->
           </div>
         </div>
       </div>
@@ -134,6 +135,8 @@
 import { ref, onMounted, nextTick, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getESClusterStats, getESDatasources, getESAggregations } from '@/api/esQuery'
+import { getSystemStats, getTypeCountTrend } from '@/api/apiManagement'
 import { useUserStore } from '@/stores/user'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
@@ -151,8 +154,9 @@ import {
   LegendComponent,
   GridComponent
 } from 'echarts/components'
+import { userOperationLogsApi, type UserOperationLog } from '@/api/userOperationLogs'
 
-// 注册必要的组件
+// 重新注册 ECharts 必需组件，避免页面空白
 use([
   CanvasRenderer,
   LineChart,
@@ -175,20 +179,25 @@ const distributionChartRef = ref<HTMLElement>()
 // 响应式数据
 const trendPeriod = ref('90d')
 
+// 数据增长趋势（动态）
+const trendDates = ref<string[]>([])
+const trendSeries = ref<Record<string, number[]>>({})
+const trendLoading = ref(false)
+
 // 统计数据
 const stats = ref([
   {
     key: 'totalData',
     label: '总数据量',
-    value: '1.2M',
+    value: '',
     icon: 'DataBoard',
     color: '#409EFF',
     trend: { type: 'up', value: '+12.5%', icon: 'ArrowUp' }
   },
   {
     key: 'activeUsers',
-    label: '活跃用户',
-    value: '2,847',
+    label: '活跃客户',
+    value: '',
     icon: 'User',
     color: '#67C23A',
     trend: { type: 'up', value: '+8.2%', icon: 'ArrowUp' }
@@ -196,7 +205,7 @@ const stats = ref([
   {
     key: 'apiCalls',
     label: 'API调用',
-    value: '45.6K',
+    value: '',
     icon: 'Connection',
     color: '#E6A23C',
     trend: { type: 'down', value: '-2.1%', icon: 'ArrowDown' }
@@ -204,19 +213,183 @@ const stats = ref([
   {
     key: 'storage',
     label: '存储使用',
-    value: '78.5GB',
+    value: '',
     icon: 'Coin',
     color: '#F56C6C',
     trend: { type: 'up', value: '+15.3%', icon: 'ArrowUp' }
   }
 ])
 
+// ES 集群统计
+const esDatasourceId = ref<number | null>(null)
+const esClusterStats = ref<any | null>(null)
+
+const loadEsClusterStats = async () => {
+  try {
+    const res = await getESDatasources()
+    const list = Array.isArray(res?.data?.items) ? res.data.items : (Array.isArray(res?.data) ? res.data : [])
+    const esList = Array.isArray(list) ? list.filter((d: any) => {
+      const t = d?.datasource_type || d?.type
+      return t === 'elasticsearch' || t === 'ELASTICSEARCH'
+    }) : []
+    const first = esList[0] || (Array.isArray(list) ? list[0] : null)
+    if (!first) return
+    esDatasourceId.value = first.id
+    const statsRes = await getESClusterStats(first.id)
+    const data = statsRes?.data
+    esClusterStats.value = data
+
+    const formatCount = (n: number) => {
+      if (!Number.isFinite(n)) return `${n}`
+      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+      if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+      return `${n}`
+    }
+
+    const totalDataIdx = stats.value.findIndex(s => s.key === 'totalData')
+    if (totalDataIdx >= 0 && data?.indices?.docsCount != null) {
+      stats.value[totalDataIdx].value = formatCount(Number(data.indices.docsCount))
+    }
+
+    const storageIdx = stats.value.findIndex(s => s.key === 'storage')
+    if (storageIdx >= 0 && data?.indices?.storeSize) {
+      stats.value[storageIdx].value = String(data.indices.storeSize)
+    }
+  } catch (e) {
+    console.error('加载ES集群统计失败', e)
+  }
+}
+
+const loadSystemStats = async () => {
+  try {
+    const res = await getSystemStats()
+    const data = res?.data
+
+    const formatCount = (n: number) => {
+      if (!Number.isFinite(n)) return `${n}`
+      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+      if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+      return `${n}`
+    }
+
+    const activeIdx = stats.value.findIndex(s => s.key === 'activeUsers')
+    if (activeIdx >= 0 && data?.activeCustomers != null) {
+      stats.value[activeIdx].value = formatCount(Number(data.activeCustomers))
+    }
+
+    const callsIdx = stats.value.findIndex(s => s.key === 'apiCalls')
+    if (callsIdx >= 0 && data?.totalApiCalls != null) {
+      stats.value[callsIdx].value = formatCount(Number(data.totalApiCalls))
+    }
+  } catch (e) {
+    console.error('加载系统统计失败', e)
+  }
+}
+
+// 数据类型分布（ES聚合）
+const distributionData = ref<Array<{ name: string; value: number }>>([])
+const distributionLoading = ref(false)
+
+const loadDistribution = async () => {
+  try {
+    if (!esDatasourceId.value) {
+      await loadEsClusterStats()
+      if (!esDatasourceId.value) return
+    }
+    distributionLoading.value = true
+
+    const indexCandidates = ['cpc_dw_publication', 'cpc_dw_publication*']
+    const fieldsToTry = [
+      'publication_category',
+      'category',
+      'publication_type'
+    ]
+
+    const ensureKeywordField = (field: string) =>
+      field && field.endsWith('.keyword') ? field : `${field}.keyword`
+
+    const tryAgg = async (field: string) => {
+      const keywordField = ensureKeywordField(field)
+      const res = await getESAggregations(
+        esDatasourceId.value as number,
+        indexCandidates,
+        {
+          category_terms: {
+            terms: {
+              field: keywordField,
+              size: 20,
+              order: { _count: 'desc' },
+              min_doc_count: 1
+            }
+          }
+        },
+        { exists: { field: keywordField } }
+      )
+      const agg = (res as any)?.data?.aggregations?.category_terms
+      const buckets = Array.isArray(agg?.buckets) ? agg.buckets : []
+      // 过滤掉可能的“未分类”值（如果后端某处仍设置了missing）
+      const filtered = buckets.filter((b: any) => String(b.key) !== '未分类')
+      return filtered.map((b: any) => ({ name: String(b.key), value: Number(b.doc_count) }))
+    }
+
+    // 尝试多个字段以获取有效聚合结果
+    let found: Array<{ name: string; value: number }> = []
+    for (const f of fieldsToTry) {
+      const data = await tryAgg(f)
+      if (data.length > 0) {
+        found = data
+        break
+      }
+    }
+
+    distributionData.value = found
+    if (found.length === 0) {
+      ElMessage.warning('未获取到数据类型分布，请检查索引/字段配置')
+    }
+  } catch (e) {
+    console.error('加载数据类型分布失败', e)
+    ElMessage.error('加载数据类型分布失败')
+  } finally {
+    distributionLoading.value = false
+  }
+}
+
+watch(esDatasourceId, (id) => {
+  if (id) loadDistribution()
+})
+
+// 加载数据增长趋势（从后端接口）
+const loadTypeCountTrend = async () => {
+  const dayMap = { '7d': 7, '30d': 30, '90d': 90 }
+  trendLoading.value = true
+  try {
+    const res = await getTypeCountTrend({ days: dayMap[trendPeriod.value as '7d' | '30d' | '90d'] })
+    const data = res?.data
+    trendDates.value = Array.isArray(data?.dates) ? data.dates : []
+    trendSeries.value = (data?.series && typeof data.series === 'object') ? data.series : {}
+  } catch (e) {
+    console.error('加载数据增长趋势失败', e)
+    ElMessage.error('加载数据增长趋势失败')
+    trendDates.value = []
+    trendSeries.value = {}
+  } finally {
+    trendLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadEsClusterStats()
+  loadSystemStats()
+  loadTypeCountTrend()
+  loadRecentActivities()
+})
+
 // 快捷操作
 const quickActions = ref([
   {
     key: 'upload',
-    title: '上传数据',
-    description: '批量上传数据文件',
+    title: '字段管理',
+    description: '对中心表字段进行管理',
     icon: 'Upload',
     color: '#409EFF'
   },
@@ -230,93 +403,142 @@ const quickActions = ref([
   {
     key: 'export',
     title: '导出报表',
-    description: '生成数据报表',
+    description: '下载数据资源包',
     icon: 'Download',
     color: '#E6A23C'
   },
   {
     key: 'settings',
-    title: '系统设置',
-    description: '配置系统参数',
+    title: '系统日志',
+    description: '日志查询',
     icon: 'Setting',
     color: '#909399'
   }
 ])
 
 // 最近活动
-const recentActivities = ref([
-  {
-    id: 1,
-    title: '用户数据导入完成',
-    time: new Date(Date.now() - 5 * 60 * 1000),
-    icon: 'Upload',
-    color: '#67C23A',
-    status: { type: 'success', text: '成功' }
-  },
-  {
-    id: 2,
-    title: '系统备份任务执行',
-    time: new Date(Date.now() - 15 * 60 * 1000),
-    icon: 'Coin',
-    color: '#409EFF',
-    status: { type: 'success', text: '完成' }
-  },
-  {
-    id: 3,
-    title: '数据清理任务失败',
-    time: new Date(Date.now() - 30 * 60 * 1000),
-    icon: 'Delete',
-    color: '#F56C6C',
-    status: { type: 'danger', text: '失败' }
-  },
-  {
-    id: 4,
-    title: '新用户注册',
-    time: new Date(Date.now() - 45 * 60 * 1000),
-    icon: 'User',
-    color: '#E6A23C',
-    status: { type: 'info', text: '待审核' }
+const recentActivities = ref<Activity[]>([])
+const recentActivitiesLoading = ref(false)
+
+type Activity = {
+  id: number
+  title: string
+  time: Date
+  icon: string
+  color: string
+  status: { type: 'success' | 'danger' | 'warning' | 'info'; text: string }
+}
+
+const statusTypeFromCode = (code?: number): 'success' | 'warning' | 'danger' | 'info' => {
+  if (code == null) return 'info'
+  if (code >= 200 && code < 300) return 'success'
+  if (code >= 400 && code < 500) return 'warning'
+  if (code >= 500) return 'danger'
+  return 'info'
+}
+
+const statusTextFromType = (type: 'success' | 'warning' | 'danger' | 'info') => {
+  switch (type) {
+    case 'success': return '成功'
+    case 'warning': return '警告'
+    case 'danger': return '失败'
+    default: return '已记录'
   }
-])
+}
+
+// 为不同状态类型提供对应的颜色（用于图标背景）
+const colorForStatusType = (type: 'success' | 'warning' | 'danger' | 'info') => {
+  switch (type) {
+    case 'success': return '#67C23A' // 绿色
+    case 'warning': return '#E6A23C' // 橙色
+    case 'danger': return '#F56C6C'  // 红色
+    default: return '#909399'        // 灰色
+  }
+}
+const iconForLog = (method?: string) => {
+  const m = (method || '').toUpperCase()
+  if (m === 'GET') return 'Search'
+  if (m === 'POST') return 'Upload'
+  if (m === 'PUT' || m === 'PATCH') return 'Edit'
+  if (m === 'DELETE') return 'Delete'
+  return 'Connection'
+}
+
+const moduleLabelFromPath = (path?: string) => {
+  if (!path) return '未知模块'
+  const p = path.replace(/^\//, '')
+  const parts = p.split('/')
+  let key = parts[0]
+  if (key === 'api' && parts.length >= 3 && parts[1] === 'v1') {
+    key = parts[2]
+  }
+  const mapping: Record<string, string> = {
+    auth: '用户认证',
+    users: '用户管理',
+    user_operation_logs: '操作日志',
+    'user-operation-logs': '操作日志',
+    data_resources: '数据资源',
+    'data-resources': '数据资源',
+    datasources: '数据源管理',
+    templates: '模板管理',
+    tags: '标签管理',
+    permissions: '权限管理',
+    system: '系统管理',
+    dashboard: '仪表盘',
+    reports: '报表管理',
+    analytics: '数据分析',
+    settings: '系统设置',
+    es: '搜索引擎',
+    apis: '接口管理',
+    customers: '客户管理',
+    logs: '操作日志'
+  }
+  return mapping[key] || key || '未知模块'
+}
+
+const titleForLog = (log: UserOperationLog) => {
+  const moduleLabel = moduleLabelFromPath(log.path)
+  return moduleLabel
+}
+
+const loadRecentActivities = async () => {
+  try {
+    recentActivitiesLoading.value = true
+    const res = await userOperationLogsApi.getLogs({ page: 1, size: 4 })
+    const paginated = res?.data
+    const items = Array.isArray((paginated as any)?.items) ? (paginated as any).items as UserOperationLog[] : []
+    recentActivities.value = items.map((log) => {
+      const type = statusTypeFromCode(log.status_code)
+      return {
+        id: Number(log.id),
+        title: titleForLog(log),
+        time: log.created_at ? new Date(log.created_at) : new Date(),
+        icon: iconForLog(log.method),
+        color: colorForStatusType(type),
+        status: { type, text: statusTextFromType(type) }
+      }
+    })
+  } catch (e) {
+    console.error('加载最近活动失败', e)
+  } finally {
+    recentActivitiesLoading.value = false
+  }
+}
 
 /**
  * 生成静态数据 - 从2025年9月开始的日增量数据
  */
-const generateStaticData = (days: number) => {
-  const startDate = new Date('2025-09-01')
-  const dates: string[] = []
-  const erpData: number[] = []
-  const aixueshuData: number[] = []
-  const processingData: number[] = []
-  
-  for (let i = 0; i < days; i++) {
-    const currentDate = new Date(startDate)
-    currentDate.setDate(startDate.getDate() + i)
-    dates.push(currentDate.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }))
-    
-    // 生成模拟数据，带有一定的随机性和趋势
-    const baseErp = 1200 + i * 15 + Math.random() * 200 - 100
-    const baseAixueshu = 800 + i * 12 + Math.random() * 150 - 75
-    const baseProcessing = 600 + i * 8 + Math.random() * 100 - 50
-    
-    erpData.push(Math.max(0, Math.round(baseErp)))
-    aixueshuData.push(Math.max(0, Math.round(baseAixueshu)))
-    processingData.push(Math.max(0, Math.round(baseProcessing)))
-  }
-  
-  return { dates, erpData, aixueshuData, processingData }
-}
 
 /**
  * 根据时间周期获取数据
  */
 const getTrendData = computed(() => {
-  const dayMap = {
-    '7d': 7,
-    '30d': 30,
-    '90d': 90
-  }
-  return generateStaticData(dayMap[trendPeriod.value as keyof typeof dayMap])
+  const dates = trendDates.value
+  const series = trendSeries.value || {}
+  const erpData = series.erp || series.ERP || []
+  const aixueshuData = series['爱学术'] || series.aixueshu || []
+  const processingData = series['资源加工平台'] || series.processing || []
+  return { dates, erpData, aixueshuData, processingData }
 })
 
 /**
@@ -464,33 +686,7 @@ const distributionChartOption = computed(() => {
         labelLine: {
           show: false
         },
-        data: [
-          { 
-            value: 42, 
-            name: '图书', 
-            itemStyle: { color: '#5470c6' }
-          },
-          { 
-            value: 28, 
-            name: '期刊文章', 
-            itemStyle: { color: '#91cc75' }
-          },
-          { 
-            value: 15, 
-            name: '会议录', 
-            itemStyle: { color: '#fac858' }
-          },
-          { 
-            value: 10, 
-            name: '学术论文', 
-            itemStyle: { color: '#ee6666' }
-          },
-          { 
-            value: 5, 
-            name: '教材', 
-            itemStyle: { color: '#73c0de' }
-          }
-        ]
+        data: distributionData.value
       }
     ]
   }
@@ -502,6 +698,7 @@ const distributionChartOption = computed(() => {
 const changeTrendPeriod = (period: string) => {
   trendPeriod.value = period
   ElMessage.success(`已切换到${period === '7d' ? '7天' : period === '30d' ? '30天' : '90天'}视图`)
+  loadTypeCountTrend()
 }
 
 /**
@@ -561,20 +758,24 @@ const handleAction = (action: any) => {
   
   switch (action.key) {
     case 'upload':
-      console.log('准备跳转到数据上传页面');
-      ElMessage.info('跳转到数据上传页面')
+      console.log('准备跳转到字段管理页面');
+      router.push('/resource-center/table-management')
+      ElMessage.success('在该页面可进行字段管理')
       break
     case 'query':
       console.log('准备跳转到数据查询页面');
-      ElMessage.info('跳转到数据查询页面')
+      router.push('/resource-center/table-query')
+      ElMessage.success('在该页面可进行数据查询')
       break
     case 'export':
-      console.log('准备跳转到报表导出页面');
-      ElMessage.info('跳转到报表导出页面')
+      console.log('准备跳转到资源包管理页面');
+      router.push('/data-resources/packages')
+      ElMessage.success('在该页面可进行报表导出')
       break
     case 'settings':
-      console.log('准备跳转到系统设置页面');
-      ElMessage.info('跳转到系统设置页面')
+      console.log('准备跳转到系统日志页面');
+      router.push('/logs/user-operation-logs')
+      ElMessage.info('在该页面可查看系统日志')
       break
     default:
       console.log('执行默认操作:', action.title);
@@ -586,6 +787,7 @@ const handleAction = (action: any) => {
  * 刷新分布图
  */
 const refreshDistribution = () => {
+  loadDistribution()
   ElMessage.success('数据分布图已刷新')
   // 这里应该重新加载图表数据
 }

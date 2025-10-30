@@ -48,7 +48,7 @@
           style="width: 150px"
           @change="handleSort"
         >
-          <el-option label="创建时间" value="createdAt" />
+          <el-option label="创建时间" value="created_at" />
           <el-option label="使用次数" value="usage_count" />
           <el-option label="标签名称" value="name" />
         </el-select>
@@ -195,9 +195,9 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="createdAt" label="创建时间" width="180">
+            <el-table-column prop="created_at" label="创建时间" width="180">
               <template #default="{ row }">
-                {{ formatDate(row.createdAt) }}
+                {{ formatDate(row.created_at) }}
               </template>
             </el-table-column>
             
@@ -310,7 +310,7 @@
                 </div>
                 
                 <div class="tag-meta">
-                  <span class="create-time">{{ formatDate(tag.createdAt) }}</span>
+                  <span class="create-time">{{ formatDate(tag.created_at) }}</span>
                 </div>
               </div>
             </div>
@@ -432,9 +432,9 @@
             </template>
           </el-table-column>
           <el-table-column prop="categoryName" label="所属分类" width="150" />
-          <el-table-column prop="createdAt" label="关联时间" width="180">
+          <el-table-column prop="created_at" label="关联时间" width="180">
             <template #default="{ row }">
-              {{ formatDate(row.createdAt) }}
+              {{ formatDate(row.created_at) }}
             </template>
           </el-table-column>
           <el-table-column label="操作" width="100">
@@ -501,7 +501,7 @@ interface TagUsage {
   resourceName: string
   resourceType: string
   categoryName?: string
-  createdAt: string
+  created_at: string
 }
 
 // 路由
@@ -520,13 +520,13 @@ const isEditMode = ref(false)
 const viewMode = ref('table') // table | card
 const searchKeyword = ref('')
 const filterStatus = ref('')
-const sortBy = ref('createdAt')
+const sortBy = ref('created_at')
 const currentPage = ref(1)
 const pageSize = ref(20)
 const totalCount = ref(0)
 const selectedTags = ref([])
-const currentTag = ref(null)
-const importPreview = ref([])
+const currentTag = ref<Tag | null>(null)
+const importPreview = ref<TagCreateRequest[]>([])
 
 // 标签表单
 const tagForm = reactive({
@@ -598,9 +598,8 @@ const filteredTags = computed(() => {
         return a.name.localeCompare(b.name)
       case 'usage_count':
         return b.usage_count - a.usage_count
-      case 'createdAt':
       default:
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     }
   })
   
@@ -1070,7 +1069,7 @@ const exportTags = (): void => {
     status: tag.status,
     description: tag.description,
     usage_count: tag.usage_count,
-    createdAt: tag.createdAt
+    created_at: tag.created_at
   }))
   
   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
@@ -1154,7 +1153,7 @@ const confirmImport = (): void => {
           status: item.status || 'active',
           description: item.description || '',
           usage_count: 0,
-          createdAt: new Date().toISOString()
+          created_at: new Date().toISOString()
         }
         tags.value.unshift(newTag)
         successCount++

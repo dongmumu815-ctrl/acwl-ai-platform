@@ -29,6 +29,8 @@ from .data_resource import (
     DataResourceTag,
     DataResourceTagRelation,
 )
+
+from .resource_type import DataResourceType
 from .project import (
     Project, ProjectMember, ProjectDatasource, ProjectQuota, 
     ProjectActivity, ProjectTemplate,
@@ -109,6 +111,7 @@ __all__ = [
     "DataResourceQueryHistory",
     "DataResourceTag",
     "DataResourceTagRelation",
+	"DataResourceType",
     "Project",
     "ProjectMember",
     "ProjectDatasource",

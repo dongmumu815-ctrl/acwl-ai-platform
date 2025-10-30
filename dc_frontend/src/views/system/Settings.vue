@@ -779,7 +779,7 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/variables.scss';
+@use "@/styles/variables.scss" as *;
 
 .system-settings {
   padding: $spacing-lg;

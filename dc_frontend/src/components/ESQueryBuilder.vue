@@ -43,6 +43,7 @@
                 placeholder="请选择ES数据源"
                 @change="onEsDatasourceChange"
                 style="width: 100%"
+                filterable
               >
                 <el-option
                   v-for="ds in esDatasources"
@@ -62,6 +63,7 @@
                 clearable
                 @change="onTemplateChange"
                 :loading="loadingTemplates"
+                filterable
               >
                 <el-option
                   v-for="template in availableTemplates"
@@ -99,6 +101,7 @@
             placeholder="请选择索引"
             @change="onIndicesChange"
             style="width: 100%"
+            filterable
           >
             <el-option
               v-for="index in esQueryConfig.availableIndices"
@@ -132,11 +135,12 @@
             multiple
             placeholder="请选择字段（留空返回所有字段）"
             style="width: 100%"
+            filterable
           >
             <el-option
               v-for="field in esQueryConfig.availableFields"
               :key="field.name"
-              :label="`${field.name} (${field.type})`"
+              :label="`${field.name} (${field.comment || field.type})`"
               :value="field.name"
             />
           </el-select>
@@ -182,6 +186,7 @@
                   size="small" 
                   style="width: 80px"
                   :disabled="condition._locked && condition._lockType === 'full'"
+                  filterable
                 >
                   <el-option label="AND" value="must" />
                   <el-option label="OR" value="should" />
@@ -198,6 +203,7 @@
                   style="width: 150px"
                   @change="onFieldChange(condition)"
                   :disabled="condition._locked && (condition._lockType === 'full' || condition._lockType === 'field')"
+                  filterable
                 >
                   <el-option
                     v-for="field in esQueryConfig.availableFields"
@@ -213,6 +219,7 @@
                   placeholder="操作符"
                   style="width: 120px"
                   :disabled="condition._locked && (condition._lockType === 'full' || condition._lockType === 'operator')"
+                  filterable
                 >
                   <el-option
                     v-for="op in getAvailableOperators(condition.field)"
@@ -291,11 +298,12 @@
                 v-model="sort.field"
                 placeholder="选择字段"
                 style="width: 200px"
+                filterable
               >
                 <el-option
                   v-for="field in esQueryConfig.availableFields"
                   :key="field.name"
-                  :label="field.name"
+                  :label="`${field.name} (${field.comment || field.type})`"
                   :value="field.name"
                 />
               </el-select>
@@ -303,6 +311,7 @@
               <el-select
                 v-model="sort.order"
                 style="width: 100px"
+                filterable
               >
                 <el-option label="升序" value="asc" />
                 <el-option label="降序" value="desc" />
@@ -354,6 +363,7 @@
                 size="small"
                 style="width: 120px"
                 @change="onAggregationTypeChange(agg)"
+                filterable
               >
                 <el-option label="计数" value="value_count" />
                 <el-option label="求和" value="sum" />
@@ -372,11 +382,12 @@
                 placeholder="选择字段"
                 size="small"
                 style="width: 150px"
+                filterable
               >
                 <el-option
                   v-for="field in esQueryConfig.availableFields"
                   :key="field.name"
-                  :label="field.name"
+                  :label="`${field.name} (${field.comment || field.type})`"
                   :value="field.name"
                 />
               </el-select>
@@ -403,6 +414,7 @@
                     placeholder="时间间隔"
                     size="small"
                     style="width: 100px"
+                    filterable
                   >
                     <el-option label="1分钟" value="1m" />
                     <el-option label="5分钟" value="5m" />
@@ -1322,18 +1334,38 @@ const buildVisualQuery = () => {
     
     let clause = {}
     
+    // 获取字段信息，判断是否需要添加 .keyword 后缀
+    const fieldInfo = esQueryConfig.availableFields.find(f => f.name === condition.field)
+    let fieldName = condition.field
+    
+    // 对于 text 类型字段，在 term 查询时自动添加 .keyword 后缀
+    if (fieldInfo && fieldInfo.type === 'text' && condition.operator === 'term') {
+      fieldName = `${condition.field}.keyword`
+      console.log(`🔧 为 text 字段 ${condition.field} 的 term 查询添加 .keyword 后缀: ${fieldName}`)
+    }
+    
     switch (condition.operator) {
       case 'term':
-        clause = { term: { [condition.field]: condition.value } }
+        clause = { term: { [fieldName]: condition.value } }
         break
       case 'match':
         clause = { match: { [condition.field]: condition.value } }
         break
       case 'prefix':
-        clause = { prefix: { [condition.field]: condition.value } }
+        // prefix 查询对 text 字段也需要使用 .keyword 后缀
+        if (fieldInfo && fieldInfo.type === 'text') {
+          fieldName = `${condition.field}.keyword`
+          console.log(`🔧 为 text 字段 ${condition.field} 的 prefix 查询添加 .keyword 后缀: ${fieldName}`)
+        }
+        clause = { prefix: { [fieldName]: condition.value } }
         break
       case 'wildcard':
-        clause = { wildcard: { [condition.field]: condition.value } }
+        // wildcard 查询对 text 字段也需要使用 .keyword 后缀
+        if (fieldInfo && fieldInfo.type === 'text') {
+          fieldName = `${condition.field}.keyword`
+          console.log(`🔧 为 text 字段 ${condition.field} 的 wildcard 查询添加 .keyword 后缀: ${fieldName}`)
+        }
+        clause = { wildcard: { [fieldName]: condition.value } }
         break
       case 'exists':
         clause = { exists: { field: condition.field } }
@@ -1378,9 +1410,21 @@ const buildVisualQuery = () => {
   
   // 添加排序
   if (visualQuery.sorts.length > 0) {
-    query.sort = visualQuery.sorts.map(sort => ({
-      [sort.field]: { order: sort.order }
-    }))
+    query.sort = visualQuery.sorts.map(sort => {
+      // 获取字段信息，判断是否需要添加 .keyword 后缀
+      const fieldInfo = esQueryConfig.availableFields.find(f => f.name === sort.field)
+      let fieldName = sort.field
+      
+      // 对于 text 类型字段，在排序时自动添加 .keyword 后缀
+      if (fieldInfo && fieldInfo.type === 'text') {
+        fieldName = `${sort.field}.keyword`
+        console.log(`🔧 为 text 字段 ${sort.field} 添加 .keyword 后缀: ${fieldName}`)
+      }
+      
+      return {
+        [fieldName]: { order: sort.order }
+      }
+    })
   }
   
   // 添加分页
@@ -1396,6 +1440,16 @@ const buildVisualQuery = () => {
       
       let aggConfig = {}
       
+      // 获取字段信息，判断是否需要添加 .keyword 后缀
+      const fieldInfo = esQueryConfig.availableFields.find(f => f.name === agg.field)
+      let fieldName = agg.field
+      
+      // 对于 text 类型字段，在聚合时自动添加 .keyword 后缀
+      if (fieldInfo && fieldInfo.type === 'text') {
+        fieldName = `${agg.field}.keyword`
+        console.log(`🔧 为 text 字段 ${agg.field} 添加 .keyword 后缀: ${fieldName}`)
+      }
+      
       switch (agg.type) {
         case 'value_count':
         case 'sum':
@@ -1404,14 +1458,14 @@ const buildVisualQuery = () => {
         case 'min':
           aggConfig = {
             [agg.type]: {
-              field: agg.field
+              field: fieldName
             }
           }
           break
         case 'terms':
           aggConfig = {
             terms: {
-              field: agg.field,
+              field: fieldName,
               size: agg.params.size || 10
             }
           }
@@ -1419,7 +1473,7 @@ const buildVisualQuery = () => {
         case 'date_histogram':
           aggConfig = {
             date_histogram: {
-              field: agg.field,
+              field: fieldName,
               calendar_interval: agg.params.calendar_interval || '1d'
             }
           }
@@ -1427,7 +1481,7 @@ const buildVisualQuery = () => {
         case 'histogram':
           aggConfig = {
             histogram: {
-              field: agg.field,
+              field: fieldName,
               interval: agg.params.interval || 1
             }
           }
@@ -1436,7 +1490,7 @@ const buildVisualQuery = () => {
           if (agg.params.ranges && agg.params.ranges.length > 0) {
             aggConfig = {
               range: {
-                field: agg.field,
+                field: fieldName,
                 ranges: agg.params.ranges.map(range => ({
                   from: range.from,
                   to: range.to
@@ -2075,6 +2129,22 @@ const formatFieldValue = (value) => {
   }
   
   return String(value)
+}
+
+/**
+ * 格式化字段值并添加注释
+ * 在字段值后面添加字段映射中的注释信息
+ */
+const formatFieldValueWithComment = (value, fieldName) => {
+  const formattedValue = formatFieldValue(value)
+  
+  // 查找字段映射中的注释
+  const fieldMapping = esQueryConfig.availableFields.find(field => field.name === fieldName)
+  if (fieldMapping && fieldMapping.comment && fieldMapping.comment !== fieldName) {
+    return `${formattedValue} (${fieldMapping.comment})`
+  }
+  
+  return formattedValue
 }
 
 /**

@@ -26,9 +26,9 @@
           <div class="card-header">
             <span class="card-title">资源包信息</span>
             <div class="package-tags">
-              <el-tag 
-                v-for="tag in packageData.tags" 
-                :key="tag.tag_name" 
+              <el-tag
+                v-for="tag in packageData.tags"
+                :key="tag.tag_name"
                 class="tag-item"
                 size="small"
                 :style="getTagStyle(tag.tag_color)"
@@ -38,29 +38,23 @@
             </div>
           </div>
         </template>
-        
-        <!-- 模板信息展示 -->
-        <div class="template-info">
-          <h4>模板信息</h4>
-          <div class="template-details">
-            <el-tag type="primary" class="template-tag" size="small">
-              类型: {{ packageData.template_type || '未知' }}
-            </el-tag>
-            <el-tag v-if="packageData.template_id" type="info" class="template-tag" size="small">
-              模板ID: {{ packageData.template_id }}
-            </el-tag>
-          </div>
-        </div>
 
         <!-- 基础配置信息 -->
         <div class="base-config">
-          <h4>查询配置</h4>
           <div class="config-info">
-            <el-descriptions :column="3" size="small">
-              <el-descriptions-item label="数据源">{{ getDatasourceName(packageData.datasource_id) }}</el-descriptions-item>
-              <el-descriptions-item label="查询类型">{{ packageData.type?.toUpperCase() || '未知' }}</el-descriptions-item>
-              <el-descriptions-item label="模板类型">{{ packageData.template_type || '未知' }}</el-descriptions-item>
-              <el-descriptions-item label="模板ID">{{ packageData.template_id || '无' }}</el-descriptions-item>
+            <el-descriptions :column="4">
+              <el-descriptions-item label="数据源：">{{
+                getDatasourceName(packageData.datasource_id)
+              }}</el-descriptions-item>
+              <el-descriptions-item label="查询类型：">{{
+                packageData.type?.toUpperCase() || "未知"
+              }}</el-descriptions-item>
+              <el-descriptions-item label="模板类型：">{{
+                packageData.template_type || "未知"
+              }}</el-descriptions-item>
+              <el-descriptions-item label="模板ID：">{{
+                packageData.template_id || "无"
+              }}</el-descriptions-item>
             </el-descriptions>
           </div>
         </div>
@@ -89,46 +83,52 @@
       </el-card> -->
 
       <!-- 基于查询类型渲染组件 -->
-      <SqlPackageQueryPanel v-if="packageData?.type === 'sql' && packageData" :packageData="packageData" />
-      <EsPackageQueryPanel v-else-if="packageData?.type === 'elasticsearch' && packageData" :packageData="packageData" />
+      <SqlPackageQueryPanel
+        v-if="packageData?.type === 'sql' && packageData"
+        :packageData="packageData"
+      />
+      <EsPackageQueryPanel
+        v-else-if="packageData?.type === 'elasticsearch' && packageData"
+        :packageData="packageData"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
-import { 
-  resourcePackageApi, 
+import { ref, reactive, computed, onMounted, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
+import { ArrowLeft } from "@element-plus/icons-vue";
+import {
+  resourcePackageApi,
   type ResourcePackage
-} from '@/api/resourcePackage'
-import { datasourceApi } from '@/api/datasource'
-import { type DataSource } from '@/types/datasource'
-import { getSQLTemplate, type SQLTemplateResponse } from '@/api/sqlQuery'
-import { templateApi } from '@/api/template'
-import SqlPackageQueryPanel from '@/views/resourcePackage/components/SqlPackageQueryPanel.vue'
-import EsPackageQueryPanel from '@/views/resourcePackage/components/EsPackageQueryPanel.vue'
+} from "@/api/resourcePackage";
+import { datasourceApi } from "@/api/datasource";
+import { type DataSource } from "@/types/datasource";
+import { getSQLTemplate, type SQLTemplateResponse } from "@/api/sqlQuery";
+import { templateApi } from "@/api/template";
+import SqlPackageQueryPanel from "@/views/resourcePackage/components/SqlPackageQueryPanel.vue";
+import EsPackageQueryPanel from "@/views/resourcePackage/components/EsPackageQueryPanel.vue";
 
 // 扩展ResourcePackage接口以包含模板条件
 interface ExtendedResourcePackage extends ResourcePackage {
-  template_conditions?: any[]
-  query?: string
+  template_conditions?: any[];
+  query?: string;
 }
 
 /**
  * 路由和导航
  */
-const route = useRoute()
-const router = useRouter()
+const route = useRoute();
+const router = useRouter();
 
 /**
  * 响应式数据
  */
-const loading = ref(false)
-const packageData = ref<ExtendedResourcePackage | null>(null)
-const datasources = ref<DataSource[]>([])
+const loading = ref(false);
+const packageData = ref<ExtendedResourcePackage | null>(null);
+const datasources = ref<DataSource[]>([]);
 // 查询相关状态交由子组件管理
 
 // 表单验证规则交由子组件管理
@@ -140,39 +140,44 @@ const datasources = ref<DataSource[]>([])
 
 const getDatasourceName = computed(() => {
   return (datasourceId: number) => {
-    const ds = datasources.value.find((d: DataSource) => d.id === datasourceId)
-    return ds ? ds.name : '未知数据源'
-  }
-})
+    const ds = datasources.value.find((d: DataSource) => d.id === datasourceId);
+    return ds ? ds.name : "未知数据源";
+  };
+});
 
 // 计算标签的可读文本颜色，避免文字与背景同色
 const getTagStyle = (bg: string) => {
-  const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+  const hexToRgb = (
+    hex: string
+  ): { r: number; g: number; b: number } | null => {
     try {
-      let h = hex.trim()
-      if (h.startsWith('#')) h = h.slice(1)
+      let h = hex.trim();
+      if (h.startsWith("#")) h = h.slice(1);
       if (h.length === 3) {
-        h = h.split('').map(c => c + c).join('')
+        h = h
+          .split("")
+          .map((c) => c + c)
+          .join("");
       }
-      if (h.length !== 6) return null
-      const r = parseInt(h.slice(0, 2), 16)
-      const g = parseInt(h.slice(2, 4), 16)
-      const b = parseInt(h.slice(4, 6), 16)
-      return { r, g, b }
+      if (h.length !== 6) return null;
+      const r = parseInt(h.slice(0, 2), 16);
+      const g = parseInt(h.slice(2, 4), 16);
+      const b = parseInt(h.slice(4, 6), 16);
+      return { r, g, b };
     } catch {
-      return null
+      return null;
     }
-  }
-  const rgb = hexToRgb(bg)
+  };
+  const rgb = hexToRgb(bg);
   // YIQ 对比度算法：数值越大越亮
-  const yiq = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 255
-  const textColor = yiq >= 186 ? '#111' : '#fff'
+  const yiq = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 255;
+  const textColor = yiq >= 186 ? "#111" : "#fff";
   return {
     backgroundColor: bg,
     color: textColor,
     borderColor: bg
-  }
-}
+  };
+};
 
 // 条件标签与信息交由子组件处理
 
@@ -185,136 +190,148 @@ const getTagStyle = (bg: string) => {
  * 返回列表页面
  */
 const goBack = () => {
-  router.push('/data-resources/packages')
-}
+  router.push("/data-resources/packages");
+};
 
 /**
  * 加载资源包详情
  */
 const loadPackageData = async () => {
-  const packageId = route.params.id as string
-  console.log('📦 开始加载资源包详情, ID:', packageId)
-  
+  const packageId = route.params.id as string;
+  console.log("📦 开始加载资源包详情, ID:", packageId);
+
   if (!packageId) {
-    console.error('❌ 资源包ID为空')
-    ElMessage.error('资源包ID不能为空')
-    goBack()
-    return
+    console.error("❌ 资源包ID为空");
+    ElMessage.error("资源包ID不能为空");
+    goBack();
+    return;
   }
 
   try {
-    loading.value = true
-    console.log('🔄 正在请求资源包API...')
-    const response = await resourcePackageApi.get(Number(packageId))
-    console.log('✅ API响应:', response)
-    
+    loading.value = true;
+    console.log("🔄 正在请求资源包API...");
+    const response = await resourcePackageApi.get(Number(packageId));
+    console.log("✅ API响应:", response);
+
     // 检查响应格式并提取数据
-    if (response && typeof response === 'object' && 'data' in response) {
+    if (response && typeof response === "object" && "data" in response) {
       // 如果是ApiResponse格式，提取data字段
-      packageData.value = response.data
-      console.log('✅ 资源包数据加载成功 (从response.data):', packageData.value)
+      packageData.value = response.data;
+      console.log(
+        "✅ 资源包数据加载成功 (从response.data):",
+        packageData.value
+      );
     } else {
       // 如果直接是数据对象
-      packageData.value = response as any
-      console.log('✅ 资源包数据加载成功 (直接使用response):', packageData.value)
+      packageData.value = response as any;
+      console.log(
+        "✅ 资源包数据加载成功 (直接使用response):",
+        packageData.value
+      );
     }
-    
-    console.log('🔍 资源包数据:', packageData.value)
-    console.log('🔍 模板ID:', packageData.value?.template_id)
-    console.log('🔍 模板类型:', packageData.value?.template_type)
-    
+
+    console.log("🔍 资源包数据:", packageData.value);
+    console.log("🔍 模板ID:", packageData.value?.template_id);
+    console.log("🔍 模板类型:", packageData.value?.template_type);
+
     // 如果有模板信息，加载参数配置
     if (packageData.value?.template_id && packageData.value?.template_type) {
-      console.log('✅ 满足模板加载条件，开始加载模板参数...')
-      await loadTemplateParams()
+      console.log("✅ 满足模板加载条件，开始加载模板参数...");
+      await loadTemplateParams();
     } else {
-      console.warn('⚠️ 不满足模板加载条件:', {
+      console.warn("⚠️ 不满足模板加载条件:", {
         template_id: packageData.value?.template_id,
         template_type: packageData.value?.template_type
-      })
+      });
     }
-    
+
     // 查询表单初始化由子组件管理
   } catch (error) {
-    console.error('❌ 加载资源包详情失败:', error)
-    ElMessage.error('加载资源包详情失败')
-    goBack()
+    console.error("❌ 加载资源包详情失败:", error);
+    ElMessage.error("加载资源包详情失败");
+    goBack();
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 /**
  * 根据模板类型加载参数配置
  */
 const loadTemplateParams = async () => {
   if (!packageData.value?.template_id || !packageData.value?.template_type) {
-    console.warn('模板ID或类型不存在，无法加载参数')
-    return
+    console.warn("模板ID或类型不存在，无法加载参数");
+    return;
   }
 
   try {
-    console.log('🔄 开始加载模板参数，模板ID:', packageData.value.template_id, '类型:', packageData.value.template_type)
-    
-    let templateData: SQLTemplateResponse | any = null
-    
-    if (packageData.value.template_type === 'sql') {
+    console.log(
+      "🔄 开始加载模板参数，模板ID:",
+      packageData.value.template_id,
+      "类型:",
+      packageData.value.template_type
+    );
+
+    let templateData: SQLTemplateResponse | any = null;
+
+    if (packageData.value.template_type === "sql") {
       // 调用SQL模板API
-      const response = await getSQLTemplate(packageData.value.template_id)
-      templateData = response.data
-    } else if (packageData.value.template_type === 'elasticsearch') {
+      const response = await getSQLTemplate(packageData.value.template_id);
+      templateData = response.data;
+    } else if (packageData.value.template_type === "elasticsearch") {
       // 调用ES模板API
-      const response = await templateApi.getByType(packageData.value.template_id, 'es')
-      templateData = (response as any)?.data || response
+      const response = await templateApi.getByType(
+        packageData.value.template_id,
+        "es"
+      );
+      templateData = (response as any)?.data || response;
     }
-    
+
     if (templateData && templateData.config) {
-      console.log('✅ 模板参数加载成功:', templateData.config)
+      console.log("✅ 模板参数加载成功:", templateData.config);
       // 从模板配置中解析条件参数，过滤掉锁定的条件
-      const conditions = templateData.config.conditions || []
-      const unlockedConditions = conditions.filter((condition: any) => !condition.locked)
-      
+      const conditions = templateData.config.conditions || [];
+      const unlockedConditions = conditions.filter(
+        (condition: any) => !condition.locked
+      );
+
       // 将未锁定的条件转换为动态参数格式
-      const dynamicParams: Record<string, any> = {}
+      const dynamicParams: Record<string, any> = {};
       unlockedConditions.forEach((condition: any) => {
-        dynamicParams[condition.name] = condition.default_value || ''
-      })
-      
+        dynamicParams[condition.name] = condition.default_value || "";
+      });
+
       if (packageData.value) {
-        packageData.value.dynamic_params = dynamicParams
-        packageData.value.template_conditions = unlockedConditions
+        packageData.value.dynamic_params = dynamicParams;
+        packageData.value.template_conditions = unlockedConditions;
       }
     } else {
-      console.warn('⚠️ 模板配置中没有找到参数信息')
+      console.warn("⚠️ 模板配置中没有找到参数信息");
     }
   } catch (error) {
-    console.error('❌ 加载模板参数失败:', error)
+    console.error("❌ 加载模板参数失败:", error);
   }
-}
+};
 
 /**
  * 加载数据源列表
  */
 const loadDatasources = async () => {
   try {
-    console.log('🔄 开始加载数据源列表...')
-    const response = await datasourceApi.getDataSourceList()
-    datasources.value = response.data?.items || []
-    console.log('✅ 数据源列表加载成功:', datasources.value)
+    console.log("🔄 开始加载数据源列表...");
+    const response = await datasourceApi.getDataSourceList();
+    datasources.value = response.data?.items || [];
+    console.log("✅ 数据源列表加载成功:", datasources.value);
   } catch (error) {
-    console.error('❌ 加载数据源列表失败:', error)
+    console.error("❌ 加载数据源列表失败:", error);
   }
-}
+};
 
 // 初始化查询表单交由子组件管理
-
-
 
 // 表单重置与主动查询由子组件管理
 
 // 查询执行由子组件管理
-
-
 
 // 分页处理由子组件管理
 
@@ -324,26 +341,28 @@ const loadDatasources = async () => {
  * 生命周期
  */
 onMounted(() => {
-  console.log('🔄 ResourcePackageQueryPage 组件已挂载')
-  console.log('📍 当前路由参数:', route.params)
-  loadDatasources()
-  loadPackageData()
-})
+  console.log("🔄 ResourcePackageQueryPage 组件已挂载");
+  console.log("📍 当前路由参数:", route.params);
+  loadDatasources();
+  loadPackageData();
+});
 
 // 监听路由参数变化
-watch(() => route.params.id, () => {
-  console.log('🔄 路由参数变化:', route.params.id)
-  if (route.params.id) {
-    loadPackageData()
+watch(
+  () => route.params.id,
+  () => {
+    console.log("🔄 路由参数变化:", route.params.id);
+    if (route.params.id) {
+      loadPackageData();
+    }
   }
-})
+);
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .resource-package-query-page {
-  padding: 20px;
+  padding: 13px;
   min-height: 100vh;
-  background-color: #f5f5f5;
 }
 
 .page-header {
@@ -394,7 +413,7 @@ watch(() => route.params.id, () => {
 .page-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
 }
 
 .package-info-card,
@@ -517,12 +536,59 @@ watch(() => route.params.id, () => {
 }
 
 :deep(.el-descriptions__label) {
-  font-weight: 600;
+  // font-weight: 600;
 }
 
 .package-info-card .template-details {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.package-info-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 5px;
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #303133;
+    }
+    .package-tags {
+      display: flex;
+      gap: 6px;
+    }
+  }
+
+  .info-section {
+    margin-top: 16px;
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #409eff;
+      margin-bottom: 8px;
+      border-left: 3px solid #409eff;
+      padding-left: 8px;
+    }
+
+    .section-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .config-descriptions {
+      background: #fafafa;
+      border-radius: 6px;
+      padding: 8px 12px;
+    }
+  }
 }
 </style>

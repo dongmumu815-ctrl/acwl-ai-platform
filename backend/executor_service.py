@@ -37,7 +37,7 @@ class ExecutorService:
         self.node_id = config.get('node_id') or str(uuid.uuid4())
         self.node_name = config.get('node_name') or f'executor-{self.node_id[:8]}'
         self.group_id = config.get('group_id', 'default')
-        self.host_ip = config.get('host_ip', '127.0.0.1')
+        self.host_ip = config.get('host_ip', '10.20.1.200')
         self.port = config.get('port', 8001)
         self.max_concurrent_tasks = config.get('max_concurrent_tasks', 5)
         
@@ -335,7 +335,7 @@ def parse_args():
     parser.add_argument('--node-id', help='节点ID')
     parser.add_argument('--node-name', help='节点名称')
     parser.add_argument('--group-id', default='default', help='执行器分组ID')
-    parser.add_argument('--host-ip', default='127.0.0.1', help='主机IP地址')
+    parser.add_argument('--host-ip', default='10.20.1.200', help='主机IP地址')
     parser.add_argument('--port', type=int, default=8001, help='端口号')
     parser.add_argument('--max-concurrent-tasks', type=int, default=5, help='最大并发任务数')
     parser.add_argument('--log-level', default='INFO', help='日志级别')

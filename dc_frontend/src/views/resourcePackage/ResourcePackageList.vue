@@ -7,14 +7,14 @@
           <h1 class="page-title">
             <el-icon><Box /></el-icon>
             资源包管理
+            <span class="page-description">管理和配置数据查询资源包，支持SQL和Elasticsearch查询</span>
           </h1>
-          <p class="page-description">管理和配置数据查询资源包，支持SQL和Elasticsearch查询</p>
         </div>
         <div class="header-right">
-          <!-- <el-button type="primary" @click="handleCreate">
+          <el-button type="primary" @click="handleCreate">
             <el-icon><Plus /></el-icon>
             创建资源包
-          </el-button> -->
+          </el-button>
           <el-button @click="refreshPackages">
             <el-icon><Refresh /></el-icon>
             刷新
@@ -279,6 +279,14 @@
                   >
                     查询设定
                   </el-button>
+                  <el-button
+                    type="success"
+                    size="small"
+                    :loading="downloadLoading"
+                    @click="openDownloadDialog(pkg)"
+                  >
+                    下载资源包
+                  </el-button>
                   <el-dropdown trigger="click">
                     <el-button size="small" text>
                       <el-icon><MoreFilled /></el-icon>
@@ -406,6 +414,9 @@
                     <el-icon><Setting /></el-icon>
                     查询设定
                   </el-button>
+                  <el-button type="success" size="small" :loading="downloadLoading" @click="openDownloadDialog(row)">
+                    下载资源包
+                  </el-button>
                   <el-dropdown trigger="click">
                     <el-button size="small">
                       更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -418,8 +429,19 @@
                         <el-dropdown-item @click="handleEdit(row)">
                           <el-icon><Edit /></el-icon>编辑
                         </el-dropdown-item>
-                        <el-dropdown-item divided @click="handleDelete(row)">
-                          <el-icon><Delete /></el-icon>删除
+                        <el-dropdown-item divided @click="handleDelete(row)" :disabled="row.is_lock === '1'">
+                          <el-tooltip 
+                            v-if="row.is_lock === '1'" 
+                            content="该资源包已锁定，不可删除" 
+                            placement="top"
+                          >
+                            <span>
+                              <el-icon><Delete /></el-icon>删除
+                            </span>
+                          </el-tooltip>
+                          <span v-else>
+                            <el-icon><Delete /></el-icon>删除
+                          </span>
                         </el-dropdown-item>
                       </el-dropdown-menu>
                     </template>
@@ -444,6 +466,13 @@
         </div>
       </el-card>
     </div>
+
+    <!-- 创建资源包 -->
+    <ResourcePackageForm
+      v-model:visible="createDialogVisible"
+      :isEdit="false"
+      @success="onCreateSuccess"
+    />
 
     <!-- 编辑资源包基本信息 -->
     <ResourcePackageForm
@@ -508,6 +537,39 @@
         <el-button @click="apiDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 下载资源包弹窗 -->
+    <el-dialog v-model="downloadDialogVisible" title="下载资源包" width="520px">
+      <div class="download-info">
+        <div class="info-row">
+          <span class="label">最新生成时间：</span>
+          <span class="value">{{ formatTime(downloadDialogData?.excel_time) || '暂无' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">最新下载时间：</span>
+          <span class="value">{{ formatTime(downloadDialogData?.download_time) || '暂无' }}</span>
+        </div>
+        <!-- 历史文件选择 -->
+        <div class="info-row">
+          <span class="label">历史文件：</span>
+          <el-select v-model="selectedFileId" placeholder="选择历史Excel" filterable style="width: 260px" :loading="historyLoading">
+            <el-option v-for="f in historyFiles" :key="f.id" :label="formatHistoryLabel(f)" :value="f.id" />
+          </el-select>
+          <el-button size="small" type="success" :disabled="!selectedFileId" :loading="historyDownloadLoading" @click="handleDownloadHistory">下载资源包</el-button>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="downloadDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="generateLoading" @click="handleGenerateExcel">
+            生成资源包
+          </el-button>
+          <el-button type="success" :disabled="!downloadDialogData?.download_url" :loading="latestDownloadLoading" @click="handleDownloadLatest">
+            下载最新资源包
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -531,11 +593,12 @@ import {
   MoreFilled,
   Edit,
   CopyDocument,
+  Download,
   Delete,
   View,
   Coin
 } from '@element-plus/icons-vue'
-import { resourcePackageApi, type ResourcePackage, type ResourcePackageSearchRequest } from '@/api/resourcePackage'
+import { resourcePackageApi, type ResourcePackage, type ResourcePackageSearchRequest, type ResourcePackageFile } from '@/api/resourcePackage'
 import { dataResourceApi } from '@/api/dataResource'
 import { saveSQLTemplate, updateSQLTemplate, executeSQLQuery } from '@/api/sqlQuery'
 import { formatDate } from '@/utils/date'
@@ -564,6 +627,7 @@ const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)
+const downloadLoading = ref(false)
 const packageList = ref<ResourcePackage[]>([])
 const datasources = ref<Datasource[]>([])
 const esDatasources = ref([])
@@ -574,6 +638,7 @@ const sqlResources = ref<any[]>([])
 
 // 编辑对话框与查询设定抽屉、API端点
 const editDialogVisible = ref(false)
+const createDialogVisible = ref(false)
 const selectedPackage = ref<ResourcePackage | null>(null)
 const querySettingVisible = ref(false)
 const querySettingPackage = ref<ResourcePackage | null>(null)
@@ -943,8 +1008,7 @@ const handleTableSort = ({ prop, order }: { prop: string; order: string }) => {
  * 创建资源包
  */
 const handleCreate = () => {
-  // 跳转到创建页面或打开创建对话框
-  router.push('/data-resources/packages/create')
+  createDialogVisible.value = true
 }
 
 /**
@@ -979,6 +1043,177 @@ const showApiEndpoint = (row: ResourcePackage) => {
   apiDialogVisible.value = true
 }
 
+// 下载相关状态与方法
+const downloadDialogVisible = ref(false)
+const downloadPackage = ref<ResourcePackage | null>(null)
+const downloadDialogData = ref<{ excel_time?: string; download_time?: string; download_url?: string } | null>(null)
+const historyFiles = ref<ResourcePackageFile[]>([])
+const selectedFileId = ref<number | null>(null)
+const historyLoading = ref(false)
+const latestDownloadLoading = ref(false)
+const historyDownloadLoading = ref(false)
+const generateLoading = ref(false)
+
+function formatTime(time?: string) {
+  if (!time) return '-'
+  const d = new Date(time)
+  if (isNaN(d.getTime())) return time
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`
+}
+
+function formatHistoryLabel(f: ResourcePackageFile): string {
+  const t = f.generated_at ? new Date(f.generated_at).toLocaleString() : ''
+  return `${f.filename} (${t})`
+}
+
+/**
+ * 生成资源包Excel
+ */
+async function handleGenerateExcel() {
+  if (!downloadPackage.value?.id) {
+    ElMessage.error('缺少资源包ID')
+    return
+  }
+  
+  try {
+    generateLoading.value = true
+    // 调用生成Excel的API
+    const payload = {}
+    const resp = await resourcePackageApi.generateExcel(downloadPackage.value.id, payload)
+    
+    if (resp?.success) {
+      const hasNew = resp?.data?.has_new_data
+      if (hasNew === false) {
+        ElMessage.warning(resp?.message || '无最新数据，无需生成')
+      } else {
+        // 更新弹窗中的下载链接
+        const data = resp.data || {}
+        if (data.download_url && downloadDialogData.value) {
+          downloadDialogData.value.download_url = data.download_url
+        }
+        // 仅在有新数据时刷新弹窗时间为本地当前时间
+        if (downloadDialogData.value) {
+          downloadDialogData.value.excel_time = new Date().toISOString()
+        }
+        ElMessage.success('Excel文件生成成功')
+      }
+    } else {
+      ElMessage.error(resp?.message || '生成Excel失败，请稍后重试')
+    }
+  } catch (e: any) {
+    console.error('生成Excel失败:', e)
+    ElMessage.error(e?.message || '生成Excel失败，请稍后重试')
+  } finally {
+    generateLoading.value = false
+  }
+}
+
+function openDownloadDialog(pkg: ResourcePackage) {
+  downloadPackage.value = pkg
+  downloadDialogVisible.value = true
+  downloadDialogData.value = {
+    excel_time: pkg.excel_time,
+    download_time: pkg.download_time,
+    download_url: pkg.download_url,
+  }
+  selectedFileId.value = null
+  fetchHistoryFiles(pkg.id)
+}
+
+async function fetchHistoryFiles(packageId: number) {
+  try {
+    historyLoading.value = true
+    const resp = await resourcePackageApi.listFiles(packageId, 1, 50)
+    if (resp.success) {
+      historyFiles.value = resp.data?.items || []
+    } else {
+      historyFiles.value = []
+    }
+  } catch (err) {
+    console.warn('加载历史文件失败:', err)
+    historyFiles.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function handleDownloadLatest() {
+  try {
+    if (!downloadPackage.value) return
+    if (!downloadDialogData.value?.download_url) {
+      ElMessage.error('暂无可下载的最新资源包，请先生成Excel')
+      return
+    }
+    latestDownloadLoading.value = true
+    const resp = await resourcePackageApi.downloadLatest(downloadPackage.value.id)
+    if (!resp.success) {
+      throw new Error(resp.message || '下载失败')
+    }
+    const url = resp.data?.download_url || downloadDialogData.value?.download_url
+    const filename = resp.data?.filename || ''
+    if (url) {
+      window.open(url, '_blank')
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } catch (e) {
+        console.warn('下载链接触发失败，已尝试回退方案:', e)
+      }
+      if (resp.data?.download_time) downloadDialogData.value!.download_time = resp.data.download_time
+      downloadDialogData.value!.download_time = new Date().toISOString()
+      ElMessage.success('正在下载最新资源包...')
+    } else {
+      ElMessage.error('未返回下载链接')
+    }
+  } catch (e: any) {
+    console.error('下载最新资源包失败:', e)
+    ElMessage.error(e.message || '下载失败，请稍后重试')
+  } finally {
+    latestDownloadLoading.value = false
+  }
+}
+
+async function handleDownloadHistory() {
+  try {
+    if (!downloadPackage.value || !selectedFileId.value) {
+      ElMessage.error('请选择需要下载的历史文件')
+      return
+    }
+    historyDownloadLoading.value = true
+    const resp = await resourcePackageApi.downloadFile(downloadPackage.value.id, selectedFileId.value)
+    if (!resp.success) {
+      throw new Error(resp.message || '下载失败')
+    }
+    const url = resp.data?.download_url
+    const filename = resp.data?.filename || ''
+    if (url) {
+      window.open(url, '_blank')
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } catch (e) {
+        console.warn('下载链接触发失败，已尝试回退方案:', e)
+      }
+      ElMessage.success('正在下载历史文件...')
+    } else {
+      ElMessage.error('未返回下载链接')
+    }
+  } catch (e: any) {
+    console.error('下载历史文件失败:', e)
+    ElMessage.error(e.message || '下载失败，请稍后重试')
+  } finally {
+    historyDownloadLoading.value = false
+  }
+}
+
 /**
  * 跳转到资源包查询页面
  */
@@ -997,6 +1232,12 @@ const handleClone = (row: ResourcePackage) => {
  * 删除资源包
  */
 const handleDelete = async (row: ResourcePackage) => {
+  // 检查资源包是否被锁定
+  if (row.is_lock === '1') {
+    ElMessage.warning('该资源包已锁定，不可删除')
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
       `确定要删除资源包 “${row.name}” 吗？`,
@@ -1213,6 +1454,12 @@ onMounted(() => {
   loadSQLResources()
 })
 
+/** 创建成功后刷新列表 */
+const onCreateSuccess = () => {
+  createDialogVisible.value = false
+  loadPackages()
+}
+
 /** 编辑成功后刷新列表 */
 const onEditSuccess = () => {
   editDialogVisible.value = false
@@ -1223,13 +1470,13 @@ const onEditSuccess = () => {
 <style scoped>
 .resource-package-page {
   padding: 20px;
-  background-color: #f5f7fa;
+  background-color: var(--el-bg-color-page);
   min-height: 100vh;
 }
 
 /* 页面头部 */
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .header-content {
@@ -1245,7 +1492,7 @@ const onEditSuccess = () => {
 .page-title {
   margin: 0 0 8px 0;
   color: #303133;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -1253,10 +1500,12 @@ const onEditSuccess = () => {
 }
 
 .page-description {
+  /* flex中靠下 */
+  align-self: flex-end; 
   margin: 0;
   color: #606266;
   font-size: 14px;
-  line-height: 1.5;
+  font-weight: 400;
 }
 
 .header-right {
@@ -1266,12 +1515,12 @@ const onEditSuccess = () => {
 
 /* 统计卡片 */
 .stats-cards {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .stat-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 24px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   border: 1px solid #ebeef5;
@@ -1333,7 +1582,7 @@ const onEditSuccess = () => {
 
 /* 筛选区域 */
 .filter-section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 /* 资源包列表 */
@@ -1362,7 +1611,7 @@ const onEditSuccess = () => {
 
 .package-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid #ebeef5;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -1576,6 +1825,9 @@ const onEditSuccess = () => {
 }
 
 /* Element Plus 样式覆盖 */
+:deep(.el-card) {
+  border-radius: 10px;
+}
 :deep(.el-card__body) {
   padding: 24px;
 }
@@ -1602,4 +1854,10 @@ const onEditSuccess = () => {
 :deep(.el-radio-group .el-radio-button__inner) {
   padding: 8px 12px;
 }
+
+/* 下载弹窗样式与查询面板保持一致 */
+.download-info { margin: 8px 0 4px; }
+.info-row { display: flex; margin-bottom: 6px; align-items: center; }
+.info-row .label { color: #606266; width: 220px; }
+.info-row .value { color: #303133; }
 </style>

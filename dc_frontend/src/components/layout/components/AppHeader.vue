@@ -8,21 +8,25 @@
       >
         <el-icon><Expand v-if="collapsed" /><Fold v-else /></el-icon>
       </el-button>
-      
-      <div class="breadcrumb">
+
+      <!-- <div class="breadcrumb">
         <el-breadcrumb separator="/">
           <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
           <el-breadcrumb-item>数据中心</el-breadcrumb-item>
         </el-breadcrumb>
+      </div> -->
+      <!-- 面包屑导航 -->
+      <div class="breadcrumb-container" v-if="showBreadcrumb">
+        <Breadcrumb />
       </div>
     </div>
-    
+
     <div class="header-right">
       <el-dropdown trigger="click">
         <div class="user-info">
-          <el-avatar 
-            :size="32" 
-            :src="userInfo?.avatar_url || '/avatar.png'" 
+          <el-avatar
+            :size="32"
+            :src="userInfo?.avatar || '/avatar.png'"
             :alt="userName"
           />
           <span class="username">{{ userName }}</span>
@@ -50,67 +54,72 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import { computed } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { useRouter, useRoute } from "vue-router";
+import { useUserStore } from "@/stores/user";
 
 /**
  * 定义组件属性
  */
 interface Props {
-  collapsed: boolean
+  collapsed: boolean;
 }
 
 /**
  * 定义组件事件
  */
 interface Emits {
-  (e: 'toggle-sidebar'): void
+  (e: "toggle-sidebar"): void;
 }
 
-defineProps<Props>()
-defineEmits<Emits>()
+defineProps<Props>();
+defineEmits<Emits>();
 
-const router = useRouter()
-const userStore = useUserStore()
+const route = useRoute();
+const router = useRouter();
+const userStore = useUserStore();
 
 // 计算用户信息
-const userInfo = computed(() => userStore.userInfo)
+const userInfo = computed(() => userStore.userInfo);
 const userName = computed(() => {
   if (userInfo.value) {
-    return userInfo.value.nickname || userInfo.value.username || userInfo.value.email || '用户'
+    return (
+      userInfo.value.username ||
+      userInfo.value.email ||
+      "用户"
+    );
   }
-  return '未登录'
-})
+  return "未登录";
+});
+
+const showBreadcrumb = computed(() => {
+  return !route.meta?.hideBreadcrumb && route.name !== "Dashboard";
+});
 
 /**
  * 处理用户退出登录
  */
 const handleLogout = async () => {
   try {
-    await ElMessageBox.confirm(
-      '确定要退出登录吗？',
-      '提示',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    await userStore.logout()
-    ElMessage.success('退出登录成功')
-    router.push('/login')
+    await ElMessageBox.confirm("确定要退出登录吗？", "提示", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning"
+    });
+
+    await userStore.logout();
+    ElMessage.success("退出登录成功");
+    router.push("/login");
   } catch (error: any) {
-    if (error !== 'cancel') {
-      console.error('退出登录失败:', error)
+    if (error !== "cancel") {
+      console.error("退出登录失败:", error);
       // 即使退出接口失败，也要清除本地状态并跳转
-      userStore.reset()
-      router.push('/login')
+      userStore.reset();
+      router.push("/login");
     }
   }
-}
+};
 </script>
 
 <style lang="scss" scoped>

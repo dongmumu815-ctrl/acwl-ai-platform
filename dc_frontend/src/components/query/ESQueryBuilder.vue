@@ -528,8 +528,18 @@ function generateDSLFromConditions(): string {
   
   // 设置排序
   if (queryConfig.sort.field) {
+    // 获取字段信息，判断是否需要添加 .keyword 后缀
+    const fieldInfo = availableFields.value.find(f => f.name === queryConfig.sort.field)
+    let fieldName = queryConfig.sort.field
+    
+    // 对于 text 类型字段，在排序时自动添加 .keyword 后缀
+    if (fieldInfo && fieldInfo.type === 'text') {
+      fieldName = `${queryConfig.sort.field}.keyword`
+      console.log(`🔧 为 text 字段 ${queryConfig.sort.field} 添加 .keyword 后缀: ${fieldName}`)
+    }
+    
     query.sort = [{
-      [queryConfig.sort.field]: {
+      [fieldName]: {
         order: queryConfig.sort.order
       }
     }]
@@ -581,10 +591,20 @@ function generateDSLFromConditions(): string {
   
   // 添加聚合查询
   if (queryConfig.enableAggregation && queryConfig.aggregation.field) {
+    // 获取字段信息，判断是否需要添加 .keyword 后缀
+    const fieldInfo = availableFields.value.find(f => f.name === queryConfig.aggregation.field)
+    let fieldName = queryConfig.aggregation.field
+    
+    // 对于 text 类型字段，在聚合时自动添加 .keyword 后缀
+    if (fieldInfo && fieldInfo.type === 'text') {
+      fieldName = `${queryConfig.aggregation.field}.keyword`
+      console.log(`🔧 为 text 字段 ${queryConfig.aggregation.field} 添加 .keyword 后缀: ${fieldName}`)
+    }
+    
     query.aggs = {
       aggregation_result: {
         [queryConfig.aggregation.type]: {
-          field: queryConfig.aggregation.field,
+          field: fieldName,
           size: queryConfig.aggregation.size
         }
       }
@@ -600,11 +620,21 @@ function generateDSLFromConditions(): string {
 function buildSingleCondition(condition: QueryCondition): any {
   const { field, queryType, value } = condition
   
+  // 获取字段信息，判断是否需要添加 .keyword 后缀
+  const fieldInfo = availableFields.value.find(f => f.name === field)
+  let fieldName = field
+  
+  // 对于 text 类型字段，在 term 查询时自动添加 .keyword 后缀
+  if (fieldInfo && fieldInfo.type === 'text' && queryType === 'term') {
+    fieldName = `${field}.keyword`
+    console.log(`🔧 为 text 字段 ${field} 的 term 查询添加 .keyword 后缀: ${fieldName}`)
+  }
+  
   switch (queryType) {
     case 'match':
       return { match: { [field]: value } }
     case 'term':
-      return { term: { [field]: value } }
+      return { term: { [fieldName]: value } }
     case 'range':
       return { range: { [field]: value } }
     case 'exists':

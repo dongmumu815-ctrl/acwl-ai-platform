@@ -7,19 +7,19 @@ import router from '@/router'
 /**
  * 请求配置接口
  */
-interface RequestConfig extends AxiosRequestConfig {
-  skipAuth?: boolean // 跳过认证
-  skipErrorHandler?: boolean // 跳过错误处理
-  showLoading?: boolean // 显示加载状态
-  showSuccessMessage?: boolean // 显示成功消息
+export interface RequestConfig extends AxiosRequestConfig {
+  skipAuth?: boolean
+  skipErrorHandler?: boolean
+  showLoading?: boolean
+  showSuccessMessage?: boolean
 }
 
 /**
  * API响应数据结构
  */
-interface ApiResponse<T = any> {
+export interface ApiResponse<T = any> {
   success: boolean
-  message: string
+  message?: string
   data: T
   code?: number
 }
@@ -318,7 +318,13 @@ export const request = async <T = any>(config: RequestConfig): Promise<ApiRespon
       'success' in response.data &&
       'data' in response.data
     ) {
-      return response.data as ApiResponse<T>
+      const rd: any = response.data
+      return {
+        success: Boolean(rd.success),
+        data: rd.data as T,
+        message: typeof rd.message === 'string' ? rd.message : undefined,
+        code: typeof rd.code === 'number' ? rd.code : undefined
+      } as ApiResponse<T>
     }
     
     // 如果不是ApiResponse格式，包装成ApiResponse格式
@@ -336,7 +342,13 @@ export const request = async <T = any>(config: RequestConfig): Promise<ApiRespon
         'success' in error.response.data &&
         'data' in error.response.data
       ) {
-        return error.response.data
+        const rd: any = error.response.data
+        return {
+          success: Boolean(rd.success),
+          data: rd.data as T,
+          message: typeof rd.message === 'string' ? rd.message : undefined,
+          code: typeof rd.code === 'number' ? rd.code : undefined
+        } as ApiResponse<T>
       }
       
       // 包装错误响应

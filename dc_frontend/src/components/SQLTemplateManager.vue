@@ -30,6 +30,7 @@
             placeholder="选择数据源"
             @change="onFilterChange"
             clearable
+            filterable
           >
             <el-option
               v-for="ds in datasources"
@@ -46,6 +47,7 @@
             @change="onFilterChange"
             multiple
             clearable
+            filterable
           >
             <el-option
               v-for="tag in availableTags"
@@ -200,6 +202,7 @@
             v-model="templateForm.datasourceId"
             placeholder="请选择数据源"
             style="width: 100%"
+            filterable
           >
             <el-option
               v-for="ds in datasources"

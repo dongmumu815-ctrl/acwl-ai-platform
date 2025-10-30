@@ -59,6 +59,7 @@ class CustomApi(Base):
     api_description = Column(Text, nullable=True, comment="API描述")  # 实际字段名
     api_url = Column(String(200), nullable=False, comment="接口地址")  # 实际字段名
     http_method = Column(String(10), default="POST", comment="HTTP方法")
+    resource_type_id = Column(String(255), nullable=True, comment="资源类型ID")
     status = Column(Integer, default=1, comment="状态(1:激活,0:禁用)")  # 实际字段名
     rate_limit = Column(Integer, nullable=True, comment="每分钟调用限制")
     response_format = Column(String(20), default="JSON", comment="响应格式")
@@ -118,6 +119,8 @@ class ApiField(Base):
     field_label = Column(String(100), nullable=False, comment="字段标签")
     field_type = Column(String(20), nullable=False, comment="字段类型")
     is_required = Column(Boolean, default=False, comment="是否必填")
+    # 是否上传：1 为勾选，0 为不勾选
+    is_upload = Column(Integer, default=0, comment="是否上传")
     default_value = Column(Text, nullable=True, comment="默认值")
     max_length = Column(Integer, nullable=True, comment="最大长度")
     min_length = Column(Integer, nullable=True, comment="最小长度")
