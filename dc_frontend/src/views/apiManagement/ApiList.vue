@@ -186,7 +186,7 @@
           <el-table-column
             prop="api_name"
             label="API名称"
-            min-width="180"
+            min-width="350"
             sortable
           >
             <template #default="{ row }">
@@ -212,15 +212,6 @@
             min-width="220"
             show-overflow-tooltip
           />
-          <el-table-column label="格式" min-width="160">
-            <template #default="{ row }">
-              <div class="format-tags">
-                <el-tag size="small" type="success"
-                  >RES: {{ row.response_format.toUpperCase() }}</el-tag
-                >
-              </div>
-            </template>
-          </el-table-column>
           <el-table-column
             prop="total_calls"
             label="调用次数"
@@ -1618,11 +1609,17 @@ const openSwaggerUI = () => {
 .api-name {
   font-weight: 600;
   color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .api-code {
   color: #909399;
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .format-tags {

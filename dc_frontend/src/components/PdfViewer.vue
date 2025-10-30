@@ -1,7 +1,7 @@
 <template>
   <div class="pdf-viewer">
     <div class="toolbar">
-      <el-button size="small" @click="openInNewTab" :disabled="!src">在新标签打开</el-button>
+      <el-button size="small" @click="openInNewTab" :disabled="!src">新网页打开</el-button>
     </div>
     <div class="viewer">
       <iframe v-if="src" :src="src" frameborder="0" class="iframe"></iframe>

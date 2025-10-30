@@ -108,7 +108,7 @@
           
           <div class="setting-item">
             <label class="setting-label">语言设置</label>
-            <el-select v-model="settings.language" @change="handleLanguageChange">
+            <el-select v-model="settings.language" @change="handleLanguageChange" filterable>
               <el-option label="简体中文" value="zh-CN" />
               <el-option label="English" value="en-US" />
             </el-select>

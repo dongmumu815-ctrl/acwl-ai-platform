@@ -28,6 +28,7 @@ export interface ESIndex {
 export interface ESField {
   name: string
   type: string
+  comment?: string
   analyzer?: string
   searchAnalyzer?: string
   properties?: Record<string, ESField>

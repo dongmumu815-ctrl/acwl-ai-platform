@@ -202,7 +202,8 @@
 
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button
+            <!-- 
+              <el-button
               type="primary"
               size="small"
               @click="viewResource(row)"
@@ -218,6 +219,23 @@
               :disabled="!hasViewPermission"
             >
               预览
+            </el-button>
+            -->
+            <el-button
+              type="primary"
+              size="small"
+              @click="editResource(row)"
+              :disabled="!hasEditPermission"
+            >
+              编辑
+            </el-button>
+            <el-button
+              type="danger"
+              size="small"
+              @click="deleteResource(row)"
+              :disabled="!hasDeletePermission"
+            >
+              删除
             </el-button>
             <el-button
               type="success"
@@ -235,6 +253,7 @@
             >
               API
             </el-button> -->
+            <!-- 
             <el-dropdown trigger="click">
               <el-button size="small">
                 更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -272,6 +291,7 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
+            -->
           </template>
         </el-table-column>
       </el-table>
@@ -1917,7 +1937,7 @@ const queryData = (resource: any) => {
     query: queryParams
   });
 
-  ElMessage.info(`查询数据: ${resource.name}`);
+  // ElMessage.info(`查询数据: ${resource.name}`);
 };
 
 /**
@@ -2013,7 +2033,7 @@ const editResource = (resource: any) => {
   // 打开编辑对话框
   showEditResourceDialog.value = true;
 
-  ElMessage.info(`编辑资源: ${resource.name}`);
+  // ElMessage.info(`编辑资源: ${resource.name}`);
 };
 
 /**

@@ -11,10 +11,10 @@
           </h1>
         </div>
         <div class="header-right">
-          <!-- <el-button type="primary" @click="handleCreate">
+          <el-button type="primary" @click="handleCreate">
             <el-icon><Plus /></el-icon>
             创建资源包
-          </el-button> -->
+          </el-button>
           <el-button @click="refreshPackages">
             <el-icon><Refresh /></el-icon>
             刷新
@@ -456,6 +456,13 @@
       </el-card>
     </div>
 
+    <!-- 创建资源包 -->
+    <ResourcePackageForm
+      v-model:visible="createDialogVisible"
+      :isEdit="false"
+      @success="onCreateSuccess"
+    />
+
     <!-- 编辑资源包基本信息 -->
     <ResourcePackageForm
       v-model:visible="editDialogVisible"
@@ -620,6 +627,7 @@ const sqlResources = ref<any[]>([])
 
 // 编辑对话框与查询设定抽屉、API端点
 const editDialogVisible = ref(false)
+const createDialogVisible = ref(false)
 const selectedPackage = ref<ResourcePackage | null>(null)
 const querySettingVisible = ref(false)
 const querySettingPackage = ref<ResourcePackage | null>(null)
@@ -989,8 +997,7 @@ const handleTableSort = ({ prop, order }: { prop: string; order: string }) => {
  * 创建资源包
  */
 const handleCreate = () => {
-  // 跳转到创建页面或打开创建对话框
-  router.push('/data-resources/packages/create')
+  createDialogVisible.value = true
 }
 
 /**
@@ -1429,6 +1436,12 @@ onMounted(() => {
   loadPackages()
   loadSQLResources()
 })
+
+/** 创建成功后刷新列表 */
+const onCreateSuccess = () => {
+  createDialogVisible.value = false
+  loadPackages()
+}
 
 /** 编辑成功后刷新列表 */
 const onEditSuccess = () => {

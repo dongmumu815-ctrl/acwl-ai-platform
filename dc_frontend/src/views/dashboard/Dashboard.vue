@@ -300,29 +300,30 @@ const loadDistribution = async () => {
 
     const indexCandidates = ['cpc_dw_publication', 'cpc_dw_publication*']
     const fieldsToTry = [
-      'publication_category.keyword',
       'publication_category',
-      'category.keyword',
       'category',
-      'publication_type.keyword',
       'publication_type'
     ]
 
+    const ensureKeywordField = (field: string) =>
+      field && field.endsWith('.keyword') ? field : `${field}.keyword`
+
     const tryAgg = async (field: string) => {
+      const keywordField = ensureKeywordField(field)
       const res = await getESAggregations(
         esDatasourceId.value as number,
         indexCandidates,
         {
           category_terms: {
             terms: {
-              field,
+              field: keywordField,
               size: 20,
               order: { _count: 'desc' },
               min_doc_count: 1
             }
           }
         },
-        { exists: { field } }
+        { exists: { field: keywordField } }
       )
       const agg = (res as any)?.data?.aggregations?.category_terms
       const buckets = Array.isArray(agg?.buckets) ? agg.buckets : []

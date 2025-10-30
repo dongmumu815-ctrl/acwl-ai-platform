@@ -43,6 +43,7 @@
                 placeholder="请选择ES数据源"
                 @change="onEsDatasourceChange"
                 style="width: 100%"
+                filterable
               >
                 <el-option
                   v-for="ds in esDatasources"
@@ -62,6 +63,7 @@
                 clearable
                 @change="onTemplateChange"
                 :loading="loadingTemplates"
+                filterable
               >
                 <el-option
                   v-for="template in availableTemplates"
@@ -99,6 +101,7 @@
             placeholder="请选择索引"
             @change="onIndicesChange"
             style="width: 100%"
+            filterable
           >
             <el-option
               v-for="index in esQueryConfig.availableIndices"
@@ -132,11 +135,12 @@
             multiple
             placeholder="请选择字段（留空返回所有字段）"
             style="width: 100%"
+            filterable
           >
             <el-option
               v-for="field in esQueryConfig.availableFields"
               :key="field.name"
-              :label="`${field.name} (${field.type})`"
+              :label="`${field.name} (${field.comment || field.type})`"
               :value="field.name"
             />
           </el-select>
@@ -182,6 +186,7 @@
                   size="small" 
                   style="width: 80px"
                   :disabled="condition._locked && condition._lockType === 'full'"
+                  filterable
                 >
                   <el-option label="AND" value="must" />
                   <el-option label="OR" value="should" />
@@ -198,6 +203,7 @@
                   style="width: 150px"
                   @change="onFieldChange(condition)"
                   :disabled="condition._locked && (condition._lockType === 'full' || condition._lockType === 'field')"
+                  filterable
                 >
                   <el-option
                     v-for="field in esQueryConfig.availableFields"
@@ -213,6 +219,7 @@
                   placeholder="操作符"
                   style="width: 120px"
                   :disabled="condition._locked && (condition._lockType === 'full' || condition._lockType === 'operator')"
+                  filterable
                 >
                   <el-option
                     v-for="op in getAvailableOperators(condition.field)"
@@ -291,11 +298,12 @@
                 v-model="sort.field"
                 placeholder="选择字段"
                 style="width: 200px"
+                filterable
               >
                 <el-option
                   v-for="field in esQueryConfig.availableFields"
                   :key="field.name"
-                  :label="field.name"
+                  :label="`${field.name} (${field.comment || field.type})`"
                   :value="field.name"
                 />
               </el-select>
@@ -303,6 +311,7 @@
               <el-select
                 v-model="sort.order"
                 style="width: 100px"
+                filterable
               >
                 <el-option label="升序" value="asc" />
                 <el-option label="降序" value="desc" />
@@ -354,6 +363,7 @@
                 size="small"
                 style="width: 120px"
                 @change="onAggregationTypeChange(agg)"
+                filterable
               >
                 <el-option label="计数" value="value_count" />
                 <el-option label="求和" value="sum" />
@@ -372,11 +382,12 @@
                 placeholder="选择字段"
                 size="small"
                 style="width: 150px"
+                filterable
               >
                 <el-option
                   v-for="field in esQueryConfig.availableFields"
                   :key="field.name"
-                  :label="field.name"
+                  :label="`${field.name} (${field.comment || field.type})`"
                   :value="field.name"
                 />
               </el-select>
@@ -403,6 +414,7 @@
                     placeholder="时间间隔"
                     size="small"
                     style="width: 100px"
+                    filterable
                   >
                     <el-option label="1分钟" value="1m" />
                     <el-option label="5分钟" value="5m" />
@@ -2117,6 +2129,22 @@ const formatFieldValue = (value) => {
   }
   
   return String(value)
+}
+
+/**
+ * 格式化字段值并添加注释
+ * 在字段值后面添加字段映射中的注释信息
+ */
+const formatFieldValueWithComment = (value, fieldName) => {
+  const formattedValue = formatFieldValue(value)
+  
+  // 查找字段映射中的注释
+  const fieldMapping = esQueryConfig.availableFields.find(field => field.name === fieldName)
+  if (fieldMapping && fieldMapping.comment && fieldMapping.comment !== fieldName) {
+    return `${formattedValue} (${fieldMapping.comment})`
+  }
+  
+  return formattedValue
 }
 
 /**

@@ -41,7 +41,7 @@
                     <el-option
                       v-for="f in availableFieldNames"
                       :key="f"
-                      :label="f"
+                      :label="getFieldDisplayName(f)"
                       :value="f"
                     />
                   </el-select>
@@ -54,8 +54,8 @@
                   />
                 </template>
               </el-input>
-              <el-button class="advanced-toggle-btn" size="default" plain type="primary" @click="toggleAdvanced">
-                高级搜索
+              <el-button class="advanced-toggle-btn" size="default" plain type="info" text @click="toggleAdvanced">
+                >>高级搜索
               </el-button>
             </div>
           </div>
@@ -106,7 +106,7 @@
                   <el-option
                     v-for="f in availableFieldNames"
                     :key="f"
-                    :label="f"
+                    :label="getFieldDisplayName(f)"
                     :value="f"
                   />
                 </el-select>
@@ -239,12 +239,7 @@
                               class="agg-row clickable"
                               @click="onAggBucketClick(String(aggName), bucket)"
                             >
-                              <template v-if="getValueLength(bucket.key) > 40">
-                                <el-tooltip placement="top-start" effect="dark" :content="String(bucket.key)">
-                                  <span class="agg-key">{{ formatText(String(bucket.key), 40) }}</span>
-                                </el-tooltip>
-                              </template>
-                              <span v-else class="agg-key">{{ String(bucket.key) }}</span>
+                              <span class="agg-key">{{ getValueLength(bucket.key) > 40 ? formatText(String(bucket.key), 40) : String(bucket.key) }}</span>
                               <span class="agg-count">{{ bucket.doc_count }}</span>
                             </div>
                           </template>
@@ -293,37 +288,12 @@
                           v-for="col in displayFields"
                           :key="col"
                           :prop="col"
-                          :label="col"
+                          :label="getFieldDisplayName(col)"
                           min-width="100"
                           sortable="custom"
                         >
                           <template #default="{ row }">
-                            <el-tooltip
-                              v-if="!wrapLongText && shouldTooltip(row[col], 160)"
-                              placement="top-start"
-                              effect="dark"
-                              raw-content
-                              :content="
-                                formatTextWithHighlight(
-                                  formatCell(row[col]),
-                                  10000,
-                                  defaultSearchValue
-                                )
-                              "
-                            >
-                              <span
-                                class="cell ellipsis"
-                                v-html="
-                                  formatTextWithHighlight(
-                                    formatCell(row[col]),
-                                    160,
-                                    defaultSearchValue
-                                  )
-                                "
-                              ></span>
-                            </el-tooltip>
                             <span
-                              v-else
                               :class="wrapLongText ? 'cell wrap' : 'cell ellipsis'"
                               v-html="
                                 formatTextWithHighlight(
@@ -359,6 +329,7 @@
                           shadow="never"
                         >
                           <div class="card-content">
+                            <!-- 
                             <el-tooltip content="复制" placement="top">
                               <el-button
                                 size="small"
@@ -369,6 +340,7 @@
                                 <el-icon><CopyDocument /></el-icon>
                               </el-button>
                             </el-tooltip>
+                            -->
                             <div class="card-title-row">
                               <el-link
                                 type="primary"
@@ -385,38 +357,30 @@
                                 :key="f"
                                 class="kv"
                               >
-                                <span class="k">{{ f }}</span>
-                                <el-tooltip
-                                  v-if="shouldTooltip(row[f], DEFAULT_MAX_CHARS)"
-                                  placement="top-start"
-                                  raw-content
-                                  :content="
-                                    formatTextWithHighlight(
-                                      formatCell(row[f]),
-                                      10000,
-                                      defaultSearchValue
-                                    )
-                                  "
-                                >
-                                  <span
-                                    class="v"
-                                    :class="{ wrap: wrapLongText }"
-                                    v-html="
-                                      formatTextWithHighlight(
-                                        formatCell(row[f]),
-                                        DEFAULT_MAX_CHARS,
-                                        defaultSearchValue
-                                      )
-                                    "
-                                  ></span>
-                                </el-tooltip>
+                                <span class="k">{{ getFieldDisplayName(f) }}：</span>
                                 <span
-                                  v-else
                                   class="v"
                                   :class="{ wrap: wrapLongText }"
                                   v-html="
                                     formatTextWithHighlight(
                                       formatCell(row[f]),
+                                      DEFAULT_MAX_CHARS,
+                                      defaultSearchValue
+                                    )
+                                  "
+                                ></span>
+                              </div>
+                            </div>
+                            <!-- 描述字段单独展示（如果存在），使用宽行显示更易读 -->
+                            <div class="card-row wide" v-if="row && 'description' in row && row['description'] !== undefined && row['description'] !== null">
+                              <div class="kv">
+                                <span class="k">{{ getFieldDisplayName('description') }}</span>
+                                <span
+                                  class="v"
+                                  :class="{ wrap: wrapLongText }"
+                                  v-html="
+                                    formatTextWithHighlight(
+                                      formatCell(row['description']),
                                       DEFAULT_MAX_CHARS,
                                       defaultSearchValue
                                     )
@@ -441,42 +405,63 @@
                     />
                   </div>
                   <!-- 通用：行详情弹窗（列表与卡片视图均可用） -->
-                  <el-dialog
+                  <el-drawer
                     v-model="detailVisible"
-                    title="数据详情"
-                    width="600px"
+                    :with-header="false"
+                    size="80%"
+                    class="detail-drawer"
                   >
-                    <el-descriptions column="1" border>
-                      <el-descriptions-item
-                        v-for="f in displayFields"
-                        :key="f"
-                        :label="f"
-                      >
-                        <span v-if="typeof selectedRow?.[f] === 'object'">{{
-                          JSON.stringify(selectedRow?.[f], null, 2)
-                        }}</span>
-                        <span v-else>{{ selectedRow?.[f] }}</span>
-                      </el-descriptions-item>
-                    </el-descriptions>
-                    <template #footer>
-                      <span class="dialog-footer">
-                        <el-button @click="detailVisible = false"
-                          >关闭</el-button
-                        >
-                        <el-button
-                          v-if="
-                            selectedRow &&
-                            selectedRow['pdf_url'] &&
-                            selectedRow['pdf_url'] !== 'null'
-                          "
-                          type="primary"
-                          @click="openPdf"
-                        >
-                          打开全文
-                        </el-button>
-                      </span>
-                    </template>
-                  </el-dialog>
+                    <div class="detail-header">
+                      <el-page-header content="数据详情" @back="detailVisible = false">
+                        <template #icon>
+                          <el-icon><ArrowLeft /></el-icon>
+                        </template>
+                      </el-page-header>
+                    </div>
+                    <div class="detail-body narrow-content">
+                      <el-collapse v-model='activeInfos' class="detail-collapse">
+                        <el-collapse-item name="basic">
+                          <template #title>
+                            <div class="collapse-title">
+                              <span class="left-bar"></span>
+                              <span class="title-text">基本信息</span>
+                            </div>
+                          </template>
+                          <div class="collapse-content">
+                            <el-form label-position="left" label-width="180px" class="detail-form">
+                              <el-form-item
+                                v-for="f in displayFields"
+                                :key="f"
+                                :label="getFieldDisplayName(f)+'：'"
+                              >
+                                <span
+                                  :class="wrapLongText ? 'cell wrap' : 'cell ellipsis'"
+                                  style="white-space: pre-wrap; word-break: break-word;"
+                                >
+                                  {{ typeof selectedRow?.[f] === 'object' ? JSON.stringify(selectedRow?.[f], null, 2) : selectedRow?.[f] }}
+                                </span>
+                              </el-form-item>
+                            </el-form>
+                          </div>
+                        </el-collapse-item>
+                        <template v-if="selectedRow && selectedRow['pdf_url'] && selectedRow['pdf_url'] !== 'null'">
+                          <el-collapse-item name="pdfInfo">
+                            <template #title>
+                              <div class="collapse-title">
+                                <span class="left-bar"></span>
+                                <span class="title-text">全文信息</span>
+                              </div>
+                            </template>
+                            <div class="collapse-content">
+                              <div class="pdf-inline-preview" style="margin-top: 8px;">
+                                <PdfViewer :src="String(selectedRow['pdf_url'])" />
+                              </div>
+                            </div>
+                          </el-collapse-item>
+                        </template>
+                      </el-collapse>
+                    </div>
+                  </el-drawer>
                 </div>
               </div>
             </div>
@@ -486,7 +471,7 @@
     </el-card>
 
     <!-- 资源包下载弹窗 -->
-    <el-dialog v-model="downloadDialogVisible" title="下载资源包" width="520px">
+    <el-dialog v-model="downloadDialogVisible" title="下载资源包" width="550px">
       <div class="download-info">
         <div class="info-row">
           <span class="label">最新生成时间：</span>
@@ -523,13 +508,12 @@
             :disabled="!selectedFileId"
             :loading="historyDownloadLoading"
             @click="handleDownloadHistory"
-            >下载资源包</el-button
+            >下载历史资源包</el-button
           >
         </div>
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="downloadDialogVisible = false">取消</el-button>
           <el-button
             type="primary"
             :loading="generateLoading"
@@ -544,6 +528,7 @@
           >
             下载最新资源包
           </el-button>
+          <el-button @click="downloadDialogVisible = false">取消</el-button>
         </div>
       </template>
     </el-dialog>
@@ -563,6 +548,7 @@ import {
   CaretRight,
   CaretBottom
 } from "@element-plus/icons-vue";
+import { ArrowLeft, Close } from "@element-plus/icons-vue";
 import { templateApi } from "@/api/template";
 import { executeESQuery, getESFieldMapping } from "@/api/esQuery";
 import { dataResourceApi } from "@/api/dataResource";
@@ -603,6 +589,9 @@ const availableFieldNames = computed(() =>
 );
 const selectedIndices = ref<string[]>([]);
 
+// 字段映射信息，用于显示字段注释
+const fieldMappings = ref<Record<string, { name: string; type: string; comment?: string; display_name: string }>>({});
+
 type Logic = "must" | "should" | "must_not";
 type Cond = { field: string; type: string; value: any; logic: Logic };
 const conditions = reactive<Cond[]>([]);
@@ -623,6 +612,8 @@ const wrapLongText = ref(false);
 const isFullscreen = ref(false);
 // 左侧聚合展开项（使用 Collapse 组件）
 const activeAggs = ref<string[]>([]);
+// 抽屉内展开项
+const activeInfos = ref<string[]>(['basic','pdfInfo']);
 const results = ref<any | null>(null);
 const records = computed<any[]>(() => {
   const hits = results.value?.hits?.hits || [];
@@ -753,6 +744,14 @@ const normalizedAggs = computed<Record<string, any>>(() => {
 
 onMounted(async () => {
   await initFromTemplate();
+  // 初始化加载字段中文映射，确保下拉框显示中文
+  if (
+    Object.keys(fieldMappings.value).length === 0 &&
+    props.packageData?.datasource_id &&
+    selectedIndices.value.length > 0
+  ) {
+    await loadInitialFieldMappings();
+  }
   if (!defaultSearchField.value && availableFieldNames.value.length > 0) {
     defaultSearchField.value = availableFieldNames.value[0];
   }
@@ -816,6 +815,29 @@ async function initFromTemplate() {
     }
   } catch (e) {
     console.error("加载ES模板详情失败:", e);
+  }
+}
+
+// 初始化场景：单独调用接口获取字段映射（含中文显示名）
+async function loadInitialFieldMappings() {
+  try {
+    const req: any = {
+      datasourceId: props.packageData!.datasource_id,
+      index: selectedIndices.value,
+      query: { match_all: {} },
+      size: 0,
+      from: 0,
+      _source: []
+    };
+    const resp = await executeESQuery(req);
+    // 兼容不同返回结构：优先从 resp.data 读取
+    const data: any = resp?.data || resp;
+    const mappings = data?.fieldMappings || resp?.fieldMappings;
+    if (mappings && typeof mappings === 'object') {
+      fieldMappings.value = mappings;
+    }
+  } catch (e) {
+    console.warn('初始化加载字段映射失败:', e);
   }
 }
 
@@ -1019,7 +1041,25 @@ async function executeQuery() {
     if (dsl._source) req._source = dsl._source;
     if (dsl.aggs) req.aggs = dsl.aggs;
     const resp = await executeESQuery(req);
-    results.value = resp?.data || resp;
+    
+    // 处理响应数据
+    if (resp?.data) {
+      // 从 resp.data 中提取 fieldMappings 和 stats
+      const { fieldMappings: respFieldMappings, stats, ...esData } = resp.data;
+      
+      // 更新 fieldMappings
+      if (respFieldMappings) {
+        fieldMappings.value = respFieldMappings;
+        console.log('fieldMappings 已更新:', fieldMappings.value);
+      } else {
+        console.log('响应中未收到 fieldMappings');
+      }
+      
+      // 设置 ES 查询结果
+      results.value = esData;
+    } else {
+      results.value = resp;
+    }
 
     // 计算全局字段顺序（基于值长度的升序）
     computeFieldOrder();
@@ -1168,16 +1208,12 @@ function getTitleField(row: Record<string, any>): string {
   return keys.length ? keys[0] : "";
 }
 const KEY_FIELDS = [
-  "authors",
-  "author",
-  "year",
-  "journal",
-  "source",
-  "doi",
-  "keyword",
-  "keywords",
+  "language",
+  "publisher",
+  "data_source",
+  "clc_classification",
+  "publication_category",
   "abstract",
-  "summary"
 ];
 function getKeyFields(row: Record<string, any>): string[] {
   const r = row || {};
@@ -1193,6 +1229,18 @@ function copyRow(row: Record<string, any>) {
   } catch (e) {
     ElMessage.error("复制失败");
   }
+}
+
+// 获取字段显示名称（优先显示 display_name，其次注释comment，最后字段名）
+function getFieldDisplayName(fieldName: string): string {
+  const fieldMapping = fieldMappings.value[fieldName];
+  if (fieldMapping?.display_name) {
+    return fieldMapping.display_name;
+  }
+  if (fieldMapping?.comment) {
+    return fieldMapping.comment;
+  }
+  return fieldName;
 }
 
 // 全屏切换函数
@@ -1540,7 +1588,7 @@ async function handleDownloadLatest() {
 
 .card-title {
   font-weight: 600;
-  font-size: 16px;
+  font-size: 20px;
   color: #303133;
   padding: 5px 0;
 }
@@ -1598,9 +1646,61 @@ async function handleDownloadLatest() {
 }
 
 .section-title {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
+  font-size: 15px;
   color: #606266;
+}
+
+/* 抽屉与折叠面板样式优化 */
+.detail-drawer {
+  :deep(.el-drawer__body) {
+    padding: 0; /* 由自定义头和主体控制内边距 */
+  }
+}
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+.detail-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #303133;
+  flex: 1;
+}
+.detail-body {
+  padding: 12px 0px;
+}
+.narrow-content {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.detail-collapse {
+  /* 让每个 item 内部内容更有内边距感 */
+}
+.collapse-title {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #303133;
+}
+.collapse-title .left-bar {
+  width: 4px;
+  height: 18px;
+  background: #409EFF;
+  border-radius: 2px;
+  margin-right: 8px;
+}
+.collapse-content {
+  padding: 12px 8px;
+}
+.detail-form {
+  :deep(.el-form-item) {
+    margin-bottom: 12px;
+  }
 }
 
 .locked-conditions {
@@ -1678,7 +1778,7 @@ async function handleDownloadLatest() {
 .agg-pane {
   border-right: 1px solid #ebeef5;
   padding-right: 8px;
-  max-height: 650px;
+  // max-height: 650px;
   overflow-y: auto;
 }
 .agg-header {
@@ -1693,7 +1793,7 @@ async function handleDownloadLatest() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 650px;
+  max-height: 750px;
   overflow-y: auto;
   padding-right: 6px;
 }
@@ -1792,7 +1892,7 @@ async function handleDownloadLatest() {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-bottom: 36px;
+  padding-bottom: 15px;
 }
 .card-row {
   display: grid;
@@ -1810,7 +1910,7 @@ async function handleDownloadLatest() {
 .k {
   color: #606266;
   min-width: 70px;
-  background: #f5f7fa;
+  /** background: #f5f7fa; **/
   padding: 0 6px;
   border-radius: 4px;
 }

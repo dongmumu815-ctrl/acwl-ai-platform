@@ -26,36 +26,36 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="资源包类型" prop="type">
-              <el-select v-model="form.type" placeholder="选择资源包类型" style="width: 100%" @change="handleTypeChange">
-                <el-option label="SQL查询" value="sql" />
-                <el-option label="Elasticsearch" value="elasticsearch" />
-              </el-select>
+            <el-form-item label="状态">
+              <el-switch v-model="form.is_active" active-text="启用" inactive-text="禁用" />
             </el-form-item>
           </el-col>
         </el-row>
         
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="数据源" prop="datasource_id">
+            <el-form-item label="资源类型" prop="resource_id">
               <el-select
-                v-model="form.datasource_id"
-                placeholder="选择数据源"
+                v-model="form.resource_id"
+                placeholder="选择资源类型"
                 style="width: 100%"
-                @change="handleDatasourceChange"
+                @change="handleResourceChange"
               >
                 <el-option
-                  v-for="ds in filteredDatasources"
-                  :key="ds.id"
-                  :label="ds.name"
-                  :value="ds.id"
+                  v-for="resource in dataResources"
+                  :key="resource.id"
+                  :label="resource.name"
+                  :value="resource.id"
                 />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="状态">
-              <el-switch v-model="form.is_active" active-text="启用" inactive-text="禁用" />
+            <el-form-item label="查询类型" prop="type">
+              <el-select v-model="form.type" placeholder="选择查询类型" style="width: 100%" @change="handleTypeChange">
+                <el-option label="SQL" value="sql" />
+                <el-option label="Elasticsearch" value="elasticsearch" />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -95,20 +95,7 @@
         </template>
         
         <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="模板类型" prop="template_type">
-              <el-select 
-                v-model="form.template_type" 
-                placeholder="选择模板类型" 
-                style="width: 100%" 
-                @change="handleTemplateTypeChange"
-              >
-                <el-option label="SQL查询" value="sql" />
-                <el-option label="Elasticsearch" value="elasticsearch" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
+          <el-col :span="24">
             <el-form-item label="查询模板" prop="template_id">
               <el-select
                 v-model="form.template_id"
@@ -117,7 +104,7 @@
                 @change="handleTemplateChange"
               >
                 <el-option
-                  v-for="template in filteredTemplates"
+                  v-for="template in templates"
                   :key="template.id"
                   :label="template.name"
                   :value="template.id"
@@ -213,9 +200,10 @@ const emit = defineEmits<{
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const dialogVisible = ref(false)
-const datasources = ref<Datasource[]>([])
+const dataResources = ref<any[]>([])
 const templates = ref<any[]>([])
 const selectedTemplate = ref<any>(null)
+const selectedResource = ref<any>(null)
 const availableTags = ref<string[]>(['数据分析', '报表', '监控', '业务', '测试'])
 
 // 表单数据
@@ -224,6 +212,7 @@ const form = reactive({
   description: '',
   type: 'sql' as PackageType,
   datasource_id: '',
+  resource_id: '',
   template_id: '',
   template_type: 'sql' as PackageType,
   dynamic_params: {} as Record<string, any>,
@@ -238,45 +227,21 @@ const rules: FormRules = {
     { min: 2, max: 255, message: '名称长度在 2 到 255 个字符', trigger: 'blur' }
   ],
   type: [
-    { required: true, message: '请选择资源包类型', trigger: 'change' }
+    { required: true, message: '请选择查询类型', trigger: 'change' }
   ],
-  datasource_id: [
-    { required: true, message: '请选择数据源', trigger: 'change' }
+  resource_id: [
+    { required: true, message: '请选择资源类型', trigger: 'change' }
   ],
   template_id: [
-    { required: true, message: '请选择模板', trigger: 'change' }
-  ],
-  template_type: [
-    { required: true, message: '请选择模板类型', trigger: 'change' }
+    { required: true, message: '请选择查询模板', trigger: 'change' }
   ]
 }
 
 // 计算属性
-const filteredDatasources = computed(() => {
-  if (form.type === 'sql') {
-    return datasources.value.filter(ds => ds.type !== 'elasticsearch')
-  } else {
-    return datasources.value.filter(ds => ds.type === 'elasticsearch')
-  }
-})
-
-const templateTypeOptions = computed(() => {
-  if (form.type === 'sql') {
-    return [
-      { label: '查询模板', value: 'query' },
-      { label: '统计模板', value: 'aggregation' }
-    ]
-  } else {
-    return [
-      { label: '搜索模板', value: 'search' },
-      { label: '聚合模板', value: 'aggregation' }
-    ]
-  }
-})
-
 const filteredTemplates = computed(() => {
   return templates.value.filter(template => {
-    return template.type === form.template_type
+    // 根据查询类型筛选模板
+    return template.type === form.type || template.template_type === form.type
   })
 })
 
@@ -293,7 +258,7 @@ const templateContent = computed(() => {
 watch(() => props.visible, (newVal) => {
   dialogVisible.value = newVal
   if (newVal) {
-    loadDatasources()
+    loadDataResources()
     if (props.isEdit && props.packageData) {
       loadFormData()
     } else {
@@ -306,41 +271,84 @@ watch(dialogVisible, (newVal) => {
   emit('update:visible', newVal)
 })
 
-watch(() => form.template_type, () => {
-  handleTemplateTypeChange()
-})
-
-watch(() => form.datasource_id, (newVal) => {
-  if (newVal) {
-    handleDatasourceChange(newVal)
+watch(() => form.type, () => {
+  // 当查询类型改变时，重新加载模板
+  form.template_id = ''
+  form.template_type = form.type
+  selectedTemplate.value = null
+  
+  if (form.type && form.resource_id) {
+    console.log('form.type 变化，重新加载模板:', { type: form.type, resource_id: form.resource_id })
+    loadTemplates()
+  } else {
+    console.log('form.type 变化，但缺少必要参数:', { type: form.type, resource_id: form.resource_id })
+    templates.value = []
   }
 })
 
-watch(() => form.template_id, (newVal) => {
-  if (newVal) {
-    handleTemplateChange(newVal)
-  }
+watch(() => form.template_id, () => {
+  // 当模板改变时，更新模板信息
+  handleTemplateChange()
 })
 
 // 方法
-const loadDatasources = async () => {
+const loadDataResources = async () => {
   try {
-    const response = await datasourceApi.list()
-    datasources.value = response.items || []
+    loading.value = true
+    const response = await dataResourceApi.getResourceList()
+    dataResources.value = response.data?.items || []
   } catch (error) {
-    console.error('加载数据源失败:', error)
+    console.error('加载数据资源失败:', error)
+    ElMessage.error('加载数据资源失败')
+  } finally {
+    loading.value = false
   }
 }
 
 const loadTemplates = async () => {
   try {
-    const response = await templateApi.list({
-      type: form.template_type as any,
-      datasource_id: Number(form.datasource_id)
+    if (!form.type) {
+      console.log('loadTemplates: form.type 为空，跳过加载')
+      return
+    }
+    
+    // 获取data_resource_id和datasource_id，两个参数都需要传递
+    let data_resource_id = form.resource_id
+    let datasource_id = form.datasource_id
+    
+    if (!data_resource_id && selectedResource.value) {
+      data_resource_id = selectedResource.value.id
+    }
+    if (!datasource_id && selectedResource.value) {
+      datasource_id = selectedResource.value.datasource_id
+    }
+    
+    console.log('loadTemplates 参数检查:', {
+      'form.type': form.type,
+      'form.resource_id': form.resource_id,
+      'form.datasource_id': form.datasource_id,
+      'selectedResource.value': selectedResource.value,
+      'data_resource_id': data_resource_id,
+      'datasource_id': datasource_id
     })
-    templates.value = response.data || []
+    
+    // 确保两个参数都有值才调用API
+    if (!data_resource_id || !datasource_id) {
+      console.warn('缺少必要参数：data_resource_id 或 datasource_id', {
+        data_resource_id,
+        datasource_id
+      })
+      templates.value = []
+      return
+    }
+    
+    console.log('调用 templateApi.list，参数:', { datasource_id, type: form.type, data_resource_id })
+    const templates_data = await templateApi.list({datasource_id, type:form.type, data_resource_id})
+    console.log(templates_data,'templates_data')
+    templates.value = templates_data.data || []
   } catch (error) {
     console.error('加载模板失败:', error)
+    ElMessage.error('加载模板失败')
   }
 }
 
@@ -353,6 +361,7 @@ const loadFormData = () => {
     description: data.description || '',
     type: data.type,
     datasource_id: data.datasource_id,
+    resource_id: data.resource_id,
     template_id: data.template_id,
     template_type: data.template_type,
     dynamic_params: data.dynamic_params || {},
@@ -361,11 +370,11 @@ const loadFormData = () => {
   })
   
   // 加载相关数据
-  if (form.datasource_id && form.template_type) {
+  if (form.type && form.resource_id) {
+    console.log('loadFormData 加载模板:', { type: form.type, resource_id: form.resource_id })
     loadTemplates()
-  }
-  if (form.template_id) {
-    loadTemplateDetails(form.template_id)
+  } else {
+    console.log('loadFormData 缺少必要参数:', { type: form.type, resource_id: form.resource_id })
   }
 }
 
@@ -375,8 +384,9 @@ const resetForm = () => {
     description: '',
     type: 'sql',
     datasource_id: '',
+    resource_id: '',
     template_id: '',
-    template_type: 'query',
+    template_type: 'sql',
     dynamic_params: {},
     is_active: true,
     tags: []
@@ -384,68 +394,58 @@ const resetForm = () => {
   
   templates.value = []
   selectedTemplate.value = null
+  selectedResource.value = null
   
   nextTick(() => {
     formRef.value?.clearValidate()
   })
 }
 
+const handleResourceChange = () => {
+  const resource = dataResources.value.find(r => r.id === form.resource_id)
+  if (resource) {
+    selectedResource.value = resource
+    form.description = resource.description || ''
+    form.datasource_id = resource.datasource_id
+    
+    // 资源变更后重新加载模板
+    if (form.type) {
+      console.log('handleResourceChange 触发模板加载:', { type: form.type, resource_id: form.resource_id })
+      loadTemplates()
+    }
+  }
+}
+
 const handleTypeChange = () => {
-  form.datasource_id = ''
+  // 当查询类型改变时，重新加载模板
   form.template_id = ''
-  form.template_type = form.type === 'sql' ? 'query' : 'search'
-  form.dynamic_params = {}
-  templates.value = []
-  selectedTemplate.value = null
-}
-
-const handleDatasourceChange = async (datasourceId: number | string) => {
-  if (!datasourceId) return
-  
-  form.template_id = ''
-  form.dynamic_params = {}
-  templates.value = []
+  form.template_type = form.type
   selectedTemplate.value = null
   
-  if (form.template_type) {
-    await loadTemplates()
+  if (form.type && form.resource_id) {
+    console.log('handleTypeChange 触发模板加载:', { type: form.type, resource_id: form.resource_id })
+    loadTemplates()
+  } else {
+    console.log('handleTypeChange 缺少必要参数:', { type: form.type, resource_id: form.resource_id })
+    templates.value = []
   }
 }
 
-const handleTemplateTypeChange = async () => {
-  form.template_id = ''
-  form.dynamic_params = {}
-  templates.value = []
-  selectedTemplate.value = null
-  
-  if (form.datasource_id) {
-    await loadTemplates()
-  }
-}
-
-const handleTemplateChange = async (templateId: string) => {
-  if (!templateId) {
+const handleTemplateChange = () => {
+  const template = templates.value.find(t => t.id === form.template_id)
+  if (template) {
+    selectedTemplate.value = template
+    // 如果模板有默认参数，可以在这里处理
+    if (template.default_params) {
+      form.dynamic_params = { ...template.default_params }
+    }
+  } else {
     selectedTemplate.value = null
     form.dynamic_params = {}
-    return
   }
-  
-  await loadTemplateDetails(templateId)
 }
 
-const loadTemplateDetails = async (templateId: string) => {
-  try {
-    const response = await templateApi.get(Number(templateId), form.template_type as any)
-    const template = response.data
-    selectedTemplate.value = template
-    
-    // 初始化动态参数
-    const defaultParams = template.default_params || {}
-    form.dynamic_params = { ...defaultParams }
-  } catch (error) {
-    console.error('加载模板详情失败:', error)
-  }
-}
+
 
 const handleSubmit = async () => {
   if (!formRef.value) return

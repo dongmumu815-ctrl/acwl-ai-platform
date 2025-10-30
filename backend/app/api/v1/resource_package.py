@@ -15,6 +15,7 @@ from app.models.resource_package import (
     ResourcePackage, ResourcePackagePermission,
     ResourcePackageQueryHistory, ResourcePackageTag, ResourcePackageFile
 )
+from app.models.datasource import Datasource
 from app.schemas.resource_package import (
     ResourcePackageCreate, ResourcePackageUpdate, ResourcePackage as ResourcePackageSchema,
     ResourcePackageResponse, ResourcePackageListResponse, ResourcePackageSearchRequest,
@@ -289,10 +290,10 @@ class ResourcePackageService:
         if conditions:
             query = query.where(and_(*conditions))
         
-        # 计算总数
-        count_query = select(func.count(ResourcePackage.id)).select_from(query.subquery())
-        total_result = await self.db.execute(count_query)
-        total = total_result.scalar()
+        # 计算总数 - 基于数据源表而不是资源包表
+        datasource_count_query = select(func.count(Datasource.id))
+        datasource_total_result = await self.db.execute(datasource_count_query)
+        total = datasource_total_result.scalar()
         
         # 排序
         if search_req.sort_by:

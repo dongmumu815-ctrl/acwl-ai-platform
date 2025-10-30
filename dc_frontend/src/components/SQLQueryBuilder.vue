@@ -57,6 +57,7 @@
                   clearable
                   @change="onTemplateChange"
                   :loading="loadingTemplates"
+                  filterable
                 >
                   <el-option
                     v-for="template in availableTemplates"
@@ -79,6 +80,7 @@
                   placeholder="请选择Schema"
                   style="width: 100%"
                   @change="onSchemaChange"
+                  filterable
                 >
                   <el-option
                     v-for="schema in availableSchemas"
@@ -96,6 +98,7 @@
                   placeholder="请选择数据表"
                   style="width: 100%"
                   @change="onTableChange"
+                  filterable
                 >
                   <el-option
                     v-for="table in availableTables"
@@ -201,6 +204,7 @@
                           v-model="templateConditionValues[condition.name]"
                           :placeholder="condition.placeholder || `请选择${condition.label || condition.name}`"
                           style="width: 100%"
+                          filterable
                         >
                           <el-option
                             v-for="option in condition.options"
@@ -256,6 +260,7 @@
                           v-model="templateConditionValues[condition.name]"
                           :placeholder="condition.placeholder || `请选择${condition.label || condition.name}`"
                           style="width: 100%"
+                          filterable
                         >
                           <el-option
                             v-for="option in condition.options"
@@ -290,7 +295,7 @@
                     <el-icon><Plus /></el-icon>
                     <span class="field-name">{{ field.name }}</span>
                     <el-tag :type="getFieldTypeTag(field.type)" size="small">
-                      {{ field.type }}
+                      {{ field.description || field.type }}
                     </el-tag>
                   </div>
                 </div>
@@ -346,6 +351,7 @@
                 size="small"
                 v-if="index > 0"
                 :disabled="condition.locked"
+                filterable
               >
                 <el-option label="AND" value="AND" />
                 <el-option label="OR" value="OR" />
@@ -357,6 +363,7 @@
                 style="width: 150px"
                 size="small"
                 :disabled="condition.locked"
+                filterable
               >
                 <el-option
                   v-for="field in availableFields"
@@ -372,6 +379,7 @@
                 style="width: 100px"
                 size="small"
                 :disabled="condition.locked"
+                filterable
               >
                 <el-option label="=" value="=" />
                 <el-option label="!=" value="!=" />
@@ -431,6 +439,7 @@
                   placeholder="选择排序字段"
                   style="width: 100%"
                   clearable
+                  filterable
                 >
                   <el-option
                     v-for="field in availableFields"
@@ -447,6 +456,7 @@
                   v-model="queryConfig.orderBy.direction"
                   style="width: 100%"
                   :disabled="!queryConfig.orderBy.field"
+                  filterable
                 >
                   <el-option label="升序" value="ASC" />
                   <el-option label="降序" value="DESC" />
@@ -543,16 +553,16 @@
             >
               <template #default="{ row }">
                 <span v-if="column.type === 'date'">
-                  {{ formatDate(row[column.prop]) }}
+                  {{ formatDateWithComment(row[column.prop], column.prop) }}
                 </span>
                 <span v-else-if="column.type === 'number'">
-                  {{ formatNumber(row[column.prop]) }}
+                  {{ formatNumberWithComment(row[column.prop], column.prop) }}
                 </span>
                 <el-tag v-else-if="column.type === 'status'" :type="getStatusTagType(row[column.prop])">
-                  {{ row[column.prop] }}
+                  {{ formatValueWithComment(row[column.prop], column.prop) }}
                 </el-tag>
                 <span v-else>
-                  {{ row[column.prop] }}
+                  {{ formatValueWithComment(row[column.prop], column.prop) }}
                 </span>
               </template>
             </el-table-column>
@@ -1859,6 +1869,40 @@ const formatDate = (date: string) => {
 const formatNumber = (num: number) => {
   if (num === null || num === undefined) return ''
   return num.toLocaleString()
+}
+
+/**
+ * 格式化日期并添加注释
+ */
+const formatDateWithComment = (date: string, fieldName: string) => {
+  const formattedDate = formatDate(date)
+  return formatValueWithComment(formattedDate, fieldName)
+}
+
+/**
+ * 格式化数字并添加注释
+ */
+const formatNumberWithComment = (num: number, fieldName: string) => {
+  const formattedNumber = formatNumber(num)
+  return formatValueWithComment(formattedNumber, fieldName)
+}
+
+/**
+ * 格式化值并添加注释
+ * 在字段值后面添加字段映射中的注释信息
+ */
+const formatValueWithComment = (value: any, fieldName: string) => {
+  if (value === null || value === undefined) {
+    value = ''
+  }
+  
+  // 查找字段映射中的注释
+  const fieldMapping = availableFields.value.find(field => field.name === fieldName)
+  if (fieldMapping && fieldMapping.description && fieldMapping.description !== fieldName) {
+    return `${value} (${fieldMapping.description})`
+  }
+  
+  return value
 }
 
 /**
