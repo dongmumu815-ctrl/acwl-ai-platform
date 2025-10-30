@@ -126,6 +126,7 @@ export interface ResourcePackage {
   template_type: PackageType
   dynamic_params?: Record<string, any>
   is_active: boolean
+  is_lock: string
   created_by: number
   created_at: string
   updated_at: string
@@ -156,6 +157,7 @@ export interface ResourcePackageCreateRequest {
   template_type: PackageType
   dynamic_params?: Record<string, any>
   is_active: boolean
+  is_lock?: string
   tags?: string[]
 }
 
@@ -167,6 +169,7 @@ export interface ResourcePackageUpdateRequest {
   template_type?: PackageType
   dynamic_params?: Record<string, any>
   is_active?: boolean
+  is_lock?: string
   tags?: string[]
 }
 
@@ -178,6 +181,7 @@ export interface ResourcePackageSearchRequest {
   created_by?: number
   tags?: string[]
   is_active?: boolean
+  is_lock?: string
   page: number
   size: number
   sort_by: string

@@ -8,7 +8,7 @@
     </div> 
     -->
 
-    <div v-loading="loading" class="page-content">
+    <div v-loading="loading" :class="['page-content', { 'loading-center': loading }]">
       <!-- 
       <el-card class="package-info-card" v-if="packageData">
         <template #header>
@@ -191,6 +191,13 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: calc(100vh - 40px); /* 减去页面padding */
+}
+
+/* 当处于加载状态时，内容居中显示 */
+.page-content.loading-center {
+  justify-content: center;
+  align-items: center;
 }
 
 .package-info-card,

@@ -174,6 +174,25 @@ class ResourcePackageBase(BaseModel):
     template_type: str = Field(..., description="模板类型(sql/elasticsearch)")
     dynamic_params: Optional[Dict[str, Any]] = Field(None, description="动态参数")
     is_active: bool = Field(True, description="是否启用")
+    is_lock: str = Field("0", description="是否锁定（禁止删除）0-否，1-是")
+    
+    @validator('is_lock', pre=True)
+    def validate_is_lock(cls, v):
+        """验证并转换is_lock值"""
+        if isinstance(v, bool):
+            return "1" if v else "0"
+        elif isinstance(v, str):
+            if v.lower() in ['true', '1', 'yes', 'on']:
+                return "1"
+            elif v.lower() in ['false', '0', 'no', 'off']:
+                return "0"
+            else:
+                raise ValueError(f"Invalid is_lock value: {v}. Must be boolean or '0'/'1'")
+        elif isinstance(v, (int, float)):
+            return "1" if v else "0"
+        else:
+            raise ValueError(f"Invalid is_lock type: {type(v)}. Must be boolean, string, or number")
+        return v
 
 
 class ResourcePackageCreate(ResourcePackageBase):
@@ -201,6 +220,7 @@ class ResourcePackageUpdate(BaseModel):
     template_type: Optional[str] = Field(None, description="模板类型(sql/elasticsearch)")
     dynamic_params: Optional[Dict[str, Any]] = Field(None, description="动态参数")
     is_active: Optional[bool] = Field(None, description="是否启用")
+    is_lock: Optional[str] = Field(None, description="是否锁定（禁止删除）0-否，1-是")
     tags: Optional[List[str]] = Field(None, description="标签列表")
     # 新增：允许更新下载与生成时间/地址（用于专用接口内部调用）
     download_time: Optional[datetime] = Field(None, description="最后下载时间")
@@ -219,6 +239,7 @@ class ResourcePackage(BaseModel):
     template_id: Optional[int] = Field(None, description="查询模板ID")
     template_type: str = Field(..., description="模板类型(sql/elasticsearch)")
     is_active: bool = Field(True, description="是否启用")
+    is_lock: str = Field("0", description="是否锁定（禁止删除）0-否，1-是")
     created_by: int
     created_at: datetime
     updated_at: datetime
@@ -244,6 +265,7 @@ class ResourcePackageResponse(BaseModel):
     template_id: Optional[int] = Field(None, description="查询模板ID")
     template_type: str = Field(..., description="模板类型(sql/elasticsearch)")
     is_active: bool = Field(True, description="是否启用")
+    is_lock: str = Field("0", description="是否锁定（禁止删除）0-否，1-是")
     created_by: int
     created_at: datetime
     updated_at: datetime
@@ -293,7 +315,7 @@ class ResourcePackageSearchRequest(BaseModel):
     size: int = Field(20, ge=1, le=100, description="每页大小")
     sort_by: str = Field("created_at", description="排序字段")
     sort_order: str = Field("desc", description="排序方向")
-
+    is_lock: Optional[str] = Field(None, description="是否锁定（禁止删除）0-否，1-是")
 
 # 列表响应模式
 class ResourcePackageListResponse(BaseModel):

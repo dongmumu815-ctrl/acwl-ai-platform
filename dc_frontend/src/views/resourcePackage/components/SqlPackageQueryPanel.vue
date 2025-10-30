@@ -127,13 +127,28 @@
         <el-dialog v-model="detailVisible" title="数据详情" width="600px">
           <el-descriptions column="1" border>
             <el-descriptions-item v-for="(field, idx) in displayFields" :key="field" :label="field">
-              <span v-if="typeof selectedRow?.[idx] === 'object'">{{ JSON.stringify(selectedRow?.[idx], null, 2) }}</span>
-              <span v-else>{{ selectedRow?.[idx] }}</span>
+              <!-- 如果是PDF字段且有值，显示为可点击链接 -->
+              <template v-if="field === 'pdf_url' && selectedRow?.[idx] && selectedRow?.[idx] !== 'null'">
+                <a 
+                  :href="selectedRow[idx]" 
+                  target="_blank" 
+                  class="pdf-link"
+                  style="color: #409EFF; text-decoration: underline; cursor: pointer;"
+                >
+                  查看PDF文档
+                </a>
+              </template>
+              <!-- 其他字段正常显示 -->
+              <template v-else>
+                <span v-if="typeof selectedRow?.[idx] === 'object'">{{ JSON.stringify(selectedRow?.[idx], null, 2) }}</span>
+                <span v-else>{{ selectedRow?.[idx] }}</span>
+              </template>
             </el-descriptions-item>
           </el-descriptions>
           <template #footer>
             <span class="dialog-footer">
               <el-button @click="detailVisible = false">关闭</el-button>
+              <!-- 注释掉打开全文按钮
               <el-button
                 v-if="displayFields.includes('pdf_url') && selectedRow && selectedRow[displayFields.indexOf('pdf_url')] && selectedRow[displayFields.indexOf('pdf_url')] !== 'null'"
                 type="primary"
@@ -141,14 +156,16 @@
               >
                 打开全文
               </el-button>
+              -->
             </span>
           </template>
         </el-dialog>
 
-        <!-- PDF 预览弹窗 -->
+        <!-- 注释掉PDF预览弹窗
         <el-dialog v-model="pdfDialogVisible" title="全文预览" width="80%">
           <PdfViewer :src="pdfUrl || ''" />
         </el-dialog>
+        -->
 
         <!-- 分页 -->
         <div class="pagination-wrapper">

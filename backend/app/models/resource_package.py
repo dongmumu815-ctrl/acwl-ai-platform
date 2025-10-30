@@ -29,6 +29,7 @@ class ResourcePackage(Base):
     
     # 系统字段
     is_active = Column(Boolean, default=True, comment="是否启用")
+    is_lock = Column(String(1), default="0", comment="是否锁定（禁止删除）0-否，1-是")
     created_by = Column(Integer, ForeignKey("acwl_users.id", ondelete="CASCADE"), nullable=False, comment="创建者ID")
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")

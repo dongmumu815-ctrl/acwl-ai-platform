@@ -33,11 +33,15 @@
                 <template #prepend>
                   <el-select
                     v-model="defaultSearchField"
-                    placeholder="选择字段"
+                    placeholder="全部字段"
                     style="width: 150px; height: 100%"
                     filterable
                     :disabled="availableFieldNames.length === 0"
                   >
+                    <el-option
+                      label="全部字段"
+                      value=""
+                    />
                     <el-option
                       v-for="f in availableFieldNames"
                       :key="f"
@@ -299,7 +303,7 @@
                                 formatTextWithHighlight(
                                   formatCell(row[col]),
                                   160,
-                                  defaultSearchValue
+                                  executedSearchValue
                                 )
                               "
                             ></span>
@@ -365,7 +369,7 @@
                                     formatTextWithHighlight(
                                       formatCell(row[f]),
                                       DEFAULT_MAX_CHARS,
-                                      defaultSearchValue
+                                      executedSearchValue
                                     )
                                   "
                                 ></span>
@@ -382,7 +386,7 @@
                                     formatTextWithHighlight(
                                       formatCell(row['description']),
                                       DEFAULT_MAX_CHARS,
-                                      defaultSearchValue
+                                      executedSearchValue
                                     )
                                   "
                                 ></span>
@@ -434,16 +438,29 @@
                                 :key="f"
                                 :label="getFieldDisplayName(f)+'：'"
                               >
+                                <!-- 如果是PDF字段且有值，显示为可点击链接 -->
+                                <template v-if="f === 'pdf_url' && selectedRow?.[f] && selectedRow?.[f] !== 'null'">
+                                  <a 
+                                    :href="selectedRow[f]" 
+                                    target="_blank" 
+                                    class="pdf-link"
+                                    style="color: #409EFF; text-decoration: underline; cursor: pointer;"
+                                  >
+                                    查看PDF文档
+                                  </a>
+                                </template>
+                                <!-- 其他字段正常显示 -->
                                 <span
+                                  v-else
                                   :class="wrapLongText ? 'cell wrap' : 'cell ellipsis'"
                                   style="white-space: pre-wrap; word-break: break-word;"
-                                >
-                                  {{ typeof selectedRow?.[f] === 'object' ? JSON.stringify(selectedRow?.[f], null, 2) : selectedRow?.[f] }}
-                                </span>
+                                  v-html="formatTextWithHighlight(typeof selectedRow?.[f] === 'object' ? JSON.stringify(selectedRow?.[f], null, 2) : selectedRow?.[f], 500, executedSearchValue)"
+                                ></span>
                               </el-form-item>
                             </el-form>
                           </div>
                         </el-collapse-item>
+                        <!-- 注释掉全文PDF预览功能
                         <template v-if="selectedRow && selectedRow['pdf_url'] && selectedRow['pdf_url'] !== 'null'">
                           <el-collapse-item name="pdfInfo">
                             <template #title>
@@ -459,6 +476,7 @@
                             </div>
                           </el-collapse-item>
                         </template>
+                        -->
                       </el-collapse>
                     </div>
                   </el-drawer>
@@ -605,6 +623,8 @@ const toggleAdvanced = () => {
 // 默认搜索相关状态
 const defaultSearchField = ref<string>("");
 const defaultSearchValue = ref<string>("");
+// 已执行查询的搜索词，用于高亮显示
+const executedSearchValue = ref<string>("");
 
 const viewMode = ref<"list" | "card">("card");
 const compactMode = ref(false);
@@ -753,7 +773,8 @@ onMounted(async () => {
     await loadInitialFieldMappings();
   }
   if (!defaultSearchField.value && availableFieldNames.value.length > 0) {
-    defaultSearchField.value = availableFieldNames.value[0];
+    // 默认选择"全部字段"（空值），而不是第一个字段
+    defaultSearchField.value = "";
   }
   const aggKeys = Object.keys(normalizedAggs.value || {});
   if (aggKeys.length) {
@@ -1029,6 +1050,8 @@ async function executeQuery() {
     }
 
     loading.value = true;
+    // 更新已执行查询的搜索词，用于高亮显示
+    executedSearchValue.value = defaultSearchValue.value;
     const dsl = buildDSL();
     const req: any = {
       datasourceId: props.packageData.datasource_id,
@@ -1211,7 +1234,6 @@ const KEY_FIELDS = [
   "language",
   "publisher",
   "data_source",
-  "clc_classification",
   "publication_category",
   "abstract",
 ];
@@ -1570,6 +1592,8 @@ async function handleDownloadLatest() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100vh;
+  overflow: hidden;
   :deep(.el-card) {
     border: none;
   }
@@ -1695,11 +1719,14 @@ async function handleDownloadLatest() {
   margin-right: 8px;
 }
 .collapse-content {
-  padding: 12px 8px;
+  padding: 8px 4px;
 }
 .detail-form {
   :deep(.el-form-item) {
     margin-bottom: 12px;
+  }
+  :deep(.el-form-item__label) {
+    padding-right: 8px;
   }
 }
 
@@ -1769,10 +1796,23 @@ async function handleDownloadLatest() {
   margin-left: 12px;
 }
 
+.results-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.results-card .section-body {
+  flex: 1;
+  overflow: hidden;
+}
+
 .results-grid {
   display: grid;
   grid-template-columns: 1fr 4fr; /* 20% / 80% */
   gap: 16px;
+  height: 100%;
 }
 
 .agg-pane {
@@ -1793,7 +1833,8 @@ async function handleDownloadLatest() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 750px;
+  max-height: calc(100vh - 380px);
+  min-height: 300px;
   overflow-y: auto;
   padding-right: 6px;
 }
@@ -1845,7 +1886,8 @@ async function handleDownloadLatest() {
 /* 表格容器样式 */
 .table-container {
   width: 100%;
-  height: 650px;
+  height: calc(100vh - 380px);
+  min-height: 300px;
   overflow: auto;
   border: 1px solid #e4e7ed;
   border-radius: 4px;
@@ -1858,7 +1900,8 @@ async function handleDownloadLatest() {
 /* 卡片容器样式 */
 .cards-container {
   width: 100%;
-  height: 650px;
+  height: calc(100vh - 460px);
+  min-height: 300px;
   overflow-y: auto;
   padding: 8px;
 }
@@ -1873,7 +1916,8 @@ async function handleDownloadLatest() {
 
 .result-pane {
   flex: 1;
-  // padding: 16px;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 .cards {
@@ -1887,6 +1931,7 @@ async function handleDownloadLatest() {
 .result-card {
   width: 100%;
   position: relative;
+  height: 180px;
 }
 .card-content {
   display: flex;
@@ -1952,9 +1997,12 @@ async function handleDownloadLatest() {
   height: 500px;
 }
 .pager {
-  margin-top: 12px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding: 8px 0;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 @media (max-width: 1024px) {

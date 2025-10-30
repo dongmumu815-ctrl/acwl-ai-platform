@@ -48,65 +48,105 @@ class ResourcePackageService:
     
     async def create_package(self, package_data: ResourcePackageCreate, user_id: int) -> ResourcePackage:
         """创建资源包"""
-        # 检查名称是否重复
-        existing_query = select(ResourcePackage).where(
-            and_(
-                ResourcePackage.name == package_data.name,
-                ResourcePackage.created_by == user_id
-            )
-        )
-        result = await self.db.execute(existing_query)
-        existing = result.scalar_one_or_none()
-        if existing:
-            raise HTTPException(status_code=400, detail="资源包名称已存在")
+        logger.info(f"=== 开始创建资源包 ===")
+        logger.info(f"用户ID: {user_id}")
+        logger.info(f"资源包数据: {package_data.dict()}")
         
-        # 创建资源包
-        db_package = ResourcePackage(
-            name=package_data.name,
-            description=package_data.description,
-            type=package_data.type,
-            datasource_id=package_data.datasource_id,
-            resource_id=package_data.resource_id,
-            template_id=package_data.template_id,
-            template_type=package_data.template_type,
-            dynamic_params=package_data.dynamic_params,
-            is_active=package_data.is_active,
-            created_by=user_id
-        )
-        
-        self.db.add(db_package)
-        await self.db.flush()
-        
-        # 添加标签
-        if package_data.tags:
-            for tag_name in package_data.tags:
-                tag = ResourcePackageTag(
-                    package_id=db_package.id,
-                    tag_name=tag_name.strip()
+        try:
+            # 检查名称是否重复
+            logger.info(f"检查资源包名称是否重复: {package_data.name}")
+            existing_query = select(ResourcePackage).where(
+                and_(
+                    ResourcePackage.name == package_data.name,
+                    ResourcePackage.created_by == user_id
                 )
-                self.db.add(tag)
-        
-        # 给创建者添加管理权限
-        permission = ResourcePackagePermission(
-            package_id=db_package.id,
-            user_id=user_id,
-            permission_type=PermissionType.ADMIN,
-            granted_by=user_id
-        )
-        self.db.add(permission)
-        
-        await self.db.commit()
-        
+            )
+            result = await self.db.execute(existing_query)
+            existing = result.scalar_one_or_none()
+            if existing:
+                logger.warning(f"资源包名称已存在: {package_data.name}")
+                raise HTTPException(status_code=400, detail="资源包名称已存在")
+            
+            logger.info("名称检查通过，开始创建资源包实例")
+            
+            # 创建资源包
+            db_package = ResourcePackage(
+                name=package_data.name,
+                description=package_data.description,
+                type=package_data.type,
+                datasource_id=package_data.datasource_id,
+                resource_id=package_data.resource_id,
+                template_id=package_data.template_id,
+                template_type=package_data.template_type,
+                dynamic_params=package_data.dynamic_params,
+                is_active=package_data.is_active,
+                is_lock=package_data.is_lock,
+                created_by=user_id
+            )
+            
+            logger.info(f"资源包实例创建完成，准备添加到数据库")
+            logger.info(f"资源包属性: name={db_package.name}, type={db_package.type}, is_lock={db_package.is_lock}")
+            
+            self.db.add(db_package)
+            logger.info("资源包已添加到会话，准备flush")
+            
+            await self.db.flush()
+            logger.info(f"数据库flush完成，资源包ID: {db_package.id}")
+            
+            # 添加标签
+            if package_data.tags:
+                logger.info(f"开始添加标签: {package_data.tags}")
+                for tag_name in package_data.tags:
+                    tag = ResourcePackageTag(
+                        package_id=db_package.id,
+                        tag_name=tag_name.strip()
+                    )
+                    self.db.add(tag)
+                    logger.info(f"添加标签: {tag_name.strip()}")
+            else:
+                logger.info("没有标签需要添加")
+            
+            # 给创建者添加管理权限
+            logger.info("开始添加管理权限")
+            permission = ResourcePackagePermission(
+                package_id=db_package.id,
+                user_id=user_id,
+                permission_type=PermissionType.ADMIN,
+                granted_by=user_id
+            )
+            self.db.add(permission)
+            logger.info(f"管理权限已添加: package_id={db_package.id}, user_id={user_id}")
+            
+            logger.info("准备提交事务")
+            await self.db.commit()
+            logger.info("事务提交成功")
+            
+        except Exception as e:
+            logger.error(f"创建资源包失败: {e}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            import traceback
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"创建资源包失败: {str(e)}")
+    
         # 重新查询以获取完整的关联数据
-        from sqlalchemy.orm import selectinload
-        query = select(ResourcePackage).options(
-            selectinload(ResourcePackage.tags),
-            selectinload(ResourcePackage.permissions)
-        ).where(ResourcePackage.id == db_package.id)
-        result = await self.db.execute(query)
-        refreshed_package = result.scalar_one()
-        
-        return refreshed_package
+        logger.info("开始重新查询资源包以获取完整数据")
+        try:
+            from sqlalchemy.orm import selectinload
+            query = select(ResourcePackage).options(
+                selectinload(ResourcePackage.tags),
+                selectinload(ResourcePackage.permissions)
+            ).where(ResourcePackage.id == db_package.id)
+            result = await self.db.execute(query)
+            refreshed_package = result.scalar_one()
+            
+            logger.info(f"资源包创建成功! ID: {refreshed_package.id}, 名称: {refreshed_package.name}")
+            logger.info(f"=== 资源包创建完成 ===")
+            
+            return refreshed_package
+        except Exception as e:
+            logger.error(f"重新查询资源包失败: {e}")
+            raise HTTPException(status_code=500, detail=f"重新查询资源包失败: {str(e)}")
     
     async def get_package(self, package_id: int, user_id: int) -> ResourcePackage:
         """获取资源包详情"""
@@ -266,6 +306,9 @@ class ResourcePackageService:
         if search_req.is_active is not None:
             conditions.append(ResourcePackage.is_active == search_req.is_active)
         
+        if search_req.is_lock is not None:
+            conditions.append(ResourcePackage.is_lock == search_req.is_lock)
+        
         if search_req.created_by:
             conditions.append(ResourcePackage.created_by == search_req.created_by)
         
@@ -290,10 +333,24 @@ class ResourcePackageService:
         if conditions:
             query = query.where(and_(*conditions))
         
-        # 计算总数 - 基于数据源表而不是资源包表
-        datasource_count_query = select(func.count(Datasource.id))
-        datasource_total_result = await self.db.execute(datasource_count_query)
-        total = datasource_total_result.scalar()
+        # 计算总数 - 基于相同的查询条件计算资源包总数
+        count_query = select(func.count(ResourcePackage.id))
+        
+        # 应用相同的权限过滤
+        if accessible_package_ids:
+            count_query = count_query.where(ResourcePackage.id.in_(accessible_package_ids))
+        else:
+            total = 0
+        
+        # 应用相同的搜索条件
+        if conditions and accessible_package_ids:
+            count_query = count_query.where(and_(*conditions))
+        
+        if accessible_package_ids:
+            total_result = await self.db.execute(count_query)
+            total = total_result.scalar()
+        else:
+            total = 0
         
         # 排序
         if search_req.sort_by:
@@ -549,8 +606,27 @@ async def create_resource_package(
     current_user: User = Depends(get_current_user)
 ):
     """创建资源包"""
-    service = ResourcePackageService(db)
-    return await service.create_package(package_data, current_user.id)
+    logger.info(f"=== 收到创建资源包请求 ===")
+    logger.info(f"当前用户: {current_user.id} ({current_user.username})")
+    logger.info(f"请求数据: {package_data.dict()}")
+    
+    try:
+        service = ResourcePackageService(db)
+        logger.info("ResourcePackageService 实例创建成功")
+        
+        result = await service.create_package(package_data, current_user.id)
+        logger.info(f"资源包创建成功，返回结果: ID={result.id}")
+        
+        return result
+    except HTTPException as he:
+        logger.error(f"HTTP异常: {he.status_code} - {he.detail}")
+        raise he
+    except Exception as e:
+        logger.error(f"创建资源包端点异常: {e}")
+        logger.error(f"异常类型: {type(e).__name__}")
+        import traceback
+        logger.error(f"异常堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
 
 @router.get("/{package_id}", response_model=ResourcePackageResponse)

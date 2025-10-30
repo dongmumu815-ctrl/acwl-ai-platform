@@ -429,8 +429,19 @@
                         <el-dropdown-item @click="handleEdit(row)">
                           <el-icon><Edit /></el-icon>编辑
                         </el-dropdown-item>
-                        <el-dropdown-item divided @click="handleDelete(row)">
-                          <el-icon><Delete /></el-icon>删除
+                        <el-dropdown-item divided @click="handleDelete(row)" :disabled="row.is_lock === '1'">
+                          <el-tooltip 
+                            v-if="row.is_lock === '1'" 
+                            content="该资源包已锁定，不可删除" 
+                            placement="top"
+                          >
+                            <span>
+                              <el-icon><Delete /></el-icon>删除
+                            </span>
+                          </el-tooltip>
+                          <span v-else>
+                            <el-icon><Delete /></el-icon>删除
+                          </span>
                         </el-dropdown-item>
                       </el-dropdown-menu>
                     </template>
@@ -1221,6 +1232,12 @@ const handleClone = (row: ResourcePackage) => {
  * 删除资源包
  */
 const handleDelete = async (row: ResourcePackage) => {
+  // 检查资源包是否被锁定
+  if (row.is_lock === '1') {
+    ElMessage.warning('该资源包已锁定，不可删除')
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
       `确定要删除资源包 “${row.name}” 吗？`,

@@ -34,6 +34,23 @@
         
         <el-row :gutter="20">
           <el-col :span="12">
+            <el-form-item label="是否可删除">
+              <el-switch 
+                v-model="form.is_deletable" 
+                active-text="可删除" 
+                inactive-text="不可删除"
+                :active-value="true"
+                :inactive-value="false"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <!-- 预留空间 -->
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="资源类型" prop="resource_id">
               <el-select
                 v-model="form.resource_id"
@@ -217,7 +234,22 @@ const form = reactive({
   template_type: 'sql' as PackageType,
   dynamic_params: {} as Record<string, any>,
   is_active: true,
+  is_lock: 'false' as string, // 添加is_lock字段，默认为"false"表示可删除
   tags: [] as string[]
+})
+
+// 计算属性：用于UI显示的is_deletable，与is_lock相反
+const is_deletable = computed({
+  get: () => form.is_lock === 'false',
+  set: (value: boolean) => {
+    form.is_lock = value ? 'false' : '1'
+  }
+})
+
+// 将is_deletable添加到form对象中，方便模板使用
+Object.defineProperty(form, 'is_deletable', {
+  get: () => is_deletable.value,
+  set: (value: boolean) => { is_deletable.value = value }
 })
 
 // 表单验证规则
@@ -366,6 +398,7 @@ const loadFormData = () => {
     template_type: data.template_type,
     dynamic_params: data.dynamic_params || {},
     is_active: data.is_active,
+    is_lock: data.is_lock || 'false', // 加载is_lock字段，默认为'false'
     tags: data.tags?.map(tag => tag.tag_name) || []
   })
   
@@ -389,6 +422,7 @@ const resetForm = () => {
     template_type: 'sql',
     dynamic_params: {},
     is_active: true,
+    is_lock: 'false', // 重置is_lock字段为'false'，表示可删除
     tags: []
   })
   
@@ -548,5 +582,9 @@ const handleClose = () => {
 
 :deep(.el-input-number) {
   width: 100%;
+}
+
+.form-item-tip {
+  margin-top: 4px;
 }
 </style>

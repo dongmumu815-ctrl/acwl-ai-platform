@@ -112,8 +112,28 @@ async def execute_es_query(
             if request.timeout:
                 search_params["timeout"] = request.timeout
             
-            # 执行查询
+            # 先执行count查询获取准确的总数
+            count_params = {
+                "index": request.index,
+                "body": {
+                    "query": request.query
+                }
+            }
+            
+            # 执行count查询
+            logger.info(f"执行count查询，索引: {request.index}")
+            count_response = await es_client.count(**count_params)
+            total_count = count_response["count"]
+            logger.info(f"count查询结果: {total_count}")
+            
+            # 执行主查询
             response = await es_client.search(**search_params)
+            
+            # 将count查询的结果替换到response中的total值
+            if "hits" in response and "total" in response["hits"]:
+                original_total = response["hits"]["total"]["value"]
+                response["hits"]["total"]["value"] = total_count
+                logger.info(f"替换total值: {original_total} -> {total_count}")
             
             # 获取字段映射信息
             field_mappings = {}
@@ -140,7 +160,7 @@ async def execute_es_query(
             
             # 构建统计信息
             stats = {
-                "totalHits": response["hits"]["total"]["value"],
+                "totalHits": total_count,  # 使用count查询的准确结果
                 "took": response["took"],
                 "maxScore": response["hits"].get("max_score", 0),
                 "shardsInfo": {

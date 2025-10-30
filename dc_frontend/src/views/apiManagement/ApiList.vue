@@ -1699,6 +1699,11 @@ const openSwaggerUI = () => {
     margin: 0 10px 12px 0;
     font-size: 12px;
     color: #606266;
+    word-break: break-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
 }
 
