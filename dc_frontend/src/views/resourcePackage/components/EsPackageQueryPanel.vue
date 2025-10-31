@@ -329,7 +329,7 @@
                               v-html="
                                 formatTextWithHighlight(
                                   formatCell(row[col]),
-                                  160,
+                                  DEFAULT_MAX_CHARS,
                                   executedSearchValue
                                 )
                               "
@@ -531,7 +531,7 @@
                                             2
                                           )
                                         : selectedRow?.[f],
-                                      500,
+                                      null,
                                       executedSearchValue
                                     )
                                   "
@@ -1276,13 +1276,13 @@ function highlightText(text: string, keyword: string): string {
 // 带高亮的格式化文本函数
 function formatTextWithHighlight(
   text: string,
-  max: number,
+  max: number | null,
   keyword?: string
 ): string {
   if (!text) return "";
 
   // 先截断文本
-  const truncatedText = text.length > max ? text.slice(0, max - 1) + "…" : text;
+  const truncatedText = (max && text.length > max) ? text.slice(0, max - 1) + "…" : text;
 
   // 如果有搜索关键词，则高亮显示
   if (keyword && keyword.trim()) {
@@ -2151,7 +2151,7 @@ async function handleDownloadLatest() {
   overflow: auto;
 }
 
-.results-card.fullscreen-mode .result-grid {
+.results-card.fullscreen-mode .results-grid {
   height: 93vh;
 }
 </style>

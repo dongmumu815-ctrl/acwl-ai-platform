@@ -1,0 +1,1 @@
+import{g as r,a as c,p,d as u}from"./index-eehN0_Kd.js";const s="/data-resource-types",$=(e={})=>{const{page:t=1,page_size:a=10,name:o}=e;return r(`${s}/list`,{page:t,page_size:a,name:o})},d=e=>r(`${s}/${e}`),g=e=>p(`${s}/create`,e),y=(e,t)=>c(`${s}/${e}`,t),l=e=>u(`${s}/${e}`);export{g as c,l as d,d as g,$ as l,y as u};

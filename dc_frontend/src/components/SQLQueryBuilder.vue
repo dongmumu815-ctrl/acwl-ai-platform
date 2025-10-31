@@ -284,19 +284,41 @@
           <div class="fields-selection">
             <div class="field-groups">
               <div class="available-fields">
-                <h5>可用字段</h5>
+                <div class="field-header">
+                  <h5>可用字段</h5>
+                  <div class="field-search">
+                    <el-input
+                      v-model="fieldSearchText"
+                      placeholder="搜索字段名或描述..."
+                      size="small"
+                      clearable
+                      @keyup.enter="focusFirstField"
+                      @clear="clearFieldSearch"
+                    >
+                      <template #prefix>
+                        <el-icon><Search /></el-icon>
+                      </template>
+                    </el-input>
+                  </div>
+                </div>
                 <div class="fields-list">
                   <div
-                    v-for="field in availableFields"
+                    v-for="field in filteredAvailableFields"
                     :key="field.name"
                     class="field-item"
+                    :class="{ 'highlighted': isFieldHighlighted(field) }"
                     @click="addField(field)"
+                    ref="fieldItems"
                   >
                     <el-icon><Plus /></el-icon>
-                    <span class="field-name">{{ field.name }}</span>
+                    <span class="field-name" v-html="highlightText(field.name, fieldSearchText)"></span>
                     <el-tag :type="getFieldTypeTag(field.type)" size="small">
-                      {{ field.description || field.type }}
+                      <span v-html="highlightText(field.description || field.type, fieldSearchText)"></span>
                     </el-tag>
+                  </div>
+                  <div v-if="filteredAvailableFields.length === 0 && fieldSearchText" class="no-fields">
+                    <el-icon><InfoFilled /></el-icon>
+                    <span>未找到匹配的字段</span>
                   </div>
                 </div>
               </div>
@@ -547,7 +569,9 @@
               v-for="column in resultColumns"
               :key="column.prop"
               :prop="column.prop"
-              :label="column.label"
+              :label="
+              availableFields.find(field => field.name === column.prop).description
+              "
               :width="column.width"
               show-overflow-tooltip
             >
@@ -938,6 +962,27 @@ const availableSchemas = ref<{ name: string; description?: string }[]>([])
 const availableTables = ref<{ name: string; type?: string; schema?: string; rowCount?: number }[]>([])
 const availableFields = ref<{ name: string; type: string; description?: string }[]>([])
 const queryTags = ref<string[]>(['常用查询', '报表查询', '数据分析', '业务查询'])
+
+// 字段搜索相关
+const fieldSearchText = ref('')
+const fieldItems = ref<HTMLElement[]>([])
+
+/**
+ * 过滤后的可用字段
+ */
+const filteredAvailableFields = computed(() => {
+  if (!fieldSearchText.value.trim()) {
+    return availableFields.value
+  }
+  
+  const searchText = fieldSearchText.value.toLowerCase().trim()
+  return availableFields.value.filter(field => {
+    const nameMatch = field.name.toLowerCase().includes(searchText)
+    const descMatch = field.description?.toLowerCase().includes(searchText) || false
+    const typeMatch = field.type.toLowerCase().includes(searchText)
+    return nameMatch || descMatch || typeMatch
+  })
+})
 
 /**
  * 判断是否禁用数据源选择
@@ -1352,6 +1397,43 @@ const addField = (field: QueryField) => {
  */
 const removeField = (index: number) => {
   queryConfig.fields.splice(index, 1)
+}
+
+/**
+ * 清空字段搜索
+ */
+const clearFieldSearch = () => {
+  fieldSearchText.value = ''
+}
+
+/**
+ * 聚焦到第一个搜索结果字段
+ */
+const focusFirstField = () => {
+  if (filteredAvailableFields.value.length > 0) {
+    const firstField = filteredAvailableFields.value[0]
+    addField(firstField)
+    fieldSearchText.value = ''
+  }
+}
+
+/**
+ * 判断字段是否高亮显示
+ */
+const isFieldHighlighted = (field: { name: string; type: string; description?: string }) => {
+  return fieldSearchText.value.trim() !== ''
+}
+
+/**
+ * 高亮搜索文本
+ */
+const highlightText = (text: string, searchText: string) => {
+  if (!searchText.trim() || !text) {
+    return text
+  }
+  
+  const regex = new RegExp(`(${searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+  return text.replace(regex, '<mark class="search-highlight">$1</mark>')
 }
 
 /**
@@ -1896,10 +1978,11 @@ const formatValueWithComment = (value: any, fieldName: string) => {
     value = ''
   }
   
+  // (${fieldMapping.description})
   // 查找字段映射中的注释
   const fieldMapping = availableFields.value.find(field => field.name === fieldName)
   if (fieldMapping && fieldMapping.description && fieldMapping.description !== fieldName) {
-    return `${value} (${fieldMapping.description})`
+    return `${value} `
   }
   
   return value
@@ -2390,9 +2473,69 @@ defineExpose({
   background-color: #e1f3d8;
 }
 
+/* 字段搜索样式 */
+.field-search {
+  margin-bottom: 12px;
+}
+
+.field-search .el-input {
+  width: 100%;
+}
+
+.field-search .el-input__wrapper {
+  border-radius: 6px;
+}
+
+.search-highlight {
+  background-color: #ffd04b;
+  color: #606266;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.field-item.highlighted {
+  border: 1px solid #409eff;
+  background-color: #ecf5ff;
+}
+
+.field-item.highlighted:hover {
+  background-color: #d9ecff;
+}
+
+.no-fields-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #909399;
+  font-size: 14px;
+  text-align: center;
+}
+
+.no-fields-found .el-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
 .field-name {
   flex: 1;
   font-size: 14px;
+}
+
+.field-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.field-description {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.2;
 }
 
 .empty-fields {

@@ -320,10 +320,11 @@ export const request = async <T = any>(config: RequestConfig): Promise<ApiRespon
     ) {
       const rd: any = response.data
       return {
+        ...rd,
         success: Boolean(rd.success),
         data: rd.data as T,
         message: typeof rd.message === 'string' ? rd.message : undefined,
-        code: typeof rd.code === 'number' ? rd.code : undefined
+        code: typeof rd.code === 'number' ? rd.code : undefined,
       } as ApiResponse<T>
     }
     

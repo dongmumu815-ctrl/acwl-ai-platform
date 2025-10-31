@@ -426,9 +426,8 @@ class DatasourceService:
             connection_params.pop('connect_timeout', None)
             
             # 添加更多连接参数以优化连接管理
+            # 注意：aiomysql不支持read_timeout和write_timeout参数
             connection_params.update({
-                'read_timeout': timeout,
-                'write_timeout': timeout,
                 'autocommit': True,
                 'charset': 'utf8mb4'
             })

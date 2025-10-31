@@ -1,1 +1,0 @@
-import{r}from"./index-wdU4tJHq.js";const t={getLogs(e){return r({url:"/user-operation-logs/",method:"get",params:e})},getLogDetail(e){return r({url:`/user-operation-logs/${e}`,method:"get"})}};export{t as u};

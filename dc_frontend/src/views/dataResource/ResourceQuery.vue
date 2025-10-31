@@ -321,13 +321,35 @@ const onSQLQueryExecute = async (queryData) => {
     // 调用API执行查询
     const response = await executeSQLQuery(queryRequest)
     
-    console.log('📥 查询响应:', response)
+    console.log('📥 查询响应完整结构:', response)
+    console.log('📥 响应数据类型:', typeof response)
+    console.log('📥 响应数据键:', Object.keys(response || {}))
     
+    // 获取实际的查询结果数据
+    // 根据API响应格式，直接使用response作为查询结果对象
+    const apiResult = response
+    console.log('📊 API响应对象:', apiResult)
+    console.log('📊 API响应类型:', typeof apiResult)
+    console.log('📊 API响应键:', Object.keys(apiResult || {}))
+    
+    // 统一处理查询结果
+    const success = !!apiResult?.success
+    const columns = apiResult?.columns
+    const data = apiResult?.data
+    const row_count = apiResult?.row_count ?? (Array.isArray(data) ? data.length : 0)
+    const execution_time = apiResult?.execution_time ?? 0
+
     // 处理查询结果
-    if (response && response.success) {
-      const { columns, data, row_count, execution_time } = response
+    if (success) {
+      console.log('📊 统一后的数据:')
+      console.log('  - columns:', columns, '类型:', typeof columns)
+      console.log('  - data:', data, '类型:', typeof data, '长度:', Array.isArray(data) ? data.length : 'N/A')
+      console.log('  - row_count:', row_count)
+      console.log('  - execution_time:', execution_time)
       
       if (columns && data) {
+        console.log('✅ 有columns和data，进行正常转换')
+        
         // 转换列信息格式
         const resultColumns = columns.map(col => ({
           prop: col,
@@ -345,6 +367,9 @@ const onSQLQueryExecute = async (queryData) => {
           return obj
         })
         
+        console.log('📋 转换后的列信息:', resultColumns)
+        console.log('📋 转换后的数据 (前3条):', resultData.slice(0, 3))
+        
         // 将结果传递给SQLQueryBuilder组件
         if (sqlQueryBuilderRef.value) {
           sqlQueryBuilderRef.value.setQueryResults(resultData, resultColumns)
@@ -352,6 +377,48 @@ const onSQLQueryExecute = async (queryData) => {
         
         console.log(`✅ 查询执行成功，返回 ${row_count} 条记录，执行时间: ${execution_time}ms`)
         ElMessage.success(`查询执行成功，返回 ${row_count} 条记录`)
+      } else if (data && Array.isArray(data) && data.length > 0) {
+        console.log('⚠️ 没有columns但有data，尝试自动生成列名',data)
+        
+        // 如果没有columns但有data，尝试自动生成列名
+        const firstRow = data[0]
+        const autoColumns = Array.isArray(firstRow) 
+          ? firstRow.map((_, index) => `column_${index + 1}_${_}`)
+          : ['column_1']
+        
+        console.log('🔧 自动生成的列名:', autoColumns)
+        
+        // 转换列信息格式
+        const resultColumns = autoColumns.map(col => ({
+          prop: col,
+          label: col,
+          type: 'string',
+          width: 150
+        }))
+        
+        // 转换数据格式
+        const resultData = data.map(row => {
+          const obj = {}
+          if (Array.isArray(row)) {
+            autoColumns.forEach((col, index) => {
+              obj[col] = row[index]
+            })
+          } else {
+            obj['column_1'] = row
+          }
+          return obj
+        })
+        
+        console.log('📋 自动转换后的列信息:', resultColumns)
+        console.log('📋 自动转换后的数据 (前3条):', resultData.slice(0, 3))
+        
+        // 将结果传递给SQLQueryBuilder组件
+        if (sqlQueryBuilderRef.value) {
+          sqlQueryBuilderRef.value.setQueryResults(resultData, resultColumns)
+        }
+        
+        console.log(`✅ 查询执行成功，返回 ${data.length} 条记录`)
+        ElMessage.success(`查询执行成功，返回 ${data.length} 条记录`)
       } else {
         console.log('⚠️ 查询成功但无数据返回')
         ElMessage.info('查询成功但无数据返回')
@@ -363,7 +430,7 @@ const onSQLQueryExecute = async (queryData) => {
       }
     } else {
       // 查询失败
-      const errorMessage = response?.error_details || response?.message || '查询执行失败'
+      const errorMessage = apiResult?.error_details || apiResult?.message || response?.message || '查询执行失败'
       console.error('❌ 查询执行失败:', errorMessage)
       
       if (sqlQueryBuilderRef.value) {
