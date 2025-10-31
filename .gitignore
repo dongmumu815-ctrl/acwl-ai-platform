@@ -153,3 +153,7 @@ htmlcov/
 # Local development
 .env.local
 .docker/
+
+# 前端build
+.ai/
+.ui/
