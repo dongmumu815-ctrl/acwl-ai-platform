@@ -113,18 +113,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
           noPermissionBehavior: 'hide'
         }
       },
-      {
-        path: 'upload',
-        name: 'ModelUpload',
-        component: () => import('@/views/models/index.vue'),
-        meta: {
-          title: '模型上传',
-          icon: 'Upload',
-          requiresAuth: true,
-          permission: PERMISSIONS.MODEL_CREATE,
-          noPermissionBehavior: 'hide'
-        }
-      },
+
       {
         path: 'service-configs',
         name: 'ModelServiceConfigs',
@@ -383,7 +372,6 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '资源管理',
       icon: 'Cpu',
       requiresAuth: true,
-      requiresAdmin: true,
       noPermissionBehavior: 'hide'
     },
     children: [
@@ -395,7 +383,6 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '服务器资源池',
           icon: 'Monitor',
           requiresAuth: true,
-          requiresAdmin: true,
           noPermissionBehavior: 'hide'
         }
       },
@@ -407,7 +394,6 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: 'GPU资源池',
           icon: 'Cpu',
           requiresAuth: true,
-          requiresAdmin: true,
           noPermissionBehavior: 'hide'
         }
       }
@@ -484,7 +470,20 @@ export const asyncRoutes: RouteRecordRaw[] = [
           permission: PERMISSIONS.SYSTEM_MONITOR,
           noPermissionBehavior: 'hide'
         }
+      },
+      {
+        path: 'environments',
+        name: 'SystemEnvironments',
+        component: () => import('@/views/environments/index.vue'),
+        meta: {
+          title: '环境管理',
+          icon: 'Setting',
+          requiresAuth: true,
+          permission: PERMISSIONS.SYSTEM_UPDATE,
+          noPermissionBehavior: 'hide'
+        }
       }
+
     ]
   },
   {
@@ -806,7 +805,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
 
 // 创建路由实例
 const router = createRouter({
-  history: createWebHistory('/ui/'),
+  history: createWebHistory('/ai/'),
   routes: [...constantRoutes, ...asyncRoutes],
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) {

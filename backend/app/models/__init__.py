@@ -29,6 +29,7 @@ from .data_resource import (
     DataResourceTag,
     DataResourceTagRelation,
 )
+
 from .resource_type import DataResourceType
 from .project import (
     Project, ProjectMember, ProjectDatasource, ProjectQuota, 
@@ -67,6 +68,7 @@ from .es_query_template import ESQueryTemplate
 from .sql_query_template import SQLQueryTemplate
 from .role import Role, UserRole, RolePermission
 from .permission import Permission
+from .environment import Environment
 from .resource_package import (
     ResourcePackage,
     ResourcePackagePermission,
@@ -109,7 +111,7 @@ __all__ = [
     "DataResourceQueryHistory",
     "DataResourceTag",
     "DataResourceTagRelation",
-    "DataResourceType",
+	"DataResourceType",
     "Project",
     "ProjectMember",
     "ProjectDatasource",
@@ -201,4 +203,5 @@ __all__ = [
     "ResourcePackagePermission",
     "ResourcePackageQueryHistory",
     "ResourcePackageTag",
+    "Environment",
 ]

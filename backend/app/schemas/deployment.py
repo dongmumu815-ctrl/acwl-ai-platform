@@ -77,6 +77,24 @@ class DeploymentUpdate(BaseModel):
         }
 
 
+class ModelInfo(BaseModel):
+    """模型信息"""
+    id: int
+    name: str
+    version: str
+    model_type: Optional[str]
+
+
+class LatestMetrics(BaseModel):
+    """最新的metrics数据"""
+    cpu_utilization: Optional[float]
+    memory_used: Optional[str]
+    gpu_utilization: Optional[Dict[str, Any]]
+    request_count: Optional[int] = 0
+    average_latency: Optional[int]
+    error_count: Optional[int] = 0
+
+
 class DeploymentResponse(BaseModel):
     """部署响应模型"""
     id: int
@@ -97,6 +115,9 @@ class DeploymentResponse(BaseModel):
     updated_at: datetime
     created_by: Optional[int]
     updated_by: Optional[int]
+    # 新增字段
+    model: Optional[ModelInfo] = None
+    latest_metrics: Optional[LatestMetrics] = None
     
     class Config:
         from_attributes = True

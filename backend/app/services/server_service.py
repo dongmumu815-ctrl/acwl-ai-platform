@@ -17,6 +17,7 @@ from sqlalchemy import select, update
 
 from app.models.server import Server, GPUResource, ServerMetrics, ServerStatus
 from app.core.config import settings
+from app.core.exceptions import GPUError, NotFoundError, ACWLException
 
 logger = logging.getLogger(__name__)
 
@@ -527,7 +528,8 @@ class ServerService:
                 "cuda_version": gpu.cuda_version,
                 "device_id": gpu.device_id,
                 "is_available": gpu.is_available,
-                "created_at": gpu.created_at.isoformat() if gpu.created_at else None
+                "created_at": gpu.created_at.isoformat() if gpu.created_at else None,
+                "updated_at": gpu.updated_at.isoformat() if gpu.updated_at else None,
             }
             
         except Exception as e:
@@ -535,42 +537,118 @@ class ServerService:
             logger.error(f"添加GPU资源失败: {str(e)}")
             raise
     
-    async def get_server_gpus(self, server_id: int) -> List[Dict[str, Any]]:
+    async def scan_server_gpus(self, server_id: int) -> List[Dict[str, Any]]:
         """
-        获取服务器GPU资源列表
+        通过SSH扫描服务器上的GPU，并将信息写入数据库
         
         Args:
             server_id: 服务器ID
-            
+        
         Returns:
-            GPU资源列表
+            持久化后的GPU资源列表
         """
         try:
-            result = await self.db.execute(
-                select(GPUResource)
-                .where(GPUResource.server_id == server_id)
-                .order_by(GPUResource.device_id)
-            )
-            gpus = result.scalars().all()
+            # 获取服务器信息
+            result = await self.db.execute(select(Server).where(Server.id == server_id))
+            server = result.scalar_one_or_none()
+            if not server:
+                raise NotFoundError("服务器不存在", detail={"server_id": server_id})
             
-            return [
-                {
-                    "id": gpu.id,
-                    "server_id": gpu.server_id,
-                    "gpu_name": gpu.gpu_name,
-                    "gpu_type": gpu.gpu_type,
-                    "memory_size": gpu.memory_size,
-                    "cuda_version": gpu.cuda_version,
-                    "device_id": gpu.device_id,
-                    "is_available": gpu.is_available,
-                    "created_at": gpu.created_at.isoformat() if gpu.created_at else None
-                }
-                for gpu in gpus
-            ]
+            ssh_client = paramiko.SSHClient()
+            ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
-        except Exception as e:
-            logger.error(f"获取服务器GPU资源失败: {str(e)}")
+            try:
+                # 建立SSH连接
+                if server.ssh_key_path:
+                    ssh_client.connect(
+                        hostname=server.ip_address,
+                        port=server.ssh_port,
+                        username=server.ssh_username,
+                        key_filename=server.ssh_key_path,
+                        timeout=15
+                    )
+                else:
+                    ssh_client.connect(
+                        hostname=server.ip_address,
+                        port=server.ssh_port,
+                        username=server.ssh_username,
+                        password=server.ssh_password,
+                        timeout=15
+                    )
+                
+                # 检查 nvidia-smi 是否存在
+                stdin, stdout, stderr = ssh_client.exec_command(
+                    "command -v nvidia-smi || which nvidia-smi || true"
+                )
+                smi_path = stdout.read().decode().strip()
+                smi_err = stderr.read().decode().strip()
+                if not smi_path:
+                    raise GPUError(
+                        "目标服务器未安装或未配置 nvidia-smi",
+                        detail={"server_id": server_id, "ip_address": server.ip_address}
+                    )
+                
+                # 查询GPU基本信息
+                stdin, stdout, stderr = ssh_client.exec_command(
+                    "nvidia-smi --query-gpu=name,memory.total,uuid --format=csv,noheader,nounits"
+                )
+                query_output = stdout.read().decode().strip()
+                stderr_output = stderr.read().decode().strip()
+                if stderr_output and ("not found" in stderr_output.lower() or "command not found" in stderr_output.lower()):
+                    raise GPUError(
+                        "nvidia-smi 命令不可用",
+                        detail={"server_id": server_id, "stderr": stderr_output}
+                    )
+                
+                # 获取CUDA版本（如果有）
+                stdin, stdout, stderr = ssh_client.exec_command(
+                    "nvidia-smi | grep -oP 'CUDA Version:\s*\K[0-9.]+'"
+                )
+                cuda_version = stdout.read().decode().strip() or None
+                
+                # 解析扫描结果
+                scanned_data: List[Dict[str, Any]] = []
+                if query_output:
+                    for line in query_output.splitlines():
+                        parts = [p.strip() for p in line.split(',') if p.strip()]
+                        if len(parts) >= 3:
+                            name, mem_total, uuid = parts[0], parts[1], parts[2]
+                            scanned_data.append({
+                                "server_id": server_id,
+                                "gpu_name": name,
+                                "gpu_type": name,  # 简化处理：使用型号名称作为类型
+                                "memory_size": f"{mem_total} MiB",
+                                "cuda_version": cuda_version,
+                                "device_id": uuid,
+                                "is_available": True,
+                            })
+                else:
+                    raise GPUError(
+                        "未检测到GPU或 nvidia-smi 未返回数据",
+                        detail={"server_id": server_id}
+                    )
+                
+                # 持久化：仅在有有效扫描数据时替换旧数据
+                gpu_result = await self.db.execute(select(GPUResource).where(GPUResource.server_id == server_id))
+                for gpu in gpu_result.scalars().all():
+                    await self.db.delete(gpu)
+                await self.db.commit()
+                
+                scanned: List[Dict[str, Any]] = []
+                for gpu_data in scanned_data:
+                    created = await self.add_gpu_resource(gpu_data)
+                    scanned.append(created)
+                
+                return scanned
+            finally:
+                ssh_client.close()
+        except ACWLException:
+            # 直接透传已分类的业务异常
             raise
+        except Exception as e:
+            logger.error(f"扫描GPU失败: {str(e)}", exc_info=True)
+            # 归一化为GPUError，避免上层500且不清空旧数据
+            raise GPUError("扫描GPU失败", detail=str(e))
     
     async def get_server(self, server_id: int) -> Dict[str, Any]:
         """

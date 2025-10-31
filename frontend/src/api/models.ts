@@ -24,6 +24,9 @@ export interface Model {
   source_url?: string
   local_path?: string
   is_active: boolean
+  download_status?: string
+  download_progress?: number | null
+  download_error?: string | null
   created_at: string
   updated_at: string
 }
@@ -56,12 +59,25 @@ export interface ModelQueryParams {
 // 模型API接口
 export const modelApi = {
   /**
+   * 获取模型统计数据
+   * @returns 模型统计数据
+   */
+  getStats() {
+    return request.get<{
+      total_count: number;
+      active_count: number;
+      inactive_count: number;
+      total_size: number;
+    }>('/models/stats')
+  },
+
+  /**
    * 获取模型列表
    * @param params 查询参数
    * @returns 分页的模型列表
    */
   getModels(params?: ModelQueryParams) {
-    return request.get<PaginatedResponse<Model>>('/models/', { params })
+    return request.get<PaginatedResponse<Model>>('/models/', params)
   },
 
   /**
@@ -142,6 +158,17 @@ export const modelApi = {
   },
 
   /**
+   * 直接下载模型文件流
+   * @param modelId 模型ID
+   * @returns 文件流
+   */
+  downloadModelFile(modelId: number) {
+    return request.get(`/models/${modelId}/download`, undefined, {
+      responseType: 'blob'
+    })
+  },
+
+  /**
    * 克隆模型
    * @param modelId 模型ID
    * @param newName 新模型名称
@@ -185,5 +212,27 @@ export const modelApi = {
       model_id: number
       description?: string
     }>>('/models/available-for-agents')
+  },
+
+  /**
+   * 获取模型下载状态
+   * @param modelId 模型ID
+   * @returns 下载状态信息
+   */
+  getDownloadStatus(modelId: number) {
+    return request.get<{
+      download_status: string
+      download_progress: number | null
+      download_error: string | null
+    }>(`/models/${modelId}/download-status`)
+  },
+
+  /**
+   * 重新下载模型
+   * @param modelId 模型ID
+   * @returns 重新下载结果
+   */
+  retryDownload(modelId: number) {
+    return request.post<{ message: string }>(`/models/${modelId}/retry-download`)
   }
 }

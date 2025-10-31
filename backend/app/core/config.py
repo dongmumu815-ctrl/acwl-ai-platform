@@ -89,21 +89,26 @@ class Settings(BaseSettings):
     # 缓存配置
     CACHE_TTL: int = Field(default=3600, description="缓存TTL(秒)")
     
-    # MinIO配置
-    MINIO_ENDPOINT: str = Field(default="10.20.1.200:9000", description="MinIO服务地址")
-    MINIO_ACCESS_KEY: str = Field(default="acwl", description="MinIO访问密钥")
-    MINIO_SECRET_KEY: str = Field(default="1qaz2WSXaczt", description="MinIO秘密密钥")
-    MINIO_SECURE: bool = Field(default=False, description="是否使用HTTPS")
-    MINIO_BUCKET_NAME: str = Field(default="cepiec-read-data", description="存储桶名称")
-    MINIO_REGION: str = Field(default="us-east-1", description="区域设置")
-    
-    # GPU配置
+    # GPU监控配置
     ENABLE_GPU_MONITORING: bool = Field(default=True, description="启用GPU监控")
     GPU_MEMORY_THRESHOLD: float = Field(default=0.9, description="GPU内存阈值")
     
     # 部署配置
     DEFAULT_DEPLOYMENT_TIMEOUT: int = Field(default=300, description="默认部署超时时间(秒)")
     MAX_CONCURRENT_DEPLOYMENTS: int = Field(default=5, description="最大并发部署数")
+    
+    # MinIO对象存储配置
+    MINIO_ENDPOINT: str = Field(default="10.20.1.200:9000", description="MinIO服务地址")
+    MINIO_ACCESS_KEY: str = Field(default="acwl", description="MinIO访问密钥")
+    MINIO_SECRET_KEY: str = Field(default="1qaz2WSXaczt", description="MinIO秘密密钥")
+    MINIO_SECURE: bool = Field(default=False, description="是否使用HTTPS")
+    MINIO_BUCKET_NAME: str = Field(default="cepiec-ai-data", description="存储桶名称")
+    MINIO_REGION: str = Field(default="us-east-1", description="区域设置")
+    
+    # MinIO分片上传配置
+    MINIO_CHUNK_SIZE: int = Field(default=64 * 1024 * 1024, description="分片大小(64MB)")
+    MINIO_MAX_RETRIES: int = Field(default=3, description="最大重试次数")
+    MINIO_TIMEOUT: int = Field(default=300, description="超时时间(秒)")
     
     @property
     def database_url(self) -> str:

@@ -52,20 +52,20 @@ export default defineConfig({
     // 只在开发环境使用代理，生产环境直接访问本站目录
     proxy: process.env.NODE_ENV === 'development' ? {
       '/api': {
-        target: 'http://127.0.0.1:8082',
+        // target: 'http://127.0.0.1:8082',
         // target: 'http://192.168.95.11:8082',
-        // target: 'http://10.20.1.201:8082',
+        target: 'http://10.20.1.201:8082',
         changeOrigin: true
       }
     } : undefined
   },
-  // 设置为/ui/路径，适配部署在服务端的/ui/目录下
-  base: process.env.NODE_ENV === 'production' ? '/ui/' : '/',
+  // 设置为/ai/路径，适配部署在服务端的/ai/目录下
+  base: process.env.NODE_ENV === 'production' ? '/ai/' : '/',
   
   build: {
     target: 'es2015',
     // 构建输出目录设置为backend下的ui目录
-    outDir: process.env.NODE_ENV === 'production' ? '../backend/ui' : 'dist',
+    outDir: process.env.NODE_ENV === 'production' ? '../backend/ai' : 'dist',
     // 静态资源目录
     assetsDir: 'static',
     sourcemap: false,

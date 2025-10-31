@@ -26,6 +26,15 @@ class ModelType(str, enum.Enum):
     OTHER = "OTHER"  # 匹配数据库实际枚举值
 
 
+class DownloadStatus(str, enum.Enum):
+    """下载状态枚举"""
+    PENDING = "PENDING"  # 等待下载
+    DOWNLOADING = "DOWNLOADING"  # 下载中
+    COMPLETED = "COMPLETED"  # 下载完成
+    FAILED = "FAILED"  # 下载失败
+    UPLOADED = "UPLOADED"  # 直接上传（非下载）
+
+
 class Model(Base, TimestampMixin):
     """模型信息表"""
     
@@ -112,6 +121,24 @@ class Model(Base, TimestampMixin):
         Boolean,
         default=False,
         comment="是否激活"
+    )
+    
+    download_status: Mapped[DownloadStatus] = mapped_column(
+        Enum(DownloadStatus),
+        default=DownloadStatus.UPLOADED,
+        comment="下载状态：等待下载、下载中、下载完成、下载失败、直接上传"
+    )
+    
+    download_progress: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="下载进度百分比(0-100)"
+    )
+    
+    download_error: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="下载错误信息"
     )
     
     # 关联关系

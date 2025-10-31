@@ -9,7 +9,7 @@ import sys
 sys.path = [p for p in sys.path if 'fastdatasets' not in p]
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, FileResponse
@@ -184,26 +184,58 @@ async def health_check():
 
 
 # 挂载静态文件服务（前端页面）
-# 新版打包 UI（ui），按 /ui 作为基准路径
-ui_built_path = os.path.join(os.path.dirname(__file__), "ui")
-if os.path.exists(ui_built_path):
-    # 挂载静态资源目录（/ui/assets/*）
-    assets_path = os.path.join(ui_built_path, "assets")
-    if os.path.exists(assets_path):
-        app.mount("/ui/assets", StaticFiles(directory=assets_path), name="ui_assets")
-        logger.info(f"📁 前端资源已挂载: {assets_path}")
+def setup_frontend_routes(app, frontend_name: str, base_path: str):
+    """
+    设置前端路由的通用函数
+    :param app: FastAPI应用实例
+    :param frontend_name: 前端名称（用于日志）
+    :param base_path: 前端文件夹路径
+    """
+    frontend_path = os.path.join(os.path.dirname(__file__), base_path)
+    if not os.path.exists(frontend_path):
+        logger.warning(f"⚠️ 前端目录不存在: {frontend_path}")
+        return False
+    
+    # 挂载静态资源目录
+    static_dirs = ["assets", "static"]  # 支持多种静态资源目录名
+    for static_dir in static_dirs:
+        static_path = os.path.join(frontend_path, static_dir)
+        if os.path.exists(static_path):
+            mount_path = f"/{base_path}/{static_dir}"
+            app.mount(mount_path, StaticFiles(directory=static_path), name=f"{base_path}_{static_dir}")
+            logger.info(f"📁 {frontend_name}静态资源已挂载: {static_path} -> {mount_path}")
+    
+    # 检查index.html是否存在
+    index_path = os.path.join(frontend_path, "index.html")
+    if not os.path.exists(index_path):
+        logger.warning(f"⚠️ index.html不存在: {index_path}")
+        return False
+    
+    # 创建路由处理函数
+    async def serve_index():
+        return FileResponse(index_path)
+    
+    async def serve_spa(path: str):
+        # 如果是静态资源请求，返回404
+        if any(path.startswith(f"{static_dir}/") for static_dir in static_dirs):
+            raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(index_path)
+    
+    # 注册路由
+    app.get(f"/{base_path}", include_in_schema=False)(serve_index)
+    app.get(f"/{base_path}/{{path:path}}", include_in_schema=False)(serve_spa)
+    
+    logger.info(f"📁 {frontend_name}前端页面已启用: {frontend_path} -> /{base_path}")
+    return True
 
-    # 提供 index.html
-    @app.get("/ui", include_in_schema=False)
-    async def serve_ui_index():
-        return FileResponse(os.path.join(ui_built_path, "index.html"))
+# 配置多个前端
+frontends = [
+    ("数据资源中心", "ui"),
+    ("AI平台", "ai")
+]
 
-    # SPA 路由回退：/ui/* 都返回 index.html（资源路径除外）
-    @app.get("/ui/{path:path}", include_in_schema=False)
-    async def serve_ui_spa(path: str):
-        return FileResponse(os.path.join(ui_built_path, "index.html"))
-
-    logger.info(f"📁 前端页面已启用: {ui_built_path}")
+for frontend_name, base_path in frontends:
+    setup_frontend_routes(app, frontend_name, base_path)
 
 # 注册API路由
 app.include_router(api_router, prefix="/api/v1")
