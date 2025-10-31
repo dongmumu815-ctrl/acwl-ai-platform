@@ -155,5 +155,5 @@ htmlcov/
 .docker/
 
 # 前端build
-.ai/
-.ui/
+./backend/ai/
+./backend/ui/
