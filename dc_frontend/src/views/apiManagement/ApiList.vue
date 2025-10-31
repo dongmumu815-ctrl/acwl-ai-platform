@@ -764,10 +764,10 @@
             <el-icon><Download /></el-icon>
             下载文档
           </el-button>
-          <el-button size="small" type="info" @click="openSwaggerUI()">
+          <!-- <el-button size="small" type="info" @click="openSwaggerUI()">
             <el-icon><View /></el-icon>
             Swagger UI
-          </el-button>
+          </el-button> -->
         </div>
 
         <div class="json-preview">
