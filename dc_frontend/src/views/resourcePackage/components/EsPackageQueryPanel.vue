@@ -1691,13 +1691,18 @@ async function handleDownloadLatest() {
   flex-direction: column;
   gap: 16px;
   // height: 100vh;
-  overflow: hidden;
+  // overflow: hidden;
   :deep(.el-card) {
     border: none;
   }
   :deep(.el-card__body) {
     padding: 2px;
   }
+}
+
+.header-card > :deep(.el-card__header) {
+  padding: 5px 16px;
+  border: none;
 }
 
 .card-header {
@@ -1742,7 +1747,7 @@ async function handleDownloadLatest() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 2px 12px;
+  padding: 5px 12px;
   border-bottom: 1px dashed #ebeef5;
 }
 .section-body {
@@ -1910,14 +1915,14 @@ async function handleDownloadLatest() {
   display: grid;
   grid-template-columns: 1fr 4fr; /* 20% / 80% */
   gap: 16px;
-  height: 100vh;
+  height: calc(100vh - 230px);
 }
 
 .agg-pane {
   border-right: 1px solid #ebeef5;
   padding-right: 8px;
   overflow-y: auto;
-  height: 100%;
+  height: calc(100% - 50px);
 }
 .agg-header {
   font-weight: 600;
@@ -2089,7 +2094,7 @@ async function handleDownloadLatest() {
 
 .no-data {
   padding: 20px;
-  height: 500px;
+  // height: 500px;
 }
 .pager {
   height: 50px;

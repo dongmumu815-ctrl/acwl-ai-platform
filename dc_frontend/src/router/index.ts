@@ -375,7 +375,8 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '中心表查询',
           icon: 'Search',
-          requiresAuth: true
+          requiresAuth: true,
+          hideFooter: true
         }
       },
       {

@@ -8,7 +8,10 @@
     </div> 
     -->
 
-    <div v-loading="loading" :class="['page-content', { 'loading-center': loading }]">
+    <div
+      v-loading="loading"
+      :class="['page-content', { 'loading-center': loading }]"
+    >
       <!-- 
       <el-card class="package-info-card" v-if="packageData">
         <template #header>
@@ -53,126 +56,151 @@
       -->
 
       <!-- 查询面板（基于包类型） -->
-      <SqlPackageQueryPanel v-if="packageData?.type === 'sql' && packageData" :packageData="packageData" />
-      <EsPackageQueryPanel v-else-if="packageData?.type === 'elasticsearch' && packageData" :packageData="packageData" />
+      <SqlPackageQueryPanel
+        v-if="packageData?.type === 'sql' && packageData"
+        :packageData="packageData"
+      />
+      <EsPackageQueryPanel
+        v-else-if="packageData?.type === 'elasticsearch' && packageData"
+        :packageData="packageData"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { resourcePackageApi, type ResourcePackage } from '@/api/resourcePackage'
-import { datasourceApi } from '@/api/datasource'
-import type { DataSource } from '@/types/datasource'
-import { getSQLTemplate, type SQLTemplateResponse } from '@/api/sqlQuery'
-import { templateApi } from '@/api/template'
-import SqlPackageQueryPanel from '@/views/resourcePackage/components/SqlPackageQueryPanel.vue'
-import EsPackageQueryPanel from '@/views/resourcePackage/components/EsPackageQueryPanel.vue'
+import { ref, computed, onMounted } from "vue";
+import { ElMessage } from "element-plus";
+import {
+  resourcePackageApi,
+  type ResourcePackage
+} from "@/api/resourcePackage";
+import { datasourceApi } from "@/api/datasource";
+import type { DataSource } from "@/types/datasource";
+import { getSQLTemplate, type SQLTemplateResponse } from "@/api/sqlQuery";
+import { templateApi } from "@/api/template";
+import SqlPackageQueryPanel from "@/views/resourcePackage/components/SqlPackageQueryPanel.vue";
+import EsPackageQueryPanel from "@/views/resourcePackage/components/EsPackageQueryPanel.vue";
 
 interface ExtendedResourcePackage extends ResourcePackage {
-  template_conditions?: any[]
-  query?: string
+  template_conditions?: any[];
+  query?: string;
 }
 
-const FIXED_PACKAGE_ID = 2
-const loading = ref(false)
-const packageData = ref<ExtendedResourcePackage | null>(null)
-const datasources = ref<DataSource[]>([])
+const FIXED_PACKAGE_ID = 2;
+const loading = ref(false);
+const packageData = ref<ExtendedResourcePackage | null>(null);
+const datasources = ref<DataSource[]>([]);
 
 const getDatasourceName = computed(() => {
   return (datasourceId: number) => {
-    const ds = datasources.value.find((d: DataSource) => d.id === datasourceId)
-    return ds ? ds.name : '未知数据源'
-  }
-})
+    const ds = datasources.value.find((d: DataSource) => d.id === datasourceId);
+    return ds ? ds.name : "未知数据源";
+  };
+});
 
 const getTagStyle = (bg: string) => {
-  const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+  const hexToRgb = (
+    hex: string
+  ): { r: number; g: number; b: number } | null => {
     try {
-      let h = hex.trim()
-      if (h.startsWith('#')) h = h.slice(1)
+      let h = hex.trim();
+      if (h.startsWith("#")) h = h.slice(1);
       if (h.length === 3) {
-        h = h.split('').map(c => c + c).join('')
+        h = h
+          .split("")
+          .map((c) => c + c)
+          .join("");
       }
-      if (h.length !== 6) return null
-      const r = parseInt(h.slice(0, 2), 16)
-      const g = parseInt(h.slice(2, 4), 16)
-      const b = parseInt(h.slice(4, 6), 16)
-      return { r, g, b }
+      if (h.length !== 6) return null;
+      const r = parseInt(h.slice(0, 2), 16);
+      const g = parseInt(h.slice(2, 4), 16);
+      const b = parseInt(h.slice(4, 6), 16);
+      return { r, g, b };
     } catch {
-      return null
+      return null;
     }
-  }
-  const rgb = hexToRgb(bg)
-  const yiq = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 255
-  const textColor = yiq >= 186 ? '#111' : '#fff'
-  return { backgroundColor: bg, color: textColor, borderColor: bg }
-}
+  };
+  const rgb = hexToRgb(bg);
+  const yiq = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 255;
+  const textColor = yiq >= 186 ? "#111" : "#fff";
+  return { backgroundColor: bg, color: textColor, borderColor: bg };
+};
 
 const loadFixedPackageData = async () => {
   try {
-    loading.value = true
-    const response = await resourcePackageApi.get(FIXED_PACKAGE_ID)
-    packageData.value = (response && 'data' in response) ? (response as any).data : (response as any)
+    loading.value = true;
+    const response = await resourcePackageApi.get(FIXED_PACKAGE_ID);
+    packageData.value =
+      response && "data" in response
+        ? (response as any).data
+        : (response as any);
     if (packageData.value?.template_id && packageData.value?.template_type) {
-      await loadTemplateParams()
+      await loadTemplateParams();
     }
   } catch (error) {
-    console.error('加载资源包详情失败:', error)
-    ElMessage.error('加载资源包详情失败')
+    console.error("加载资源包详情失败:", error);
+    ElMessage.error("加载资源包详情失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const loadTemplateParams = async () => {
-  if (!packageData.value?.template_id || !packageData.value?.template_type) return
+  if (!packageData.value?.template_id || !packageData.value?.template_type)
+    return;
   try {
-    let templateData: SQLTemplateResponse | any = null
-    if (packageData.value.template_type === 'sql') {
-      const response = await getSQLTemplate(packageData.value.template_id)
-      templateData = response.data
-    } else if (packageData.value.template_type === 'elasticsearch') {
-      const response = await templateApi.getByType(packageData.value.template_id, 'es')
-      templateData = (response as any)?.data || response
+    let templateData: SQLTemplateResponse | any = null;
+    if (packageData.value.template_type === "sql") {
+      const response = await getSQLTemplate(packageData.value.template_id);
+      templateData = response.data;
+    } else if (packageData.value.template_type === "elasticsearch") {
+      const response = await templateApi.getByType(
+        packageData.value.template_id,
+        "es"
+      );
+      templateData = (response as any)?.data || response;
     }
     if (templateData && templateData.config) {
-      const conditions = templateData.config.conditions || []
-      const unlockedConditions = conditions.filter((condition: any) => !condition.locked)
-      const dynamicParams: Record<string, any> = {}
+      const conditions = templateData.config.conditions || [];
+      const unlockedConditions = conditions.filter(
+        (condition: any) => !condition.locked
+      );
+      const dynamicParams: Record<string, any> = {};
       unlockedConditions.forEach((condition: any) => {
-        dynamicParams[condition.name] = condition.default_value || ''
-      })
+        dynamicParams[condition.name] = condition.default_value || "";
+      });
       if (packageData.value) {
-        packageData.value.dynamic_params = dynamicParams
-        packageData.value.template_conditions = unlockedConditions
+        packageData.value.dynamic_params = dynamicParams;
+        packageData.value.template_conditions = unlockedConditions;
       }
     }
   } catch (error) {
-    console.error('加载模板参数失败:', error)
+    console.error("加载模板参数失败:", error);
   }
-}
+};
 
 const loadDatasources = async () => {
   try {
-    const response = await datasourceApi.getDataSourceList()
-    datasources.value = response.data?.items || []
+    const response = await datasourceApi.getDataSourceList();
+    datasources.value = response.data?.items || [];
   } catch (error) {
-    console.error('加载数据源列表失败:', error)
+    console.error("加载数据源列表失败:", error);
   }
-}
+};
 
 onMounted(() => {
-  loadDatasources()
-  loadFixedPackageData()
-})
+  loadDatasources();
+  loadFixedPackageData();
+});
 </script>
 
 <style scoped>
+
 .center-table-query-page {
   padding: 10px;
-  min-height: 100vh;
+  /* min-height: 100vh; */
+  /* height: calc(100vh - 175px); */
   background-color: white;
 }
 
@@ -191,7 +219,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  min-height: calc(100vh - 40px); /* 减去页面padding */
+  /* min-height: calc(100vh - 40px);  */
+  height: calc(100vh - 80px);
 }
 
 /* 当处于加载状态时，内容居中显示 */
