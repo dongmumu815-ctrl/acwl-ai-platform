@@ -283,7 +283,8 @@ export const resourcePackageApi = {
    * 生成Excel（更新excel_time与download_url）
    */
   generateExcel(id: number, payload: Record<string, any>): Promise<ApiResponse<any>> {
-    return post(`/resource-packages/${id}/generate-excel`, payload)
+    // 为长耗时任务单独提升超时到180秒
+    return post(`/resource-packages/${id}/generate-excel`, payload, { timeout: 180000 })
   },
 
   /**

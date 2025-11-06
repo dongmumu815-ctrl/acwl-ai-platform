@@ -34,12 +34,17 @@
           style="width: 120px"
           clearable
         >
-          <el-option label="全部" value="" />
-          <el-option label="用户数据" value="用户数据" />
-          <el-option label="搜索数据" value="搜索数据" />
-          <el-option label="销售数据" value="销售数据" />
-          <el-option label="监控数据" value="监控数据" />
-          <el-option label="订单数据" value="订单数据" />
+          <el-option label="未分类" value="未分类" />
+          <el-option label="ODS层" value="ods" />
+          <el-option label="DWD层" value="dwd" />
+          <el-option label="DWS层" value="dws" />
+          <el-option label="ADS层" value="ads" />
+          <el-option label="维度表" value="维度表" />
+          <el-option label="事实表" value="事实表" />
+          <el-option label="报表数据" value="报表数据" />
+          <el-option label="实时数据" value="实时数据" />
+          <el-option label="外部数据" value="外部数据" />
+          <el-option label="临时数据" value="临时数据" />
         </el-select>
 
         <el-select
@@ -72,6 +77,9 @@
           placeholder="搜索资源名称或描述..."
           style="width: 250px"
           clearable
+          @change="handleSearchSubmit"
+          @keyup.enter="handleSearchSubmit"
+          @clear="handleSearchClear"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
@@ -1170,7 +1178,7 @@ const filteredResources = computed(() => {
   // 按数据源筛选
   if (filterDatasource.value) {
     filtered = filtered.filter(
-      (resource) => resource.datasourceType === filterDatasource.value
+      (resource) => String(resource.datasourceId ?? '') === filterDatasource.value
     );
   }
 
@@ -1193,9 +1201,9 @@ const filteredResources = computed(() => {
     const keyword = searchKeyword.value.toLowerCase();
     filtered = filtered.filter(
       (resource) =>
-        resource.name.toLowerCase().includes(keyword) ||
-        resource.description.toLowerCase().includes(keyword) ||
-        resource.tags.some((tag) => tag.toLowerCase().includes(keyword))
+        (resource.name && resource.name.toLowerCase().includes(keyword)) ||
+        ((resource.description || '').toLowerCase().includes(keyword)) ||
+        getDisplayTagsForRow(resource).some((tag) => tag.toLowerCase().includes(keyword))
     );
   }
 
@@ -2547,12 +2555,13 @@ const loadResources = async () => {
     loading.value = true;
     const response = await dataResourceApi.getResourceList({
       page: currentPage.value,
-      pageSize: pageSize.value,
-      datasource: filterDatasource.value,
-      category: filterCategory.value,
-      status: filterStatus.value,
-      keyword: searchKeyword.value,
-      dateRange: dateRange.value
+      size: pageSize.value,
+      datasource_id: filterDatasource.value
+        ? Number(filterDatasource.value)
+        : undefined,
+      // category_id：当前筛选为分类名称，暂不映射后端ID
+      status: filterStatus.value || undefined,
+      keyword: searchKeyword.value || undefined
     });
 
     console.log("API返回的原始数据:", response.data);
@@ -2573,6 +2582,22 @@ const loadResources = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+/**
+ * 提交搜索（回车或change事件）
+ */
+const handleSearchSubmit = () => {
+  currentPage.value = 1;
+  loadResources();
+};
+
+/**
+ * 清空搜索
+ */
+const handleSearchClear = () => {
+  currentPage.value = 1;
+  loadResources();
 };
 
 /**

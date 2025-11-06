@@ -42,6 +42,7 @@ async def list_user_operation_logs(
     status_code: Optional[int] = Query(None),
     result_status: Optional[str] = Query(None),  # 'success' or 'failure'
     ip_address: Optional[str] = Query(None),
+    module: Optional[str] = Query(None),
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     db: AsyncSession = Depends(get_async_db),
@@ -62,23 +63,44 @@ async def list_user_operation_logs(
     if path and 'path' in available_columns:
         where_clauses.append("path LIKE :path")
         params["path"] = f"%{path}%"
-    if status_code is not None and 'status_code' in available_columns:
-        where_clauses.append("status_code = :status_code")
-        params["status_code"] = status_code
-    if result_status and 'result_status' in available_columns:
-        where_clauses.append("result_status = :result_status")
-        params["result_status"] = result_status
-    if ip_address and 'ip_address' in available_columns:
-        where_clauses.append("ip_address = :ip_address")
-        params["ip_address"] = ip_address
+    # 状态码过滤：兼容 response_status 字段
+    if status_code is not None:
+        if 'status_code' in available_columns:
+            where_clauses.append("status_code = :status_code")
+            params["status_code"] = status_code
+        elif 'response_status' in available_columns:
+            where_clauses.append("response_status = :status_code")
+            params["status_code"] = status_code
+    # 结果过滤：优先 result_status；若不存在则使用 success 字段
+    if result_status:
+        if 'result_status' in available_columns:
+            where_clauses.append("result_status = :result_status")
+            params["result_status"] = result_status
+        elif 'success' in available_columns:
+            where_clauses.append("success = :success_val")
+            params["success_val"] = 1 if result_status == 'success' else 0
+    # IP过滤：兼容 ip 字段
+    if ip_address:
+        if 'ip_address' in available_columns:
+            where_clauses.append("ip_address = :ip_address")
+            params["ip_address"] = ip_address
+        elif 'ip' in available_columns:
+            where_clauses.append("ip = :ip_address")
+            params["ip_address"] = ip_address
+    # 模块过滤（可选字段）
+    if module and 'module' in available_columns:
+        where_clauses.append("module LIKE :module")
+        params["module"] = f"%{module}%"
 
-    # 关键字搜索：仅在相关字段存在时构造
+    # 关键字搜索：用户名 / 路径 / 请求ID
     if keyword:
         keyword_clauses = []
         if 'username' in available_columns:
             keyword_clauses.append("username LIKE :kw")
         if 'path' in available_columns:
             keyword_clauses.append("path LIKE :kw")
+        if 'request_id' in available_columns:
+            keyword_clauses.append("request_id LIKE :kw")
         if keyword_clauses:
             where_clauses.append("(" + " OR ".join(keyword_clauses) + ")")
             params["kw"] = f"%{keyword}%"

@@ -195,6 +195,9 @@ class ResourcePackageService:
             package.dynamic_params = package_data.dynamic_params
         if package_data.is_active is not None:
             package.is_active = package_data.is_active
+        # 支持更新删除锁定状态（0 可删除，1 禁止删除）
+        if package_data.is_lock is not None:
+            package.is_lock = package_data.is_lock
         
         package.updated_at = datetime.utcnow()
         
@@ -218,8 +221,19 @@ class ResourcePackageService:
                 self.db.add(tag)
         
         await self.db.commit()
-        await self.db.refresh(package)
-        return package
+        # 为避免异步会话下的懒加载导致序列化抛错（MissingGreenlet），
+        # 重新查询并使用 selectinload 预加载关联数据后再返回
+        reload_query = (
+            select(ResourcePackage)
+            .options(
+                selectinload(ResourcePackage.tags),
+                selectinload(ResourcePackage.permissions)
+            )
+            .where(ResourcePackage.id == package_id)
+        )
+        reload_result = await self.db.execute(reload_query)
+        updated_package = reload_result.scalar_one_or_none()
+        return updated_package
     
     async def delete_package(self, package_id: int, user_id: int):
         """删除资源包"""

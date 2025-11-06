@@ -452,10 +452,10 @@
                           <el-icon><Setting /></el-icon>
                           字段
                         </el-dropdown-item>
-                        <el-dropdown-item @click="testApi(api)">
+                        <!-- <el-dropdown-item @click="testApi(api)">
                           <el-icon><VideoPlay /></el-icon>
                           测试
-                        </el-dropdown-item>
+                        </el-dropdown-item> -->
                         <el-dropdown-item @click="viewLogs(api)">
                           <el-icon><View /></el-icon>
                           日志

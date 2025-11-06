@@ -191,6 +191,8 @@ function isExternalLink(path: string): boolean {
     border: none;
     height: 100%;
     width: 100% !important;
+    overflow: auto;
+    padding-bottom: 10px;
     background-color: transparent;
 
     // 菜单项样式

@@ -5,31 +5,39 @@
       <div class="header-content">
         <div class="header-left">
           <h1 class="page-title">
-            <el-icon><Box /></el-icon>
+            <el-icon>
+              <Box />
+            </el-icon>
             资源包管理
             <span class="page-description">管理和配置数据查询资源包，支持SQL和Elasticsearch查询</span>
           </h1>
         </div>
         <div class="header-right">
           <el-button type="primary" @click="handleCreate">
-            <el-icon><Plus /></el-icon>
+            <el-icon>
+              <Plus />
+            </el-icon>
             创建资源包
           </el-button>
           <el-button @click="refreshPackages">
-            <el-icon><Refresh /></el-icon>
+            <el-icon>
+              <Refresh />
+            </el-icon>
             刷新
           </el-button>
         </div>
       </div>
     </div>
-    
+
     <!-- 统计卡片 -->
     <div class="stats-cards">
       <el-row :gutter="20">
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon total">
-              <el-icon><Box /></el-icon>
+              <el-icon>
+                <Box />
+              </el-icon>
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ stats.total }}</div>
@@ -37,11 +45,13 @@
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon active">
-              <el-icon><CircleCheck /></el-icon>
+              <el-icon>
+                <CircleCheck />
+              </el-icon>
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ stats.active }}</div>
@@ -49,11 +59,13 @@
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon sql">
-              <el-icon><Coin /></el-icon>
+              <el-icon>
+                <Coin />
+              </el-icon>
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ stats.sqlCount }}</div>
@@ -61,11 +73,13 @@
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon elasticsearch">
-              <el-icon><Search /></el-icon>
+              <el-icon>
+                <Search />
+              </el-icon>
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ stats.elasticsearchCount }}</div>
@@ -75,93 +89,67 @@
         </el-col>
       </el-row>
     </div>
-    
+
     <!-- 筛选和搜索 -->
     <div class="filter-section">
       <el-card shadow="never">
         <el-form :model="filters" inline>
           <el-form-item label="搜索">
-            <el-input
-              v-model="filters.search"
-              placeholder="搜索资源包名称或描述"
-              clearable
-              style="width: 250px"
-              @input="handleSearch"
-            >
+            <el-input v-model="filters.search" placeholder="搜索资源包名称或描述" clearable style="width: 250px"
+              @input="handleSearch">
               <template #prefix>
-                <el-icon><Search /></el-icon>
+                <el-icon>
+                  <Search />
+                </el-icon>
               </template>
             </el-input>
           </el-form-item>
-          
+
           <el-form-item label="类型">
-            <el-select
-              v-model="filters.type"
-              placeholder="选择类型"
-              clearable
-              style="width: 150px"
-              @change="handleFilter"
-            >
+            <el-select v-model="filters.type" placeholder="选择类型" clearable style="width: 150px" @change="handleFilter">
               <el-option label="全部" value="" />
               <el-option label="SQL" value="sql" />
               <el-option label="Elasticsearch" value="elasticsearch" />
             </el-select>
           </el-form-item>
-          
+
           <el-form-item label="数据源">
-            <el-select
-              v-model="filters.datasource_id"
-              placeholder="选择数据源"
-              clearable
-              style="width: 150px"
-              @change="handleFilter"
-            >
+            <el-select v-model="filters.datasource_id" placeholder="选择数据源" clearable style="width: 150px"
+              @change="handleFilter">
               <el-option label="全部" value="" />
-              <el-option
-                v-for="ds in datasources"
-                :key="ds.id"
-                :label="ds.name"
-                :value="ds.id"
-              />
+              <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
             </el-select>
           </el-form-item>
-          
+
           <el-form-item label="状态">
-            <el-select
-              v-model="filters.status"
-              placeholder="选择状态"
-              clearable
-              style="width: 120px"
-              @change="handleFilter"
-            >
+            <el-select v-model="filters.status" placeholder="选择状态" clearable style="width: 120px"
+              @change="handleFilter">
               <el-option label="全部" value="" />
               <el-option label="启用" value="true" />
               <el-option label="禁用" value="false" />
             </el-select>
           </el-form-item>
-          
+
           <el-form-item label="排序">
-            <el-select
-              v-model="filters.sortBy"
-              style="width: 150px"
-              @change="handleSort"
-            >
+            <el-select v-model="filters.sortBy" style="width: 150px" @change="handleSort">
               <el-option label="创建时间" value="created_at" />
               <el-option label="更新时间" value="updated_at" />
               <el-option label="名称" value="name" />
             </el-select>
           </el-form-item>
-          
+
           <el-form-item>
             <el-button @click="resetFilters">
-              <el-icon><RefreshLeft /></el-icon>
+              <el-icon>
+                <RefreshLeft />
+              </el-icon>
               重置
             </el-button>
           </el-form-item>
         </el-form>
       </el-card>
     </div>
-    
+
     <!-- 资源包列表 -->
     <div class="packages-list">
       <el-card shadow="never">
@@ -171,27 +159,24 @@
             <div class="header-actions">
               <el-radio-group v-model="viewMode" size="small">
                 <el-radio-button value="grid">
-                  <el-icon><Grid /></el-icon>
+                  <el-icon>
+                    <Grid />
+                  </el-icon>
                 </el-radio-button>
                 <el-radio-button value="list">
-                  <el-icon><List /></el-icon>
+                  <el-icon>
+                    <List />
+                  </el-icon>
                 </el-radio-button>
               </el-radio-group>
             </div>
           </div>
         </template>
-        
+
         <!-- 网格视图 -->
         <div v-if="viewMode === 'grid'" class="grid-view">
           <el-row :gutter="20">
-            <el-col
-              v-for="pkg in paginatedPackages"
-              :key="pkg.id"
-              :xs="24"
-              :sm="12"
-              :md="8"
-              :lg="6"
-            >
+            <el-col v-for="pkg in paginatedPackages" :key="pkg.id" :xs="24" :sm="12" :md="8" :lg="6">
               <div class="package-card">
                 <div class="package-header">
                   <div class="package-type">
@@ -200,49 +185,47 @@
                     </el-icon>
                   </div>
                   <div class="package-status">
-                    <el-tag
-                      :type="getStatusType(pkg.is_active)"
-                      size="small"
-                    >
+                    <el-tag :type="getStatusType(pkg.is_active)" size="small">
                       {{ pkg.is_active ? '启用' : '禁用' }}
                     </el-tag>
                   </div>
                 </div>
-                
+
                 <div class="package-content">
                   <h3 class="package-name">{{ pkg.name }}</h3>
                   <p class="package-description">{{ pkg.description || '暂无描述' }}</p>
-                  
+
                   <div class="package-meta">
                     <div class="meta-item">
-                      <el-icon><Calendar /></el-icon>
+                      <el-icon>
+                        <Calendar />
+                      </el-icon>
                       <span>{{ formatDate(pkg.created_at) }}</span>
                     </div>
                     <div class="meta-item">
-                      <el-icon><Coin /></el-icon>
+                      <el-icon>
+                        <Coin />
+                      </el-icon>
                       <span>{{ getDatasourceName(pkg.datasource_id) }}</span>
                     </div>
                     <div class="meta-item">
-                      <el-icon><Setting /></el-icon>
+                      <el-icon>
+                        <Setting />
+                      </el-icon>
                       <span>{{ pkg.template_type || '未知' }} 模板</span>
                     </div>
                   </div>
-                  
+
                   <div class="package-tags" v-if="pkg.tags && pkg.tags.length > 0">
-                    <el-tag
-                      v-for="tag in pkg.tags.slice(0, 3)"
-                      :key="tag.id"
-                      size="small"
-                      class="tag-item"
-                      :color="tag.tag_color"
-                    >
+                    <el-tag v-for="tag in pkg.tags.slice(0, 3)" :key="tag.id" size="small" class="tag-item"
+                      :color="tag.tag_color">
                       {{ tag.tag_name }}
                     </el-tag>
                     <el-tag v-if="pkg.tags.length > 3" size="small" type="info" class="tag-item">
                       +{{ pkg.tags.length - 3 }}
                     </el-tag>
                   </div>
-                  
+
                   <!-- 模板预览 -->
                   <div class="package-preview" v-if="pkg.template_id">
                     <div class="preview-label">模板信息:</div>
@@ -256,52 +239,51 @@
                     </div>
                   </div>
                 </div>
-                
+
                 <div class="package-actions">
-                  <el-button
-                    size="small"
-                    @click="showApiEndpoint(pkg)"
-                  >
-                    API
-                  </el-button>
-                  <el-button
-                    v-if="pkg.is_active"
-                    type="primary"
-                    size="small"
-                    @click="handleQuery(pkg)"
-                  >
+                  
+                  <el-tooltip v-if="!pkg.is_active" content="资源包已禁用，无法查询" placement="top">
+                    <span>
+                      <el-button type="primary" size="small" @click="handleQuery(pkg)" :disabled="!pkg.is_active">
+                        查询
+                      </el-button>
+                    </span>
+                  </el-tooltip>
+                  <el-button v-else type="primary" size="small" @click="handleQuery(pkg)">
                     查询
                   </el-button>
-                  <el-button
-                    type="warning"
-                    size="small"
-                    @click="handleQuerySetting(pkg)"
-                  >
+                  <el-button type="warning" size="small" @click="handleQuerySetting(pkg)">
                     查询设定
                   </el-button>
-                  <el-button
-                    type="success"
-                    size="small"
-                    :loading="downloadLoading"
-                    @click="openDownloadDialog(pkg)"
-                  >
+                  <el-button type="success" size="small" :loading="downloadLoading" @click="openDownloadDialog(pkg)">
                     下载资源包
                   </el-button>
                   <el-dropdown trigger="click">
-                    <el-button size="small" text>
-                      <el-icon><MoreFilled /></el-icon>
+                    
+                    <el-button size="small" >
+                      <el-icon>
+                        <MoreFilled />
+                      </el-icon>
+                      更多
                     </el-button>
                     <template #dropdown>
                       <el-dropdown-menu>
-                        <el-dropdown-item @click="handleEdit(pkg)">
-                          <el-icon><Edit /></el-icon>
+                        <el-dropdown-item  @click="showApiEndpoint(pkg)">
+                          <el-icon>
+                            <Link />
+                          </el-icon>
+                          API
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="handleEdit(pkg)">
+                          <el-icon>
+                            <Edit />
+                          </el-icon>
                           编辑
                         </el-dropdown-item>
-                        <el-dropdown-item
-                          divided
-                          @click="handleDelete(pkg)"
-                        >
-                          <el-icon><Delete /></el-icon>
+                        <el-dropdown-item divided @click="handleDelete(pkg)">
+                          <el-icon>
+                            <Delete />
+                          </el-icon>
                           删除
                         </el-dropdown-item>
                       </el-dropdown-menu>
@@ -312,17 +294,11 @@
             </el-col>
           </el-row>
         </div>
-        
+
         <!-- 列表视图 -->
         <div v-else class="list-view">
-          <el-table
-            v-loading="loading"
-            :data="paginatedPackages"
-            style="width: 100%"
-            border
-            @header-dragend="handleColumnResize"
-            @sort-change="handleTableSort"
-          >
+          <el-table v-loading="loading" :data="paginatedPackages" style="width: 100%" border
+            @header-dragend="handleColumnResize" @sort-change="handleTableSort">
             <el-table-column prop="name" column-key="name" label="资源包名称" :width="getColumnWidth('name', 200)" sortable>
               <template #default="{ row }">
                 <div class="package-name-cell">
@@ -342,7 +318,7 @@
                 </div>
               </template>
             </el-table-column>
-            
+
             <el-table-column prop="type" column-key="type" label="类型" :width="getColumnWidth('type', 120)">
               <template #default="{ row }">
                 <el-tag :type="row.type === 'sql' ? 'primary' : 'success'">
@@ -350,13 +326,13 @@
                 </el-tag>
               </template>
             </el-table-column>
-            
+
             <el-table-column column-key="datasource" label="数据源" :width="getColumnWidth('datasource', 150)">
               <template #default="{ row }">
                 {{ getDatasourceName(row.datasource_id) }}
               </template>
             </el-table-column>
-            
+
             <el-table-column column-key="template" label="模板信息" :width="getColumnWidth('template', 120)">
               <template #default="{ row }">
                 <div class="condition-info">
@@ -369,17 +345,12 @@
                 </div>
               </template>
             </el-table-column>
-            
+
             <el-table-column column-key="tags" label="标签" :width="getColumnWidth('tags', 200)">
               <template #default="{ row }">
                 <div class="package-tags" v-if="row.tags && row.tags.length > 0">
-                  <el-tag
-                    v-for="tag in row.tags.slice(0, 3)"
-                    :key="tag.id"
-                    size="small"
-                    :color="tag.tag_color"
-                    style="margin-right: 4px; margin-top: 4px"
-                  >
+                  <el-tag v-for="tag in row.tags.slice(0, 3)" :key="tag.id" size="small" :color="tag.tag_color"
+                    style="margin-right: 4px; margin-top: 4px">
                     {{ tag.tag_name }}
                   </el-tag>
                   <el-tag v-if="row.tags.length > 3" size="small" type="info" style="margin-top: 4px">
@@ -388,7 +359,7 @@
                 </div>
               </template>
             </el-table-column>
-            
+
             <el-table-column prop="is_active" column-key="status" label="状态" :width="getColumnWidth('status', 80)">
               <template #default="{ row }">
                 <el-tag :type="getStatusType(row.is_active)">
@@ -396,22 +367,27 @@
                 </el-tag>
               </template>
             </el-table-column>
-            
-            <el-table-column prop="created_at" column-key="created_at" label="创建时间" :width="getColumnWidth('created_at', 160)" sortable>
+
+            <el-table-column prop="created_at" column-key="created_at" label="创建时间"
+              :width="getColumnWidth('created_at', 160)" sortable>
               <template #default="{ row }">
                 {{ formatDate(row.created_at) }}
               </template>
             </el-table-column>
-            
+
             <el-table-column column-key="actions" label="操作" :width="getColumnWidth('actions', 240)" fixed="right">
               <template #default="{ row }">
                 <div class="action-buttons">
                   <el-button type="primary" size="small" @click="handleQuery(row)">
-                    <el-icon><Search /></el-icon>
+                    <el-icon>
+                      <Search />
+                    </el-icon>
                     查询
                   </el-button>
                   <el-button type="warning" size="small" @click="handleQuerySetting(row)">
-                    <el-icon><Setting /></el-icon>
+                    <el-icon>
+                      <Setting />
+                    </el-icon>
                     查询设定
                   </el-button>
                   <el-button type="success" size="small" :loading="downloadLoading" @click="openDownloadDialog(row)">
@@ -419,28 +395,34 @@
                   </el-button>
                   <el-dropdown trigger="click">
                     <el-button size="small">
-                      更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                      更多<el-icon class="el-icon--right">
+                        <ArrowDown />
+                      </el-icon>
                     </el-button>
                     <template #dropdown>
                       <el-dropdown-menu>
                         <el-dropdown-item @click="showApiEndpoint(row)">
-                          <el-icon><View /></el-icon>API
+                          <el-icon>
+                            <View />
+                          </el-icon>API
                         </el-dropdown-item>
                         <el-dropdown-item @click="handleEdit(row)">
-                          <el-icon><Edit /></el-icon>编辑
+                          <el-icon>
+                            <Edit />
+                          </el-icon>编辑
                         </el-dropdown-item>
                         <el-dropdown-item divided @click="handleDelete(row)" :disabled="row.is_lock === '1'">
-                          <el-tooltip 
-                            v-if="row.is_lock === '1'" 
-                            content="该资源包已锁定，不可删除" 
-                            placement="top"
-                          >
+                          <el-tooltip v-if="row.is_lock === '1'" content="该资源包已锁定，不可删除" placement="top">
                             <span>
-                              <el-icon><Delete /></el-icon>删除
+                              <el-icon>
+                                <Delete />
+                              </el-icon>删除
                             </span>
                           </el-tooltip>
                           <span v-else>
-                            <el-icon><Delete /></el-icon>删除
+                            <el-icon>
+                              <Delete />
+                            </el-icon>删除
                           </span>
                         </el-dropdown-item>
                       </el-dropdown-menu>
@@ -451,77 +433,43 @@
             </el-table-column>
           </el-table>
         </div>
-        
+
         <!-- 分页 -->
         <div class="pagination-wrapper">
-          <el-pagination
-            v-model:current-page="pagination.currentPage"
-            v-model:page-size="pagination.pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            :total="pagination.total"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
+          <el-pagination v-model:current-page="pagination.currentPage" v-model:page-size="pagination.pageSize"
+            :page-sizes="[10, 20, 50, 100]" :total="pagination.total" layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange" @current-change="handleCurrentChange" />
         </div>
       </el-card>
     </div>
 
     <!-- 创建资源包 -->
-    <ResourcePackageForm
-      v-model:visible="createDialogVisible"
-      :isEdit="false"
-      @success="onCreateSuccess"
-    />
+    <ResourcePackageForm v-model:visible="createDialogVisible" :isEdit="false" @success="onCreateSuccess" />
 
     <!-- 编辑资源包基本信息 -->
-    <ResourcePackageForm
-      v-model:visible="editDialogVisible"
-      :packageData="selectedPackage as any"
-      :isEdit="true"
-      @success="onEditSuccess"
-    />
+    <ResourcePackageForm v-model:visible="editDialogVisible" :packageData="selectedPackage as any" :isEdit="true"
+      @success="onEditSuccess" />
 
     <!-- 查询设定：根据资源包类型加载对应查询构建器 -->
-    <el-drawer v-model="querySettingVisible" title="查询设定" size="80%"><p>test{{ initialSchema }}{{ initialTableName }}</p>
+    <el-drawer v-model="querySettingVisible" title="查询设定" size="80%">
+      <!-- <p>test{{ initialSchema }}{{ initialTableName }}</p> -->
       <template v-if="querySettingPackage && querySettingPackage.type === 'sql'">
-        <SQLQueryBuilder
-          ref="sqlQueryBuilderRef"
-          :sqlResources="sqlResources"
-          :hasQueryPermission="hasQueryPermission"
-          :hasExportPermission="hasExportPermission"
-          :hasSavePermission="hasSavePermission"
+        <SQLQueryBuilder ref="sqlQueryBuilderRef" :sqlResources="sqlResources" :hasQueryPermission="hasQueryPermission"
+          :hasExportPermission="hasExportPermission" :hasSavePermission="hasSavePermission"
           :initialDatasourceId="querySettingPackage.datasource_id"
-          :initialResourceId="querySettingPackage.resource_id || null"
-          :initialSchema="initialSchema"
-          :initialTableName="initialTableName"
-          :isInResourcePackage="true"
-          :resourcePackageId="querySettingPackage.id"
-          :resourcePackageName="querySettingPackage.name"
-          @execute-query="onSQLQueryExecute"
-          @save-query="onSQLQuerySave"
-          @update-query="onSQLQueryUpdate"
-          @export-results="onSQLResultsExport"
-        />
+          :initialResourceId="querySettingPackage.resource_id || null" :initialSchema="initialSchema"
+          :initialTableName="initialTableName" :isInResourcePackage="true" :resourcePackageId="querySettingPackage.id"
+          :resourcePackageName="querySettingPackage.name" @execute-query="onSQLQueryExecute"
+          @save-query="onSQLQuerySave" @update-query="onSQLQueryUpdate" @export-results="onSQLResultsExport" />
       </template>
       <template v-else-if="querySettingPackage && querySettingPackage.type === 'elasticsearch'">
-        <ESQueryBuilder
-          ref="esQueryBuilderRef"
-          :es-datasources="esDatasources"
-          :initial-datasource-id="String(querySettingPackage.datasource_id)"
-          :initial-indices="initialIndices"
-          :data-resource-id="querySettingPackage.resource_id || null"
-          :has-es-query-permission="hasESQueryPermission"
-          :has-export-permission="hasExportPermission"
-          :has-save-permission="hasSavePermission"
-          :isInResourcePackage="true"
-          :resourcePackageId="querySettingPackage.id"
-          :resourcePackageName="querySettingPackage.name"
-          @execute-query="onESQueryExecute"
-          @save-query="onESQuerySave"
-          @export-results="onESResultsExport"
-          @datasources-loaded="onESDatasourcesLoaded"
-        />
+        <ESQueryBuilder ref="esQueryBuilderRef" :es-datasources="esDatasources"
+          :initial-datasource-id="String(querySettingPackage.datasource_id)" :initial-indices="initialIndices"
+          :data-resource-id="querySettingPackage.resource_id || null" :has-es-query-permission="hasESQueryPermission"
+          :has-export-permission="hasExportPermission" :has-save-permission="hasSavePermission"
+          :isInResourcePackage="true" :resourcePackageId="querySettingPackage.id"
+          :resourcePackageName="querySettingPackage.name" @execute-query="onESQueryExecute" @save-query="onESQuerySave"
+          @export-results="onESResultsExport" @datasources-loaded="onESDatasourcesLoaded" />
       </template>
     </el-drawer>
 
@@ -552,10 +500,12 @@
         <!-- 历史文件选择 -->
         <div class="info-row">
           <span class="label">历史文件：</span>
-          <el-select v-model="selectedFileId" placeholder="选择历史Excel" filterable style="width: 260px" :loading="historyLoading">
+          <el-select v-model="selectedFileId" placeholder="选择历史Excel" filterable style="width: 260px"
+            :loading="historyLoading">
             <el-option v-for="f in historyFiles" :key="f.id" :label="formatHistoryLabel(f)" :value="f.id" />
           </el-select>
-          <el-button size="small" type="success" :disabled="!selectedFileId" :loading="historyDownloadLoading" @click="handleDownloadHistory">下载资源包</el-button>
+          <el-button size="small" type="success" :disabled="!selectedFileId" :loading="historyDownloadLoading"
+            @click="handleDownloadHistory">下载资源包</el-button>
         </div>
       </div>
       <template #footer>
@@ -564,7 +514,8 @@
           <el-button type="primary" :loading="generateLoading" @click="handleGenerateExcel">
             生成资源包
           </el-button>
-          <el-button type="success" :disabled="!downloadDialogData?.download_url" :loading="latestDownloadLoading" @click="handleDownloadLatest">
+          <el-button type="success" :disabled="!downloadDialogData?.download_url" :loading="latestDownloadLoading"
+            @click="handleDownloadLatest">
             下载最新资源包
           </el-button>
         </div>
@@ -600,6 +551,7 @@ import {
 } from '@element-plus/icons-vue'
 import { resourcePackageApi, type ResourcePackage, type ResourcePackageSearchRequest, type ResourcePackageFile } from '@/api/resourcePackage'
 import { dataResourceApi } from '@/api/dataResource'
+import { templateApi } from '@/api/template'
 import { saveSQLTemplate, updateSQLTemplate, executeSQLQuery } from '@/api/sqlQuery'
 import { formatDate } from '@/utils/date'
 import SQLQueryBuilder from '@/components/SQLQueryBuilder.vue'
@@ -702,21 +654,21 @@ const initialIndices = computed(() => {
   if (!currentDataResource.value) {
     return []
   }
-  
+
   // 如果数据资源有 indices 字段，直接返回
   if (currentDataResource.value.indices && Array.isArray(currentDataResource.value.indices)) {
     return currentDataResource.value.indices
   }
-  
+
   // 如果数据资源有 table_name 或 index_name，返回对应的名称
   if (currentDataResource.value.table_name) {
     return [currentDataResource.value.table_name]
   }
-  
+
   if (currentDataResource.value.index_name) {
     return [currentDataResource.value.index_name]
   }
-  
+
   return []
 })
 
@@ -793,7 +745,7 @@ const filteredPackages = computed(() => {
   // 搜索过滤
   if (filters.search) {
     const keyword = filters.search.toLowerCase()
-    result = result.filter(pkg => 
+    result = result.filter(pkg =>
       pkg.name.toLowerCase().includes(keyword) ||
       (pkg.description && pkg.description.toLowerCase().includes(keyword))
     )
@@ -820,11 +772,11 @@ const filteredPackages = computed(() => {
     const field = filters.sortBy as keyof ResourcePackage
     const aValue = a[field]
     const bValue = b[field]
-    
+
     if (typeof aValue === 'string' && typeof bValue === 'string') {
       return bValue.localeCompare(aValue) // 降序
     }
-    
+
     return 0
   })
 
@@ -862,7 +814,7 @@ const getStatusType = (isActive: boolean): 'success' | 'danger' => {
 const loadPackages = async () => {
   try {
     loading.value = true
-    
+
     const searchParams: ResourcePackageSearchRequest = {
       keyword: filters.search || undefined,
       type: filters.type as any || undefined,
@@ -873,15 +825,15 @@ const loadPackages = async () => {
       sort_by: 'created_at',
       sort_order: 'desc'
     }
-    
-  const res = await resourcePackageApi.search(searchParams)
-  console.log('搜索资源包响应:', res)
-  packageList.value = res.data?.items || []
-  pagination.total = res.data?.total || 0 // 更新总数
 
-  // 更新统计数据
-  updateStats()
-    
+    const res = await resourcePackageApi.search(searchParams)
+    console.log('搜索资源包响应:', res)
+    packageList.value = res.data?.items || []
+    pagination.total = res.data?.total || 0 // 更新总数
+
+    // 更新统计数据
+    updateStats()
+
   } catch (error) {
     console.error('加载资源包列表失败:', error)
     ElMessage.error('加载资源包列表失败')
@@ -913,7 +865,7 @@ const loadDatasources = async () => {
     // 模拟数据源API调用
     // const response = await datasourceApi.getDataSourceList()
     // datasources.value = response.data?.items || []
-    
+
     // 临时使用模拟数据
     datasources.value = [
       { id: 1, name: 'MySQL主库', type: 'mysql', host: 'localhost', port: 3306, username: 'root', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
@@ -929,7 +881,7 @@ const loadDatasources = async () => {
  */
 const loadSQLResources = async () => {
   try {
-  const response: any = await dataResourceApi.getResourceList({ page: 1, page_size: 1000 })
+    const response: any = await dataResourceApi.getResourceList({ page: 1, page_size: 1000 })
     // 兼容不同返回结构
     const items = response?.data?.items || response?.items || response?.data?.list || []
     sqlResources.value = items
@@ -1024,12 +976,12 @@ const handleEdit = (row: ResourcePackage) => {
  */
 const handleQuerySetting = async (row: ResourcePackage) => {
   querySettingPackage.value = row
-  
+
   // 如果资源包有关联的数据资源ID，获取数据资源详情
   if (row.resource_id) {
     await fetchDataResourceDetail(row.resource_id)
   }
-  
+
   querySettingVisible.value = true
 }
 
@@ -1053,12 +1005,15 @@ const historyLoading = ref(false)
 const latestDownloadLoading = ref(false)
 const historyDownloadLoading = ref(false)
 const generateLoading = ref(false)
+// 下载弹窗的模板兜底数据：ES模板的_source与indices
+const downloadTemplateSourceFields = ref<string[]>([])
+const downloadTemplateIndices = ref<string[]>([])
 
 function formatTime(time?: string) {
   if (!time) return '-'
   const d = new Date(time)
   if (isNaN(d.getTime())) return time
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
 }
 
 function formatHistoryLabel(f: ResourcePackageFile): string {
@@ -1074,13 +1029,54 @@ async function handleGenerateExcel() {
     ElMessage.error('缺少资源包ID')
     return
   }
-  
+
   try {
     generateLoading.value = true
-    // 调用生成Excel的API
-    const payload = {}
+    // 调用生成Excel的API，构造与查询页一致的payload
+    let payload: Record<string, any> = {}
+
+    if (downloadPackage.value?.type === 'elasticsearch') {
+      // 优先从查询构建器获取当前选择的索引与DSL
+      let indices: string[] = []
+      let builtQuery: any = null
+      try {
+        // 依赖 ESQueryBuilder 暴露的方法
+        if (esQueryBuilderRef.value && typeof esQueryBuilderRef.value.getSelectedIndices === 'function') {
+          indices = esQueryBuilderRef.value.getSelectedIndices()
+        }
+        if (esQueryBuilderRef.value && typeof esQueryBuilderRef.value.getQuery === 'function') {
+          builtQuery = esQueryBuilderRef.value.getQuery()
+        }
+      } catch (e) {
+        console.warn('从查询构建器获取索引或DSL失败，尝试使用数据资源索引兜底:', e)
+      }
+
+      // 索引兜底优先顺序：模板indices -> 数据资源indices
+      if ((!indices || indices.length === 0) && downloadTemplateIndices.value && downloadTemplateIndices.value.length > 0) {
+        indices = downloadTemplateIndices.value
+      }
+      if ((!indices || indices.length === 0) && initialIndices.value && initialIndices.value.length > 0) {
+        indices = initialIndices.value as string[]
+      }
+
+      if (!indices || indices.length === 0) {
+        ElMessage.error('缺少索引信息，无法生成Excel，请先在查询设定中选择索引')
+        return
+      }
+
+      // 构造与查询页一致的 payload 结构
+      const queryPart = builtQuery && builtQuery.query ? builtQuery.query : { match_all: {} }
+      payload = { index: indices, query: queryPart }
+      // 字段导出优先顺序：查询设定的_source -> 模板_source
+      if (builtQuery && builtQuery._source) {
+        payload._source = builtQuery._source
+      } else if (downloadTemplateSourceFields.value && downloadTemplateSourceFields.value.length > 0) {
+        payload._source = downloadTemplateSourceFields.value
+      }
+    }
+
     const resp = await resourcePackageApi.generateExcel(downloadPackage.value.id, payload)
-    
+
     if (resp?.success) {
       const hasNew = resp?.data?.has_new_data
       if (hasNew === false) {
@@ -1117,6 +1113,39 @@ function openDownloadDialog(pkg: ResourcePackage) {
     download_url: pkg.download_url,
   }
   selectedFileId.value = null
+  // 预加载数据资源详情，以便 initialIndices 兜底
+  if (pkg.resource_id) {
+    fetchDataResourceDetail(pkg.resource_id).catch(err => {
+      console.warn('预加载数据资源详情失败:', err)
+    })
+  }
+  // 清空模板兜底数据并在ES类型时预加载模板详情（_source与indices）
+  downloadTemplateSourceFields.value = []
+  downloadTemplateIndices.value = []
+  if (pkg.type === 'elasticsearch' && pkg.template_id) {
+    templateApi.getByType(pkg.template_id, 'es')
+      .then((resp: any) => {
+        const detail = resp?.data || resp
+        const idx = detail?.indices || detail?.config?.indices || []
+        if (Array.isArray(idx)) {
+          downloadTemplateIndices.value = idx
+        }
+        let q = detail?.query || detail?.query_content || null
+        try {
+          if (q && typeof q === 'string') {
+            q = JSON.parse(q)
+          }
+        } catch (e) {
+          console.warn('解析模板query_content失败，按原值处理:', e)
+        }
+        if (q && Array.isArray(q._source)) {
+          downloadTemplateSourceFields.value = q._source
+        }
+      })
+      .catch(err => {
+        console.warn('预加载ES模板详情失败:', err)
+      })
+  }
   fetchHistoryFiles(pkg.id)
 }
 
@@ -1152,16 +1181,18 @@ async function handleDownloadLatest() {
     const url = resp.data?.download_url || downloadDialogData.value?.download_url
     const filename = resp.data?.filename || ''
     if (url) {
-      window.open(url, '_blank')
-      try {
-        const link = document.createElement('a')
-        link.href = url
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } catch (e) {
-        console.warn('下载链接触发失败，已尝试回退方案:', e)
+      const newWin = window.open(url, '_blank')
+      if (!newWin) {
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        } catch (e) {
+          console.warn('下载链接触发失败，已尝试回退方案:', e)
+        }
       }
       if (resp.data?.download_time) downloadDialogData.value!.download_time = resp.data.download_time
       downloadDialogData.value!.download_time = new Date().toISOString()
@@ -1191,16 +1222,18 @@ async function handleDownloadHistory() {
     const url = resp.data?.download_url
     const filename = resp.data?.filename || ''
     if (url) {
-      window.open(url, '_blank')
-      try {
-        const link = document.createElement('a')
-        link.href = url
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } catch (e) {
-        console.warn('下载链接触发失败，已尝试回退方案:', e)
+      const newWin = window.open(url, '_blank')
+      if (!newWin) {
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        } catch (e) {
+          console.warn('下载链接触发失败，已尝试回退方案:', e)
+        }
       }
       ElMessage.success('正在下载历史文件...')
     } else {
@@ -1467,7 +1500,7 @@ const onEditSuccess = () => {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .resource-package-page {
   padding: 20px;
   background-color: var(--el-bg-color-page);
@@ -1501,7 +1534,7 @@ const onEditSuccess = () => {
 
 .page-description {
   /* flex中靠下 */
-  align-self: flex-end; 
+  align-self: flex-end;
   margin: 0;
   color: #606266;
   font-size: 14px;
@@ -1734,8 +1767,13 @@ const onEditSuccess = () => {
 .package-actions {
   padding: 0 20px 20px;
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 12px;
   align-items: center;
+
+  .el-button+.el-button {
+    margin-left: 0;
+  }
 }
 
 /* 列表视图 */
@@ -1800,25 +1838,25 @@ const onEditSuccess = () => {
   .resource-package-page {
     padding: 16px;
   }
-  
+
   .header-content {
     flex-direction: column;
     gap: 16px;
   }
-  
+
   .header-right {
     width: 100%;
     justify-content: flex-start;
   }
-  
+
   .page-title {
     font-size: 24px;
   }
-  
+
   .stat-card {
     padding: 16px;
   }
-  
+
   .stat-value {
     font-size: 24px;
   }
@@ -1828,6 +1866,7 @@ const onEditSuccess = () => {
 :deep(.el-card) {
   border-radius: 10px;
 }
+
 :deep(.el-card__body) {
   padding: 24px;
 }
@@ -1856,8 +1895,22 @@ const onEditSuccess = () => {
 }
 
 /* 下载弹窗样式与查询面板保持一致 */
-.download-info { margin: 8px 0 4px; }
-.info-row { display: flex; margin-bottom: 6px; align-items: center; }
-.info-row .label { color: #606266; width: 220px; }
-.info-row .value { color: #303133; }
+.download-info {
+  margin: 8px 0 4px;
+}
+
+.info-row {
+  display: flex;
+  margin-bottom: 6px;
+  align-items: center;
+}
+
+.info-row .label {
+  color: #606266;
+  width: 220px;
+}
+
+.info-row .value {
+  color: #303133;
+}
 </style>

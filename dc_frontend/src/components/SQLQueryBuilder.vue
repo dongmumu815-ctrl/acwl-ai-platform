@@ -2437,6 +2437,18 @@ defineExpose({
   gap: 20px;
 }
 
+.available-fields,
+.selected-fields {
+  min-width: 0; /* 防止在网格中子项固定宽度导致溢出 */
+}
+
+/* 小屏幕下字段选择区域改为单列，避免溢出 */
+@media (max-width: 768px) {
+  .field-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
 .available-fields h5,
 .selected-fields h5 {
   margin: 0 0 12px 0;
@@ -2449,6 +2461,7 @@ defineExpose({
   min-height: 200px;
   max-height: 300px;
   overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid #ebeef5;
   border-radius: 4px;
   padding: 8px;
@@ -2457,6 +2470,7 @@ defineExpose({
 .field-item {
   display: flex;
   align-items: center;
+  flex-wrap: wrap; /* 允许在小屏幕下换行，避免横向溢出 */
   gap: 8px;
   padding: 8px;
   margin-bottom: 4px;
@@ -2523,6 +2537,7 @@ defineExpose({
 .field-name {
   flex: 1;
   font-size: 14px;
+  word-break: break-word; /* 长字段名在小屏幕下换行，避免溢出 */
 }
 
 .field-info {
@@ -2632,6 +2647,13 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 已选字段别名输入框在小屏幕下占满行，提升可读性 */
+@media (max-width: 768px) {
+  .selected-fields .alias-input {
+    width: 100%;
+  }
 }
 
 /* 模板条件配置样式 */

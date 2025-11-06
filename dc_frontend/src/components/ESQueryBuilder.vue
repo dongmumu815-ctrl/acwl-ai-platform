@@ -2286,7 +2286,8 @@ defineExpose({
   loadQuery,
   clearQuery,
   executeQuery: executeESQuery,
-  getQuery: () => buildQuery()
+  getQuery: () => buildQuery(),
+  getSelectedIndices: () => (queryType.value === 'visual' ? visualQuery.indices : (esQueryConfig.selectedIndex ? [esQueryConfig.selectedIndex] : []))
 })
 </script>
 

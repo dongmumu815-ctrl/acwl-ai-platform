@@ -30,7 +30,7 @@ export interface ApiResponse<T = any> {
 const createAxiosInstance = (): AxiosInstance => {
   const instance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-    timeout: 30000,
+    timeout: 120000, // 默认超时提升至120秒，适配生成Excel等长耗时请求
     headers: {
       'Content-Type': 'application/json'
     }

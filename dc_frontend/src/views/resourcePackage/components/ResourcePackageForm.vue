@@ -51,7 +51,7 @@
         
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="资源类型" prop="resource_id">
+            <el-form-item v-if="!isEdit" label="资源类型" prop="resource_id">
               <el-select
                 v-model="form.resource_id"
                 placeholder="选择资源类型"
@@ -68,7 +68,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="查询类型" prop="type">
+            <el-form-item v-if="!isEdit" label="查询类型" prop="type">
               <el-select v-model="form.type" placeholder="选择查询类型" style="width: 100%" @change="handleTypeChange">
                 <el-option label="SQL" value="sql" />
                 <el-option label="Elasticsearch" value="elasticsearch" />
@@ -105,8 +105,8 @@
         </el-form-item>
       </el-card>
 
-      <!-- 模板配置 -->
-      <el-card class="form-section">
+      <!-- 模板配置（编辑模式下隐藏） -->
+      <el-card v-if="!isEdit" class="form-section">
         <template #header>
           <span class="section-title">模板配置</span>
         </template>
@@ -116,7 +116,7 @@
             <el-form-item label="查询模板" prop="template_id">
               <el-select
                 v-model="form.template_id"
-                placeholder="选择查询模板"
+                placeholder="选择查询模板,该模板为资源类型的查询模板,选取后该资源包自动使用该模板的查询条件"
                 style="width: 100%"
                 @change="handleTemplateChange"
               >
@@ -132,7 +132,7 @@
         </el-row>
         
         <!-- 模板预览 -->
-        <el-form-item label="模板内容" v-if="selectedTemplate">
+        <!-- <el-form-item label="模板内容" v-if="selectedTemplate">
           <el-input
             :model-value="selectedTemplate.content"
             type="textarea"
@@ -140,7 +140,7 @@
             readonly
             placeholder="模板内容预览"
           />
-        </el-form-item>
+        </el-form-item> -->
         
         <!-- 动态参数配置 -->
         <el-form-item label="动态参数" v-if="selectedTemplate && selectedTemplate.default_params">
@@ -234,15 +234,15 @@ const form = reactive({
   template_type: 'sql' as PackageType,
   dynamic_params: {} as Record<string, any>,
   is_active: true,
-  is_lock: 'false' as string, // 添加is_lock字段，默认为"false"表示可删除
+  is_lock: '0' as string, // 添加is_lock字段，默认为"0"表示可删除
   tags: [] as string[]
 })
 
 // 计算属性：用于UI显示的is_deletable，与is_lock相反
 const is_deletable = computed({
-  get: () => form.is_lock === 'false',
+  get: () => form.is_lock === '0',
   set: (value: boolean) => {
-    form.is_lock = value ? 'false' : '1'
+    form.is_lock = value ? '0' : '1'
   }
 })
 
@@ -398,7 +398,7 @@ const loadFormData = () => {
     template_type: data.template_type,
     dynamic_params: data.dynamic_params || {},
     is_active: data.is_active,
-    is_lock: data.is_lock || 'false', // 加载is_lock字段，默认为'false'
+    is_lock: data.is_lock || '0', // 加载is_lock字段，默认为'0'
     tags: data.tags?.map(tag => tag.tag_name) || []
   })
   
@@ -422,7 +422,7 @@ const resetForm = () => {
     template_type: 'sql',
     dynamic_params: {},
     is_active: true,
-    is_lock: 'false', // 重置is_lock字段为'false'，表示可删除
+    is_lock: '0', // 重置is_lock字段为'0'，表示可删除
     tags: []
   })
   
@@ -489,15 +489,23 @@ const handleSubmit = async () => {
     
     loading.value = true
     
-    const submitData = {
-      ...form,
-      datasource_id: Number(form.datasource_id)
-    }
-    
     if (props.isEdit && props.packageData) {
-      await resourcePackageApi.update(props.packageData.id, submitData as ResourcePackageUpdateRequest)
+      // 编辑模式下仅允许更新指定字段
+      const updateData: ResourcePackageUpdateRequest = {
+        name: form.name,
+        description: form.description,
+        is_active: form.is_active,
+        is_lock: form.is_lock,
+        tags: form.tags
+      }
+      await resourcePackageApi.update(props.packageData.id, updateData)
       ElMessage.success('更新成功')
     } else {
+      // 创建模式下提交完整数据
+      const submitData = {
+        ...form,
+        datasource_id: Number(form.datasource_id)
+      }
       await resourcePackageApi.create(submitData as ResourcePackageCreateRequest)
       ElMessage.success('创建成功')
     }

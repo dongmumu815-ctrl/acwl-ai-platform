@@ -75,7 +75,7 @@
     <el-card class="filter-card">
       <el-form :model="filters" inline>
         <el-form-item label="数据源类型">
-          <el-select v-model="filters.type" placeholder="选择类型" clearable style="width: 150px">
+          <el-select v-model="filters.datasource_type" placeholder="选择类型" clearable style="width: 150px">
             <el-option
               v-for="template in datasourceTemplates"
               :key="template.datasource_type"
@@ -87,12 +87,13 @@
         <el-form-item label="状态">
           <el-select v-model="filters.status" placeholder="选择状态" clearable style="width: 120px">
             <el-option label="正常" value="active" />
+            <el-option label="停用" value="inactive" />
+            <el-option label="测试中" value="testing" />
             <el-option label="异常" value="error" />
-            <el-option label="未知" value="unknown" />
           </el-select>
         </el-form-item>
         <el-form-item label="启用状态">
-          <el-select v-model="filters.enabled" placeholder="选择启用状态" clearable style="width: 120px">
+          <el-select v-model="filters.is_enabled" placeholder="选择启用状态" clearable style="width: 120px">
             <el-option label="启用" :value="true" />
             <el-option label="禁用" :value="false" />
           </el-select>
@@ -353,9 +354,9 @@ const stats = ref({
 // 筛选条件
 const filters = reactive({
   search: '',
-  type: '',
+  datasource_type: '',
   status: '',
-  enabled: null
+  is_enabled: null
 })
 
 // 分页
@@ -446,9 +447,9 @@ const handleSearch = () => {
 const handleReset = () => {
   Object.assign(filters, {
     search: '',
-    type: '',
+    datasource_type: '',
     status: '',
-    enabled: null
+    is_enabled: null
   })
   handleSearch()
 }
@@ -607,8 +608,9 @@ const getTypeLabel = (type) => {
 const getStatusColor = (status) => {
   const colors = {
     active: 'success',
-    error: 'danger',
-    unknown: 'info'
+    inactive: 'info',
+    testing: 'warning',
+    error: 'danger'
   }
   return colors[status] || 'info'
 }
@@ -616,8 +618,9 @@ const getStatusColor = (status) => {
 const getStatusLabel = (status) => {
   const labels = {
     active: '正常',
-    error: '异常',
-    unknown: '未知'
+    inactive: '停用',
+    testing: '测试中',
+    error: '异常'
   }
   return labels[status] || status
 }

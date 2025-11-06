@@ -6,7 +6,7 @@
 
 from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_
 
 from app.models import DataResourceType
 from app.schemas.resource_type import ResourceTypeCreate, ResourceTypeUpdate
@@ -79,7 +79,13 @@ class ResourceTypeService:
     ) -> Tuple[List[DataResourceType], int, int]:
         stmt = select(DataResourceType)
         if name:
-            stmt = stmt.where(DataResourceType.name.like(f"%{name}%"))
+            # 同时按名称和描述进行模糊匹配
+            stmt = stmt.where(
+                or_(
+                    DataResourceType.name.like(f"%{name}%"),
+                    DataResourceType.describe.like(f"%{name}%")
+                )
+            )
 
         # 排序：更新时间优先，其次创建时间
         stmt = stmt.order_by(

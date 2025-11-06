@@ -12,9 +12,9 @@
       </template>
 
       <el-form :model="filters" label-width="100px" inline>
-        <el-form-item label="关键字">
+        <!-- <el-form-item label="关键字">
           <el-input v-model="filters.search" placeholder="用户名、路径、请求ID" clearable style="width: 240px" />
-        </el-form-item>
+        </el-form-item> -->
         <el-form-item label="业务模块">
           <el-input v-model="filters.module" placeholder="业务模块" clearable style="width: 180px" />
         </el-form-item>

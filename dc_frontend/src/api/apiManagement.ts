@@ -55,10 +55,21 @@ export const getCustomer = (id: number): Promise<ApiResponse<Customer>> => {
  * 创建客户
  */
 export const createCustomer = (data: CustomerCreate): Promise<ApiResponse<Customer>> => {
+  const formData = new FormData()
+  formData.append('name', data.name)
+  formData.append('email', data.email)
+  if (data.phone) formData.append('phone', data.phone)
+  if (data.company) formData.append('company', data.company)
+  if (typeof data.rate_limit !== 'undefined') formData.append('rate_limit', String(data.rate_limit))
+  if (typeof data.max_apis !== 'undefined') formData.append('max_apis', String(data.max_apis))
+
   return request({
     url: '/customers',
     method: 'post',
-    data
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
   })
 }
 
@@ -66,10 +77,22 @@ export const createCustomer = (data: CustomerCreate): Promise<ApiResponse<Custom
  * 更新客户
  */
 export const updateCustomer = (id: number, data: CustomerUpdate): Promise<ApiResponse<Customer>> => {
+  const formData = new FormData()
+  if (typeof data.name !== 'undefined') formData.append('name', data.name)
+  if (typeof data.email !== 'undefined') formData.append('email', data.email)
+  if (typeof data.phone !== 'undefined') formData.append('phone', data.phone)
+  if (typeof data.company !== 'undefined') formData.append('company', data.company)
+  if (typeof data.rate_limit !== 'undefined') formData.append('rate_limit', String(data.rate_limit))
+  if (typeof data.max_apis !== 'undefined') formData.append('max_apis', String(data.max_apis))
+  if (typeof data.is_active !== 'undefined') formData.append('is_active', String(data.is_active))
+
   return request({
     url: `/customers/${id}`,
     method: 'put',
-    data
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
   })
 }
 

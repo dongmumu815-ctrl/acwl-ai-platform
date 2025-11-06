@@ -712,7 +712,7 @@ const defaultSearchValue = ref<string>("");
 const executedSearchValue = ref<string>("");
 
 const viewMode = ref<"list" | "card">("card");
-const compactMode = ref(false);
+const compactMode = ref(true);
 const wrapLongText = ref(false);
 const isFullscreen = ref(false);
 // 左侧聚合展开项（使用 Collapse 组件）
@@ -1054,13 +1054,21 @@ function buildDSL(): any {
     } else {
       // 未指定字段时，对所有可用字段进行multi_match查询
       if (availableFieldNames.value.length > 0) {
-        bool.must.push({
-          multi_match: {
-            query: defaultSearchValue.value.trim(),
-            fields: availableFieldNames.value,
-            type: "best_fields"
-          }
+        const nonDateFields = availableFieldNames.value.filter((f) => {
+          const t =
+            fieldMappings.value[f]?.type ||
+            availableFields.value.find((af) => af.name === f)?.type;
+          return t !== "date" && t !== "date_nanos";
         });
+        if (nonDateFields.length > 0) {
+          bool.must.push({
+            multi_match: {
+              query: defaultSearchValue.value.trim(),
+              fields: nonDateFields,
+              type: "best_fields"
+            }
+          });
+        }
       }
     }
   }
@@ -1470,18 +1478,19 @@ async function downloadResourcePackage() {
 
         if (downloadUrl) {
           // 优先使用 window.open 触发浏览器下载，避免跨域导致的 download 属性失效
-          window.open(downloadUrl, "_blank");
-
-          // 回退方案：创建临时链接尝试触发下载（跨域可能忽略 download）
-          try {
-            const link = document.createElement("a");
-            link.href = downloadUrl;
-            link.download = filename || "";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          } catch (e) {
-            console.warn("下载链接触发失败，已尝试回退方案:", e);
+          const newWin = window.open(downloadUrl, "_blank");
+          // 若被拦截或失败则回退到创建链接点击
+          if (!newWin) {
+            try {
+              const link = document.createElement("a");
+              link.href = downloadUrl;
+              link.download = filename || "";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            } catch (e) {
+              console.warn("下载链接触发失败，已尝试回退方案:", e);
+            }
           }
 
           ElMessage.success("Excel文件生成成功，正在下载...");
@@ -1556,16 +1565,18 @@ async function handleDownloadHistory() {
     const url = resp.data?.download_url;
     const filename = resp.data?.filename || "";
     if (url) {
-      window.open(url, "_blank");
-      try {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (e) {
-        console.warn("下载链接触发失败，已尝试回退方案:", e);
+      const newWin = window.open(url, "_blank");
+      if (!newWin) {
+        try {
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } catch (e) {
+          console.warn("下载链接触发失败，已尝试回退方案:", e);
+        }
       }
       ElMessage.success("正在下载历史文件...");
     } else {
@@ -1643,16 +1654,18 @@ async function handleDownloadLatest() {
     const url = resp.data?.download_url || dialogData.download_url;
     const filename = resp.data?.filename || "";
     if (url) {
-      window.open(url, "_blank");
-      try {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (e) {
-        console.warn("下载链接触发失败，已尝试回退方案:", e);
+      const newWin = window.open(url, "_blank");
+      if (!newWin) {
+        try {
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } catch (e) {
+          console.warn("下载链接触发失败，已尝试回退方案:", e);
+        }
       }
       // 更新最新下载时间（若后端返回）
       if (resp.data?.download_time)
@@ -1683,7 +1696,7 @@ async function handleDownloadLatest() {
     border: none;
   }
   :deep(.el-card__body) {
-    padding: 10px;
+    padding: 2px;
   }
 }
 
@@ -1729,11 +1742,11 @@ async function handleDownloadLatest() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 2px 12px;
   border-bottom: 1px dashed #ebeef5;
 }
 .section-body {
-  padding: 10px 8px 5px;
+  padding: 0px 8px 5px;
 
   :deep(.el-input-group__prepend) {
     background-color: white;

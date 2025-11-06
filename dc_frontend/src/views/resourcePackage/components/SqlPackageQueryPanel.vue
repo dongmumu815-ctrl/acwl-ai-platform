@@ -1,7 +1,7 @@
 <template>
   <div class="sql-package-query-panel">
     <!-- 查询参数表单 -->
-    <el-card class="query-form-card" v-if="props.packageData?.dynamic_params && Object.keys(props.packageData.dynamic_params).length">
+    <el-card class="query-form-card">
       <template #header>
         <div class="card-header">
           <span class="card-title">查询参数</span>
@@ -24,7 +24,7 @@
       >
         <el-row :gutter="20">
           <el-col
-            v-for="(paramValue, paramName) in props.packageData!.dynamic_params"
+            v-for="(paramValue, paramName) in (props.packageData?.dynamic_params || {})"
             :key="paramName"
             :span="12"
           >

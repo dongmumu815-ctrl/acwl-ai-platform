@@ -6,7 +6,17 @@
     </div>
 
     <div class="toolbar">
-      <el-input v-model="keyword" placeholder="搜索名称或描述" clearable class="toolbar-input" @keyup.enter="fetchList" />
+      <el-input
+        v-model="keyword"
+        placeholder="搜索名称或描述"
+        clearable
+        class="toolbar-input"
+        @keyup.enter="fetchList"
+      />
+      <el-button type="primary" @click="fetchList">
+        <el-icon><Search /></el-icon>
+        搜索
+      </el-button>
       <el-button type="primary" @click="openCreateDialog">新建类型</el-button>
     </div>
 

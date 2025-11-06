@@ -135,7 +135,7 @@
 import { ref, onMounted, nextTick, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getESClusterStats, getESDatasources, getESAggregations } from '@/api/esQuery'
+import { getESClusterStats, getESDatasources, getESAggregations, getESIndexStats } from '@/api/esQuery'
 import { getSystemStats, getTypeCountTrend } from '@/api/apiManagement'
 import { useUserStore } from '@/stores/user'
 import VChart from 'vue-echarts'
@@ -223,6 +223,8 @@ const stats = ref([
 // ES 集群统计
 const esDatasourceId = ref<number | null>(null)
 const esClusterStats = ref<any | null>(null)
+// 指定用于统计展示的主索引名称
+const primaryIndexName = 'cpc_dw_publication'
 
 const loadEsClusterStats = async () => {
   try {
@@ -255,8 +257,42 @@ const loadEsClusterStats = async () => {
     if (storageIdx >= 0 && data?.indices?.storeSize) {
       stats.value[storageIdx].value = String(data.indices.storeSize)
     }
+
+    // 使用主索引的统计覆盖展示（与服务器 cat indices 结果一致）
+    await loadEsIndexStats(primaryIndexName)
   } catch (e) {
     console.error('加载ES集群统计失败', e)
+  }
+}
+
+// 加载单个索引统计并更新“总数据量/存储使用”卡片
+const loadEsIndexStats = async (indexName: string) => {
+  try {
+    if (!esDatasourceId.value) return
+    const res = await getESIndexStats(esDatasourceId.value as number, indexName)
+    const data = res?.data
+    if (!data) return
+
+    const formatCount = (n: number) => {
+      if (!Number.isFinite(n)) return `${n}`
+      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+      if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+      return `${n}`
+    }
+
+    const totalDataIdx = stats.value.findIndex(s => s.key === 'totalData')
+    if (totalDataIdx >= 0 && data?.docsCount != null) {
+      stats.value[totalDataIdx].value = formatCount(Number(data.docsCount))
+    }
+
+    const storageIdx = stats.value.findIndex(s => s.key === 'storage')
+    if (storageIdx >= 0 && data?.storeSize) {
+      // 直接展示 cat indices 的字符串（例如 27.1gb）
+      stats.value[storageIdx].value = String(data.storeSize)
+    }
+  } catch (e) {
+    // 若索引统计失败，保持集群统计的显示作为回退
+    console.warn('加载索引统计失败，使用集群统计作为回退', e)
   }
 }
 
@@ -309,26 +345,40 @@ const loadDistribution = async () => {
       field && field.endsWith('.keyword') ? field : `${field}.keyword`
 
     const tryAgg = async (field: string) => {
+      const rawField = field
       const keywordField = ensureKeywordField(field)
-      const res = await getESAggregations(
-        esDatasourceId.value as number,
-        indexCandidates,
-        {
-          category_terms: {
-            terms: {
-              field: keywordField,
-              size: 20,
-              order: { _count: 'desc' },
-              min_doc_count: 1
+
+      const callAgg = async (aggField: string, existsField: string) => {
+        const res = await getESAggregations(
+          esDatasourceId.value as number,
+          indexCandidates,
+          {
+            category_terms: {
+              terms: {
+                field: aggField,
+                size: 20,
+                order: { _count: 'desc' },
+                min_doc_count: 1
+              }
             }
-          }
-        },
-        { exists: { field: keywordField } }
-      )
-      const agg = (res as any)?.data?.aggregations?.category_terms
-      const buckets = Array.isArray(agg?.buckets) ? agg.buckets : []
-      // 过滤掉可能的“未分类”值（如果后端某处仍设置了missing）
-      const filtered = buckets.filter((b: any) => String(b.key) !== '未分类')
+          },
+          { exists: { field: existsField } }
+        )
+        const ok = Boolean((res as any)?.success)
+        const agg = (res as any)?.data?.aggregations?.category_terms
+        const buckets = Array.isArray(agg?.buckets) ? agg.buckets : []
+        return { ok, buckets }
+      }
+
+      // 优先尝试 keyword 子字段，exists 过滤使用原始字段
+      let { ok, buckets } = await callAgg(keywordField, rawField)
+
+      // 回退：如果失败或无数据，尝试原始字段（适配字段已是keyword类型的情况）
+      if (!ok || buckets.length === 0) {
+        ({ ok, buckets } = await callAgg(rawField, rawField))
+      }
+
+      const filtered = Array.isArray(buckets) ? buckets.filter((b: any) => String(b.key) !== '未分类') : []
       return filtered.map((b: any) => ({ name: String(b.key), value: Number(b.doc_count) }))
     }
 
