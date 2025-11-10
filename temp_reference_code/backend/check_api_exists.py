@@ -44,7 +44,7 @@ def check_api_exists(api_code: str):
                 print(f"   - 状态: {'激活' if api_row.status else '停用'}")
                 print(f"   - 创建时间: {api_row.created_at}")
                 
-                # 获取客户信息
+                # 获取平台信息
                 customer_result = conn.execute(
                     text("SELECT * FROM customers WHERE id = :customer_id"),
                     {"customer_id": api_row.customer_id}
@@ -71,7 +71,7 @@ def check_api_exists(api_code: str):
                         status = '激活' if existing_api.status else '停用'
                         print(f"   - {existing_api.api_code} ({status})")
                         
-                        # 获取每个API的客户信息
+                        # 获取每个API的平台信息
                         customer_result = conn.execute(
                             text("SELECT id, name FROM customers WHERE id = (SELECT customer_id FROM custom_apis WHERE api_code = :api_code)"),
                             {"api_code": existing_api.api_code}

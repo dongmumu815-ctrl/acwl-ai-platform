@@ -118,7 +118,7 @@ def verify_migration():
             print("\n总体统计:")
             print(f"总API数: {stats[0]}")
             print(f"有link_read_id的API数: {stats[1]}")
-            print(f"总客户数: {stats[2]}")
+            print(f"总平台数: {stats[2]}")
             print(f"有link_read_id的客户数: {stats[3]}")
             
             if all_matched:

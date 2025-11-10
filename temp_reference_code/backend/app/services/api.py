@@ -3561,7 +3561,7 @@ class ApiFieldService(BaseService[ApiField, ApiFieldCreate, ApiFieldUpdate]):
                 
                 return result
             else:
-                # 如果没有客户信息，只返回简单响应（向后兼容）
+                # 如果没有平台信息，只返回简单响应（向后兼容）
                 response_time = time.time()
                 result = {
                     "success": True,
@@ -3572,7 +3572,7 @@ class ApiFieldService(BaseService[ApiField, ApiFieldCreate, ApiFieldUpdate]):
                 self.logger.debug(f"[单条数据处理] 简单响应构建耗时: {(time.time() - response_time)*1000:.2f}ms")
                 
                 total_time = time.time() - start_time
-                self.logger.debug(f"[单条数据处理] 单条数据处理完成（无客户信息），总耗时: {total_time*1000:.2f}ms")
+                self.logger.debug(f"[单条数据处理] 单条数据处理完成（无平台信息），总耗时: {total_time*1000:.2f}ms")
                 
                 return result
                 

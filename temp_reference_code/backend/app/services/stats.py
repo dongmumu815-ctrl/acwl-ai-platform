@@ -380,7 +380,7 @@ class StatsService:
         order_by: str = "calls"
     ) -> List[Dict[str, Any]]:
         """
-        获取活跃客户统计
+        获取活跃平台统计
         
         Args:
             db: 数据库会话
@@ -389,7 +389,7 @@ class StatsService:
             order_by: 排序字段（calls, apis, uploads）
             
         Returns:
-            活跃客户列表
+            活跃平台列表
         """
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=days)

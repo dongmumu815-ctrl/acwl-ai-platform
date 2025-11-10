@@ -2,10 +2,10 @@
   <div>
     <div class="page-card">
       <div class="page-header">
-        <h2>客户管理</h2>
+        <h2>平台管理</h2>
         <el-button type="primary" @click="showAddDialog">
           <el-icon><Plus /></el-icon>
-          添加客户
+          添加平台
         </el-button>
       </div>
       
@@ -14,7 +14,7 @@
         <div class="table-toolbar">
           <el-input
             v-model="searchQuery"
-            placeholder="搜索客户名称或邮箱"
+            placeholder="搜索平台名称或邮箱"
             style="width: 300px;"
             clearable
             @input="handleSearch"
@@ -275,7 +275,7 @@ const customerRules = {
 }
 
 // 计算属性
-const dialogTitle = computed(() => isEdit.value ? '编辑客户' : '添加客户')
+const dialogTitle = computed(() => isEdit.value ? '编辑客户' : '添加平台')
 
 const filteredCustomers = computed(() => {
   console.log('计算filteredCustomers, customers.value:', customers.value)
@@ -395,7 +395,7 @@ const saveCustomer = async () => {
       await api.put(`/admin/customers/${customerForm.id}`, customerForm)
       ElMessage.success('客户更新成功')
     } else {
-      // 添加客户
+      // 添加平台
       await api.post('/admin/customers', customerForm)
       ElMessage.success('客户添加成功')
     }

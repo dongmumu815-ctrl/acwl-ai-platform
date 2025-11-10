@@ -38,7 +38,7 @@ BASE_URL = "http://127.0.0.1:8081"
 AUTH_ENDPOINT = "/api/v1/auth/token"
 CUSTOM_API_ENDPOINT = "/api/v1"  # 带batch_id的自定义API基础路径
 
-# 测试客户信息
+# 测试平台信息
 TEST_CUSTOMER = {
     "app_id": "test_app_001",
     "app_secret": "test_secret_123456789"

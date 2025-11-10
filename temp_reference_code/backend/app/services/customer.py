@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-客户管理服务模块
+平台管理服务模块
 
 提供客户和客户会话的业务逻辑处理功能。
 
@@ -39,7 +39,7 @@ class CustomerService(BaseService[Customer, CustomerCreate, CustomerUpdate]):
     """
     客户服务
     
-    提供客户管理的业务逻辑处理
+    提供平台管理的业务逻辑处理
     """
     
     def __init__(self):
@@ -105,7 +105,7 @@ class CustomerService(BaseService[Customer, CustomerCreate, CustomerUpdate]):
         updated_by: Optional[int] = None
     ) -> Customer:
         """
-        更新客户信息
+        更新平台信息
         
         Args:
             db: 数据库会话

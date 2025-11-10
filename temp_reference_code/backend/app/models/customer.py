@@ -3,7 +3,7 @@
 """
 客户相关数据库模型
 
-定义客户管理和会话管理相关的数据库模型。
+定义平台管理和会话管理相关的数据库模型。
 包含客户基本信息、认证信息和登录状态管理。
 
 Author: System
@@ -363,7 +363,7 @@ class Customer(BaseModel):
     @classmethod
     def get_active_customers(cls, db: Session, skip: int = 0, limit: int = 100) -> List['Customer']:
         """
-        获取活跃客户列表
+        获取活跃平台列表
         
         Args:
             db: 数据库会话
@@ -371,7 +371,7 @@ class Customer(BaseModel):
             limit: 限制的记录数
         
         Returns:
-            List[Customer]: 活跃客户列表
+            List[Customer]: 活跃平台列表
         """
         return db.query(cls).filter(cls.status == True).offset(skip).limit(limit).all()
     
@@ -384,7 +384,7 @@ class Customer(BaseModel):
             **kwargs: 其他参数
         
         Returns:
-            dict: 客户信息字典
+            dict: 平台信息字典
         """
         exclude = [] if include_sensitive else ['app_secret']
         return super().to_dict(exclude=exclude, **kwargs)

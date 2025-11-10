@@ -247,7 +247,7 @@ async def get_access_token(
         if check_nonce(auth_request.nonce):
             raise BusinessException(BusinessCode.NONCE_REPLAY_ATTACK)
         
-        # 3. 查找客户信息
+        # 3. 查找平台信息
         customer = db.query(Customer).filter(
             Customer.app_id == auth_request.appid,
             Customer.status == True

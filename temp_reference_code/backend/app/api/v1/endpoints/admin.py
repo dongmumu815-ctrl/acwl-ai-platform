@@ -5,7 +5,7 @@
 
 提供系统管理功能，包括：
 1. 管理员登录认证
-2. 客户管理
+2. 平台管理
 3. API管理
 4. 系统配置
 5. 统计信息
@@ -144,7 +144,7 @@ def _generate_complete_api_documentation(db: Session, api: CustomApi, format: st
     
     Args:
         db: 数据库会话
-        api: API对象（用于获取客户信息）
+        api: API对象（用于获取平台信息）
         format: 文档格式（markdown/html/json）
         
     Returns:
@@ -1475,7 +1475,7 @@ async def delete_admin(
         )
 
 
-# ==================== 客户管理 ====================
+# ==================== 平台管理 ====================
 
 @router.get("/customers", response_model=PaginatedResponse[CustomerResponse], summary="获取客户列表")
 async def get_customers(
@@ -1535,7 +1535,7 @@ async def create_customer(
         current_admin: 当前管理员
         
     Returns:
-        创建的客户信息
+        创建的平台信息
     """
     try:
         customer = customer_service.create_customer(db, customer_data)
@@ -1594,7 +1594,7 @@ async def update_customer(
     current_admin: AdminUser = Depends(get_current_admin_user)
 ):
     """
-    更新客户信息
+    更新平台信息
     
     Args:
         customer_id: 客户ID
@@ -1603,7 +1603,7 @@ async def update_customer(
         current_admin: 当前管理员
         
     Returns:
-        更新后的客户信息
+        更新后的平台信息
     """
     try:
         customer = customer_service.update_customer(db, customer_id, update_data)
@@ -1986,7 +1986,7 @@ async def generate_api_documentation(
     支持多种格式输出（Markdown、HTML、JSON）。
     
     Args:
-        api_id: API ID（用于获取客户信息和API配置）
+        api_id: API ID（用于获取平台信息和API配置）
         format: 文档格式（markdown/html/json）
         db: 数据库会话
         current_admin: 当前管理员
@@ -1995,7 +1995,7 @@ async def generate_api_documentation(
         生成的完整API服务文档内容
     """
     try:
-        # 获取API详细信息（用于获取客户信息）
+        # 获取API详细信息（用于获取平台信息）
         api = api_service.get_with_fields(db, api_id)
         
         if not api:
@@ -2195,10 +2195,10 @@ async def get_api_logs(
             db, api_id, page=page, page_size=page_size
         )
         
-        # 将数据库模型转换为响应模型，并添加客户名称
+        # 将数据库模型转换为响应模型，并添加平台名称
         log_responses = []
         for log in logs:
-            # 获取客户信息
+            # 获取平台信息
             customer = db.query(Customer).filter(Customer.id == log.customer_id).first()
             customer_name = customer.name if customer else "未知客户"
             

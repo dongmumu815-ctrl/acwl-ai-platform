@@ -107,7 +107,7 @@ def test_api_usage_logs():
         print(f"  批量处理记录数: {batch_count}")
         print(f"  文件存储记录数: {file_storage_count}")
         
-        # 5. 查询关联的API和客户信息
+        # 5. 查询关联的API和平台信息
         print("\n5. 查询关联信息...")
         if recent_logs:
             log = recent_logs[0]

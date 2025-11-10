@@ -143,6 +143,12 @@ class ExcelService:
             from app.services.datasource import DatasourceService
             from elasticsearch import AsyncElasticsearch
             from elasticsearch.exceptions import ConnectionError as ESConnectionError, AuthenticationException, ConnectionTimeout as ESConnectionTimeout
+            try:
+                # ES 8+ 客户端的通用 API 错误类型
+                from elasticsearch import ApiError
+            except Exception:
+                # 兼容旧版本
+                from elasticsearch.exceptions import TransportError as ApiError
             
             datasource_service = DatasourceService(db)
             datasource = await datasource_service.get_datasource(package.datasource_id)
@@ -282,11 +288,26 @@ class ExcelService:
                         sort=["_doc"],
                         source=source_fields,
                         scroll=scroll_keep_alive,
-                        request_timeout=timeout
+                        request_timeout=timeout,
+                        allow_partial_search_results=True
                     )
                 except ESConnectionTimeout as e:
                     logger.error(f"ES查询超时 [index={query_data.get('index')} host={datasource.host} port={datasource.port} scheme={scheme} timeout={timeout}] : {e}")
                     raise
+                except ApiError as e:
+                    # 详细记录错误信息，并进行一次回退：去掉sort重试
+                    detail = getattr(e, 'body', None) or str(e)
+                    logger.error(f"ES初始滚动查询失败(ApiError): {detail}")
+                    logger.info("尝试回退：移除sort后再次执行初始查询")
+                    first = await es_client.search(
+                        index=query_data.get("index", ""),
+                        query=query,
+                        size=page_size,
+                        source=source_fields,
+                        scroll=scroll_keep_alive,
+                        request_timeout=timeout,
+                        allow_partial_search_results=True
+                    )
 
                 try:
                     total_meta = first.get('hits', {}).get('total')
@@ -303,7 +324,12 @@ class ExcelService:
                 # 继续滚动直到达到上限或无更多数据
                 try:
                     while scroll_id and len(all_hits) < export_max_rows:
-                        next_page = await es_client.scroll(scroll_id=scroll_id, scroll=scroll_keep_alive, request_timeout=timeout)
+                        try:
+                            next_page = await es_client.scroll(scroll_id=scroll_id, scroll=scroll_keep_alive, request_timeout=timeout)
+                        except ApiError as e:
+                            detail = getattr(e, 'body', None) or str(e)
+                            logger.error(f"ES滚动查询下一页失败(ApiError): {detail}")
+                            break
                         batch_hits = next_page.get('hits', {}).get('hits', []) or []
                         if not batch_hits:
                             logger.info("ES滚动查询：无更多数据，结束滚动")

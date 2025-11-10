@@ -47,6 +47,10 @@ export interface ESQueryRequest {
   _source?: string[]
   timeout?: string
   aggs?: any
+  // 深分页支持
+  search_after?: any[]
+  scroll?: string
+  scroll_id?: string
 }
 
 // ES查询响应接口

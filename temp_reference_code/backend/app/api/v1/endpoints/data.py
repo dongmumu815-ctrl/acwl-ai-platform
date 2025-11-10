@@ -77,13 +77,13 @@ data_key_store = {}
 
 def get_current_customer(authorization: str = Header(...)) -> Dict[str, Any]:
     """
-    获取当前认证的客户信息
+    获取当前认证的平台信息
     
     Args:
         authorization: Authorization头
         
     Returns:
-        Dict[str, Any]: 客户信息
+        Dict[str, Any]: 平台信息
         
     Raises:
         HTTPException: 认证失败时抛出异常

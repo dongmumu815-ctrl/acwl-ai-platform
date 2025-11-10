@@ -4,16 +4,18 @@
     <el-card class="header-card package-info-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="card-title">Elasticsearch 高级查询</span>
+          <span class="card-title">中心表查询</span>
           <div class="header-actions">
             <el-button
               type="primary"
               size="small"
               plain
-              :loading="downloadLoading"
-              @click="openDownloadDialog"
-              >下载资源包</el-button
+              :disabled="selectedCount === 0"
+              @click="exportResults"
             >
+              <el-icon><Download /></el-icon>
+              导出查询结果
+            </el-button>
           </div>
         </div>
       </template>
@@ -217,6 +219,18 @@
                 >
                   {{ isFullscreen ? "退出全屏" : "全屏显示" }}
                 </el-button>
+                <el-button
+                  @click="toggleSelectAll"
+                  size="small"
+                  :type="isAllSelected ? 'success' : 'default'"
+                  :icon="Check"
+                  style="margin-left: 8px"
+                >
+                  {{ isAllSelected ? "取消全选" : "全选当前页" }}
+                </el-button>
+                <span class="selected-count" style="margin-left: 8px; color: var(--el-text-color-secondary)">
+                  已选 {{ selectedCount }} 条
+                </span>
               </div>
             </div>
           </div>
@@ -257,7 +271,7 @@
                         <div class="agg-body agg-scroll">
                           <template v-if="agg.type === 'terms'">
                             <div
-                              v-for="bucket in agg.buckets.slice(0, 20)"
+                              v-for="bucket in agg.buckets.slice(0, 1000)"
                               :key="bucket.key"
                               class="agg-row clickable"
                               @click="onAggBucketClick(String(aggName), bucket)"
@@ -304,6 +318,7 @@
                   <template v-if="viewMode === 'list'">
                     <div class="table-container">
                       <el-table
+                        ref="tableRef"
                         :data="processedRecords"
                         border
                         stripe
@@ -311,7 +326,9 @@
                         style="width: 100%"
                         @sort-change="onSortChange"
                         @row-click="openRowDetail"
+                        @selection-change="onTableSelectionChange"
                       >
+                        <el-table-column type="selection" width="48" />
                         <el-table-column type="index" label="#" width="60" />
                         <el-table-column
                           v-for="col in displayFields"
@@ -375,6 +392,11 @@
                             </el-tooltip>
                             -->
                             <div class="card-title-row">
+                              <el-checkbox
+                                :model-value="isCardSelected(idx)"
+                                @change="(val: boolean) => toggleCardSelection(idx, val)"
+                                style="margin-right: 8px"
+                              />
                               <el-link
                                 type="primary"
                                 :underline="false"
@@ -404,6 +426,14 @@
                                     )
                                   "
                                 ></span>
+                                <template v-if="f === 'publication_category'">
+                                  <el-icon v-if="String(row[f]).toUpperCase() === 'BOOK'" style="margin-left: 6px; color: #6b7fd7;">
+                                    <Reading />
+                                  </el-icon>
+                                  <el-icon v-else-if="String(row[f]).toUpperCase() === 'JOURNAL_ARTICLE'" style="margin-left: 6px; color: #e37b40;">
+                                    <Document />
+                                  </el-icon>
+                                </template>
                               </div>
                             </div>
                             <!-- 描述字段单独展示（如果存在），使用宽行显示更易读 -->
@@ -442,10 +472,10 @@
                     <el-pagination
                       v-model:current-page="currentPage"
                       v-model:page-size="pageSize"
-                      :page-sizes="[10, 20, 50, 100]"
+                      :page-sizes="[10, 20, 50, 100,1000]"
                       layout="total, sizes, prev, pager, next, jumper"
                       :total="totalHits"
-                      @current-change="executeQuery"
+                      @current-change="onPageChange"
                       @size-change="onPageSizeChange"
                     />
                   </div>
@@ -567,84 +597,27 @@
         </div>
       </div>
     </el-card>
-
-    <!-- 资源包下载弹窗 -->
-    <el-dialog v-model="downloadDialogVisible" title="下载资源包" width="550px">
-      <div class="download-info">
-        <div class="info-row">
-          <span class="label">最新生成时间：</span>
-          <span class="value">{{
-            formatTime(dialogData.excel_time) || "暂无"
-          }}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">最新下载时间：</span>
-          <span class="value">{{
-            formatTime(dialogData.download_time) || "暂无"
-          }}</span>
-        </div>
-        <!-- 历史文件选择 -->
-        <div class="info-row">
-          <span class="label">历史文件：</span>
-          <el-select
-            v-model="selectedFileId"
-            placeholder="选择历史Excel"
-            filterable
-            style="width: 260px"
-            :loading="historyLoading"
-          >
-            <el-option
-              v-for="f in historyFiles"
-              :key="f.id"
-              :label="formatHistoryLabel(f)"
-              :value="f.id"
-            />
-          </el-select>
-          <el-button
-            size="small"
-            type="success"
-            :disabled="!selectedFileId"
-            :loading="historyDownloadLoading"
-            @click="handleDownloadHistory"
-            >下载历史资源包</el-button
-          >
-        </div>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button
-            type="primary"
-            :loading="generateLoading"
-            @click="handleGenerateExcel"
-            >生成资源包</el-button
-          >
-          <el-button
-            type="success"
-            :disabled="!dialogData.download_url"
-            :loading="latestDownloadLoading"
-            @click="handleDownloadLatest"
-          >
-            下载最新资源包
-          </el-button>
-          <el-button @click="downloadDialogVisible = false">取消</el-button>
-        </div>
-      </template>
-    </el-dialog>
+    <!-- 下载资源包功能已禁用 -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from "vue";
-import { ElMessage } from "element-plus";
+import { ref, reactive, computed, onMounted, watch, nextTick } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Lock,
   Plus,
   Delete,
   CopyDocument,
   Search,
+  Download,
   FullScreen,
   CaretRight,
-  CaretBottom
+  CaretBottom,
+  Reading,
+  Collection,
+  Document,
+  Check
 } from "@element-plus/icons-vue";
 import { ArrowLeft, Close } from "@element-plus/icons-vue";
 import { templateApi } from "@/api/template";
@@ -653,6 +626,7 @@ import { dataResourceApi } from "@/api/dataResource";
 import { resourcePackageApi } from "@/api/resourcePackage";
 import type { ResourcePackageFile } from "@/api/resourcePackage";
 import PdfViewer from "@/components/PdfViewer.vue";
+import * as XLSX from "xlsx";
 
 const props = defineProps<{ packageData: any }>();
 
@@ -771,6 +745,140 @@ const onSortChange = (payload: {
     order: payload?.order || null
   };
 };
+
+// 勾选导出：列表与卡片视图的选中项
+const tableRef = ref<any>();
+const selectedTableRows = ref<Record<string, any>[]>([]);
+const selectedCardIndices = ref<Set<number>>(new Set());
+const selectedCount = computed(() =>
+  viewMode.value === "list"
+    ? selectedTableRows.value.length
+    : selectedCardIndices.value.size
+);
+
+const onTableSelectionChange = (rows: Record<string, any>[]) => {
+  selectedTableRows.value = rows || [];
+};
+
+const isCardSelected = (idx: number) => selectedCardIndices.value.has(idx);
+const toggleCardSelection = (idx: number, val: boolean) => {
+  if (val) selectedCardIndices.value.add(idx);
+  else selectedCardIndices.value.delete(idx);
+};
+
+// 数据变化时默认全选当前页的列表与卡片数据
+watch(
+  processedRecords,
+  (rows) => {
+    nextTick(() => {
+      // 表格选择默认全选
+      selectedTableRows.value = [...(rows || [])];
+      try {
+        tableRef.value?.clearSelection?.();
+        (rows || []).forEach((r: Record<string, any>) =>
+          tableRef.value?.toggleRowSelection?.(r, true)
+        );
+      } catch {}
+    });
+  },
+  { immediate: true }
+);
+
+watch(
+  records,
+  (rows) => {
+    // 卡片选择默认全选
+    selectedCardIndices.value = new Set((rows || []).map((_, i) => i));
+  },
+  { immediate: true }
+);
+
+// 全选/取消全选逻辑与状态
+const isAllSelected = computed(() => {
+  if (viewMode.value === "list") {
+    return processedRecords.value.length > 0 && selectedTableRows.value.length === processedRecords.value.length;
+  }
+  return records.value.length > 0 && selectedCardIndices.value.size === records.value.length;
+});
+
+const selectAllCurrentView = () => {
+  if (viewMode.value === "list") {
+    const rows = processedRecords.value || [];
+    selectedTableRows.value = [...rows];
+    nextTick(() => {
+      try {
+        tableRef.value?.clearSelection?.();
+        rows.forEach((r: Record<string, any>) => tableRef.value?.toggleRowSelection?.(r, true));
+      } catch {}
+    });
+  } else {
+    const rows = records.value || [];
+    selectedCardIndices.value = new Set(rows.map((_, i) => i));
+  }
+};
+
+const clearAllSelection = () => {
+  if (viewMode.value === "list") {
+    selectedTableRows.value = [];
+    try {
+      tableRef.value?.clearSelection?.();
+    } catch {}
+  } else {
+    selectedCardIndices.value = new Set();
+  }
+};
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    clearAllSelection();
+  } else {
+    selectAllCurrentView();
+  }
+};
+
+// 导出当前查询结果到 Excel
+const exportResults = async () => {
+  const exportRows =
+    viewMode.value === "list"
+      ? selectedTableRows.value
+      : Array.from(selectedCardIndices.value)
+          .map((i) => records.value?.[i])
+          .filter(Boolean);
+
+  if (!exportRows?.length) {
+    ElMessage.warning("没有数据可导出（请勾选需要导出的记录）");
+    return;
+  }
+  try {
+    await ElMessageBox.confirm("确定要导出查询结果吗？", "确认导出", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "info"
+    });
+
+    const wb = XLSX.utils.book_new();
+    const exportData = exportRows.map((row: Record<string, any>) => {
+      const newRow: Record<string, any> = {};
+      displayFields.value.forEach((field: string) => {
+        const v = row?.[field];
+        newRow[field] = typeof v === "object" ? JSON.stringify(v) : v ?? "";
+      });
+      return newRow;
+    });
+    const ws = XLSX.utils.json_to_sheet(exportData, { header: displayFields.value });
+    XLSX.utils.book_append_sheet(wb, ws, "查询结果");
+    const fileName = `${props.packageData?.name || "资源包查询"}_${new Date()
+      .toISOString()
+      .slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    ElMessage.success("导出成功");
+  } catch (error: any) {
+    if (error !== "cancel") {
+      console.error("导出失败:", error);
+      ElMessage.error("导出失败");
+    }
+  }
+};
 // 行详情
 const detailVisible = ref(false);
 const selectedRow = ref<Record<string, any> | null>(null);
@@ -792,13 +900,60 @@ const openPdf = () => {
 
 // 分页
 const currentPage = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(1000);
+// 滑动查询相关状态
+const MAX_RESULT_WINDOW = 10000;
+const pagingMode = ref<"offset" | "search_after">("offset");
+const lastSearchAfter = ref<any[] | null>(null);
+const lastPageLoaded = ref<number>(1);
+
+function onPageChange(page: number) {
+  const maxOffsetPages = Math.floor(MAX_RESULT_WINDOW / pageSize.value);
+  // 1) 在 offset 窗口内允许任意跳页
+  if (page <= maxOffsetPages) {
+    pagingMode.value = "offset";
+    currentPage.value = page;
+    lastPageLoaded.value = page;
+    lastSearchAfter.value = null;
+    executeQuery();
+    return;
+  }
+
+  // 2) 第一次跨窗口跳转：先收敛到上限页，并提示继续点击“下一页”进入滑动模式
+  if (lastPageLoaded.value < maxOffsetPages) {
+    pagingMode.value = "offset";
+    currentPage.value = maxOffsetPages;
+    lastPageLoaded.value = maxOffsetPages;
+    lastSearchAfter.value = null;
+    ElMessage.warning(`超过 10,000 结果窗口限制，已跳转至上限页（第 ${maxOffsetPages} 页），继续点击“下一页”将进入滑动查询模式`);
+    executeQuery();
+    return;
+  }
+
+  // 3) 从上限页开始的连续下一页：切换为 search_after 模式并仅允许逐页前进
+  if (pagingMode.value !== "search_after") {
+    pagingMode.value = "search_after";
+  }
+  if (page === lastPageLoaded.value + 1) {
+    currentPage.value = page;
+    lastPageLoaded.value = page;
+    executeQuery();
+  } else {
+    const target = lastPageLoaded.value + 1;
+    ElMessage.warning(`滑动查询模式下仅支持逐页前进，已跳至第 ${target} 页`);
+    currentPage.value = target;
+    executeQuery();
+    lastPageLoaded.value = currentPage.value;
+  }
+}
 const totalHits = computed<number>(() => {
   const total = results.value?.hits?.total;
   if (typeof total === "number") return total;
   if (typeof total?.value === "number") return total.value;
   return records.value.length;
 });
+
+// 重复的深分页状态与方法已移除，统一使用上方 onPageChange 实现
 
 // 按字段值长度构建一致的字段顺序
 const fieldOrder = ref<string[]>([]);
@@ -987,6 +1142,11 @@ function resetConditions() {
   defaultSearchValue.value = "";
   results.value = null;
   fieldOrder.value = [];
+  // 重置分页与滑动游标
+  currentPage.value = 1;
+  lastPageLoaded.value = 1;
+  lastSearchAfter.value = null;
+  pagingMode.value = "offset";
 }
 
 function formatFixedCondition(cond: any): string {
@@ -1114,12 +1274,27 @@ function buildDSL(): any {
   if (availableFieldNames.value.length) {
     query._source = availableFieldNames.value;
   }
-  // 保持分页基础配置
+  // 分页基础：滑动查询不设置 from，仅设置 size
   query.size = pageSize.value;
-  query.from = (currentPage.value - 1) * pageSize.value;
-  // 默认按 update_time 倒序（存在该字段时）
-  if (availableFieldNames.value.includes("update_time")) {
-    query.sort = [{ update_time: { order: "desc" } }];
+  if (pagingMode.value === "offset") {
+    query.from = (currentPage.value - 1) * pageSize.value;
+  }
+  // 排序：
+  // - offset 模式：优先使用 update_time desc；无则不设置排序（使用默认）
+  // - search_after 模式：使用 update_time desc 并追加 _shard_doc 作为稳定tie-breaker；无 update_time 时仅 _shard_doc
+  if (pagingMode.value === "search_after") {
+    if (availableFieldNames.value.includes("update_time")) {
+      query.sort = [
+        { update_time: { order: "desc" } },
+        { _shard_doc: { order: "asc" } }
+      ];
+    } else {
+      query.sort = [{ _shard_doc: { order: "asc" } }];
+    }
+  } else {
+    if (availableFieldNames.value.includes("update_time")) {
+      query.sort = [{ update_time: { order: "desc" } }];
+    }
   }
 
   // 如果模板定义了聚合，沿用之（便于左侧展示）
@@ -1156,6 +1331,13 @@ async function executeQuery() {
     if (dsl.sort) req.sort = dsl.sort;
     if (dsl._source) req._source = dsl._source;
     if (dsl.aggs) req.aggs = dsl.aggs;
+    // 滑动查询：不传 from，传递 search_after
+    if (pagingMode.value === "search_after") {
+      delete req.from;
+      if (lastSearchAfter.value && Array.isArray(lastSearchAfter.value)) {
+        req.search_after = lastSearchAfter.value;
+      }
+    }
     const resp = await executeESQuery(req);
 
     // 处理响应数据
@@ -1173,6 +1355,30 @@ async function executeQuery() {
 
       // 设置 ES 查询结果
       results.value = esData;
+      // 更新下一页的游标（search_after）
+      try {
+        const cursor = esData?.cursor || (resp as any)?.cursor;
+        const nextSearchAfter = cursor?.nextSearchAfter;
+        if (pagingMode.value === "search_after") {
+          if (nextSearchAfter) {
+            lastSearchAfter.value = nextSearchAfter;
+          } else {
+            const hits = esData?.hits?.hits || [];
+            if (hits.length > 0 && Array.isArray(hits[hits.length - 1]?.sort)) {
+              lastSearchAfter.value = hits[hits.length - 1].sort;
+            }
+          }
+        } else {
+          const hits = esData?.hits?.hits || [];
+          if (hits.length > 0 && Array.isArray(hits[hits.length - 1]?.sort)) {
+            lastSearchAfter.value = hits[hits.length - 1].sort;
+          } else {
+            lastSearchAfter.value = null;
+          }
+        }
+      } catch (e) {
+        // 游标更新失败不影响显示
+      }
     } else {
       results.value = resp;
     }
@@ -1426,6 +1632,10 @@ function buildCardChunks(
 function onPageSizeChange(size: number) {
   pageSize.value = size;
   currentPage.value = 1;
+  // 重置滑动游标状态
+  pagingMode.value = "offset";
+  lastPageLoaded.value = 1;
+  lastSearchAfter.value = null;
   executeQuery();
 }
 
@@ -2094,7 +2304,10 @@ async function handleDownloadLatest() {
 
 .no-data {
   padding: 20px;
-  // height: 500px;
+  min-height: calc(100vh - 230px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .pager {
   height: 50px;
@@ -2171,5 +2384,8 @@ async function handleDownloadLatest() {
 
 .results-card.fullscreen-mode .results-grid {
   height: 93vh;
+}
+.results-card.fullscreen-mode .no-data {
+  min-height: 93vh;
 }
 </style>

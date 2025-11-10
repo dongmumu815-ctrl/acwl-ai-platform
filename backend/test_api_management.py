@@ -178,7 +178,7 @@ async def main():
     if passed_tests == total_tests:
         print("🎉 所有测试通过！API管理功能集成成功！")
         print("\n📝 功能说明:")
-        print("✅ 客户管理 - 管理API接口客户信息和权限配置")
+        print("✅ 平台管理 - 管理API接口平台信息和权限配置")
         print("✅ API管理 - 创建和管理自定义API接口")
         print("✅ 字段配置 - 配置API接口的请求和响应字段")
         print("✅ 批次管理 - 管理数据批次处理任务")
@@ -187,7 +187,7 @@ async def main():
         print("- 前端界面: http://localhost:3005/")
         print("- API文档: http://localhost:8082/docs (需要启动后端)")
         print("\n📁 新增页面路由:")
-        print("- /api-management/customers - 客户管理")
+        print("- /api-management/customers - 平台管理")
         print("- /api-management/apis - API管理")
         print("- /api-management/batches - 批次管理")
         print("- /api-management/dashboard - API仪表板")

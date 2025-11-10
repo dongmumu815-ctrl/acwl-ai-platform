@@ -29,7 +29,7 @@ from .base import (
     BulkOperationResponse
 )
 
-# 客户管理schemas
+# 平台管理schemas
 from .customer import (
     CustomerBase,
     CustomerCreate,
@@ -133,7 +133,7 @@ __all__ = [
     "BulkOperationRequest",
     "BulkOperationResponse",
     
-    # 客户管理schemas
+    # 平台管理schemas
     "CustomerBase",
     "CustomerCreate",
     "CustomerUpdate",

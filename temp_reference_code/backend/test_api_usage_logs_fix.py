@@ -46,9 +46,9 @@ def check_api_usage_logs_before():
 
 def get_test_api_and_customer():
     """
-    获取测试用的API和客户信息
+    获取测试用的API和平台信息
     """
-    print("\n=== 获取测试API和客户信息 ===")
+    print("\n=== 获取测试API和平台信息 ===")
     
     db = next(get_db())
     try:
@@ -199,7 +199,7 @@ def main():
     # 2. 获取测试API和客户
     api, customer = get_test_api_and_customer()
     if not api or not customer:
-        print("\n测试失败: 无法获取测试API和客户信息")
+        print("\n测试失败: 无法获取测试API和平台信息")
         return
     
     # 3. 测试API调用

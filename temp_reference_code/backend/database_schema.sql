@@ -6,7 +6,7 @@
 CREATE DATABASE IF NOT EXISTS acwl_api_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE acwl_api_system;
 
--- 1. 客户管理表
+-- 1. 平台管理表
 CREATE TABLE `customers` (
     `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '客户ID',
     `name` varchar(100) NOT NULL COMMENT '客户名称',
@@ -24,7 +24,7 @@ CREATE TABLE `customers` (
     UNIQUE KEY `uk_email` (`email`),
     INDEX `idx_status` (`status`),
     INDEX `idx_link_read_id` (`link_read_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客户管理表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='平台管理表';
 
 -- 2. 客户登录状态表
 CREATE TABLE `customer_sessions` (
@@ -296,7 +296,7 @@ LEFT JOIN `customers` c ON db.customer_id = c.id
 LEFT JOIN `custom_apis` ca ON db.api_id = ca.id;
 
 -- 添加表注释
-ALTER TABLE `customers` COMMENT = '客户管理表 - 存储客户基本信息和认证信息';
+ALTER TABLE `customers` COMMENT = '平台管理表 - 存储客户基本信息和认证信息';
 ALTER TABLE `customer_sessions` COMMENT = '客户登录状态表 - 管理客户登录会话';
 ALTER TABLE `custom_apis` COMMENT = '自定义接口定义表 - 存储客户自定义的接口配置';
 ALTER TABLE `api_fields` COMMENT = '数据结构字段定义表 - 定义接口的数据结构和验证规则';
@@ -307,7 +307,7 @@ ALTER TABLE `data_uploads` COMMENT = '数据上传记录表 - 记录通过接口
 ALTER TABLE `system_configs` COMMENT = '系统配置表 - 存储系统全局配置参数';
 
 -- 数据库初始化完成说明
--- 1. 包含完整的客户管理、接口定义、数据上传和批次管理功能
+-- 1. 包含完整的平台管理、接口定义、数据上传和批次管理功能
 -- 2. 数据批次管理表支持批次状态跟踪和统计信息维护
 -- 3. 批次统计视图提供便捷的批次数据查询
 -- 4. 相关索引和外键约束确保数据完整性和查询性能

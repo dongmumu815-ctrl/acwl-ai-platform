@@ -259,7 +259,7 @@
           <el-input v-model="form.batch_name" placeholder="请输入批次名称" />
         </el-form-item>
         
-        <el-form-item label="所属客户" prop="customer_id">
+        <el-form-item label="所属平台" prop="customer_id">
           <el-select
             v-model="form.customer_id"
             placeholder="请选择客户"

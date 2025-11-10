@@ -73,7 +73,7 @@ async def test_with_provided_token():
                             else:
                                 print(f"\n✅ 数据来源分析: 真实数据库数据")
                                 print(f"   说明: API端点成功连接到acwl_api_system数据库")
-                                print(f"   数据特征: 客户信息不匹配测试数据模式")
+                                print(f"   数据特征: 平台信息不匹配测试数据模式")
                         else:
                             print(f"\n⚠️  数据来源分析: 空数据集")
                             print(f"   可能原因: acwl_api_system数据库中没有客户数据")

@@ -29,7 +29,7 @@
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ stats.totalCustomers }}</div>
-              <div class="stat-label">总客户数</div>
+              <div class="stat-label">总平台数</div>
               <div class="stat-change positive">+{{ stats.activeCustomers }} 活跃</div>
             </div>
           </div>

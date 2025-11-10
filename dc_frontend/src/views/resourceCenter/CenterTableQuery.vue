@@ -1,7 +1,7 @@
 <template>
   <div class="center-table-query-page">
     <!-- <div class="page-header">
-      <h2>中心表查询</h2>
+      <h2>资源中心</h2>
       <el-tag :type="packageData?.type === 'sql' ? 'primary' : 'success'">
         {{ packageData?.type === 'sql' ? 'SQL查询' : 'Elasticsearch' }}
       </el-tag>

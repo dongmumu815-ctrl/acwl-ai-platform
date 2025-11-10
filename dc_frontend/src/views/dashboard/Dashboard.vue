@@ -196,7 +196,7 @@ const stats = ref([
   },
   {
     key: 'activeUsers',
-    label: '活跃客户',
+    label: '活跃平台',
     value: '',
     icon: 'User',
     color: '#67C23A',
@@ -540,7 +540,7 @@ const moduleLabelFromPath = (path?: string) => {
     settings: '系统设置',
     es: '搜索引擎',
     apis: '接口管理',
-    customers: '客户管理',
+    customers: '平台管理',
     logs: '操作日志'
   }
   return mapping[key] || key || '未知模块'

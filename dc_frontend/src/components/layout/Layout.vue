@@ -292,6 +292,7 @@ onUnmounted(() => {
 .content {
   flex: 1;
   overflow-y: auto;
+  min-height: 0; // 让 flex 子项在容器内可滚动，避免被 100vh 限制
   // background-color: var(--el-bg-color-page);
 
   &::-webkit-scrollbar {

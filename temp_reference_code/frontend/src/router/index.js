@@ -36,7 +36,7 @@ const routes = [
         path: 'customers',
         name: 'CustomerList',
         component: CustomerList,
-        meta: { title: '客户管理', icon: 'User' }
+        meta: { title: '平台管理', icon: 'User' }
       },
       {
         path: 'batches',

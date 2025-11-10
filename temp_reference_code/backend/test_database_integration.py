@@ -82,7 +82,7 @@ def test_database_records():
         print(f"  已完成记录数: {completed_uploads}")
         print(f"  MinIO存储记录数: {minio_count}")
         
-        # 4. 查询关联的API和客户信息
+        # 4. 查询关联的API和平台信息
         print("\n4. 查询关联信息...")
         if recent_uploads:
             upload = recent_uploads[0]

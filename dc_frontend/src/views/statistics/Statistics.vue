@@ -380,7 +380,7 @@ const topResources = ref([
   },
   {
     id: 4,
-    name: '客户信息数据库',
+    name: '平台信息数据库',
     type: '数据库',
     category: '客户数据',
     value: 8765
@@ -431,7 +431,7 @@ const tableData = ref([
   },
   {
     id: 4,
-    name: '客户信息数据库',
+    name: '平台信息数据库',
     type: 'database',
     category: '客户数据',
     views: 8765,

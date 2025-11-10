@@ -28,10 +28,10 @@ import type {
  * API管理相关接口
  */
 
-// ==================== 客户管理 ====================
+// ==================== 平台管理 ====================
 
 /**
- * 获取客户列表
+ * 获取平台列表
  */
 export const getCustomers = (params?: PaginationParams): Promise<ApiResponse<PaginatedResponse<Customer>>> => {
   return request({
@@ -42,7 +42,7 @@ export const getCustomers = (params?: PaginationParams): Promise<ApiResponse<Pag
 }
 
 /**
- * 获取客户详情
+ * 获取平台详情
  */
 export const getCustomer = (id: number): Promise<ApiResponse<Customer>> => {
   return request({
@@ -52,7 +52,7 @@ export const getCustomer = (id: number): Promise<ApiResponse<Customer>> => {
 }
 
 /**
- * 创建客户
+ * 创建平台
  */
 export const createCustomer = (data: CustomerCreate): Promise<ApiResponse<Customer>> => {
   const formData = new FormData()
@@ -74,7 +74,7 @@ export const createCustomer = (data: CustomerCreate): Promise<ApiResponse<Custom
 }
 
 /**
- * 更新客户
+ * 更新平台
  */
 export const updateCustomer = (id: number, data: CustomerUpdate): Promise<ApiResponse<Customer>> => {
   const formData = new FormData()
@@ -97,7 +97,7 @@ export const updateCustomer = (id: number, data: CustomerUpdate): Promise<ApiRes
 }
 
 /**
- * 删除客户
+ * 删除平台
  */
 export const deleteCustomer = (id: number): Promise<ApiResponse<void>> => {
   return request({
@@ -107,7 +107,7 @@ export const deleteCustomer = (id: number): Promise<ApiResponse<void>> => {
 }
 
 /**
- * 重置客户密钥
+ * 重置平台密钥
  */
 export const resetCustomerSecret = (id: number): Promise<ApiResponse<{ app_secret: string }>> => {
   return request({
@@ -117,7 +117,7 @@ export const resetCustomerSecret = (id: number): Promise<ApiResponse<{ app_secre
 }
 
 /**
- * 重置客户密码
+ * 重置平台密码
  * 如果不传入 password，则由服务端生成一次性强密码并返回
  */
 export const resetCustomerPassword = (
@@ -425,7 +425,7 @@ export const getApiCallStats = (params?: {
 }
 
 /**
- * 获取客户活跃度统计
+ * 获取平台活跃度统计
  */
 export const getCustomerActivityStats = (params?: {
   limit?: number

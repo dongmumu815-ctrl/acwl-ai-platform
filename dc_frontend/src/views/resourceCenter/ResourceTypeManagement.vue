@@ -75,112 +75,41 @@
     </el-dialog>
 
     <!-- 字段管理 -->
-    <el-drawer v-model="fieldsDialog.visible" title="字段管理" direction="rtl" size="1300px">
+    <el-drawer v-model="fieldsDialog.visible" title="字段管理" direction="rtl" size="1000px">
        <div class="field-editor-container">
-         <!-- 左侧：中心表字段选择 -->
+         <!-- 单面板：中心表字段勾选即为该资源类型所需字段 -->
          <div class="left-panel">
            <div class="panel-header">
              <h4>中心表字段 (cpc_dw_publication)</h4>
-             <p class="panel-desc">选择字段添加到当前资源类型</p>
+             <p class="panel-desc">勾选为该资源类型所需字段，保存后提交</p>
              <el-button @click="loadCenterTableFields" :loading="centerFieldsLoading" size="small">
                <el-icon><Refresh /></el-icon>
                刷新字段
              </el-button>
            </div>
-           
+
            <div class="center-fields-list">
              <el-table
-               :data="centerTableFields"
-               @selection-change="handleCenterFieldSelection"
+               ref="centerFieldsTableRef"
+               :data="sortedCenterTableFields"
+               row-key="column_name"
                v-loading="centerFieldsLoading"
                size="small"
              >
-               <el-table-column type="selection" width="55" :selectable="selectableCenterField" />
-               <el-table-column prop="column_name" label="字段名" width="150" />
-               <el-table-column prop="data_type" label="数据类型" width="120" />
+               <el-table-column label="必选" width="80">
+                 <template #default="{ row }">
+                   <el-checkbox :model-value="isFieldChecked(row.column_name)" @change="onFieldCheckChange(row, $event)" />
+                 </template>
+               </el-table-column>
+               <el-table-column prop="column_name" label="字段名" width="180" />
+               <el-table-column prop="data_type" label="数据类型" width="140" />
                <el-table-column prop="column_comment" label="字段说明" show-overflow-tooltip>
                  <template #default="{ row }">
                    {{ row.column_comment || row.comment || '-' }}
                  </template>
                </el-table-column>
-               <el-table-column label="状态" width="100">
-                 <template #default="{ row }">
-                   <el-tag :type="isExistingCenterField(row) ? 'info' : 'success'" size="small">
-                     {{ isExistingCenterField(row) ? '已存在' : '可添加' }}
-                   </el-tag>
-                 </template>
-               </el-table-column>
              </el-table>
            </div>
-           
-           <div class="panel-actions">
-             <el-button
-               type="primary"
-               @click="addSelectedFields"
-               :disabled="selectedCenterFields.length === 0"
-               size="small"
-             >
-               添加选中字段 ({{ selectedCenterFields.length }})
-             </el-button>
-           </div>
-         </div>
-         
-         <!-- 右侧：当前资源类型字段管理 -->
-         <div class="right-panel">
-           <div class="panel-header">
-             <h4>资源类型字段</h4>
-             <div class="field-toolbar">
-               <el-button type="primary" size="small" @click="addField(fieldsDialog.form)">新增字段</el-button>
-             </div>
-           </div>
-           <el-table :data="fieldsDialog.form.metadata || []" size="small" style="width: 100%">
-             <el-table-column prop="key" label="key" min-width="140">
-               <template #default="{ row }">
-                 <el-input v-model="row.key" placeholder="字段唯一key" />
-               </template>
-             </el-table-column>
-             <!-- 移除 label 列 -->
-             <el-table-column prop="type" label="类型" min-width="160">
-               <template #default="{ row }">
-                 <el-select v-model="row.type" placeholder="类型">
-                   <el-option label="string" value="string" />
-                   <el-option label="text" value="text" />
-                   <el-option label="number" value="number" />
-                   <el-option label="integer" value="integer" />
-                   <el-option label="float" value="float" />
-                   <el-option label="double" value="double" />
-                   <el-option label="decimal" value="decimal" />
-                   <el-option label="bigint" value="bigint" />
-                   <el-option label="boolean" value="boolean" />
-                   <el-option label="date" value="date" />
-                   <el-option label="time" value="time" />
-                   <el-option label="datetime" value="datetime" />
-                   <el-option label="uuid" value="uuid" />
-                   <el-option label="email" value="email" />
-                   <el-option label="url" value="url" />
-                   <el-option label="json" value="json" />
-                   <el-option label="enum" value="enum" />
-                   <el-option label="object" value="object" />
-                   <el-option label="array" value="array" />
-                 </el-select>
-               </template>
-             </el-table-column>
-             <el-table-column prop="required" label="必填" width="80">
-               <template #default="{ row }">
-                 <el-switch v-model="row.required" />
-               </template>
-             </el-table-column>
-             <el-table-column prop="description" label="说明" min-width="180">
-               <template #default="{ row }">
-                 <el-input v-model="row.description" placeholder="用途说明" />
-               </template>
-             </el-table-column>
-             <el-table-column label="操作" width="100">
-               <template #default="{ $index }">
-                 <el-button size="small" type="danger" link @click="removeField(fieldsDialog.form, $index)">删除</el-button>
-               </template>
-             </el-table-column>
-           </el-table>
          </div>
        </div>
        <template #footer>
@@ -192,7 +121,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listResourceTypes, createResourceType, updateResourceType, deleteResourceType } from '@/api/resourceType'
 import { dataInsightAPI } from '@/api/dataInsight'
@@ -225,8 +154,41 @@ const fieldsDialog = reactive({
 
 // 中心表字段管理相关数据
 const centerTableFields = ref<CenterTableField[]>([])
-const selectedCenterFields = ref<CenterTableField[]>([])
+// 勾选的字段 key（使用小写，避免大小写差异）
+const checkedKeys = ref<string[]>([])
 const centerFieldsLoading = ref(false)
+const centerFieldsTableRef = ref<any>(null)
+
+// 计算属性：将已勾选（选中）的字段排到列表顶部，保持其他顺序不变
+const sortedCenterTableFields = computed(() => {
+  const selectedSet = new Set(checkedKeys.value)
+  // 稳定排序：选中的在前，未选中的在后；同组内保持原始相对顺序
+  const arr = centerTableFields.value.slice()
+  return arr.sort((a, b) => {
+    const aSel = selectedSet.has(String(a.column_name).toLowerCase()) ? 1 : 0
+    const bSel = selectedSet.has(String(b.column_name).toLowerCase()) ? 1 : 0
+    return bSel - aSel
+  })
+})
+
+// 计算：当前已勾选的中心表字段对象列表（用于保存）
+const selectedCenterFields = computed<CenterTableField[]>(() => {
+  const set = new Set(checkedKeys.value)
+  return centerTableFields.value.filter(f => set.has(String(f.column_name).toLowerCase()))
+})
+
+// 勾选状态相关方法
+const isFieldChecked = (key: string) => checkedKeys.value.includes(String(key).toLowerCase())
+const onFieldCheckChange = (row: CenterTableField, checked: boolean) => {
+  const key = String(row.column_name).toLowerCase()
+  const set = new Set(checkedKeys.value)
+  if (checked) {
+    set.add(key)
+  } else {
+    set.delete(key)
+  }
+  checkedKeys.value = Array.from(set)
+}
 
 // 硬编码的数据源和表信息（与中心表管理保持一致）
 const HARDCODED_DATASOURCE = {
@@ -305,7 +267,7 @@ const submitType = async () => {
   }
 }
 
-const openFieldsDialog = (row: ResourceTypeItem) => {
+const openFieldsDialog = async (row: ResourceTypeItem) => {
   fieldsDialog.visible = true
   fieldsDialog.form = {
     id: row.id,
@@ -315,9 +277,23 @@ const openFieldsDialog = (row: ResourceTypeItem) => {
   }
   // 重置中心表字段相关数据
   centerTableFields.value = []
-  selectedCenterFields.value = []
+  checkedKeys.value = []
   // 加载固定表的字段
-  loadCenterTableFields()
+  await loadCenterTableFields()
+  // 加载完成后根据现有metadata预选中对应字段
+  await nextTick()
+  try {
+    const existingKeys = new Set((fieldsDialog.form.metadata || []).map(f => String(f.key).toLowerCase()))
+    const preset: string[] = []
+    centerTableFields.value.forEach((rowItem) => {
+      const colKey = String(rowItem.column_name).toLowerCase()
+      if (existingKeys.has(colKey)) preset.push(colKey)
+    })
+    checkedKeys.value = preset
+  } catch (e) {
+    // 兜底：忽略表格引用异常，保证不影响使用
+    console.warn('预选字段失败：', e)
+  }
 }
 
 // 加载中心表字段（固定表：cpc_dw_publication）
@@ -349,52 +325,7 @@ const loadCenterTableFields = async () => {
   }
 }
 
-// 处理中心表字段选择
-const handleCenterFieldSelection = (selection: CenterTableField[]) => {
-  selectedCenterFields.value = selection
-}
-
-// 新增：判断中心表字段是否已在当前资源类型中存在
-const isExistingCenterField = (row: CenterTableField) => {
-  return (fieldsDialog.form.metadata || []).some(f => f.key === row.column_name)
-}
-
-// 新增：中心表字段是否可选择（已存在则禁选）
-const selectableCenterField = (row: CenterTableField) => {
-  return !isExistingCenterField(row)
-}
-
-// 添加选中的中心表字段到当前资源类型
-const addSelectedFields = () => {
-  if (selectedCenterFields.value.length === 0) {
-    ElMessage.warning('请先选择要添加的字段')
-    return
-  }
-  
-  const newFields: ResourceField[] = selectedCenterFields.value.map(field => ({
-    key: field.column_name,
-    type: mapDataTypeToFieldType(field.data_type),
-    required: !field.is_nullable,
-    description: field.column_comment || field.comment || ''
-  }))
-  
-  // 检查重复字段
-  const existingKeys = fieldsDialog.form.metadata.map(f => f.key)
-  const uniqueFields = newFields.filter(field => !existingKeys.includes(field.key))
-  
-  if (uniqueFields.length === 0) {
-    ElMessage.warning('所选字段已存在，无需重复添加')
-    return
-  }
-  
-  // 添加字段到当前资源类型
-  fieldsDialog.form.metadata.push(...uniqueFields)
-  
-  // 清空选择
-  selectedCenterFields.value = []
-  
-  ElMessage.success(`成功添加 ${uniqueFields.length} 个字段`)
-}
+// 下方逻辑改为：勾选即为保存目标，不再进行“添加/删除”操作
 
 // 将数据库字段类型映射为资源字段类型
 const mapDataTypeToFieldType = (dataType: string): string => {
@@ -415,9 +346,16 @@ const mapDataTypeToFieldType = (dataType: string): string => {
 const saveFields = async () => {
   if (!fieldsDialog.form.id) return
   try {
-    const res = await updateResourceType(fieldsDialog.form.id as string, {
-      metadata: fieldsDialog.form.metadata as ResourceField[]
-    })
+    // 将当前勾选的中心表字段保存为资源类型的metadata
+    const selected = selectedCenterFields.value
+    const newMetadata: ResourceField[] = selected.map((field) => ({
+      key: field.column_name,
+      type: mapDataTypeToFieldType(field.data_type),
+      // 需求：勾选即为该资源类型所需字段（必填）
+      required: true,
+      description: field.column_comment || ''
+    }))
+    const res = await updateResourceType(fieldsDialog.form.id as string, { metadata: newMetadata })
     if (!res.success) throw new Error(res.message)
     ElMessage.success('字段保存成功')
     fieldsDialog.visible = false
@@ -425,15 +363,6 @@ const saveFields = async () => {
   } catch (e: any) {
     ElMessage.error(e?.message || '保存失败')
   }
-}
-
-const addField = (form: Partial<ResourceTypeItem>) => {
-  if (!form.metadata) form.metadata = []
-  form.metadata.push({ key: '', type: 'string', required: false, description: '' })
-}
-
-const removeField = (form: Partial<ResourceTypeItem>, index: number) => {
-  form.metadata = (form.metadata || []).filter((_, i) => i !== index)
 }
 
 // 新增：删除资源类型

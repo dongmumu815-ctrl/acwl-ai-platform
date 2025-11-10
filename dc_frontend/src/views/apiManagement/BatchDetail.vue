@@ -72,7 +72,7 @@
           </el-col>
           <el-col :span="6">
             <div class="info-item">
-              <span class="label">所属客户:</span>
+              <span class="label">所属平台:</span>
               <span class="value">{{ batchInfo.customer?.name || '-' }}</span>
             </div>
           </el-col>

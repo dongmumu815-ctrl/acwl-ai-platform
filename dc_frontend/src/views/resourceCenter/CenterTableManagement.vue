@@ -2,20 +2,31 @@
   <div class="center-table-management">
     <!-- 页面头部 -->
     <div class="page-header">
-      <h2>中心表管理</h2>
+      <!-- <h2>中心表管理</h2> -->
       <!-- <p class="page-description">数据源: 10.20.1.201 | 模式: cepiec-warehouse | 表: cpc_dw_publication</p> -->
     </div>
 
-    <!-- 主要内容 -->
+    <!-- 主要内容：左右两栏布局 -->
     <div class="content-wrapper">
-      <el-card class="main-card">
+      <div class="two-column-layout">
+        <!-- 左侧：中心表结构 -->
+        <el-card
+          class="main-card left-col"
+          v-loading="tableDetailLoading"
+          element-loading-text="加载表结构..."
+          element-loading-background="rgba(255,255,255,0.7)"
+        >
         <template #header>
           <div class="card-header">
-            <span>表结构详情</span>
+            <span>中心表结构详情</span>
             <div class="header-actions">
-              <el-button @click="loadTableDetail" :loading="tableDetailLoading">
+              <el-button @click="loadTableDetail" :loading="tableDetailLoading" size="small">
                 <el-icon><Refresh /></el-icon>
                 刷新数据
+              </el-button>
+              <el-button size="small" type="primary" @click="showAddFieldDialog">
+              <el-icon><Plus /></el-icon>
+              新增字段
               </el-button>
               <!--  <el-button type="primary" @click="loadTableData" :loading="tableDataLoading">
                 <el-icon><Search /></el-icon>
@@ -26,48 +37,49 @@
         </template>
 
         <!-- 表基本信息 -->
-        <div v-if="tableDetail" class="table-info-section" style="margin-bottom: 20px;">
+        <!-- <div v-if="tableDetail" class="table-info-section" style="margin-bottom: 20px;">
           <el-descriptions :column="3" border>
             <el-descriptions-item label="表名称">{{ tableDetail.table_name }}</el-descriptions-item>
             <el-descriptions-item label="表类型">{{ tableDetail.table_type }}</el-descriptions-item>
             <el-descriptions-item label="行数">{{ tableDetail.row_count || 'N/A' }}</el-descriptions-item>
             <el-descriptions-item label="表注释" :span="3">{{ tableDetail.table_comment || '无注释' }}</el-descriptions-item>
           </el-descriptions>
-        </div>
+        </div> -->
 
         <!-- 列信息表格 -->
         <div v-if="tableDetail" class="columns-section">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;">列信息 ({{ filteredColumns?.length || 0 }} 列)</h3>
-            <el-button type="primary" @click="showAddFieldDialog">
+          <!-- <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">字段信息 ({{ filteredColumns?.length || 0 }} 个字段)</h3>
+            <el-button size="small" type="primary" @click="showAddFieldDialog">
               <el-icon><Plus /></el-icon>
-              新增列
+              新增字段
             </el-button>
-          </div>
+          </div> -->
           <el-table
             :data="filteredColumns"
             border
             stripe
             style="width: 100%"
+              size="small"
             :loading="tableDetailLoading"
           >
-            <el-table-column prop="column_name" label="列名" width="200" />
-            <el-table-column prop="data_type" label="数据类型" width="150" />
-            <el-table-column prop="is_nullable" label="允许空值" width="100">
+            <el-table-column prop="column_name" label="字段名" width="180" />
+            <el-table-column prop="data_type" label="数据类型" width="130" />
+            <el-table-column prop="is_nullable" label="允许空值" width="90">
               <template #default="{ row }">
                 <el-tag :type="row.is_nullable ? 'success' : 'danger'">
                   {{ row.is_nullable ? '是' : '否' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="is_primary_key" label="主键" width="80">
+            <!-- <el-table-column prop="is_primary_key" label="主键" width="80">
               <template #default="{ row }">
                 <el-icon v-if="row.is_primary_key" color="#f56c6c"><Key /></el-icon>
               </template>
-            </el-table-column>
-            <el-table-column prop="column_default" label="默认值" width="120" />
-            <el-table-column prop="column_comment" label="列注释" min-width="200" />
-            <el-table-column label="操作" width="180" fixed="right">
+            </el-table-column> -->
+            <el-table-column prop="column_default" label="默认值" width="120" show-overflow-tooltip />
+            <el-table-column prop="column_comment" label="字段注释" min-width="300" show-overflow-tooltip />
+            <el-table-column label="操作" width="155" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="showEditFieldDialog(row)">
                   <el-icon><Edit /></el-icon>
@@ -92,7 +104,143 @@
         <div v-if="!tableDetail && !tableDetailLoading" class="empty-state">
           <el-empty description="点击刷新数据按钮加载表详情" />
         </div>
-      </el-card>
+        </el-card>
+
+        <!-- 右侧：资源类型与字段勾选管理 -->
+        <el-card
+          class="main-card right-col"
+          v-loading="resourceTypesLoading"
+          element-loading-text="加载资源类型..."
+          element-loading-background="rgba(255,255,255,0.7)"
+        >
+          <template #header>
+            <div class="card-header">
+              <span>资源类型字段管理</span>
+              <div class="header-actions">
+                <el-button @click="loadResourceTypesList" :loading="resourceTypesLoading" size="small">
+                  <el-icon><Refresh /></el-icon>
+                  刷新类型
+                </el-button>
+                <el-button type="primary" size="small" @click="openCreateTypeDialog">
+                  <el-icon><Plus /></el-icon>
+                  新建类型
+                </el-button>
+              </div>
+            </div>
+            <!-- 资源类型卡片列表 -->
+          <div class="resource-type-cards" style="height: 90px; overflow-y: auto;">
+            <template v-if="resourceTypes.length">
+              <el-card
+                v-for="rt in resourceTypes"
+                :key="rt.id"
+                class="type-card"
+                :class="{ active: String(rt.id) === String(activeTypeId) }"
+                @click="selectResourceType(rt)"
+                shadow="hover"
+              >
+                <div class="type-card-title">{{ rt.name }}</div>
+                <div class="type-card-desc">{{ rt.describe || '无描述' }}</div>
+                <div class="type-card-actions">
+                  <el-button size="small" text @click.stop="openEditTypeDialog(rt)">
+                    <el-icon><Edit /></el-icon>
+                    编辑
+                  </el-button>
+                  <el-button size="small" text type="danger" @click.stop="confirmDeleteType(rt)">
+                    <el-icon><Delete /></el-icon>
+                    删除
+                  </el-button>
+                </div>
+              </el-card>
+            </template>
+            <div v-else style="margin-left: 40%; display: flex; align-items: center; gap: 8px;">
+              <el-icon class="is-loading" :size="20"><Loading /></el-icon>
+              <span>加载资源类型...</span>
+            </div>
+          </div>
+          <div class="actions" style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+            <!-- <el-button size="small" @click="clearChecked" :disabled="!activeTypeId">清空勾选</el-button> -->
+            <span v-if="activeTypeId" class="save-status" style="color: var(--el-text-color-secondary); font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
+              <el-icon v-if="isAutoSaving" class="is-loading"><Loading /></el-icon>
+              <span>{{ isAutoSaving ? '自动保存中…' : (saveStatusText || '勾选将自动保存') }}</span>
+            </span>
+          </div>
+          </template>
+
+          <!-- 资源类型卡片列表 -->
+          <!-- <div class="resource-type-cards" style="height: 90px; overflow-y: auto;">
+            <template v-if="resourceTypes.length">
+              <el-card
+                v-for="rt in resourceTypes"
+                :key="rt.id"
+                class="type-card"
+                :class="{ active: String(rt.id) === String(activeTypeId) }"
+                @click="selectResourceType(rt)"
+                shadow="hover"
+              >
+                <div class="type-card-title">{{ rt.name }}</div>
+                <div class="type-card-desc">{{ rt.describe || '无描述' }}</div>
+                <div class="type-card-actions">
+                  <el-button size="small" text @click.stop="openEditTypeDialog(rt)">
+                    <el-icon><Edit /></el-icon>
+                    编辑
+                  </el-button>
+                  <el-button size="small" text type="danger" @click.stop="confirmDeleteType(rt)">
+                    <el-icon><Delete /></el-icon>
+                    删除
+                  </el-button>
+                </div>
+              </el-card>
+            </template>
+            <el-empty v-else description="暂无资源类型" />
+          </div>
+          <div class="actions" style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+            <el-button size="small" @click="clearChecked" :disabled="!activeTypeId">清空勾选</el-button>
+            <span v-if="activeTypeId" class="save-status" style="color: var(--el-text-color-secondary); font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
+              <el-icon v-if="isAutoSaving" class="is-loading"><Loading /></el-icon>
+              <span>{{ isAutoSaving ? '自动保存中…' : (saveStatusText || '勾选将自动保存') }}</span>
+            </span>
+          </div> -->
+          <!-- 字段勾选区：显示中心表字段，勾选即为该资源类型所需字段 -->
+          <div
+            class="center-fields-list"
+            style="margin-top: 12px;"
+            v-loading="isAutoSaving"
+            element-loading-text="保存中..."
+            element-loading-background="rgba(255,255,255,0.4)"
+          >
+            <div class="panel-header" style="margin-bottom: 8px;">
+              <!-- <h4 style="margin: 0;">中心表字段 ({{ HARDCODED_TABLE }})</h4> -->
+              <!-- <p class="panel-desc" style="margin: 4px 0 0 0; color: var(--el-text-color-secondary);">勾选为该资源类型所需字段，点击保存提交</p> -->
+            </div>
+            <el-table
+              :data="sortedRightPanelFields"
+              border
+              stripe
+              style="width: 100%"
+              size="small"
+              :loading="tableDetailLoading || resourceTypesLoading"
+            >
+              <el-table-column label="必选" width="80">
+                <template #default="{ row }">
+                  <el-checkbox :disabled="!activeTypeId" :model-value="isFieldChecked(row.column_name)" @change="onFieldCheckChange(row, $event)" />
+                </template>
+              </el-table-column>
+              <el-table-column prop="column_name" label="字段名" width="180" />
+              <el-table-column prop="data_type" label="数据类型" width="140" />
+              <el-table-column prop="column_comment" label="字段说明" show-overflow-tooltip>
+                <template #default="{ row }">
+                  {{ row.column_comment || '-' }}
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <!-- <div class="actions" style="margin-top: 12px; display: flex; gap: 8px;">
+              <el-button @click="clearChecked" :disabled="!activeTypeId">清空勾选</el-button>
+              <el-button type="primary" @click="saveResourceTypeFields" :disabled="!activeTypeId">保存</el-button>
+            </div> -->
+          </div>
+        </el-card>
+      </div>
 
       <!-- 表数据对话框 -->
       <el-dialog
@@ -101,46 +249,53 @@
         width="90%"
         :close-on-click-modal="false"
       >
-        <div class="data-toolbar">
-          <div class="data-info">
-            <span>共 {{ tableData.length }} 条记录</span>
-          </div>
-          <div>
-            <el-button @click="loadTableData" :loading="tableDataLoading">
-              <el-icon><Refresh /></el-icon>
-              刷新
-            </el-button>
-          </div>
-        </div>
-
-        <el-table
-          :data="paginatedTableData"
-          border
-          stripe
-          style="width: 100%; margin-top: 16px;"
-          :loading="tableDataLoading"
-          max-height="400"
+        <div
+          class="dialog-loading-wrap"
+          v-loading="tableDataLoading"
+          element-loading-text="加载数据..."
+          element-loading-background="rgba(255,255,255,0.7)"
         >
-          <el-table-column
-            v-for="column in tableDataColumns"
-            :key="column"
-            :prop="column"
-            :label="column"
-            min-width="120"
-            show-overflow-tooltip
-          />
-        </el-table>
+          <div class="data-toolbar">
+            <div class="data-info">
+              <span>共 {{ tableData.length }} 条记录</span>
+            </div>
+            <div>
+              <el-button @click="loadTableData" :loading="tableDataLoading">
+                <el-icon><Refresh /></el-icon>
+                刷新
+              </el-button>
+            </div>
+          </div>
 
-        <div class="pagination-section" style="margin-top: 16px;">
-          <el-pagination
-            v-model:current-page="dataTablePagination.currentPage"
-            v-model:page-size="dataTablePagination.pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            :total="tableData.length"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleDataSizeChange"
-            @current-change="handleDataCurrentChange"
-          />
+          <el-table
+            :data="paginatedTableData"
+            border
+            stripe
+            style="width: 100%; margin-top: 16px;"
+            :loading="tableDataLoading"
+            max-height="400"
+          >
+            <el-table-column
+              v-for="column in tableDataColumns"
+              :key="column"
+              :prop="column"
+              :label="column"
+              min-width="120"
+              show-overflow-tooltip
+            />
+          </el-table>
+
+          <div class="pagination-section" style="margin-top: 16px;">
+            <el-pagination
+              v-model:current-page="dataTablePagination.currentPage"
+              v-model:page-size="dataTablePagination.pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="tableData.length"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleDataSizeChange"
+              @current-change="handleDataCurrentChange"
+            />
+          </div>
         </div>
       </el-dialog>
 
@@ -157,8 +312,11 @@
            :rules="editFieldRules"
            label-width="120px"
          >
-           <el-form-item label="字段名称">
-             <el-input v-model="editFieldForm.column_name" disabled />
+           <el-form-item label="字段名称" prop="column_name">
+             <el-input
+               v-model="editFieldForm.column_name"
+               placeholder="请输入新的字段名称"
+             />
            </el-form-item>
            <el-form-item label="数据类型">
              <el-input v-model="editFieldForm.data_type" disabled />
@@ -290,21 +448,44 @@
              <el-button type="primary" @click="submitAddField" :loading="addFieldLoading">
                保存
              </el-button>
-           </div>
+         </div>
          </template>
        </el-dialog>
+        
+        <!-- 新建类型对话框（复制资源类型管理中的实现） -->
+        <el-dialog v-model="typeDialog.visible" title="新建类型" width="700px">
+          <el-form :model="typeDialog.form" label-width="100px">
+            <el-form-item label="名称">
+              <el-input v-model="typeDialog.form.name" placeholder="请输入类型名称" />
+            </el-form-item>
+            <el-form-item label="描述">
+              <el-input
+                v-model="typeDialog.form.describe"
+                type="textarea"
+                :autosize="{ minRows: 4, maxRows: 10 }"
+                placeholder="请输入描述"
+              />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="typeDialog.visible = false">取消</el-button>
+            <el-button type="primary" @click="submitType">保存</el-button>
+          </template>
+        </el-dialog>
       </div>
     </div>
-  </template>
+    </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { Search, Refresh, Plus, Delete, Key, Edit, WarningFilled } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete, Key, Edit, WarningFilled, Loading } from '@element-plus/icons-vue'
 import { dataInsightAPI } from '@/api/dataInsight'
 import type { DataSource, TableInfo, TableDetail, TableColumn, TableDataRequest, FieldUpdateRequest } from '@/api/dataInsight'
+import { listResourceTypes, createResourceType, updateResourceType, deleteResourceType } from '@/api/resourceType'
+import type { ResourceTypeItem, ResourceField } from '@/types/resourceType'
 
 const route = useRoute()
 
@@ -340,9 +521,19 @@ const editFieldDialogVisible = ref(false)
 const deleteFieldDialogVisible = ref(false)
 const addFieldDialogVisible = ref(false)
 
+// 新建/编辑资源类型对话框（复制资源类型管理中的结构）
+const typeDialog = reactive({
+  visible: false,
+  form: { name: '', describe: '', metadata: [] as ResourceField[] } as Partial<ResourceTypeItem>,
+  mode: 'create' as 'create' | 'edit',
+  editId: null as null | string | number
+})
+
 // 字段编辑相关
 const editFieldFormRef = ref<FormInstance>()
 const editFieldForm = reactive({
+  // 原始列名用于重命名时定位旧列
+  original_name: '',
   column_name: '',
   data_type: '',
   column_comment: '',
@@ -380,7 +571,27 @@ const addFieldRules = {
   ]
 }
 
+// 编辑校验：允许修改字段名，并做唯一性与命名规范校验
+const validateEditColumnNameUnique = (_rule: any, value: string, callback: any) => {
+  const name = String(value || '').toLowerCase()
+  const original = String(editFieldForm.original_name || '').toLowerCase()
+  // 命名规范：与新增一致
+  const pattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+  if (!value) return callback(new Error('请输入字段名称'))
+  if (!pattern.test(value)) return callback(new Error('字段名称只能包含字母、数字和下划线，且不能以数字开头'))
+  if (value.length > 64) return callback(new Error('字段名称长度不能超过64个字符'))
+  // 唯一性（排除当前原始名）
+  const exists = (tableDetail.value?.columns || []).some(
+    (col) => String(col.column_name).toLowerCase() === name && String(col.column_name).toLowerCase() !== original
+  )
+  if (exists) return callback(new Error('字段名称已存在'))
+  callback()
+}
+
 const editFieldRules = {
+  column_name: [
+    { validator: validateEditColumnNameUnique, trigger: 'blur' }
+  ],
   column_comment: [
     { max: 500, message: '字段注释长度不能超过500个字符', trigger: 'blur' }
   ]
@@ -401,6 +612,216 @@ const filteredColumns = computed(() => {
   )
 })
 
+// ====== 右侧资源类型与字段勾选逻辑 ======
+const resourceTypesLoading = ref(false)
+const resourceTypes = ref<ResourceTypeItem[]>([])
+const activeTypeId = ref<string | number | null>(null)
+// 勾选的字段 key（小写）
+const checkedKeys = ref<string[]>([])
+// 自动保存状态
+const isAutoSaving = ref(false)
+const saveStatusText = ref('')
+let autoSaveTimer: any = null
+
+// 右侧面板字段数据（来自左侧已加载的 filteredColumns）
+const rightPanelFields = computed(() => filteredColumns.value)
+// 已勾选字段置顶
+const sortedRightPanelFields = computed(() => {
+  const set = new Set(checkedKeys.value)
+  const arr = rightPanelFields.value.slice()
+  return arr.sort((a, b) => {
+    const aSel = set.has(String(a.column_name).toLowerCase()) ? 1 : 0
+    const bSel = set.has(String(b.column_name).toLowerCase()) ? 1 : 0
+    return bSel - aSel
+  })
+})
+
+// 勾选状态方法
+const isFieldChecked = (key: string) => checkedKeys.value.includes(String(key).toLowerCase())
+const onFieldCheckChange = (row: TableColumn, checked: boolean) => {
+  const key = String(row.column_name).toLowerCase()
+  const set = new Set(checkedKeys.value)
+  if (checked) set.add(key); else set.delete(key)
+  checkedKeys.value = Array.from(set)
+  scheduleAutoSave()
+}
+const clearChecked = () => { checkedKeys.value = []; scheduleAutoSave() }
+
+// 防抖自动保存
+const scheduleAutoSave = () => {
+  if (!activeTypeId.value) return
+  isAutoSaving.value = true
+  saveStatusText.value = '自动保存中…'
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(async () => {
+    await saveResourceTypeFields(true)
+  }, 500)
+}
+
+// 数据类型映射到资源字段类型
+const mapDataTypeToFieldType = (dataType: string): string => {
+  const type = (dataType || '').toLowerCase()
+  if (type.includes('int') || type.includes('bigint') || type.includes('smallint')) return 'integer'
+  if (type.includes('decimal') || type.includes('float') || type.includes('double') || type.includes('numeric')) return 'number'
+  if (type.includes('bool')) return 'boolean'
+  if (type.includes('date') || type.includes('time')) return 'datetime'
+  return 'string'
+}
+
+// 根据当前选中的资源类型，预选勾选字段
+const refreshPreselection = async () => {
+  await nextTick()
+  if (!activeTypeId.value) { checkedKeys.value = []; return }
+  const current = resourceTypes.value.find(rt => String(rt.id) === String(activeTypeId.value))
+  const existingKeys = new Set((current?.metadata || []).map(f => String(f.key).toLowerCase()))
+  const preset: string[] = []
+  rightPanelFields.value.forEach(col => {
+    const colKey = String(col.column_name).toLowerCase()
+    if (existingKeys.has(colKey)) preset.push(colKey)
+  })
+  checkedKeys.value = preset
+}
+
+const loadResourceTypesList = async () => {
+  try {
+    resourceTypesLoading.value = true
+    const res = await listResourceTypes({ page: 1, page_size: 100 })
+    if (!res.success) throw new Error(res.message)
+    resourceTypes.value = (res.data?.items || []) as ResourceTypeItem[]
+    // 默认选中第一个
+    if (resourceTypes.value.length && !activeTypeId.value) {
+      activeTypeId.value = resourceTypes.value[0].id as any
+    }
+    await refreshPreselection()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载资源类型失败')
+  } finally {
+    resourceTypesLoading.value = false
+  }
+}
+
+const selectResourceType = async (rt: ResourceTypeItem) => {
+  activeTypeId.value = rt.id as any
+  await refreshPreselection()
+}
+
+const saveResourceTypeFields = async (silent = false) => {
+  if (!activeTypeId.value) return
+  try {
+    const set = new Set(checkedKeys.value)
+    const selected = rightPanelFields.value.filter(f => set.has(String(f.column_name).toLowerCase()))
+    const newMetadata: ResourceField[] = selected.map(field => ({
+      key: field.column_name,
+      type: mapDataTypeToFieldType(field.data_type),
+      required: true,
+      description: field.column_comment || ''
+    }))
+    const res = await updateResourceType(String(activeTypeId.value), { metadata: newMetadata })
+    if (!res.success) throw new Error(res.message)
+    if (!silent) ElMessage.success('字段保存成功')
+    // 更新本地资源类型数据中的 metadata
+    const idx = resourceTypes.value.findIndex(rt => String(rt.id) === String(activeTypeId.value))
+    if (idx >= 0) resourceTypes.value[idx].metadata = newMetadata
+    await refreshPreselection()
+    isAutoSaving.value = false
+    saveStatusText.value = '已保存'
+    setTimeout(() => { saveStatusText.value = '' }, 1500)
+  } catch (e: any) {
+    if (!silent) ElMessage.error(e?.message || '保存失败')
+    isAutoSaving.value = false
+    saveStatusText.value = '保存失败'
+  }
+}
+
+onUnmounted(() => { if (autoSaveTimer) clearTimeout(autoSaveTimer) })
+
+// 打开“新建类型”对话框
+const openCreateTypeDialog = () => {
+  typeDialog.visible = true
+  typeDialog.mode = 'create'
+  typeDialog.editId = null
+  typeDialog.form = { name: '', describe: '', metadata: [] }
+}
+
+// 打开“编辑类型”对话框
+const openEditTypeDialog = (rt: ResourceTypeItem) => {
+  typeDialog.visible = true
+  typeDialog.mode = 'edit'
+  typeDialog.editId = rt.id as any
+  typeDialog.form = { id: rt.id, name: rt.name, describe: rt.describe, metadata: (rt.metadata || []).map(f => ({ ...f })) }
+}
+
+// 提交创建/编辑资源类型
+const submitType = async () => {
+  if (!typeDialog.form?.name) {
+    ElMessage.warning('请填写名称')
+    return
+  }
+  try {
+    if (typeDialog.mode === 'edit' && typeDialog.editId) {
+      const res = await updateResourceType(String(typeDialog.editId), {
+        name: typeDialog.form.name!,
+        describe: typeDialog.form.describe,
+        metadata: typeDialog.form.metadata as ResourceField[]
+      })
+      if (!res.success) throw new Error(res.message)
+      ElMessage.success('更新成功')
+      typeDialog.visible = false
+      // 更新本地列表项
+      const idx = resourceTypes.value.findIndex(rt => String(rt.id) === String(typeDialog.editId))
+      if (idx >= 0) {
+        resourceTypes.value[idx].name = typeDialog.form.name!
+        resourceTypes.value[idx].describe = typeDialog.form.describe || ''
+      }
+      activeTypeId.value = typeDialog.editId as any
+      await refreshPreselection()
+    } else {
+      const res = await createResourceType({
+        name: typeDialog.form.name!,
+        describe: typeDialog.form.describe,
+        metadata: []
+      })
+      if (!res.success) throw new Error(res.message)
+      ElMessage.success('创建成功')
+      typeDialog.visible = false
+      // 刷新资源类型列表，并优先选中新创建的类型
+      await loadResourceTypesList()
+      const newId = res.data?.id
+      if (newId) {
+        activeTypeId.value = newId as any
+        await refreshPreselection()
+      }
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '保存失败')
+  }
+}
+
+// 删除资源类型
+const confirmDeleteType = async (rt: ResourceTypeItem) => {
+  if (!rt?.id) {
+    ElMessage.warning('无法获取类型ID')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确认删除类型 “${rt.name}”？`, '删除确认', { type: 'warning' })
+    const res = await deleteResourceType(String(rt.id))
+    if (!res.success) throw new Error(res.message)
+    ElMessage.success('删除成功')
+    // 从本地列表移除并处理选中状态
+    resourceTypes.value = resourceTypes.value.filter(t => String(t.id) !== String(rt.id))
+    if (String(activeTypeId.value) === String(rt.id)) {
+      activeTypeId.value = resourceTypes.value[0]?.id ?? null
+    }
+    await refreshPreselection()
+  } catch (e: any) {
+    // 取消不提示错误
+    if (e && e !== 'cancel') {
+      ElMessage.error(e?.message || '删除失败')
+    }
+  }
+}
+
 const paginatedTableData = computed(() => {
   const start = (dataTablePagination.currentPage - 1) * dataTablePagination.pageSize
   const end = start + dataTablePagination.pageSize
@@ -418,6 +839,9 @@ const loadTableDetail = async () => {
     )
     tableDetail.value = response
     ElMessage.success('表详情加载成功')
+    // 同步加载资源类型并进行预选
+    if (!resourceTypes.value.length) await loadResourceTypesList()
+    await refreshPreselection()
   } catch (error) {
     console.error('获取表详情失败:', error)
     ElMessage.error('获取表详情失败')
@@ -453,6 +877,7 @@ const loadTableData = async () => {
 // 字段编辑相关方法
 const showEditFieldDialog = (column: TableColumn) => {
   console.log('showEditFieldDialog called with:', column)
+  editFieldForm.original_name = column.column_name
   editFieldForm.column_name = column.column_name
   editFieldForm.data_type = column.data_type
   editFieldForm.column_comment = column.column_comment || ''
@@ -475,8 +900,8 @@ const submitEditField = async () => {
       schema: HARDCODED_SCHEMA,
       operation_type: 'modify_column',
       column_data: {
-        original_name: editFieldForm.column_name,
-        name: editFieldForm.column_name, // 保持列名不变
+        original_name: editFieldForm.original_name,
+        name: editFieldForm.column_name,
         type: editFieldForm.data_type,
         comment: editFieldForm.column_comment,
         default: editFieldForm.column_default,
@@ -492,17 +917,22 @@ const submitEditField = async () => {
       
       // 更新本地数据
       if (tableDetail.value && tableDetail.value.columns) {
+        const originalKey = String(editFieldForm.original_name).toLowerCase()
+        const newKey = String(editFieldForm.column_name).toLowerCase()
         const columnIndex = tableDetail.value.columns.findIndex(
-          col => col.column_name === editFieldForm.column_name
+          col => String(col.column_name).toLowerCase() === originalKey
         )
         if (columnIndex !== -1) {
           tableDetail.value.columns[columnIndex] = {
             ...tableDetail.value.columns[columnIndex],
+            column_name: editFieldForm.column_name,
             column_comment: editFieldForm.column_comment,
             column_default: editFieldForm.column_default,
             is_nullable: editFieldForm.is_nullable
           }
         }
+        // 同步勾选状态中的键名（若该字段被勾选）
+        checkedKeys.value = checkedKeys.value.map(k => (k === originalKey ? newKey : k))
       }
       
       // 关闭编辑对话框
@@ -646,14 +1076,22 @@ const handleDataCurrentChange = (page: number) => {
 onMounted(() => {
   loadTableDetail()
 })
+
 </script>
 
 <style scoped lang="scss">
 .center-table-management {
-  padding: 20px;
+  padding: 6px;
+  /* 去掉不必要的底部留白，避免出现外部滚动条 */
+  padding-bottom: 0;
+  /* 与上层布局内容区保持一致高度，避免 100vh 引起溢出 */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 禁止页面外部滚动，使用内部滚动 */
 
   .page-header {
-    margin-bottom: 20px;
+    margin-bottom: 6px;
 
     h2 {
       margin: 0 0 8px 0;
@@ -670,16 +1108,54 @@ onMounted(() => {
   }
 
   .content-wrapper {
-    .main-card {
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+    flex: 1;              /* 占满剩余空间 */
+    min-height: 0;        /* 允许子元素在高度上收缩以启用滚动 */
+    overflow: hidden;     /* 避免包裹层产生外部滚动 */
+        padding-bottom: 5px;
 
-        .header-actions {
+    .two-column-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      height: 100%;       /* 填满内容区高度 */
+      min-height: 0;      /* 使网格子项可在高度上收缩以使用内部滚动 */
+
+      // .right-col, .el-card__body {
+      //   padding: 8px !important;
+      // }
+    }
+
+      .main-card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        .card-header {
           display: flex;
-          gap: 12px;
+          justify-content: space-between;
+          align-items: center;
+          min-height: 42px; /* 统一左右标题高度 */
+
+          .header-actions {
+            display: flex;
+            gap: 12px;
+          }
         }
+
+        /* 卡片主体区域启用内部滚动，填满剩余空间 */
+        :deep(.el-card__body) {
+          flex: 1;
+          min-height: 0;
+          padding: 12px;
+          overflow-y: auto;
+
+          .el-scrollbar__bar.is-vertical {
+            display: none!important;
+          }
+        }
+
+      /* 网格子项需要可收缩以启用卡片内部滚动 */
+      .left-col, .right-col {
+        min-height: 0;
       }
 
       .datasource-section {
@@ -708,6 +1184,27 @@ onMounted(() => {
         text-align: center;
         padding: 40px 0;
       }
+
+      // 右侧资源类型卡片样式
+      .resource-type-cards {
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 6px; /* 给滚动条留一点空间 */
+        scroll-snap-type: x proximity;
+      }
+
+      .resource-type-cards::-webkit-scrollbar { height: 8px; }
+      .resource-type-cards::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.2); border-radius: 4px; }
+
+      .type-card { cursor: pointer; flex: 0 0 auto; width: 185px; scroll-snap-align: start; position: relative; }
+      .type-card.active { border-color: var(--el-color-primary); }
+      .type-card-title { font-weight: 600; margin-bottom: 6px; }
+      .type-card-desc { color: var(--el-text-color-secondary); font-size: 12px; }
+      .type-card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s ease; }
+      .type-card:hover .type-card-actions { opacity: 1; }
     }
   }
 

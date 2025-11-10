@@ -12,7 +12,7 @@ Date: 2024
 # 基础服务
 from .base import BaseService
 
-# 客户管理服务
+# 平台管理服务
 from .customer import CustomerService, CustomerSessionService
 
 # API管理服务
@@ -44,7 +44,7 @@ __all__ = [
     # 基础服务
     "BaseService",
     
-    # 客户管理服务
+    # 平台管理服务
     "CustomerService",
     "CustomerSessionService",
     

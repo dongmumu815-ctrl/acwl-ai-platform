@@ -438,8 +438,8 @@ class SystemStatsResponse(BaseModel):
     """
     
     # 用户统计
-    total_customers: int = Field(description="总客户数")
-    active_customers: int = Field(description="活跃客户数")
+    total_customers: int = Field(description="总平台数")
+    active_customers: int = Field(description="活跃平台数")
     total_admins: int = Field(description="总管理员数")
     active_admins: int = Field(description="活跃管理员数")
     

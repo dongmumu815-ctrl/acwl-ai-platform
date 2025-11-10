@@ -36,6 +36,10 @@ class ESQueryRequest(BaseModel):
     source: Optional[List[str]] = Field(None, alias="_source", description="返回字段")
     timeout: Optional[str] = Field("30s", description="查询超时时间")
     aggs: Optional[Dict[str, Any]] = Field(None, description="聚合查询")
+    # 深分页支持
+    search_after: Optional[List[Any]] = Field(None, alias="search_after", description="search_after 游标值数组")
+    scroll: Optional[str] = Field(None, description="滚动查询超时时间，例如 '1m'")
+    scroll_id: Optional[str] = Field(None, alias="scroll_id", description="滚动查询ID（继续滚动时提供）")
 
 class ESExportRequest(BaseModel):
     """ES导出请求模型"""
@@ -89,19 +93,63 @@ async def execute_es_query(
         es_client = await _create_es_client(datasource)
         
         try:
-            # 构建查询参数
-            search_params = {
+            # 构建查询参数（支持 offset / search_after / scroll 三种模式）
+            # 默认使用 offset
+            search_mode = "offset"
+            search_params: Dict[str, Any] = {
                 "index": request.index,
                 "body": {
                     "query": request.query,
-                    "size": request.size,
-                    "from": request.from_
+                    "size": request.size
                 }
             }
+
+            # 如果提供了 scroll_id，则使用滚动查询继续拉取
+            if request.scroll_id:
+                search_mode = "scroll"
+                logger.info(f"继续滚动查询: scroll_id={request.scroll_id}, scroll={request.scroll or '1m'}")
+                response = await es_client.scroll(scroll_id=request.scroll_id, scroll=request.scroll or "1m")
+            else:
+                # 初始滚动或 search_after 或常规 offset
+                if request.search_after is not None:
+                    search_mode = "search_after"
+                    # search_after 需要稳定排序，避免使用 _id（会触发 fielddata 错误）
+                    # 若未提供排序，则使用 _shard_doc 作为稳定 tie-breaker
+                    sort_list: List[Dict[str, Any]] = []
+                    if request.sort and isinstance(request.sort, list) and len(request.sort) > 0:
+                        # 过滤掉 _id 排序键，避免 400 错误
+                        for s in request.sort:
+                            k = list(s.keys())[0]
+                            if k == "_id":
+                                continue
+                            sort_list.append(s)
+                        # 追加 _shard_doc 作为最后的稳定排序键（若未包含）
+                        keys = [list(s.keys())[0] for s in sort_list]
+                        if "_shard_doc" not in keys:
+                            sort_list.append({"_shard_doc": {"order": "asc"}})
+                    else:
+                        sort_list = [{"_shard_doc": {"order": "asc"}}]
+                    search_params["body"]["sort"] = sort_list
+                    search_params["body"]["search_after"] = request.search_after
+                else:
+                    # 非深分页时使用 from
+                    search_params["body"]["from"] = request.from_
+                    # 保留前端提供的排序，但移除 _id，避免后端强制追加造成错误
+                    if request.sort and isinstance(request.sort, list) and len(request.sort) > 0:
+                        safe_sort = [s for s in request.sort if list(s.keys())[0] != "_id"]
+                        if safe_sort:
+                            search_params["body"]["sort"] = safe_sort
+
+                # 初始滚动查询
+                if request.scroll:
+                    search_mode = "scroll"
+                    search_params["scroll"] = request.scroll
+                    # 注意：scroll 模式下不允许设置 from，与 search_after 一样只使用 size+sort
+                    if "from" in search_params["body"]:
+                        del search_params["body"]["from"]
             
             # 添加可选参数
-            if request.sort:
-                search_params["body"]["sort"] = request.sort
+            # 注：上方已处理排序逻辑
             
             if request.source:
                 search_params["body"]["_source"] = request.source
@@ -112,7 +160,7 @@ async def execute_es_query(
             if request.timeout:
                 search_params["timeout"] = request.timeout
             
-            # 先执行count查询获取准确的总数
+            # 先执行count查询获取准确的总数（与分页模式无关）
             count_params = {
                 "index": request.index,
                 "body": {
@@ -127,7 +175,11 @@ async def execute_es_query(
             logger.info(f"count查询结果: {total_count}")
             
             # 执行主查询
-            response = await es_client.search(**search_params)
+            if search_mode == "scroll" and request.scroll_id:
+                # 已在上方通过 scroll() 获取 response
+                pass
+            else:
+                response = await es_client.search(**search_params)
             
             # 将count查询的结果替换到response中的total值
             if "hits" in response and "total" in response["hits"]:
@@ -167,15 +219,30 @@ async def execute_es_query(
                     "total": response["_shards"]["total"],
                     "successful": response["_shards"]["successful"],
                     "failed": response["_shards"]["failed"]
-                }
+                },
+                "mode": search_mode
             }
+
+            # 提取游标信息（search_after 或 scroll）
+            next_cursor: Dict[str, Any] = {}
+            try:
+                hits = response.get("hits", {}).get("hits", [])
+                if isinstance(hits, list) and len(hits) > 0:
+                    last = hits[-1]
+                    if "sort" in last:
+                        next_cursor["nextSearchAfter"] = last["sort"]
+                if search_mode == "scroll" and "_scroll_id" in response:
+                    next_cursor["scrollId"] = response["_scroll_id"]
+            except Exception as _:
+                pass
             
             return {
                 "success": True,
                 "data": {
                     **response,
                     "stats": stats,
-                    "fieldMappings": field_mappings
+                    "fieldMappings": field_mappings,
+                    **({"cursor": next_cursor} if next_cursor else {})
                 },
                 "message": f"查询完成，共找到 {stats['totalHits']} 条记录"
             }

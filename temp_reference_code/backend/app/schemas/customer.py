@@ -3,7 +3,7 @@
 """
 客户相关Pydantic Schemas
 
-定义客户管理相关的API请求和响应数据模型。
+定义平台管理相关的API请求和响应数据模型。
 
 Author: System
 Date: 2024
@@ -53,7 +53,7 @@ class CustomerUpdate(BaseUpdateSchema):
     """
     客户更新请求模型
     
-    更新客户信息时的请求数据
+    更新平台信息时的请求数据
     """
     
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="客户名称")
@@ -76,7 +76,7 @@ class CustomerResponse(CustomerBase):
     """
     客户响应模型
     
-    返回客户信息时的数据结构
+    返回平台信息时的数据结构
     """
     
     id: int = Field(description="客户ID")
@@ -160,8 +160,8 @@ class CustomerLoginResponse(BaseModel):
     token_type: str = Field(default="bearer", description="令牌类型")
     expires_in: int = Field(description="过期时间（秒）")
     
-    # 客户信息
-    customer: CustomerResponse = Field(description="客户信息")
+    # 平台信息
+    customer: CustomerResponse = Field(description="平台信息")
     
     # 会话信息
     session_id: str = Field(description="会话ID")

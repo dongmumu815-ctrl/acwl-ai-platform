@@ -365,7 +365,8 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '中心表管理',
           icon: 'Grid',
-          requiresAuth: true
+          requiresAuth: true,
+          hideFooter: true
         }
       },
       {
@@ -373,7 +374,7 @@ const authRoutes: RouteRecordRaw[] = [
         name: 'CenterTableQuery',
         component: () => import('@/views/resourceCenter/CenterTableQuery.vue'),
         meta: {
-          title: '中心表查询',
+          title: '资源中心',
           icon: 'Search',
           requiresAuth: true,
           hideFooter: true
@@ -406,7 +407,7 @@ const authRoutes: RouteRecordRaw[] = [
         name: 'CustomerManagement',
         component: () => import('@/views/apiManagement/CustomerList.vue'),
         meta: {
-          title: '客户管理',
+          title: '平台管理',
           icon: 'UserFilled',
           requiresAuth: true
         }

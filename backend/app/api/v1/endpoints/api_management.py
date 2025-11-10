@@ -3,7 +3,7 @@
 """
 API管理端点
 
-提供客户管理、API管理、批次管理等功能的REST API接口
+提供平台管理、API管理、批次管理等功能的REST API接口
 使用多数据库功能连接到 acwl_api_system 数据库
 """
 
@@ -70,7 +70,7 @@ def invalidate_api_fields_cache(api_id: int):
 
 # Mock数据已删除，现在使用真实的数据库操作
 
-# ==================== 客户管理 ====================
+# ==================== 平台管理 ====================
 
 @router.get("/customers", summary="获取客户列表")
 async def get_customers(
@@ -474,7 +474,7 @@ async def get_apis(
             print(f"🔍 [DEBUG] 搜索条件: {search}, 客户ID: {customer_id}")
             print(f"🔍 [DEBUG] 分页参数: page={page}, page_size={page_size}")
 
-            # 构建基本查询，预加载客户信息
+            # 构建基本查询，预加载平台信息
             query = select(CustomApi).options(selectinload(CustomApi.customer))
 
             # 搜索条件
@@ -517,7 +517,7 @@ async def get_apis(
             apis = result.scalars().all()
             print(f"🔍 [DEBUG] 返回API记录数: {len(apis)}")
 
-            # 转换为字典并序列化时间、客户信息
+            # 转换为字典并序列化时间、平台信息
             items: List[dict] = []
             for api in apis:
                 item = {
@@ -538,7 +538,7 @@ async def get_apis(
                     "updated_at": api.updated_at.isoformat() if api.updated_at else None,
                 }
 
-                # 附加客户信息（只包含前端需要的基础字段）
+                # 附加平台信息（只包含前端需要的基础字段）
                 if getattr(api, "customer", None):
                     customer = api.customer
                     item["customer"] = {
@@ -573,7 +573,7 @@ async def get_api(
     
     try:
         async for api_db in get_db_session(db_name="api_system"):
-            # 查询API详情，包含客户信息
+            # 查询API详情，包含平台信息
             query = select(CustomApi).options(joinedload(CustomApi.customer)).where(CustomApi.id == api_id)
             result = await api_db.execute(query)
             api = result.scalar_one_or_none()
@@ -603,7 +603,7 @@ async def get_api(
                 "updated_at": api.updated_at.isoformat() if api.updated_at else None,
             }
             
-            # 添加客户信息
+            # 添加平台信息
             if api.customer:
                 api_data["customer"] = {
                     "id": api.customer.id,
@@ -802,7 +802,7 @@ async def update_api(
                 "updated_at": api.updated_at.isoformat() if api.updated_at else None,
             }
             
-            # 添加客户信息
+            # 添加平台信息
             if api.customer:
                 api_data["customer"] = {
                     "id": api.customer.id,
@@ -1063,7 +1063,7 @@ async def get_batches(
                     "completed_at": batch.completed_at.isoformat() if batch.completed_at else None,
                 }
                 
-                # 添加客户信息
+                # 添加平台信息
                 if batch.customer:
                     item["customer"] = {
                         "id": batch.customer.id,
@@ -1097,7 +1097,7 @@ async def get_batch(
     
     try:
         async for api_db in get_db_session(db_name="api_system"):
-            # 查询批次详情，包含客户信息
+            # 查询批次详情，包含平台信息
             query = select(DataBatch).options(joinedload(DataBatch.customer)).where(DataBatch.id == batch_id)
             result = await api_db.execute(query)
             batch = result.scalar_one_or_none()
@@ -1121,7 +1121,7 @@ async def get_batch(
                 "completed_at": batch.completed_at.isoformat() if batch.completed_at else None,
             }
             
-            # 添加客户信息
+            # 添加平台信息
             if batch.customer:
                 batch_data["customer"] = {
                     "id": batch.customer.id,
@@ -1232,7 +1232,7 @@ async def get_system_stats(
             total_customers_result = await api_db.execute(total_customers_query)
             total_customers = total_customers_result.scalar()
             
-            # 统计活跃客户数量（按需求：等于 customers 表总数）
+            # 统计活跃平台数量（按需求：等于 customers 表总数）
             active_customers = total_customers
             
             # 统计API数量
@@ -2133,7 +2133,7 @@ def _generate_html_doc(api: CustomApi, api_fields: list = None) -> str:
         <table class="info-table">
             <tr><th>API名称</th><td>{api.api_name}</td></tr>
             <tr><th>API代码</th><td>{api.api_code}</td></tr>
-            <tr><th>所属客户</th><td>{customer_name}</td></tr>
+            <tr><th>所属平台</th><td>{customer_name}</td></tr>
             <tr><th>请求方法</th><td><span class="method-tag method-{api.http_method.lower()}">{api.http_method}</span></td></tr>
             <tr><th>接口地址</th><td>{api.api_url or 'N/A'}</td></tr>
             <tr><th>状态</th><td><span class="{'status-active' if api.status == 1 else 'status-inactive'}">{'激活' if api.status == 1 else '禁用'}</span></td></tr>

@@ -24,7 +24,7 @@ def test_token_decode():
         # 测试get_current_customer函数
         authorization = f"Bearer {token}"
         customer_info = get_current_customer(authorization)
-        print(f"客户信息: {customer_info}")
+        print(f"平台信息: {customer_info}")
         
     except Exception as e:
         print(f"Token解码失败: {e}")

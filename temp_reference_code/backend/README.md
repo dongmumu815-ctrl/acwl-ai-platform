@@ -109,8 +109,8 @@ gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 - Token验证
 - 权限管理
 
-### 2. 客户管理 (`/api/v1/customers`)
-- 客户信息管理
+### 2. 平台管理 (`/api/v1/customers`)
+- 平台信息管理
 - 客户状态控制
 
 ### 3. 批次管理 (`/api/v1/batches`)

@@ -7,7 +7,7 @@
       <el-col :span="6">
         <div class="stat-card">
           <div class="stat-number">{{ stats.totalCustomers }}</div>
-          <div class="stat-label">总客户数</div>
+          <div class="stat-label">总平台数</div>
         </div>
       </el-col>
       <el-col :span="6">

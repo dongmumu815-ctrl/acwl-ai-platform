@@ -518,7 +518,7 @@
           </el-col>
         </el-row>
 
-        <el-form-item label="所属客户" prop="customer_id">
+        <el-form-item label="所属平台" prop="customer_id">
           <el-select
             v-model="form.customer_id"
             placeholder="请选择客户"

@@ -93,7 +93,7 @@ async def handle_custom_api(
                     detail="缺少Authorization头"
                 )
             
-            # 获取客户信息
+            # 获取平台信息
             from app.api.v1.endpoints.data import get_current_customer
             try:
                 customer_info = get_current_customer(authorization)

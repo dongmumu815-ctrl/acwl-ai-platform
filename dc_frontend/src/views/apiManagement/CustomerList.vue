@@ -6,14 +6,14 @@
         <div class="header-left">
           <h1 class="page-title">
             <el-icon><UserFilled /></el-icon>
-            客户管理
+            平台管理
           </h1>
-          <p class="page-description">管理API接口客户信息和权限配置</p>
+          <p class="page-description">管理API接口平台信息和权限配置</p>
         </div>
         <div class="header-right">
           <el-button type="primary" @click="showCreateDialog">
             <el-icon><Plus /></el-icon>
-            添加客户
+            添加平台
           </el-button>
           <el-button @click="loadCustomers">
             <el-icon><Refresh /></el-icon>
@@ -33,7 +33,7 @@
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ customerStats.total }}</div>
-              <div class="stat-label">总客户数</div>
+              <div class="stat-label">总平台数</div>
             </div>
           </div>
         </el-col>
@@ -45,7 +45,7 @@
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ customerStats.active }}</div>
-              <div class="stat-label">活跃客户</div>
+              <div class="stat-label">活跃平台</div>
             </div>
           </div>
         </el-col>
@@ -83,7 +83,7 @@
           <el-form-item label="搜索">
             <el-input
               v-model="searchQuery"
-              placeholder="搜索客户名称、邮箱或公司"
+              placeholder="搜索平台名称、邮箱或公司"
               clearable
               style="width: 280px"
               @input="handleSearch"
@@ -277,7 +277,7 @@
         >
           <el-table-column prop="id" label="ID" min-width="80" sortable />
           
-          <el-table-column prop="name" label="客户信息" min-width="250" sortable>
+          <el-table-column prop="name" label="平台信息" min-width="250" sortable>
             <template #default="{ row }">
               <div class="customer-info">
                 <div class="customer-avatar">
@@ -417,7 +417,7 @@
     <!-- 创建/编辑客户对话框 -->
     <el-dialog
       v-model="dialogVisible"
-      :title="isEdit ? '编辑客户' : '添加客户'"
+      :title="isEdit ? '编辑客户' : '添加平台'"
       width="600px"
       @close="resetForm"
     >
@@ -647,7 +647,7 @@ const customerStats = computed(() => {
   const active = customers.value.filter(c => c.is_active).length
   const totalApiCalls = customers.value.reduce((sum, c) => sum + (c.total_api_calls || 0), 0)
   
-  // 计算近期活跃客户（最近30天有API调用）
+  // 计算近期活跃平台（最近30天有API调用）
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
   const recentActive = customers.value.filter(c => 

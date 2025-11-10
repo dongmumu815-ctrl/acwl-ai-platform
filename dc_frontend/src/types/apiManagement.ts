@@ -3,7 +3,7 @@
  */
 
 /**
- * 客户信息接口
+ * 平台信息接口
  */
 export interface Customer {
   id: number
@@ -23,7 +23,7 @@ export interface Customer {
 }
 
 /**
- * 创建客户请求
+ * 创建平台请求
  */
 export interface CustomerCreate {
   name: string
@@ -35,7 +35,7 @@ export interface CustomerCreate {
 }
 
 /**
- * 更新客户请求
+ * 更新平台请求
  */
 export interface CustomerUpdate {
   name?: string
@@ -265,7 +265,7 @@ export interface ApiCallStats {
 }
 
 /**
- * 客户活跃度统计
+ * 平台活跃度统计
  */
 export interface CustomerActivityStats {
   customer_name: string
