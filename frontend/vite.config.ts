@@ -52,9 +52,9 @@ export default defineConfig({
     // 只在开发环境使用代理，生产环境直接访问本站目录
     proxy: process.env.NODE_ENV === 'development' ? {
       '/api': {
-        // target: 'http://127.0.0.1:8082',
+        target: 'http://127.0.0.1:8082',
         // target: 'http://192.168.95.11:8082',
-        target: 'http://10.20.1.201:8082',
+        // target: 'http://10.20.1.201:8082',
         changeOrigin: true
       }
     } : undefined

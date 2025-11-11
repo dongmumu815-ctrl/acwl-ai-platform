@@ -95,6 +95,7 @@ class UserPermissionResponse(BaseModel):
     username: str = Field(..., description="用户名")
     permissions: List[PermissionResponse] = Field([], description="用户拥有的权限列表")
     permission_codes: List[str] = Field([], description="用户拥有的权限代码列表")
+    role_codes: List[str] = Field([], description="用户拥有的角色代码列表")
 
 
 # 为了避免循环导入，在文件末尾导入Role相关的schema

@@ -1,4 +1,5 @@
 import { request } from '@/utils/request'
+import type { ApiResponse } from '@/types/common'
 
 // 角色相关类型定义
 export interface Role {
@@ -6,7 +7,7 @@ export interface Role {
   name: string
   code: string
   description?: string
-  is_active: boolean
+  status: boolean
   is_system: boolean
   created_at: string
   updated_at: string
@@ -18,14 +19,14 @@ export interface RoleCreate {
   name: string
   code: string
   description?: string
-  is_active?: boolean
+  status?: boolean
 }
 
 export interface RoleUpdate {
   name?: string
   code?: string
   description?: string
-  is_active?: boolean
+  status?: boolean
 }
 
 export interface UserRole {
@@ -71,11 +72,22 @@ export interface Permission {
   code: string
   description?: string
   module: string
-  resource: string
+  resource: string | null
   action: string
-  is_active: boolean
+  status: boolean
+  sort_order: number
+  is_system: boolean
   created_at: string
   updated_at: string
+}
+
+// 角色分页数据结构（与后端 RoleListResponse 对齐）
+export interface RoleListResponse {
+  items: Role[]
+  total: number
+  page: number
+  size: number
+  pages: number
 }
 
 // 角色管理API接口
@@ -87,58 +99,54 @@ export const roleApi = {
     page?: number
     size?: number
     search?: string
-    is_active?: boolean
+    status?: boolean
     is_system?: boolean
   }) {
-    return request.get<{
-      items: Role[]
-      total: number
-      page: number
-      size: number
-      pages: number
-    }>('/roles/', { params })
+    return request.get<ApiResponse<RoleListResponse>>('/roles/', { params })
   },
 
   /**
    * 获取角色详情
    */
   getRole(roleId: number) {
-    return request.get<Role>(`/roles/${roleId}`)
+    return request.get<ApiResponse<Role>>(`/roles/${roleId}`)
   },
 
   /**
    * 创建角色
    */
   createRole(data: RoleCreate) {
-    return request.post<Role>('/roles/', data)
+    return request.post<ApiResponse<Role>>('/roles/', data)
   },
 
   /**
    * 更新角色
    */
   updateRole(roleId: number, data: RoleUpdate) {
-    return request.put<Role>(`/roles/${roleId}`, data)
+    return request.put<ApiResponse<Role>>(`/roles/${roleId}`, data)
   },
 
   /**
    * 删除角色
    */
   deleteRole(roleId: number) {
-    return request.delete(`/roles/${roleId}`)
+    return request.delete<ApiResponse<any>>(`/roles/${roleId}`)
   },
 
   /**
    * 获取角色权限
    */
   getRolePermissions(roleId: number) {
-    return request.get<Permission[]>(`/roles/${roleId}/permissions`)
+    return request.get<ApiResponse<RoleWithPermissions>>(`/roles/${roleId}/permissions`)
   },
 
   /**
    * 为角色分配权限
    */
   assignPermissions(roleId: number, permissionIds: number[]) {
-    return request.post(`/roles/${roleId}/permissions`, {
+    // 后端要求 Body 同时包含 role_id 与 permission_ids
+    return request.post<ApiResponse<any>>(`/roles/${roleId}/permissions`, {
+      role_id: roleId,
       permission_ids: permissionIds
     })
   },
@@ -147,14 +155,14 @@ export const roleApi = {
    * 移除角色权限
    */
   removePermission(roleId: number, permissionId: number) {
-    return request.delete(`/roles/${roleId}/permissions/${permissionId}`)
+    return request.delete<ApiResponse<any>>(`/roles/${roleId}/permissions/${permissionId}`)
   },
 
   /**
    * 批量移除角色权限
    */
   removePermissions(roleId: number, permissionIds: number[]) {
-    return request.delete(`/roles/${roleId}/permissions/batch`, {
+    return request.delete<ApiResponse<any>>(`/roles/${roleId}/permissions/batch`, {
       data: { permission_ids: permissionIds }
     })
   },
@@ -166,34 +174,28 @@ export const roleApi = {
     page?: number
     size?: number
   }) {
-    return request.get<{
-      items: UserWithRoles[]
-      total: number
-      page: number
-      size: number
-      pages: number
-    }>(`/roles/${roleId}/users`, { params })
+    return request.get<ApiResponse<UserWithRoles[]>>(`/roles/${roleId}/users`, { params })
   },
 
   /**
    * 为用户分配角色
    */
   assignRole(data: UserRoleCreate) {
-    return request.post<UserRole>('/roles/assign', data)
+    return request.post<ApiResponse<UserRole>>('/roles/assign', data)
   },
 
   /**
    * 移除用户角色
    */
   removeRole(userId: number, roleId: number) {
-    return request.delete(`/roles/remove/${userId}/${roleId}`)
+    return request.delete<ApiResponse<any>>(`/roles/remove/${userId}/${roleId}`)
   },
 
   /**
    * 获取用户角色列表
    */
   getUserRoles(userId: number) {
-    return request.get<Role[]>(`/users/${userId}/roles`)
+    return request.get<ApiResponse<Role[]>>(`/users/${userId}/roles`)
   },
 
   /**
@@ -221,45 +223,47 @@ export const roleApi = {
 export const permissionApi = {
   /**
    * 获取权限列表
+   *
+   * 说明：后端参数为 `skip` 与 `limit`，若传入 `page/size`，后端会忽略。
+   * 为兼容现有用法，保留 `page/size` 定义，但建议在批量操作或全量拉取时使用 `skip/limit`。
    */
   getPermissions(params?: {
     page?: number
     size?: number
+    skip?: number
+    limit?: number
     search?: string
     module?: string
     resource?: string
     action?: string
-    is_active?: boolean
+    status?: boolean
   }) {
-    return request.get<{
-      items: Permission[]
-      total: number
-      page: number
-      size: number
-      pages: number
-    }>('/permissions/', { params })
+    return request.get<ApiResponse<{ items: Permission[]; total: number; page: number; size: number; pages: number }>>('/permissions/', { params })
   },
 
   /**
    * 获取权限详情
    */
   getPermission(permissionId: number) {
-    return request.get<Permission>(`/permissions/${permissionId}`)
+    return request.get<ApiResponse<Permission>>(`/permissions/${permissionId}`)
   },
 
   /**
    * 创建权限
+   *
+   * 说明：`resource` 可为 `null`，用于表示非特定资源的操作权限。
    */
   createPermission(data: {
     name: string
     code: string
     description?: string
     module: string
-    resource: string
+    resource: string | null
     action: string
-    is_active?: boolean
+    status?: boolean
+    sort_order?: number
   }) {
-    return request.post<Permission>('/permissions/', data)
+    return request.post<ApiResponse<Permission>>('/permissions/', data)
   },
 
   /**
@@ -272,16 +276,17 @@ export const permissionApi = {
     module?: string
     resource?: string
     action?: string
-    is_active?: boolean
+    status?: boolean
+    sort_order?: number
   }) {
-    return request.put<Permission>(`/permissions/${permissionId}`, data)
+    return request.put<ApiResponse<Permission>>(`/permissions/${permissionId}`, data)
   },
 
   /**
    * 删除权限
    */
   deletePermission(permissionId: number) {
-    return request.delete(`/permissions/${permissionId}`)
+    return request.delete<ApiResponse<any>>(`/permissions/${permissionId}`)
   },
 
   /**
@@ -289,7 +294,7 @@ export const permissionApi = {
    */
   getPermissionTree() {
     // 后端返回 ResponseModel[PermissionTreeListResponse]
-    return request.get<any>('/permissions/tree')
+    return request.get<ApiResponse<any>>('/permissions/tree')
   },
 
   /**
@@ -297,29 +302,31 @@ export const permissionApi = {
    */
   getPermissionsByModule(module: string) {
     // 后端路由为 /permissions/modules/{module}
-    return request.get<any>(`/permissions/modules/${module}`)
+    return request.get<ApiResponse<Permission[]>>(`/permissions/modules/${module}`)
   },
 
   /**
    * 批量创建权限
+   * 请求体为权限数组（List[PermissionCreate]），不是对象包装
    */
   batchCreatePermissions(permissions: Array<{
     name: string
     code: string
     description?: string
     module: string
-    resource: string
+    resource: string | null
     action: string
-    is_active?: boolean
+    status?: boolean
+    sort_order?: number
   }>) {
-    return request.post('/permissions/batch', { permissions })
+    return request.post<ApiResponse<any>>('/permissions/batch', permissions)
   },
 
   /**
    * 检查用户权限
    */
   checkUserPermission(userId: number, permissionCode: string) {
-    return request.get<{ has_permission: boolean }>(`/permissions/check/${userId}/${permissionCode}`)
+    return request.get<ApiResponse<{ has_permission: boolean }>>(`/permissions/check/${userId}/${permissionCode}`)
   },
 
   /**
@@ -327,6 +334,6 @@ export const permissionApi = {
    */
   getUserPermissions(userId: number) {
     // 后端路由为 /permissions/user/{user_id}，返回 ResponseModel[UserPermissionResponse]
-    return request.get<any>(`/permissions/user/${userId}`)
+    return request.get<ApiResponse<any>>(`/permissions/user/${userId}`)
   }
 }

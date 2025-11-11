@@ -301,7 +301,10 @@ def get_user_permissions(
     current_user: User = Depends(get_current_user)
 ):
     """
-    获取用户的所有权限
+    获取用户的所有权限与角色代码
+    
+    - 返回字段包含：`permissions`、`permission_codes`、`role_codes`
+    - 其中 `role_codes` 来自新角色系统，支持多角色场景
     """
     # 验证用户是否存在
     from app.crud.user import crud_user
@@ -311,12 +314,17 @@ def get_user_permissions(
     
     permissions = crud_permission.get_user_permissions(db=db, user_id=user_id)
     permission_codes = crud_permission.get_permission_codes_by_user(db=db, user_id=user_id)
+    # 计算用户角色代码（新角色系统），仅返回启用状态的角色
+    role_codes = user.get_role_codes()
     
     return ResponseModel(
         data=UserPermissionResponse(
+            # 补充 username 字段，避免响应模型缺失导致 500
             user_id=user_id,
+            username=user.username,
             permissions=[PermissionResponse.model_validate(perm) for perm in permissions],
-            permission_codes=permission_codes
+            permission_codes=permission_codes,
+            role_codes=role_codes
         ),
         message="获取用户权限成功"
     )

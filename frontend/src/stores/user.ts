@@ -22,8 +22,16 @@ export const useUserStore = defineStore('user', () => {
     return !!token.value && !!user.value
   })
   
+  /**
+   * 是否为管理员（支持老字段与多角色判断）
+   * 优先使用多角色数组，其次兼容旧的单角色 user.role 字段
+   */
   const isAdmin = computed(() => {
-    return user.value?.role === 'admin'
+    return (
+      roles.value.includes(ROLES.ADMIN) ||
+      roles.value.includes('super_admin') ||
+      user.value?.role === 'admin'
+    )
   })
   
   const userName = computed(() => {
@@ -125,7 +133,11 @@ export const useUserStore = defineStore('user', () => {
   }
 
   /**
-   * 加载用户权限信息
+   * 加载用户权限与角色信息
+   *
+   * - 调用后端接口 `/permissions/user/{id}`
+   * - 使用返回的 `permission_codes` 与 `role_codes` 更新 store
+   * - 兼容旧的 `user.role` 字段作为降级
    */
   const loadUserPermissions = async () => {
     if (!user.value?.id) {
@@ -142,9 +154,11 @@ export const useUserStore = defineStore('user', () => {
       // 优先使用后端直接提供的权限代码列表
       permissions.value = respData.permission_codes || permissionObjects.value.map((p: any) => p.code)
 
-      // 获取用户角色（如果有相关API）
-      // 暂时使用用户的role字段
-      if (user.value?.role) {
+      // 适配后端返回的多角色：role_codes
+      if (Array.isArray(respData.role_codes) && respData.role_codes.length > 0) {
+        roles.value = respData.role_codes
+      } else if (user.value?.role) {
+        // 兼容旧的 user.role 字段
         roles.value = [user.value.role]
       }
 

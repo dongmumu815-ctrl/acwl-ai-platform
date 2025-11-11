@@ -285,6 +285,24 @@ export const PERMISSIONS = {
   INSTRUCTION_SET_UPDATE: 'instruction_set:update',
   INSTRUCTION_SET_DELETE: 'instruction_set:delete',
   INSTRUCTION_SET_TEST: 'instruction_set:test'
+  ,
+  // 数据源模块权限
+  DATASOURCE_READ: 'datasource:read',
+  DATASOURCE_CREATE: 'datasource:create',
+  DATASOURCE_UPDATE: 'datasource:update',
+  DATASOURCE_DELETE: 'datasource:delete',
+
+  // 智能体模块权限
+  AGENT_READ: 'agent:read',
+  AGENT_CREATE: 'agent:create',
+  AGENT_UPDATE: 'agent:update',
+  AGENT_DELETE: 'agent:delete',
+
+  // 微调/训练模块权限
+  TRAINING_READ: 'training:read',
+  TRAINING_CREATE: 'training:create',
+  TRAINING_UPDATE: 'training:update',
+  TRAINING_DELETE: 'training:delete'
 } as const
 
 /**

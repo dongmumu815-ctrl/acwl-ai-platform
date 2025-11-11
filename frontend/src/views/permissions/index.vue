@@ -14,6 +14,10 @@
           <el-icon><Plus /></el-icon>
           新建权限
         </el-button>
+        <el-button type="warning" @click="syncPermissionsFromConstants">
+          <el-icon><Refresh /></el-icon>
+          同步权限常量
+        </el-button>
         <el-button @click="expandAll">
           <el-icon><ArrowDown /></el-icon>
           展开全部
@@ -280,6 +284,17 @@
             :disabled="isEditing"
           />
         </el-form-item>
+
+        <el-form-item
+          v-if="permissionForm.type === 'permission'"
+          label="资源标识"
+          prop="resource"
+        >
+          <el-input
+            v-model="permissionForm.resource"
+            placeholder="可选。用于区分资源，如某个数据集"
+          />
+        </el-form-item>
         
         <el-form-item label="权限描述" prop="description">
           <el-input
@@ -335,6 +350,7 @@ import {
   Refresh
 } from '@element-plus/icons-vue'
 import { permissionApi, type Permission } from '@/api/roles'
+import { PERMISSIONS } from '@/utils/permission'
 
 // 响应式数据
 const treeLoading = ref(false)
@@ -373,6 +389,8 @@ const permissionForm = reactive({
   type: 'module',
   parent_id: null as number | null,
   is_active: true,
+  // 资源标识（后端字段 resource），用于进一步区分权限归属
+  resource: '',
   sort: 0,
   is_system: false
 })
@@ -412,6 +430,9 @@ const permissionRules: FormRules = {
   ],
   parent_id: [
     { required: true, message: '请选择所属模块', trigger: 'change' }
+  ],
+  resource: [
+    { min: 0, max: 100, message: '资源标识长度不能超过100', trigger: 'blur' }
   ],
   description: [
     { max: 200, message: '描述不能超过 200 个字符', trigger: 'blur' }
@@ -548,6 +569,7 @@ const showCreateDialog = () => {
     type: 'module',
     parent_id: null,
     is_active: true,
+    resource: '',
     sort: 0,
     is_system: false
   })
@@ -569,6 +591,7 @@ const showCreatePermissionDialog = (module: any) => {
     type: 'permission',
     parent_id: module.id,
     is_active: true,
+    resource: '',
     sort: 0,
     is_system: false
   })
@@ -578,7 +601,15 @@ const showCreatePermissionDialog = (module: any) => {
 /**
  * 显示编辑对话框
  */
+/**
+ * 显示编辑对话框
+ * 仅支持编辑具体权限节点，模块节点为聚合显示不可编辑
+ */
 const showEditDialog = (data: any) => {
+  if (data.type === 'module') {
+    ElMessage.warning('模块节点为聚合显示，不支持直接编辑')
+    return
+  }
   isEditing.value = true
   isCreatingPermission.value = false
   Object.assign(permissionForm, { ...data })
@@ -614,6 +645,11 @@ const handleCloseDialog = () => {
 /**
  * 提交表单
  */
+/**
+ * 提交表单
+ * - 创建：从 code 中拆分 module/action，提交 status 与 sort_order
+ * - 更新：支持更新 name/code/description/status/sort_order 及 module/action
+ */
 const handleSubmit = async () => {
   if (!permissionFormRef.value) return
   
@@ -623,24 +659,31 @@ const handleSubmit = async () => {
     
     if (isEditing.value) {
       // 更新权限
+      // 从 code 拆分 module 与 action（如：user:create）
+      const [mod, act] = (permissionForm.code || '').split(':')
       await permissionApi.updatePermission(permissionForm.id, {
         name: permissionForm.name,
         code: permissionForm.code,
         description: permissionForm.description,
-        is_active: permissionForm.is_active,
-        sort: permissionForm.sort
+        module: mod,
+        action: act,
+        resource: permissionForm.resource || '',
+        status: permissionForm.is_active,
+        sort_order: permissionForm.sort
       })
       ElMessage.success('权限更新成功')
     } else {
       // 创建权限
+      const [mod, act] = (permissionForm.code || '').split(':')
       await permissionApi.createPermission({
         name: permissionForm.name,
         code: permissionForm.code,
         description: permissionForm.description,
-        type: permissionForm.type,
-        parent_id: permissionForm.parent_id,
-        is_active: permissionForm.is_active,
-        sort: permissionForm.sort
+        module: mod,
+        resource: permissionForm.resource || '',
+        action: act,
+        status: permissionForm.is_active,
+        sort_order: permissionForm.sort
       })
       ElMessage.success('权限创建成功')
     }
@@ -658,7 +701,15 @@ const handleSubmit = async () => {
 /**
  * 删除权限
  */
+/**
+ * 删除权限
+ * - 限制：模块节点为聚合展示，不能删除
+ */
 const handleDelete = async (data: any) => {
+  if (data.type === 'module') {
+    ElMessage.warning('模块节点为聚合显示，不能直接删除')
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `确定要删除${data.type === 'module' ? '模块' : '权限'} "${data.name}" 吗？此操作不可恢复。`,
@@ -679,6 +730,148 @@ const handleDelete = async (data: any) => {
       ElMessage.error(error.response?.data?.message || '删除失败')
     }
     // 用户取消删除时不显示错误
+  }
+}
+
+/**
+ * 根据模块与动作生成默认权限名称
+ * @param module 模块标识（如：user、model、datasource）
+ * @param action 动作标识（如：read、create、update、delete）
+ * @returns 默认的中文权限名称，例如："数据源:读取"
+ */
+function getDefaultPermissionName(module: string, action: string): string {
+  const actionMap: Record<string, string> = {
+    read: '读取',
+    create: '创建',
+    update: '更新',
+    delete: '删除',
+    deploy: '部署',
+    monitor: '监控',
+    test: '测试'
+  }
+  const moduleMap: Record<string, string> = {
+    user: '用户',
+    role: '角色',
+    permission: '权限',
+    model: '模型',
+    dataset: '数据集',
+    project: '项目',
+    system: '系统',
+    instruction_set: '指令集',
+    datasource: '数据源',
+    agent: '智能体',
+    training: '微调'
+  }
+  return `${moduleMap[module] || module}:${actionMap[action] || action}`
+}
+
+/**
+ * 同步前端权限常量到数据库
+ *
+ * 实现步骤：
+ * 1) 全量拉取现有权限（列表接口：skip/limit），避免树结构遗漏导致重复创建
+ * 2) 对比前端 PERMISSIONS 常量，计算缺失代码集合
+ * 3) 优先尝试批量创建；如遇 400（重复或名称冲突），降级为逐条创建并忽略已存在项
+ * 4) 创建成功后刷新权限树，以便页面展示最新结果
+ */
+const syncPermissionsFromConstants = async () => {
+  try {
+    treeLoading.value = true
+    // 1) 通过列表接口全量获取已有权限，避免树结构遗漏
+    const listResp = await permissionApi.getPermissions({ skip: 0, limit: 1000 })
+    const listData = (listResp as any)?.data || {}
+    const items: Array<{ code: string }> = listData.items || []
+    const existingCodes = new Set<string>(items.filter(it => !!it.code).map(it => it.code))
+
+    // 兜底：再合并一次树结构中的代码（如果已加载过）
+    if (permissionTree.value && permissionTree.value.length > 0) {
+      permissionTree.value.forEach((mod: any) => {
+        (mod.children || []).forEach((perm: any) => {
+          if (perm.code) existingCodes.add(perm.code)
+        })
+      })
+    } else {
+      // 若未加载过树，则补一次加载，提升完整性
+      await loadPermissionTree()
+      permissionTree.value.forEach((mod: any) => {
+        (mod.children || []).forEach((perm: any) => {
+          if (perm.code) existingCodes.add(perm.code)
+        })
+      })
+    }
+
+    // 前端常量中的所有权限代码
+    const constantCodes: string[] = Object.values(PERMISSIONS)
+    const missingCodes = constantCodes.filter(code => !existingCodes.has(code))
+
+    if (missingCodes.length === 0) {
+      ElMessage.success('权限常量已与数据库一致，无需同步')
+      return
+    }
+
+    // 构造批量创建的权限数据
+    const payloads = missingCodes.map(code => {
+      const [module, action] = code.split(':')
+      return {
+        name: getDefaultPermissionName(module, action),
+        code,
+        description: `同步自前端常量 ${code}`,
+        module,
+        resource: null,
+        action,
+        status: true,
+        sort_order: 0
+      }
+    })
+
+    // 3) 执行批量创建
+    try {
+      await permissionApi.batchCreatePermissions(payloads)
+      ElMessage.success(`已同步 ${missingCodes.length} 个权限`)
+    } catch (batchError: any) {
+      // 批量创建失败（可能因为部分代码/名称已存在），降级为逐条创建
+      const batchDetail = batchError?.response?.data?.detail || batchError?.response?.data?.message
+      console.warn('批量创建失败，降级单条创建:', batchDetail)
+
+      let successCount = 0
+      for (const p of payloads) {
+        // 跳过已存在代码（双重保险）
+        if (existingCodes.has(p.code)) continue
+        try {
+          await permissionApi.createPermission(p)
+          successCount++
+        } catch (singleError: any) {
+          const detail = singleError?.response?.data?.detail || singleError?.response?.data?.message || ''
+          // 如果是名称已存在，尝试调整名称后重试一次
+          if (typeof detail === 'string' && detail.includes('名称已存在')) {
+            const adjusted = { ...p, name: `${p.name}（常量）` }
+            try {
+              await permissionApi.createPermission(adjusted)
+              successCount++
+            } catch (retryErr) {
+              console.warn(`创建权限失败（重试后）: ${p.code}`, retryErr)
+            }
+          } else {
+            // 其他错误忽略，保留日志
+            console.warn(`创建权限失败: ${p.code}`, singleError)
+          }
+        }
+      }
+
+      if (successCount > 0) {
+        ElMessage.success(`已同步 ${successCount} 个权限（逐条创建）`)
+      } else {
+        ElMessage.info('没有可创建的缺失权限或全部创建失败')
+      }
+    }
+
+    // 4) 刷新权限树
+    await loadPermissionTree()
+  } catch (error: any) {
+    console.error('同步权限失败:', error)
+    ElMessage.error(error.response?.data?.message || '同步权限失败')
+  } finally {
+    treeLoading.value = false
   }
 }
 

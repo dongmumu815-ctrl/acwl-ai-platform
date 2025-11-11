@@ -315,13 +315,26 @@
                   <p class="email">{{ user.email }}</p>
                   
                   <div class="user-tags">
-                    <el-tag
-                      :type="getRoleType(user.role)"
-                      size="small"
-                      class="role-tag"
-                    >
-                      {{ getRoleText(user.role) }}
-                    </el-tag>
+                    <template v-if="getRoles(user).length > 0">
+                      <el-tag
+                        v-for="r in getRoles(user)"
+                        :key="r"
+                        :type="getRoleType(r)"
+                        size="small"
+                        class="role-tag"
+                      >
+                        {{ getRoleText(r) }}
+                      </el-tag>
+                    </template>
+                    <template v-else>
+                      <el-tag
+                        :type="getRoleType('guest')"
+                        size="small"
+                        class="role-tag"
+                      >
+                        {{ getRoleText('guest') }}
+                      </el-tag>
+                    </template>
                     <el-tag
                       :type="getStatusType(user.status)"
                       size="small"
@@ -474,15 +487,21 @@
           />
         </el-form-item>
         
-        <el-form-item label="角色" prop="role">
+        <el-form-item label="角色" prop="roles">
           <el-select
-            v-model="userForm.role"
-            placeholder="请选择角色"
+            v-model="userForm.roles"
+            multiple
+            filterable
+            collapse-tags
+            placeholder="请选择角色（可多选）"
             style="width: 100%"
           >
-            <el-option label="管理员" value="admin" />
-            <el-option label="普通用户" value="user" />
-            <el-option label="访客" value="guest" />
+            <el-option
+              v-for="opt in roleOptions"
+              :key="opt.code"
+              :label="opt.name"
+              :value="opt.code"
+            />
           </el-select>
         </el-form-item>
         
@@ -559,6 +578,7 @@ import {
   Calendar,
   Clock
 } from '@element-plus/icons-vue'
+import { roleApi } from '@/api/roles'
 
 const router = useRouter()
 
@@ -601,7 +621,7 @@ const userForm = reactive({
   email: '',
   password: '',
   confirmPassword: '',
-  role: 'user',
+  roles: ['user'],
   department: '',
   phone: '',
   status: 'active',
@@ -635,8 +655,17 @@ const userRules: FormRules = {
       trigger: 'blur'
     }
   ],
-  role: [
-    { required: true, message: '请选择角色', trigger: 'change' }
+  roles: [
+    {
+      validator: (rule, value, callback) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          callback(new Error('请选择至少一个角色'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
   ],
   status: [
     { required: true, message: '请选择状态', trigger: 'change' }
@@ -656,9 +685,12 @@ const filteredUsers = computed(() => {
     )
   }
   
-  // 角色过滤
+  // 角色过滤（支持多角色）
   if (filters.role) {
-    result = result.filter(user => user.role === filters.role)
+    result = result.filter(user => {
+      const roles = getRoles(user)
+      return roles.includes(filters.role)
+    })
   }
   
   // 状态过滤
@@ -689,6 +721,19 @@ const paginatedUsers = computed(() => {
 // 方法
 const formatDate = (date: string) => {
   return new Date(date).toLocaleString('zh-CN')
+}
+
+/**
+ * 获取用户的角色列表（函数级注释）
+ *
+ * - 兼容用户对象包含单角色字段 `role` 或多角色数组 `roles`
+ * - 当不存在任何角色时返回空数组
+ */
+const getRoles = (user: any): string[] => {
+  if (!user) return []
+  if (Array.isArray(user.roles)) return user.roles
+  if (typeof user.role === 'string' && user.role) return [user.role]
+  return []
 }
 
 const getRoleType = (role: string) => {
@@ -880,7 +925,7 @@ const refreshUsers = async () => {
 const updateStats = () => {
   stats.total = users.value.length
   stats.active = users.value.filter(u => u.status === 'active').length
-  stats.admin = users.value.filter(u => u.role === 'admin').length
+  stats.admin = users.value.filter(u => getRoles(u).includes('admin')).length
   stats.online = users.value.filter(u => u.is_online).length
 }
 
@@ -896,7 +941,7 @@ const resetUserForm = () => {
   userForm.email = ''
   userForm.password = ''
   userForm.confirmPassword = ''
-  userForm.role = 'user'
+  userForm.roles = ['user']
   userForm.department = ''
   userForm.phone = ''
   userForm.status = 'active'
@@ -921,7 +966,8 @@ const submitUser = async () => {
       
       const index = users.value.findIndex(u => u.id === userForm.id)
       if (index > -1) {
-        users.value[index] = { ...users.value[index], ...userForm }
+        const primaryRole = Array.isArray(userForm.roles) ? (userForm.roles[0] || '') : ''
+        users.value[index] = { ...users.value[index], ...userForm, role: primaryRole }
       }
       
       ElMessage.success('用户更新成功')
@@ -929,8 +975,10 @@ const submitUser = async () => {
       // 这里应该调用实际的API创建用户
       // await userApi.createUser(userForm)
       
+      const primaryRole = Array.isArray(userForm.roles) ? (userForm.roles[0] || '') : ''
       const newUser = {
         ...userForm,
+        role: primaryRole,
         id: Date.now().toString(),
         avatar: '',
         is_online: false,
@@ -964,6 +1012,8 @@ const viewUser = (user: any) => {
 const editUser = (user: any) => {
   isEditing.value = true
   Object.assign(userForm, user)
+  // 同步已有用户的角色到多选字段
+  userForm.roles = getRoles(user)
   userDialogVisible.value = true
 }
 
@@ -1054,8 +1104,33 @@ const deleteUser = async (user: any) => {
   }
 }
 
+// 角色选项列表（默认静态，后端加载后覆盖）
+const roleOptions = ref<Array<{ code: string; name: string }>>([
+  { code: 'admin', name: '管理员' },
+  { code: 'user', name: '普通用户' },
+  { code: 'guest', name: '访客' }
+])
+
+/**
+ * 加载角色选项（函数级注释）
+ *
+ * - 优先从后端获取可用角色列表 `/roles/`
+ * - 将后端返回的 `code`/`name` 映射为下拉选项
+ * - 若请求失败，保留静态默认选项，避免界面不可用
+ */
+const loadRoleOptions = async () => {
+  try {
+    const resp = await roleApi.getRoles({ size: 100 })
+    const items = resp?.data?.items || []
+    roleOptions.value = items.map((r: any) => ({ code: r.code, name: r.name }))
+  } catch (e) {
+    console.warn('加载角色列表失败，使用内置默认选项', e)
+  }
+}
+
 onMounted(() => {
   refreshUsers()
+  loadRoleOptions()
 })
 </script>
 

@@ -148,7 +148,9 @@ import {
   Cpu,
   VideoCamera,
   Connection,
-  Folder
+  Folder,
+  Key,
+  UserFilled
 } from '@element-plus/icons-vue'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import RobotIcon from '@/components/RobotIcon.vue'
@@ -172,6 +174,8 @@ const iconMap: Record<string, any> = {
   Upload,
   Plus,
   User,
+  UserFilled,
+  Key,
   Document,
   Cpu,
   VideoCamera,
