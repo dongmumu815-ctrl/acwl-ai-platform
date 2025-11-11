@@ -248,7 +248,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       title: '数据源管理',
       icon: 'Connection',
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.DATASOURCE_READ,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -258,7 +260,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '数据源列表',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.DATASOURCE_READ,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -296,7 +300,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       title: '智能体管理',
       icon: 'Robot',
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.AGENT_READ,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -306,7 +312,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '智能体列表',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.AGENT_READ,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -317,7 +325,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '创建智能体',
           icon: 'Plus',
           requiresAuth: true,
-          hideInMenu: true
+          hideInMenu: true,
+          permission: PERMISSIONS.AGENT_CREATE,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -327,7 +337,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '智能体详情',
           hidden: true,
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.AGENT_READ,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -339,7 +351,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
     meta: {
       title: '模型微调',
       icon: 'Setting',
-      requiresAuth: true
+      requiresAuth: true,
+      permission: PERMISSIONS.TRAINING_READ,
+      noPermissionBehavior: 'hide'
     },
     children: [
       {
@@ -349,7 +363,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '微调任务',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.TRAINING_READ,
+          noPermissionBehavior: 'hide'
         }
       },
       {
@@ -359,7 +375,9 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '创建微调',
           icon: 'Plus',
-          requiresAuth: true
+          requiresAuth: true,
+          permission: PERMISSIONS.TRAINING_CREATE,
+          noPermissionBehavior: 'hide'
         }
       }
     ]
@@ -372,6 +390,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
       title: '资源管理',
       icon: 'Cpu',
       requiresAuth: true,
+      permission: PERMISSIONS.SYSTEM_MONITOR,
       noPermissionBehavior: 'hide'
     },
     children: [
@@ -383,6 +402,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: '服务器资源池',
           icon: 'Monitor',
           requiresAuth: true,
+          permission: PERMISSIONS.SYSTEM_MONITOR,
           noPermissionBehavior: 'hide'
         }
       },
@@ -394,6 +414,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
           title: 'GPU资源池',
           icon: 'Cpu',
           requiresAuth: true,
+          permission: PERMISSIONS.SYSTEM_MONITOR,
           noPermissionBehavior: 'hide'
         }
       }
@@ -495,6 +516,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
       icon: 'Monitor',
       requiresAuth: true,
       requiresAdmin: true,
+      permission: PERMISSIONS.SYSTEM_MONITOR,
       noPermissionBehavior: 'hide'
     },
     children: [
@@ -507,6 +529,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
           icon: 'Monitor',
           requiresAuth: true,
           requiresAdmin: true,
+          permission: PERMISSIONS.SYSTEM_MONITOR,
           noPermissionBehavior: 'hide'
         }
       }

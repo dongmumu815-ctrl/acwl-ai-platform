@@ -140,10 +140,10 @@
         
         <el-table-column prop="description" label="描述" min-width="200" />
         
-        <el-table-column prop="is_active" label="状态" width="100" align="center">
+        <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.is_active ? 'success' : 'danger'" size="small">
-              {{ row.is_active ? '启用' : '禁用' }}
+            <el-tag :type="row.status ? 'success' : 'danger'" size="small">
+              {{ row.status ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -234,8 +234,8 @@
           />
         </el-form-item>
         
-        <el-form-item label="状态" prop="is_active">
-          <el-radio-group v-model="roleForm.is_active">
+        <el-form-item label="状态" prop="status">
+          <el-radio-group v-model="roleForm.status">
             <el-radio :label="true">启用</el-radio>
             <el-radio :label="false">禁用</el-radio>
           </el-radio-group>
@@ -348,7 +348,7 @@ const roleForm = reactive({
   name: '',
   code: '',
   description: '',
-  is_active: true,
+  status: true,
   is_system: false
 })
 
@@ -388,6 +388,11 @@ const formatDate = (date: string) => {
 /**
  * 加载角色列表
  */
+/**
+ * 加载角色列表
+ * - 使用后端通用响应结构 ApiResponse<RoleListResponse>
+ * - 支持 status 过滤与分页
+ */
 const loadRoles = async () => {
   loading.value = true
   try {
@@ -395,7 +400,7 @@ const loadRoles = async () => {
       page: pagination.currentPage,
       size: pagination.pageSize,
       search: filters.search || undefined,
-      is_active: filters.status === 'active' ? true : filters.status === 'disabled' ? false : undefined
+      status: filters.status === 'active' ? true : filters.status === 'disabled' ? false : undefined
     }
     
     const response = await roleApi.getRoles(params)
@@ -404,7 +409,7 @@ const loadRoles = async () => {
     
     // 更新统计数据
     stats.value.total = response.data.total
-    stats.value.active = response.data.items.filter((role: Role) => role.is_active).length
+    stats.value.active = response.data.items.filter((role: Role) => (role as any).status).length
     stats.value.system = response.data.items.filter((role: Role) => role.is_system).length
     stats.value.custom = response.data.items.filter((role: Role) => !role.is_system).length
     
@@ -419,10 +424,23 @@ const loadRoles = async () => {
 /**
  * 加载权限树
  */
+/**
+ * 加载权限树
+ * - 将后端 modules 列表转换为 el-tree 所需结构
+ */
 const loadPermissionTree = async () => {
   try {
     const response = await permissionApi.getPermissionTree()
-    permissionTree.value = response.data
+    const modules = (response as any)?.data?.modules || []
+    permissionTree.value = modules.map((mod: any) => ({
+      id: `module:${mod.module}`,
+      name: mod.module,
+      children: (mod.permissions || []).map((perm: any) => ({
+        id: perm.id,
+        name: perm.name,
+        code: perm.code
+      }))
+    }))
   } catch (error: any) {
     console.error('加载权限数据失败:', error)
     ElMessage.error(error.response?.data?.message || '加载权限数据失败')
@@ -432,6 +450,9 @@ const loadPermissionTree = async () => {
 /**
  * 显示创建对话框
  */
+/**
+ * 显示创建角色对话框
+ */
 const showCreateDialog = () => {
   isEditing.value = false
   Object.assign(roleForm, {
@@ -439,7 +460,7 @@ const showCreateDialog = () => {
     name: '',
     code: '',
     description: '',
-    is_active: true,
+    status: true,
     is_system: false
   })
   roleDialogVisible.value = true
@@ -457,6 +478,10 @@ const showEditDialog = (role: any) => {
 /**
  * 显示权限配置对话框
  */
+/**
+ * 显示权限配置对话框
+ * - 加载权限树并初始化已选权限
+ */
 const showPermissionsDialog = async (role: Role) => {
   currentRole.value = role
   await loadPermissionTree()
@@ -464,7 +489,8 @@ const showPermissionsDialog = async (role: Role) => {
   try {
     // 加载角色已有权限
     const response = await roleApi.getRolePermissions(role.id)
-    selectedPermissions.value = response.data.map(p => p.id)
+    const perms = (response as any)?.data?.permissions || []
+    selectedPermissions.value = perms.map((p: any) => p.id)
   } catch (error: any) {
     console.error('加载角色权限失败:', error)
     selectedPermissions.value = []
@@ -517,6 +543,10 @@ const handleCloseDialog = () => {
 /**
  * 提交表单
  */
+/**
+ * 提交角色表单
+ * - 创建/更新均提交 status 字段
+ */
 const handleSubmit = async () => {
   if (!roleFormRef.value) return
   
@@ -528,9 +558,9 @@ const handleSubmit = async () => {
       // 更新角色
       const updateData: RoleUpdate = {
         name: roleForm.name,
-        code: roleForm.code,
         description: roleForm.description,
-        is_active: roleForm.is_active
+        status: roleForm.status,
+        code: roleForm.code
       }
       await roleApi.updateRole(roleForm.id, updateData)
       ElMessage.success('角色更新成功')
@@ -540,7 +570,7 @@ const handleSubmit = async () => {
         name: roleForm.name,
         code: roleForm.code,
         description: roleForm.description,
-        is_active: roleForm.is_active
+        status: roleForm.status
       }
       await roleApi.createRole(createData)
       ElMessage.success('角色创建成功')
@@ -623,9 +653,11 @@ const savePermissions = async () => {
   try {
     savingPermissions.value = true
     
-    const checkedKeys = permissionTreeRef.value?.getCheckedKeys() || []
+    // 仅提交叶子节点（具体权限）的 ID，过滤非数字键（模块键形如 "module:xxx"）
+    const checkedLeafKeys = permissionTreeRef.value?.getCheckedKeys(true) || []
+    const permissionIds = (checkedLeafKeys as Array<string | number>).filter(k => typeof k === 'number') as number[]
     
-    await roleApi.assignPermissions(currentRole.value.id, checkedKeys)
+    await roleApi.assignPermissions(currentRole.value.id, permissionIds)
     
     ElMessage.success('权限配置保存成功')
     permissionsDialogVisible.value = false

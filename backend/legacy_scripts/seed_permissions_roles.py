@@ -53,14 +53,34 @@ def ensure_admin_user(db: Session):
 
 
 def ensure_roles(db: Session, admin_id: int):
-    """创建/确保 developer 和 operator 角色存在，并返回所有相关角色"""
+    """创建/确保基础与扩展角色存在，并返回所有相关角色
+
+    基础角色：super_admin、admin、user、guest
+    扩展角色：developer、operator
+    - 若 super_admin 不存在则创建，并标记为系统角色
+    - 其余角色若不存在则创建为普通角色
+    """
     roles = {}
 
-    # 先尝试加载已有基础角色
-    for code in ["super_admin", "admin", "user", "guest"]:
+    # 基础角色定义（含是否系统角色）
+    base_role_defs = [
+        ("super_admin", "超级管理员", True, "拥有所有系统权限的最高角色"),
+        ("admin", "管理员", False, "系统管理员，拥有大部分管理权限"),
+        ("user", "用户", False, "普通用户角色"),
+        ("guest", "访客", False, "访客角色，权限最少")
+    ]
+
+    # 加载或创建基础角色
+    for code, name, is_system, desc in base_role_defs:
         r = crud_role.get_by_code(db, code)
-        if r:
-            roles[code] = r
+        if not r:
+            r = crud_role.create(
+                db,
+                RoleCreate(name=name, code=code, description=desc, status=True, is_system=is_system),
+                created_by=admin_id,
+            )
+            print(f"✅ 已创建基础角色: {name} ({code})，系统角色={is_system}")
+        roles[code] = r
 
     # 创建新增角色
     for code, name, desc in [
@@ -194,6 +214,44 @@ def ensure_user_role(db: Session, user_id: int, role_code: str, created_by: int)
     crud_user_role.create(db, UserRoleCreate(user_id=user_id, role_id=role.id), created_by)
 
 
+def assign_all_system_permissions_to_super_admin(db: Session, created_by: int) -> int:
+    """为 super_admin 绑定所有系统且启用的权限
+
+    说明：
+    - 仅追加绑定，不会删除已存在的绑定记录
+    - 通过直接使用 CRUD 层绕过 API 端点中的系统角色限制
+    - 避免清空已有分配，逐条 create 以保持幂等
+    返回：新增绑定数量
+    """
+    from app.models.permission import Permission
+
+    super_admin_role = crud_role.get_by_code(db, "super_admin")
+    if not super_admin_role:
+        print("⚠️ 未找到角色 super_admin，跳过系统权限绑定")
+        return 0
+
+    # 查询所有启用的系统权限
+    system_perms = db.query(Permission).filter(
+        Permission.status == True,
+        Permission.is_system == True,
+    ).all()
+
+    assigned = 0
+    for perm in system_perms:
+        crud_role_permission.create(
+            db,
+            RolePermissionCreate(role_id=super_admin_role.id, permission_id=perm.id),
+            created_by,
+        )
+        assigned += 1
+
+    if assigned:
+        print(f"✅ super_admin 绑定系统权限数量: +{assigned}")
+    else:
+        print("ℹ️ super_admin 无需新增系统权限绑定")
+    return assigned
+
+
 def main():
     db = SessionLocal()
     try:
@@ -218,6 +276,10 @@ def main():
         # 将管理员用户绑定到 admin 角色（用于权限计算）
         ensure_user_role(db, admin.id, "admin", admin.id)
         print("✅ 管理员用户已绑定到 admin 角色")
+
+        # 将管理员用户绑定到 super_admin 角色（用于全局权限放行）
+        ensure_user_role(db, admin.id, "super_admin", admin.id)
+        print("✅ 管理员用户已绑定到 super_admin 角色")
 
         # 为各角色分配权限
         admin_codes = [p.code for p in perms_to_create]  # 管理员拥有全部新权限
@@ -248,6 +310,9 @@ def main():
 
         print("=== 分配结果 ===")
         print(f"admin: +{assigned_admin} 个权限（不影响原有系统权限）")
+        # 为 super_admin 角色追加所有系统权限绑定（不影响原绑定）
+        assigned_sa = assign_all_system_permissions_to_super_admin(db, admin.id)
+        print(f"super_admin: +{assigned_sa} 个系统权限绑定")
         print(f"user: +{assigned_user} 个权限")
         print(f"guest: +{assigned_guest} 个权限")
         print(f"developer: +{assigned_dev} 个权限")
