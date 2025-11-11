@@ -608,7 +608,7 @@ const trendChartOption = computed(() => {
       }
     },
     legend: {
-      data: ['ERP系统', '爱学术平台', '加工平台'],
+      data: ['爱学术平台', '资源加工平台'],
       top: 10
     },
     grid: {
@@ -637,25 +637,25 @@ const trendChartOption = computed(() => {
       }
     ],
     series: [
-      {
-        name: 'ERP系统',
-        type: 'line',
-        stack: 'Total',
-        smooth: true,
-        lineStyle: {
-          width: 3
-        },
-        areaStyle: {
-          opacity: 0.3
-        },
-        emphasis: {
-          focus: 'series'
-        },
-        data: data.erpData,
-        itemStyle: {
-          color: '#409EFF'
-        }
-      },
+      // {
+      //   name: 'ERP系统',
+      //   type: 'line',
+      //   stack: 'Total',
+      //   smooth: true,
+      //   lineStyle: {
+      //     width: 3
+      //   },
+      //   areaStyle: {
+      //     opacity: 0.3
+      //   },
+      //   emphasis: {
+      //     focus: 'series'
+      //   },
+      //   data: data.erpData,
+      //   itemStyle: {
+      //     color: '#409EFF'
+      //   }
+      // },
       {
         name: '爱学术平台',
         type: 'bar',
@@ -665,7 +665,7 @@ const trendChartOption = computed(() => {
         }
       },
       {
-        name: '加工平台',
+        name: '资源加工平台',
         type: 'line',
         smooth: true,
         lineStyle: {
@@ -691,6 +691,26 @@ const trendChartOption = computed(() => {
  * 计算数据类型分布的配置
  * @returns {Object} ECharts饼图配置对象
  */
+// 英文类型到中文标签的映射
+const typeLabelMap: Record<string, string> = {
+  BOOK: '图书',
+  JOURNAL_ARTICLE: '期刊文章',
+  CONFERENCE_PAPER: '会议论文',
+  REPORT: '报告',
+  THESIS: '学位论文',
+  STANDARD: '标准',
+  PATENT: '专利',
+  OTHER: '其他'
+}
+
+// 计算后的中文映射数据（未匹配的保留原值）
+const mappedDistributionData = computed(() =>
+  (distributionData.value || []).map((d) => ({
+    ...d,
+    name: typeLabelMap[d.name] || d.name
+  }))
+)
+
 const distributionChartOption = computed(() => {
   return {
     title: {
@@ -736,7 +756,7 @@ const distributionChartOption = computed(() => {
         labelLine: {
           show: false
         },
-        data: distributionData.value
+        data: mappedDistributionData.value
       }
     ]
   }

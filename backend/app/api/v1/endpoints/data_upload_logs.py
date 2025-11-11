@@ -19,7 +19,10 @@ async def _query_doris_logs(
     page: int,
     size: int,
     sort_by: str = "sync_start_time",
-    order: str = "desc"
+    order: str = "desc",
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    batch_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     查询 Doris 中的日志数据
@@ -40,18 +43,39 @@ async def _query_doris_logs(
     sort_field = sort_by if sort_by in allowed_sort_fields else "sync_start_time"
     sort_order = "DESC" if order.lower() == "desc" else "ASC"
 
+    # 过滤条件构建
+    where_clauses = []
+    params: List[Any] = []
+
+    if batch_id:
+        where_clauses.append("batch_id = %s")
+        params.append(batch_id)
+
+    if start_time and end_time:
+        where_clauses.append("sync_start_time BETWEEN %s AND %s")
+        params.extend([start_time, end_time])
+    elif start_time:
+        where_clauses.append("sync_start_time >= %s")
+        params.append(start_time)
+    elif end_time:
+        where_clauses.append("sync_start_time <= %s")
+        params.append(end_time)
+
+    where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
     # 基础查询语句
     base_select = (
         "SELECT id, batch_id, data_source_name, platform_name, target_table_name, "
         "target_table_desc, need_review, resource_type, sync_start_time, sync_end_time, "
         "total_data_count, success_data_count, failed_data_count, sync_status, failure_reason, "
         "retry_upload, encryption_method, operator, sync_log, create_time, update_time "
-        "FROM logs_data_sync "
-        f"ORDER BY {sort_field} {sort_order} "
+        "FROM logs_data_sync" +
+        where_sql +
+        f" ORDER BY {sort_field} {sort_order} "
         "LIMIT %s OFFSET %s"
     )
 
-    count_sql = "SELECT COUNT(*) AS total FROM logs_data_sync"
+    count_sql = "SELECT COUNT(*) AS total FROM logs_data_sync" + where_sql
 
     # 连接 Doris（MySQL 协议）
     connection = await aiomysql.connect(
@@ -66,12 +90,12 @@ async def _query_doris_logs(
     try:
         async with connection.cursor(aiomysql.DictCursor) as cursor:
             # 查询总数
-            await cursor.execute(count_sql)
+            await cursor.execute(count_sql, params)
             count_row = await cursor.fetchone()
             total = int(count_row.get("total", 0)) if count_row else 0
 
             # 查询分页数据
-            await cursor.execute(base_select, (size, offset))
+            await cursor.execute(base_select, (*params, size, offset))
             rows = await cursor.fetchall()
 
             items: List[Dict[str, Any]] = []
@@ -111,10 +135,21 @@ async def get_data_upload_logs(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=settings.MAX_PAGE_SIZE, description="每页大小"),
     sort_by: Optional[str] = Query("sync_start_time", description="排序字段"),
-    order: Optional[str] = Query("desc", description="排序顺序：asc/desc")
+    order: Optional[str] = Query("desc", description="排序顺序：asc/desc"),
+    start_time: Optional[str] = Query(None, description="开始时间，格式 YYYY-MM-DD HH:MM:SS"),
+    end_time: Optional[str] = Query(None, description="结束时间，格式 YYYY-MM-DD HH:MM:SS"),
+    batch_id: Optional[str] = Query(None, description="按批次号过滤")
 ):
     try:
-        result = await _query_doris_logs(page=page, size=size, sort_by=sort_by or "sync_start_time", order=order or "desc")
+        result = await _query_doris_logs(
+            page=page,
+            size=size,
+            sort_by=sort_by or "sync_start_time",
+            order=order or "desc",
+            start_time=start_time,
+            end_time=end_time,
+            batch_id=batch_id
+        )
         return paginated_response(items=result["items"], total=result["total"], page=page, size=size, message="获取数据上传日志成功")
     except Exception as e:
         return error_response(message="查询Doris日志失败", error_code="DORIS_QUERY_ERROR", detail=str(e))

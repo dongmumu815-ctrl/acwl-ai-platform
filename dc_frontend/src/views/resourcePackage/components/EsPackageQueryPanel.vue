@@ -276,11 +276,7 @@
                               class="agg-row clickable"
                               @click="onAggBucketClick(String(aggName), bucket)"
                             >
-                              <span class="agg-key">{{
-                                getValueLength(bucket.key) > 40
-                                  ? formatText(String(bucket.key), 40)
-                                  : String(bucket.key)
-                              }}</span>
+                              <span class="agg-key">{{ formatAggKey(bucket.key) }}</span>
                               <span class="agg-count">{{
                                 bucket.doc_count
                               }}</span>
@@ -984,20 +980,40 @@ const displayFields = computed<string[]>(() => {
 const normalizedAggs = computed<Record<string, any>>(() => {
   const aggs = results.value?.aggregations;
   if (!aggs) return {};
-  const out: Record<string, any> = {};
-  const tplQuery =
-    templateDetail.value?.query || templateDetail.value?.query_content;
+  const tplQuery = templateDetail.value?.query || templateDetail.value?.query_content;
+
+  // 收集条目，包含识别字段，后续按优先级排序
+  const entries: Array<{ name: string; info: any; isPreferred: boolean; orderHint: number }> = [];
+  const preferredFields = new Set(["publication_category", "data_type", "type"]);
+
   Object.entries(aggs).forEach(([name, cfg]: [string, any]) => {
     if (cfg?.buckets && Array.isArray(cfg.buckets)) {
       const field = tplQuery?.aggs?.[name]?.terms?.field;
-      out[name] = { type: "terms", buckets: cfg.buckets, field, raw: cfg };
+      const info = { type: "terms", buckets: cfg.buckets, field, raw: cfg };
+      const nameLower = String(name).toLowerCase();
+      const isPreferred = (field && preferredFields.has(String(field)))
+        || nameLower.includes("data_type")
+        || nameLower.includes("publication")
+        || nameLower.includes("type");
+      // 使用 orderHint 便于扩展更多优先策略
+      const orderHint = isPreferred ? 0 : 1;
+      entries.push({ name, info, isPreferred, orderHint });
     } else if (cfg?.value !== undefined) {
       // sum/avg/max/min/value_count
       const type = cfg.meta?.type || "metric";
-      out[name] = { type, value: cfg.value, raw: cfg };
+      const info = { type, value: cfg.value, raw: cfg };
+      entries.push({ name, info, isPreferred: false, orderHint: 2 });
     } else {
-      out[name] = { type: "unknown", raw: cfg };
+      const info = { type: "unknown", raw: cfg };
+      entries.push({ name, info, isPreferred: false, orderHint: 3 });
     }
+  });
+
+  // 排序：优先显示“数据类型/出版物类型”等首选聚合，其余保持原相对顺序
+  const sorted = entries.sort((a, b) => a.orderHint - b.orderHint);
+  const out: Record<string, any> = {};
+  sorted.forEach((e) => {
+    out[e.name] = e.info;
   });
   return out;
 });
@@ -1447,7 +1463,7 @@ function getValueLength(v: any): number {
 
 function formatCell(v: any): string {
   if (v === null || v === undefined) return "-";
-  if (typeof v === "string") return v;
+  if (typeof v === "string") return mapTypeLabel(v);
   try {
     return JSON.stringify(v);
   } catch {
@@ -1464,6 +1480,28 @@ function formatTime(t?: string): string {
   } catch {
     return String(t || "");
   }
+}
+
+// 英文数据类型到中文的映射
+const typeLabelMap: Record<string, string> = {
+  BOOK: "图书",
+  JOURNAL_ARTICLE: "期刊文章",
+  CONFERENCE_PAPER: "会议论文",
+  REPORT: "报告",
+  THESIS: "学位论文",
+  STANDARD: "标准",
+  PATENT: "专利",
+  OTHER: "其他"
+};
+
+function mapTypeLabel(val: any): string {
+  const key = String(val ?? "").toUpperCase();
+  return typeLabelMap[key] || String(val ?? "");
+}
+
+function formatAggKey(val: any): string {
+  const label = mapTypeLabel(val);
+  return getValueLength(label) > 40 ? formatText(String(label), 40) : String(label);
 }
 
 function formatText(text: string, max: number): string {

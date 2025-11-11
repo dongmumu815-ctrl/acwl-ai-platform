@@ -29,6 +29,12 @@ export interface DataUploadLog {
 export interface DataUploadLogsQuery extends PaginationParams {
   sort_by?: string
   order?: 'asc' | 'desc'
+  /** 按批次号过滤（后端若支持则生效） */
+  batch_id?: string
+  /** 按时间范围过滤：开始时间 */
+  start_time?: string
+  /** 按时间范围过滤：结束时间 */
+  end_time?: string
 }
 
 export const dataUploadLogsApi = {
@@ -40,7 +46,12 @@ export const dataUploadLogsApi = {
         page: params?.page ?? 1,
         size: params?.page_size ?? 20,
         sort_by: params?.sort_by ?? 'sync_start_time',
-        order: params?.order ?? 'desc'
+        order: params?.order ?? 'desc',
+        // 透传批次号查询参数（如果存在）
+        batch_id: params?.batch_id,
+        // 透传时间范围查询参数（如果存在）
+        start_time: params?.start_time,
+        end_time: params?.end_time
       }
     })
   }
