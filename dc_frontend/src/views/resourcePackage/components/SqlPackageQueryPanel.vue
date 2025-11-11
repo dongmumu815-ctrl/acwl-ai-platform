@@ -118,7 +118,7 @@
           >
             <template #default="{ row }">
               <span v-if="typeof row[index] === 'object'">{{ JSON.stringify(row[index]) }}</span>
-              <span v-else>{{ row[index] }}</span>
+              <span v-else>{{ mapTypeLabel(row[index]) }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -141,7 +141,7 @@
               <!-- 其他字段正常显示 -->
               <template v-else>
                 <span v-if="typeof selectedRow?.[idx] === 'object'">{{ JSON.stringify(selectedRow?.[idx], null, 2) }}</span>
-                <span v-else>{{ selectedRow?.[idx] }}</span>
+                <span v-else>{{ mapTypeLabel(selectedRow?.[idx]) }}</span>
               </template>
             </el-descriptions-item>
           </el-descriptions>
@@ -288,7 +288,7 @@ const processedData = computed(() => {
       if (na !== null && nb !== null) {
         cmp = na - nb
       } else {
-        cmp = String(va ?? '').localeCompare(String(vb ?? ''), 'zh-CN', { numeric: true, sensitivity: 'base' })
+        cmp = String(mapTypeLabel(va ?? '')).localeCompare(String(mapTypeLabel(vb ?? '')), 'zh-CN', { numeric: true, sensitivity: 'base' })
       }
       return order === 'ascending' ? cmp : -cmp
     })
@@ -498,6 +498,23 @@ const openPdf = () => {
   } else {
     ElMessage.warning('未找到有效的 pdf_url 字段')
   }
+}
+
+// 英文出版物类型到中文的映射（与 ES 面板保持一致）
+const typeLabelMap: Record<string, string> = {
+  BOOK: '图书',
+  JOURNAL_ARTICLE: '期刊文章',
+  CONFERENCE_PAPER: '会议论文',
+  REPORT: '报告',
+  THESIS: '学位论文',
+  STANDARD: '标准',
+  PATENT: '专利',
+  OTHER: '其他'
+}
+
+const mapTypeLabel = (val: any): string => {
+  const key = String(val ?? '').toUpperCase()
+  return typeLabelMap[key] || String(val ?? '')
 }
 
 watch(() => props.packageData, (newVal) => {
