@@ -19,6 +19,50 @@ from app.schemas.common import ResponseModel
 
 router = APIRouter()
 
+@router.get("/me", response_model=ResponseModel[UserPermissionResponse])
+def get_my_permissions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取当前认证用户的所有权限与角色代码
+
+    - 使用认证信息解析当前用户，无需传入用户ID
+    - 返回字段包含：`permissions`、`permission_codes`、`role_codes`
+    """
+    # 基于当前认证用户ID查询权限与角色代码
+    permissions = crud_permission.get_user_permissions(db=db, user_id=current_user.id)
+    permission_codes = crud_permission.get_permission_codes_by_user(db=db, user_id=current_user.id)
+    role_codes = current_user.get_role_codes()
+
+    return ResponseModel(
+        data=UserPermissionResponse(
+            user_id=current_user.id,
+            username=current_user.username,
+            permissions=[PermissionResponse.model_validate(perm) for perm in permissions],
+            permission_codes=permission_codes,
+            role_codes=role_codes
+        ),
+        message="获取当前用户权限成功"
+    )
+
+@router.get("/check/{permission_code}", response_model=ResponseModel[bool])
+def check_my_permission(
+    permission_code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    检查当前认证用户是否拥有指定权限
+
+    - 使用认证信息解析当前用户，无需传入用户ID
+    - 返回布尔值表示是否拥有指定权限
+    """
+    has_permission = crud_permission.check_user_permission(
+        db=db, user_id=current_user.id, permission_code=permission_code
+    )
+    return ResponseModel(data=has_permission, message="权限检查完成")
+
 
 @router.get("/", response_model=ResponseModel[PermissionListResponse])
 def get_permissions(

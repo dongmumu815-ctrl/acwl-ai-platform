@@ -12,7 +12,7 @@ import uuid
 import traceback
 import socket
 import os
-from typing import Optional
+from typing import Optional, Dict, Set
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -27,6 +27,9 @@ from app.core.security import decode_access_token
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+# 表结构缓存，避免每次请求都查询 INFORMATION_SCHEMA
+_TABLE_COLUMNS_CACHE: Dict[str, Set[str]] = {}
 
 
 class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
@@ -595,6 +598,36 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
         except Exception:
             return None
 
+    def _truncate_text(self, text: Optional[str], max_len: int = 4096) -> Optional[str]:
+        """截断过长文本以降低日志写入与序列化开销"""
+        if text is None:
+            return None
+        if len(text) <= max_len:
+            return text
+        return text[:max_len] + "..."
+
+    def _should_capture_response_body(self, method: str, status_code: Optional[int]) -> bool:
+        """判断是否需要捕获响应体：
+        - 对于成功的 GET 响应不抓取响应体，减少 I/O 与内存占用
+        - 其他方法或错误响应则抓取以便排错
+        """
+        m = (method or '').upper()
+        if m == 'GET' and (status_code is not None and status_code < 400):
+            return False
+        return True
+
+    async def _get_table_columns_cached(self, db, table_name: str) -> Set[str]:
+        """获取指定表的列集合，使用内存缓存避免每次请求都访问 INFORMATION_SCHEMA"""
+        cached = _TABLE_COLUMNS_CACHE.get(table_name)
+        if cached is not None:
+            return cached
+        res = await db.execute(text(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t"
+        ), {"t": table_name})
+        cols = {row[0] for row in res.fetchall()}
+        _TABLE_COLUMNS_CACHE[table_name] = cols
+        return cols
+
     async def dispatch(self, request: Request, call_next):
         # 过滤不必要的请求，例如静态、文档、健康检查、预检
         path = request.url.path
@@ -681,6 +714,8 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
         except Exception:
             request_body = None
             request_size = 0
+        # 截断过长的请求体，避免日志膨胀
+        request_body = self._truncate_text(request_body, 4096)
 
         error_message = None
         stack_trace = None
@@ -692,14 +727,20 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             status_code = response.status_code
-            # 读取响应体内容（可能是流式）
-            try:
-                resp_body = [section async for section in response.body_iterator]
-                response.body_iterator = iterate_in_threadpool(iter(resp_body))
-                response_body = b"".join(resp_body)
-                response_text = response_body.decode('utf-8', errors='ignore') if response_body else None
-                response_size = len(response_body) if response_body else 0
-            except Exception:
+            # 根据需要决定是否捕获响应体（避免对 GET 成功响应的额外读取）
+            if self._should_capture_response_body(method, status_code):
+                try:
+                    resp_body = [section async for section in response.body_iterator]
+                    response.body_iterator = iterate_in_threadpool(iter(resp_body))
+                    response_body = b"".join(resp_body)
+                    response_text = response_body.decode('utf-8', errors='ignore') if response_body else None
+                    response_size = len(response_body) if response_body else 0
+                    # 截断过长的响应体
+                    response_text = self._truncate_text(response_text, 4096)
+                except Exception:
+                    response_text = None
+                    response_size = 0
+            else:
                 response_text = None
                 response_size = 0
         except Exception as e:
@@ -726,11 +767,8 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
         # 将日志写入数据库
         try:
             async with get_db_context() as db:
-                # 动态检测主表可用列，构造兼容的 INSERT
-                main_cols_res = await db.execute(text(
-                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_operation_logs'"
-                ))
-                main_cols = {row[0] for row in main_cols_res.fetchall()}
+                # 动态检测主表可用列（带缓存），构造兼容的 INSERT
+                main_cols = await self._get_table_columns_cached(db, 'user_operation_logs')
 
                 insert_cols = []
                 value_exprs = []
@@ -802,11 +840,8 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
                 else:
                     log_id = None
 
-                # 动态检测详情表可用列，构造兼容的 INSERT
-                detail_cols_res = await db.execute(text(
-                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_operation_log_details'"
-                ))
-                detail_cols = {row[0] for row in detail_cols_res.fetchall()}
+                # 动态检测详情表可用列（带缓存），构造兼容的 INSERT
+                detail_cols = await self._get_table_columns_cached(db, 'user_operation_log_details')
 
                 # 兼容旧库可能存在的必填字段 field_name
                 def _guess_field_name():

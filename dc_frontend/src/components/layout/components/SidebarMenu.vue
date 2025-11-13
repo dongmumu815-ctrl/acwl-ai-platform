@@ -118,18 +118,61 @@ function shouldShowInMenu(route: RouteRecordRaw): boolean {
  * @param route 路由配置
  */
 function hasPermission(route: RouteRecordRaw): boolean {
-  // 如果路由设置了权限要求
-  if (route.meta?.permission) {
-    return userStore.hasPermission(route.meta.permission as string);
+  /**
+   * 菜单权限检查（与路由守卫一致）
+   * - requiresAuth: 需登录
+   * - roles: 任一角色满足
+   * - permission: 单个权限码满足
+   * - permissionsAny: 任一权限满足
+   * - permissionsAll: 所有权限满足
+   */
+  // 登录要求
+  if (route.meta?.requiresAuth && !userStore.isLoggedIn) {
+    return false;
   }
 
-  // 如果路由设置了角色要求
+  // 角色检查
   if (route.meta?.roles) {
     const roles = route.meta.roles as string[];
-    return roles.some((role) => userStore.hasRole(role));
+    if (!roles.some((role) => userStore.hasRole(role))) {
+      return false;
+    }
   }
 
-  // 默认有权限
+  // 单个权限码
+  if (route.meta?.permission) {
+    const perm = route.meta.permission as string
+    const useStrict = Boolean((route.meta as any)?.strictPermission)
+    const ok = useStrict ? userStore.hasPermissionStrict(perm) : userStore.hasPermission(perm)
+    if (!ok) {
+      return false;
+    }
+  }
+
+  // 任一权限
+  if (route.meta?.permissionsAny) {
+    const any = route.meta.permissionsAny as string[];
+    const useStrict = Boolean((route.meta as any)?.strictPermission)
+    const ok = useStrict
+      ? any.some((p) => userStore.hasPermissionStrict(p))
+      : userStore.hasAnyPermission(any)
+    if (!ok) {
+      return false;
+    }
+  }
+
+  // 所有权限
+  if (route.meta?.permissionsAll) {
+    const all = route.meta.permissionsAll as string[];
+    const useStrict = Boolean((route.meta as any)?.strictPermission)
+    const ok = useStrict
+      ? all.every((p) => userStore.hasPermissionStrict(p))
+      : userStore.hasAllPermissions(all)
+    if (!ok) {
+      return false;
+    }
+  }
+
   return true;
 }
 

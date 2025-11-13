@@ -67,6 +67,21 @@ export interface UserRole {
 }
 
 /**
+ * 当前认证用户权限响应
+ *
+ * - 与后端 `/api/v1/permissions/me` 返回结构对应
+ * - `permission_codes` 为权限代码数组
+ * - `role_codes` 为角色代码数组
+ */
+export interface MyPermissionsResponse {
+  user_id: number
+  username: string
+  permissions: UserPermission[]
+  permission_codes: string[]
+  role_codes: string[]
+}
+
+/**
  * 用户详细信息（包含权限和角色）
  */
 export interface UserDetail extends User {

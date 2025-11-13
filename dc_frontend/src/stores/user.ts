@@ -34,6 +34,18 @@ export const useUserStore = defineStore('user', () => {
   })
 
   /**
+   * 是否为管理员
+   * - 当 `roles` 包含 `admin` 或 `super_admin`，或权限中包含 `admin` 时视为管理员
+   */
+  const isAdmin = computed(() => {
+    return (
+      roles.value.includes('admin') ||
+      roles.value.includes('super_admin') ||
+      permissions.value.includes('admin')
+    )
+  })
+
+  /**
    * 用户登录
    * @param loginData 登录数据
    */
@@ -51,21 +63,16 @@ export const useUserStore = defineStore('user', () => {
         user.value = userData
         token.value = access_token
         
-        // 将后端的单个role字段转换为前端期望的roles数组
-        const userRoles = userData.role ? [userData.role] : ['user']
-        roles.value = userRoles
-        
-        // 根据角色设置默认权限
-        const userPermissions = userData.role === 'admin' 
-          ? ['admin', 'user', 'read', 'write', 'delete', 'data:elasticsearch:query'] 
-          : ['user', 'read']
-        permissions.value = userPermissions
-        
-        // 保存到本地存储
+        const userRolesArr = userData.role ? [userData.role] : ['user']
+        roles.value = userRolesArr
+        permissions.value = []
         localStorage.setItem('token', access_token)
         localStorage.setItem('user', JSON.stringify(userData))
-        localStorage.setItem('permissions', JSON.stringify(userPermissions))
-        localStorage.setItem('roles', JSON.stringify(userRoles))
+        localStorage.setItem('permissions', JSON.stringify([]))
+        localStorage.setItem('roles', JSON.stringify(userRolesArr))
+
+        // 登录后拉取真实权限与角色（基于认证信息）
+        await loadPermissions()
         
         ElMessage.success('登录成功')
       } else {
@@ -152,6 +159,9 @@ export const useUserStore = defineStore('user', () => {
         localStorage.setItem('user', JSON.stringify(userData))
         localStorage.setItem('permissions', JSON.stringify(userPermissions || []))
         localStorage.setItem('roles', JSON.stringify(userRoles || []))
+
+        // 进一步同步 /permissions/me 返回的真实权限字段
+        await loadPermissions()
       } else {
         throw new Error(response.message || '获取用户信息失败')
       }
@@ -163,6 +173,71 @@ export const useUserStore = defineStore('user', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * 加载当前认证用户的权限与角色
+   *
+   * - 调用后端接口 `/permissions/me`（基于认证信息解析当前用户）
+   * - 使用返回的 `permission_codes` 与 `role_codes` 更新 store
+   * - 兼容旧的 `user.role` 字段作为降级
+   */
+  const loadPermissions = async (): Promise<void> => {
+    try {
+      const resp = await authApi.getMyPermissions()
+      if (!resp.success) {
+        throw new Error(resp.message || '获取权限失败')
+      }
+
+      const data = resp.data as any
+      // 优先使用后端直接提供的权限代码列表
+      permissions.value = Array.isArray(data?.permission_codes)
+        ? data.permission_codes
+        : Array.isArray(data?.permissions)
+          ? (data.permissions as any[]).map((p: any) => p?.code).filter(Boolean)
+          : []
+
+      // 适配后端返回的多角色：role_codes
+      if (Array.isArray(data?.role_codes) && data.role_codes.length > 0) {
+        roles.value = data.role_codes
+      } else if (user.value?.role) {
+        // 兼容旧的 user.role 字段
+        roles.value = [user.value.role]
+      }
+
+      // 持久化到本地存储
+      localStorage.setItem('permissions', JSON.stringify(permissions.value))
+      localStorage.setItem('roles', JSON.stringify(roles.value))
+
+      console.log('用户权限加载成功:', permissions.value)
+    } catch (error) {
+      console.error('加载用户权限失败:', error)
+      // 失败时保持现有权限作为降级
+    }
+  }
+
+  /**
+   * 通配符权限匹配
+   * - 支持按 `:` 分段的权限码，例如：`data:resource:query`
+   * - 当已授予权限为 `data:resource:*` 时，可匹配 `data:resource:query`
+   * - 当已授予权限为 `*` 时，匹配任意权限
+   * @param granted 已授予的权限码
+   * @param required 需要的权限码
+   */
+  function permissionMatches(granted: string, required: string): boolean {
+    if (!granted) return false
+    if (granted === '*' || required === '*') return true
+    if (granted === required) return true
+    const g = granted.split(':')
+    const r = required.split(':')
+    const len = Math.max(g.length, r.length)
+    for (let i = 0; i < len; i++) {
+      const gi = g[i] ?? ''
+      const ri = r[i] ?? ''
+      if (gi === '*' || gi === ri) continue
+      return false
+    }
+    return true
   }
 
   /**
@@ -197,7 +272,15 @@ export const useUserStore = defineStore('user', () => {
    */
   const hasPermission = (permission: string): boolean => {
     if (!permission) return true
-    return permissions.value.includes(permission)
+    // 管理员放行
+    if (isAdmin.value) return true
+    // 精确或通配符匹配
+    return permissions.value.some(p => permissionMatches(p, permission))
+  }
+
+  const hasPermissionStrict = (permission: string): boolean => {
+    if (!permission) return true
+    return permissions.value.some(p => permissionMatches(p, permission))
   }
 
   /**
@@ -215,7 +298,8 @@ export const useUserStore = defineStore('user', () => {
    */
   const hasAnyPermission = (permissionList: string[]): boolean => {
     if (!permissionList || permissionList.length === 0) return true
-    return permissionList.some(permission => permissions.value.includes(permission))
+    if (isAdmin.value) return true
+    return permissionList.some(required => permissions.value.some(p => permissionMatches(p, required)))
   }
 
   /**
@@ -224,7 +308,8 @@ export const useUserStore = defineStore('user', () => {
    */
   const hasAllPermissions = (permissionList: string[]): boolean => {
     if (!permissionList || permissionList.length === 0) return true
-    return permissionList.every(permission => permissions.value.includes(permission))
+    if (isAdmin.value) return true
+    return permissionList.every(required => permissions.value.some(p => permissionMatches(p, required)))
   }
 
   /**
@@ -243,11 +328,18 @@ export const useUserStore = defineStore('user', () => {
    */
   const refreshPermissions = async (): Promise<void> => {
     try {
-      const response = await authApi.getUserPermissions()
-      if (response.success) {
-        permissions.value = response.data.permissions || []
-        roles.value = response.data.roles || []
-        
+      // 使用 /permissions/me 同步最新权限（优先 permission_codes/role_codes）
+      const resp = await authApi.getMyPermissions()
+      if (resp.success) {
+        const data = resp.data as any
+        permissions.value = Array.isArray(data?.permission_codes)
+          ? data.permission_codes
+          : Array.isArray(data?.permissions)
+            ? (data.permissions as any[]).map((p: any) => p?.code).filter(Boolean)
+            : []
+
+        roles.value = Array.isArray(data?.role_codes) ? data.role_codes : roles.value
+
         localStorage.setItem('permissions', JSON.stringify(permissions.value))
         localStorage.setItem('roles', JSON.stringify(roles.value))
       }
@@ -283,16 +375,19 @@ export const useUserStore = defineStore('user', () => {
     userInfo,
     userPermissions,
     userRoles,
+    isAdmin,
     
     // 方法
     login,
     logout,
     getCurrentUser,
+    loadPermissions,
     restoreFromStorage,
     hasPermission,
     hasRole,
     hasAnyPermission,
     hasAllPermissions,
+    hasPermissionStrict,
     updateUserInfo,
     refreshPermissions,
     reset

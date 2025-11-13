@@ -330,10 +330,27 @@ export const permissionApi = {
   },
 
   /**
+   * 检查当前认证用户的权限
+   * @param permissionCode 权限代码
+   * @returns 是否拥有该权限（基于认证信息解析当前用户）
+   */
+  checkMyPermission(permissionCode: string) {
+    return request.get<ApiResponse<boolean>>(`/permissions/check/${permissionCode}`)
+  },
+
+  /**
    * 获取用户所有权限
    */
   getUserPermissions(userId: number) {
     // 后端路由为 /permissions/user/{user_id}，返回 ResponseModel[UserPermissionResponse]
     return request.get<ApiResponse<any>>(`/permissions/user/${userId}`)
+  },
+
+  /**
+   * 获取当前认证用户的所有权限
+   * @returns 后端返回 ResponseModel[UserPermissionResponse]
+   */
+  getMyPermissions() {
+    return request.get<ApiResponse<any>>('/permissions/me')
   }
 }

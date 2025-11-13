@@ -3,7 +3,7 @@
 提供数据库操作的封装
 """
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, load_only
 from sqlalchemy import and_, or_, func
 
 from app.models.permission import Permission
@@ -133,8 +133,23 @@ class CRUDPermission:
         ).order_by(Permission.sort_order, Permission.created_at).all()
     
     def get_tree_structure(self, db: Session) -> Dict[str, List[Permission]]:
-        """获取权限的树形结构（按模块分组）"""
-        permissions = db.query(Permission).filter(Permission.status == True).order_by(
+        """获取权限的树形结构（按模块分组）
+        仅加载树节点所需字段与列属性（role_count），减少不必要的列与关系加载。
+        """
+        permissions = db.query(Permission).options(
+            load_only(
+                Permission.id,
+                Permission.name,
+                Permission.code,
+                Permission.module,
+                Permission.resource,
+                Permission.action,
+                Permission.is_system,
+                Permission.status,
+                Permission.sort_order,
+                Permission.role_count,
+            )
+        ).filter(Permission.status == True).order_by(
             Permission.module, Permission.sort_order, Permission.created_at
         ).all()
         

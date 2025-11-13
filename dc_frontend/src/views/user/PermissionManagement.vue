@@ -424,6 +424,159 @@ const permissionTree = ref([
             sort: 2,
             description: '下载数据资源',
             createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 13,
+            name: '创建资源',
+            code: 'data:resource:create',
+            type: 'button',
+            enabled: true,
+            sort: 3,
+            description: '创建数据资源',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 14,
+            name: '编辑资源',
+            code: 'data:resource:edit',
+            type: 'button',
+            enabled: true,
+            sort: 4,
+            description: '编辑数据资源',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 15,
+            name: '删除资源',
+            code: 'data:resource:delete',
+            type: 'button',
+            enabled: true,
+            sort: 5,
+            description: '删除数据资源',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 16,
+            name: '分享资源',
+            code: 'data:resource:share',
+            type: 'button',
+            enabled: true,
+            sort: 6,
+            description: '分享数据资源',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 17,
+            name: '查询数据',
+            code: 'data:resource:query',
+            type: 'api',
+            enabled: true,
+            sort: 7,
+            description: '查询资源数据',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 18,
+            name: '导出数据',
+            code: 'data:resource:export',
+            type: 'api',
+            enabled: true,
+            sort: 8,
+            description: '导出查询结果',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 19,
+            name: '保存查询',
+            code: 'data:resource:save',
+            type: 'button',
+            enabled: true,
+            sort: 9,
+            description: '保存查询设定',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 20,
+            name: 'ES查询',
+            code: 'data:elasticsearch:query',
+            type: 'api',
+            enabled: true,
+            sort: 10,
+            description: 'Elasticsearch 查询权限',
+            createdAt: '2024-01-01 00:00:00'
+          }
+        ]
+      }
+      ,
+      {
+        id: 21,
+        name: '数据源管理',
+        code: 'data:datasource',
+        type: 'menu',
+        enabled: true,
+        sort: 2,
+        description: '数据源管理模块',
+        createdAt: '2024-01-01 00:00:00',
+        children: [
+          {
+            id: 22,
+            name: '查看数据源',
+            code: 'data:datasource:view',
+            type: 'button',
+            enabled: true,
+            sort: 1,
+            description: '查看数据源列表',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 23,
+            name: '新建数据源',
+            code: 'data:datasource:create',
+            type: 'button',
+            enabled: true,
+            sort: 2,
+            description: '创建新数据源',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 24,
+            name: '编辑数据源',
+            code: 'data:datasource:edit',
+            type: 'button',
+            enabled: true,
+            sort: 3,
+            description: '编辑数据源配置',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 25,
+            name: '删除数据源',
+            code: 'data:datasource:delete',
+            type: 'button',
+            enabled: true,
+            sort: 4,
+            description: '删除数据源',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 26,
+            name: '测试连接',
+            code: 'data:datasource:test',
+            type: 'api',
+            enabled: true,
+            sort: 5,
+            description: '测试数据源连接',
+            createdAt: '2024-01-01 00:00:00'
+          },
+          {
+            id: 27,
+            name: '启用/禁用',
+            code: 'data:datasource:enable',
+            type: 'button',
+            enabled: true,
+            sort: 6,
+            description: '启用或禁用数据源',
+            createdAt: '2024-01-01 00:00:00'
           }
         ]
       }

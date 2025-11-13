@@ -34,6 +34,10 @@
           <el-icon><Refresh /></el-icon>
           刷新页面
         </el-button>
+        <el-button type="danger" @click="doLogout">
+          <el-icon><SwitchButton /></el-icon>
+          退出登录
+        </el-button>
       </div>
       
       <!-- 建议链接 -->
@@ -72,9 +76,11 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { HomeFilled, ArrowLeft, Refresh, Monitor, FolderOpened, User, Setting } from '@element-plus/icons-vue'
+import { HomeFilled, ArrowLeft, Refresh, Monitor, FolderOpened, User, Setting, SwitchButton } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 /**
  * 返回首页
@@ -101,6 +107,15 @@ const goBack = () => {
  */
 const refresh = () => {
   window.location.reload()
+}
+
+/**
+ * 退出登录并跳转到登录页
+ */
+const doLogout = async () => {
+  await userStore.logout()
+  await router.push('/login')
+  ElMessage.success('已退出登录')
 }
 </script>
 

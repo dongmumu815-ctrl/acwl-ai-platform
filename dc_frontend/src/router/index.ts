@@ -49,7 +49,10 @@ const authRoutes: RouteRecordRaw[] = [
     meta: {
       title: '数据中心概览',
       icon: 'DataBoard',
-      requiresAuth: true
+      requiresAuth: true,
+      // 分组访问权限：概览访问
+      permission: 'data:overview:view',
+      strictPermission: true
     },
     children: [
       {
@@ -60,6 +63,9 @@ const authRoutes: RouteRecordRaw[] = [
           title: '仪表盘',
           icon: 'Monitor',
           requiresAuth: true,
+          // 页面访问权限：仪表盘查看
+          permission: 'data:dashboard:view',
+          strictPermission: true,
           keepAlive: true
         }
       },
@@ -82,7 +88,10 @@ const authRoutes: RouteRecordRaw[] = [
     meta: {
       title: '数据资源管理',
       icon: 'FolderOpened',
-      requiresAuth: true
+      requiresAuth: true,
+      // 分组访问权限：数据资源查看
+      permission: 'data:resource:view',
+      strictPermission: true
     },
     children: [
       {
@@ -93,6 +102,9 @@ const authRoutes: RouteRecordRaw[] = [
           title: '资源列表',
           icon: 'List',
           requiresAuth: true,
+          // 访问资源列表需要查看权限
+          permission: 'data:resource:view',
+          strictPermission: true,
           keepAlive: true
         }
       },
@@ -104,6 +116,9 @@ const authRoutes: RouteRecordRaw[] = [
           title: '创建资源',
           icon: 'Plus',
           requiresAuth: true,
+          // 创建资源需要创建权限
+          permission: 'data:resource:create',
+          strictPermission: true,
           hideInMenu: true
         }
       },
@@ -114,6 +129,9 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '资源详情',
           requiresAuth: true,
+          // 查看资源详情需要查看权限
+          permission: 'data:resource:view',
+          strictPermission: true,
           hideInMenu: true,
           activeMenu: '/data-resources/list'
         }
@@ -125,6 +143,9 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '数据查询',
           requiresAuth: true,
+          // 数据查询页需要查询权限
+          permission: 'data:resource:query',
+          strictPermission: true,
           hideInMenu: true,
           activeMenu: '/data-resources/list'
         }
@@ -156,7 +177,9 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '资源包管理',
           icon: 'Box',
-          requiresAuth: true
+          requiresAuth: true,
+          // 资源包列表页至少需要查询权限
+          permission: 'data:resource:query'
         }
       },
       {
@@ -166,6 +189,8 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '资源包查询',
           requiresAuth: true,
+          // 资源包查询页需要查询权限
+          permission: 'data:resource:query',
           hideInMenu: true,
           activeMenu: '/data-resources/packages'
         }
@@ -179,7 +204,10 @@ const authRoutes: RouteRecordRaw[] = [
     meta: {
       title: '数据源管理',
       icon: 'Connection',
-      requiresAuth: true
+      requiresAuth: true,
+      // 分组访问权限：数据源查看
+      permission: 'data:datasource:view',
+      strictPermission: true
     },
     children: [
       {
@@ -189,7 +217,10 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '数据源列表',
           icon: 'List',
-          requiresAuth: true
+          requiresAuth: true,
+          // 查看数据源列表需要查看权限
+          permission: 'data:datasource:view',
+          strictPermission: true
         }
       }
     ]
@@ -355,7 +386,10 @@ const authRoutes: RouteRecordRaw[] = [
     meta: {
       title: '资源中心管理',
       icon: 'Setting',
-      requiresAuth: true
+      requiresAuth: true,
+      // 分组访问权限：资源中心查看
+      permission: 'data:resource_center:view',
+      strictPermission: true
     },
     children: [
       {
@@ -366,6 +400,9 @@ const authRoutes: RouteRecordRaw[] = [
           title: '中心表管理',
           icon: 'Grid',
           requiresAuth: true,
+          // 页面访问权限：资源中心-表管理查看
+          permission: 'data:resource_center:view',
+          strictPermission: true,
           hideFooter: true
         }
       },
@@ -377,6 +414,9 @@ const authRoutes: RouteRecordRaw[] = [
           title: '资源中心',
           icon: 'Search',
           requiresAuth: true,
+          // 页面访问权限：资源中心查询
+          permission: 'data:resource_center:query',
+          strictPermission: true,
           hideFooter: true
         }
       },
@@ -387,7 +427,10 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '资源类型管理',
           icon: 'Collection',
-          requiresAuth: true
+          requiresAuth: true,
+          // 页面访问权限：资源中心-类型查看
+          permission: 'data:resource_center:view',
+          strictPermission: true
         }
       }
     ]
@@ -399,7 +442,10 @@ const authRoutes: RouteRecordRaw[] = [
     meta: {
       title: 'API接口管理',
       icon: 'Connection',
-      requiresAuth: true
+      requiresAuth: true,
+      // 分组访问权限：API查看
+      permission: 'data:api:view',
+      strictPermission: true
     },
     children: [
       {
@@ -409,7 +455,10 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '平台管理',
           icon: 'UserFilled',
-          requiresAuth: true
+          requiresAuth: true,
+          // 页面访问权限：客户平台查看
+          permission: 'data:customer:view',
+          strictPermission: true
         }
       },
       {
@@ -419,7 +468,10 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: 'API管理',
           icon: 'Connection',
-          requiresAuth: true
+          requiresAuth: true,
+          // 页面访问权限：API列表查看
+          permission: 'data:api:view',
+          strictPermission: true
         }
       },
       {
@@ -429,6 +481,9 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: 'API字段配置',
           requiresAuth: true,
+          // API字段配置页需要查询权限（用于编辑字段前校验）
+          permission: 'data:resource:query',
+          strictPermission: true,
           hideInMenu: true,
           activeMenu: '/api-management/apis'
         }
@@ -440,6 +495,9 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: 'API日志',
           requiresAuth: true,
+          // API日志页需要查询权限（用于查看调用记录）
+          permission: 'data:resource:query',
+          strictPermission: true,
           hideInMenu: true,
           activeMenu: '/api-management/apis'
         }
@@ -485,6 +543,9 @@ const authRoutes: RouteRecordRaw[] = [
       title: '用户中心',
       icon: 'User',
       requiresAuth: true,
+      // 分组访问权限：用户中心查看
+      permission: 'data:user:view',
+      strictPermission: true,
       hideInMenu: true
     },
     children: [
@@ -495,6 +556,9 @@ const authRoutes: RouteRecordRaw[] = [
         meta: {
           title: '个人资料',
           requiresAuth: true,
+          // 页面访问权限：用户资料查看
+          permission: 'data:user:profile:view',
+          strictPermission: true,
           hideInMenu: true
         }
       }
@@ -513,7 +577,10 @@ authRoutes.push({
   meta: {
     title: '日志管理',
     icon: 'Document',
-    requiresAuth: true
+    requiresAuth: true,
+    // 分组访问权限：日志查看
+    permission: 'data:logs:view',
+    strictPermission: true
   },
   children: [
     {
@@ -523,7 +590,10 @@ authRoutes.push({
       meta: {
         title: '用户操作日志',
         icon: 'List',
-        requiresAuth: true
+        requiresAuth: true,
+        // 页面访问权限：用户操作日志查看
+        permission: 'data:logs:user_operation:view',
+        strictPermission: true
       }
     },
     {
@@ -533,7 +603,10 @@ authRoutes.push({
       meta: {
         title: '数据上传日志',
         icon: 'UploadFilled',
-        requiresAuth: true
+        requiresAuth: true,
+        // 页面访问权限：数据上传日志查看
+        permission: 'data:logs:data_upload:view',
+        strictPermission: true
       }
     }
   ]
@@ -561,6 +634,13 @@ const router = createRouter({
 /**
  * 路由守卫
  * 检查用户认证状态和权限
+ *
+ * 权限元信息支持：
+ * - meta.permission: string，要求具备该单个权限码
+ * - meta.permissionsAny: string[]，要求具备列表中的任一权限
+ * - meta.permissionsAll: string[]，要求具备列表中的所有权限
+ * - meta.roles: string[]，要求具备任一角色
+ * - meta.requiresAuth: boolean，需要登录
  */
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
@@ -578,11 +658,60 @@ router.beforeEach(async (to, from, next) => {
       next('/login')
       return
     }
+
+    // 首次进入时初始化权限：避免本地存储为空导致权限误判
+    try {
+      if ((userStore.userPermissions?.length ?? 0) === 0) {
+        await userStore.loadPermissions()
+      }
+    } catch (e) {
+      console.warn('初始化权限失败，继续使用现有权限')
+    }
     
-    // 检查角色权限
+    // 检查角色权限（任一匹配）
     if (to.meta.roles) {
       const roles = to.meta.roles as string[]
       if (!roles.some(role => userStore.hasRole(role))) {
+        ElMessage.error('没有访问权限')
+        next('/404')
+        return
+      }
+    }
+
+    // 检查单个权限码（支持 strictPermission 忽略管理员直通）
+    if (to.meta.permission) {
+      const perm = to.meta.permission as string
+      const useStrict = Boolean((to.meta as any)?.strictPermission)
+      const ok = useStrict ? userStore.hasPermissionStrict(perm) : userStore.hasPermission(perm)
+      if (!ok) {
+        ElMessage.error('没有访问权限')
+        next('/404')
+        return
+      }
+    }
+
+    // 检查任一权限满足（支持 strictPermission）
+    if (to.meta.permissionsAny) {
+      const permsAny = to.meta.permissionsAny as string[]
+      const useStrict = Boolean((to.meta as any)?.strictPermission)
+      const ok = useStrict
+        ? permsAny.some(p => userStore.hasPermissionStrict(p))
+        : userStore.hasAnyPermission(permsAny)
+      if (!ok) {
+        ElMessage.error('没有访问权限')
+        next('/404')
+        return
+      }
+    }
+
+    // 检查所有权限满足（支持 strictPermission）
+    if (to.meta.permissionsAll) {
+      const permsAll = to.meta.permissionsAll as string[]
+      const useStrict = Boolean((to.meta as any)?.strictPermission)
+      const ok = useStrict
+        ? permsAll.every(p => userStore.hasPermissionStrict(p))
+        : userStore.hasAllPermissions(permsAll)
+      if (!ok) {
         ElMessage.error('没有访问权限')
         next('/404')
         return

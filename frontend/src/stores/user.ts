@@ -135,19 +135,14 @@ export const useUserStore = defineStore('user', () => {
   /**
    * 加载用户权限与角色信息
    *
-   * - 调用后端接口 `/permissions/user/{id}`
+   * - 调用后端接口 `/permissions/me`（基于认证信息解析当前用户）
    * - 使用返回的 `permission_codes` 与 `role_codes` 更新 store
    * - 兼容旧的 `user.role` 字段作为降级
    */
   const loadUserPermissions = async () => {
-    if (!user.value?.id) {
-      console.warn('用户信息不存在，无法加载权限')
-      return
-    }
-
     try {
-      // 获取用户权限
-      const permissionsResponse = await permissionApi.getUserPermissions(user.value.id)
+      // 获取当前认证用户的权限
+      const permissionsResponse = await permissionApi.getMyPermissions()
       // 后端返回 ResponseModel，包含 data: { permissions, permission_codes }
       const respData = (permissionsResponse as any)?.data || {}
       permissionObjects.value = respData.permissions || []
