@@ -1239,6 +1239,64 @@ function extractMenuItemsFromDcMenuText(text: string): Array<{ code: string; tit
   return items
 }
 
+/**
+ * 从 AI 中台（frontend 路由）文本中提取菜单项的权限代码与标题
+ * - 支持 PERMISSIONS 常量映射到字符串权限码
+ * - 过滤 hidden/hideInMenu 项
+ */
+function extractMenuItemsFromAiRouterText(text: string): Array<{ code: string; title: string | null }> {
+  const items: Array<{ code: string; title: string | null }> = []
+  const seen = new Set<string>()
+  const metaBlockRegex = /meta\s*:\s*\{([\s\S]*?)\}/g
+  let m: RegExpExecArray | null
+  while ((m = metaBlockRegex.exec(text)) !== null) {
+    const block = m[1]
+    if (/hideInMenu\s*:\s*true/.test(block) || /hidden\s*:\s*true/.test(block)) continue
+    const tMatch = /title\s*:\s*['"]([\s\S]*?)['"]/.exec(block)
+    const title = tMatch ? tMatch[1].trim() : null
+
+    // 单个权限
+    const permToken = block.match(/permission\s*:\s*([^,\n]+)/)
+    const singlePerms: string[] = []
+    if (permToken) {
+      const token = permToken[1].trim()
+      const constMatch = token.match(/PERMISSIONS\.(\w+)/)
+      if (constMatch && PERMISSIONS[constMatch[1] as keyof typeof PERMISSIONS]) {
+        singlePerms.push(PERMISSIONS[constMatch[1] as keyof typeof PERMISSIONS])
+      } else {
+        const strMatch = token.match(/['"]([\w:-]+)['"]/)
+        if (strMatch) singlePerms.push(strMatch[1])
+      }
+    }
+
+    // 多个权限
+    const multiBlocks = block.match(/permissions\s*:\s*\[([\s\S]*?)\]|requireAllPermissions\s*:\s*\[([\s\S]*?)\]/g) || []
+    const multiPerms: string[] = []
+    for (const mb of multiBlocks) {
+      const constTokens = mb.match(/PERMISSIONS\.(\w+)/g) || []
+      for (const t of constTokens) {
+        const key = t.split('.')[1]
+        const val = PERMISSIONS[key as keyof typeof PERMISSIONS]
+        if (val) multiPerms.push(val)
+      }
+      const strTokens = mb.match(/['"]([\w:-]+)['"]/g) || []
+      for (const st of strTokens) {
+        const v = st.replace(/['"]/g, '')
+        multiPerms.push(v)
+      }
+    }
+
+    const allCodes = [...singlePerms, ...multiPerms]
+    for (const code of allCodes) {
+      if (!seen.has(code)) {
+        seen.add(code)
+        items.push({ code, title })
+      }
+    }
+  }
+  return items
+}
+
 // 初始化
 onMounted(() => {
   loadPermissionTree()
@@ -1433,29 +1491,47 @@ const rebuildPermissionsFromDcMenu = async () => {
       }
     }
 
-    // 2) 读取数据中台路由文本
+    // 2) 读取 AI 中台与数据中台路由文本
+    const aiRouterPaths = [
+      'D:/works/codes/acwl-ai-data/frontend/src/router/index.ts',
+      'd:/works/codes/acwl-ai-data/frontend/src/router/index.ts'
+    ]
     const dcRouterPaths = [
       'D:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts',
       'd:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts'
     ]
+    let aiText: string | null = null
     let dcText: string | null = null
+    for (const p of aiRouterPaths) {
+      aiText = await loadExternalRouterText(p)
+      if (aiText) break
+    }
     for (const p of dcRouterPaths) {
       dcText = await loadExternalRouterText(p)
       if (dcText) break
     }
-    if (!dcText) {
-      ElMessage.error('无法读取数据中台路由文件，重建终止')
+    if (!aiText && !dcText) {
+      ElMessage.error('无法读取前端与数据中台路由文件，重建终止')
       return
     }
 
-    // 3) 从路由文本提取“菜单可见”的权限项（title+code）
-    const dcMenuItems = extractMenuItemsFromDcMenuText(dcText)
-    if (dcMenuItems.length === 0) {
-      ElMessage.warning('未从数据中台菜单提取到任何权限码')
+    // 3) 从菜单可见项提取权限项（title+code），优先 AI 中台
+    const aiMenuItems = aiText ? extractMenuItemsFromAiRouterText(aiText) : []
+    const dcMenuItems = dcText ? extractMenuItemsFromDcMenuText(dcText) : []
+    const mergedMap = new Map<string, string | null>()
+    for (const it of aiMenuItems) {
+      if (!mergedMap.has(it.code)) mergedMap.set(it.code, it.title)
+    }
+    for (const it of dcMenuItems) {
+      if (!mergedMap.has(it.code)) mergedMap.set(it.code, it.title)
+    }
+    const menuItems = Array.from(mergedMap.entries()).map(([code, title]) => ({ code, title }))
+    if (menuItems.length === 0) {
+      ElMessage.warning('未从菜单提取到任何权限码')
     }
 
     // 4) 构造批量创建的权限数据
-    const payloads = dcMenuItems.map(({ code, title }) => {
+    const payloads = menuItems.map(({ code, title }) => {
       const parts = code.split(':')
       const module = parts[0]
       const action = parts[parts.length - 1]
@@ -1463,7 +1539,7 @@ const rebuildPermissionsFromDcMenu = async () => {
       return {
         name: title || getDefaultPermissionName(code),
         code,
-        description: `按数据中台菜单重建：${code}`,
+        description: `按菜单重建：${code}`,
         module,
         resource,
         action,
