@@ -181,21 +181,21 @@ export const roleApi = {
    * 为用户分配角色
    */
   assignRole(data: UserRoleCreate) {
-    return request.post<ApiResponse<UserRole>>('/roles/assign', data)
+    return request.post<ApiResponse<UserRole>>('/roles/assign-user', data)
   },
 
   /**
    * 移除用户角色
    */
   removeRole(userId: number, roleId: number) {
-    return request.delete<ApiResponse<any>>(`/roles/remove/${userId}/${roleId}`)
+    return request.delete<ApiResponse<any>>(`/roles/remove-user/${userId}/${roleId}`)
   },
 
   /**
    * 获取用户角色列表
    */
   getUserRoles(userId: number) {
-    return request.get<ApiResponse<Role[]>>(`/users/${userId}/roles`)
+    return request.get<ApiResponse<Role[]>>(`/roles/users/${userId}/roles`)
   },
 
   /**

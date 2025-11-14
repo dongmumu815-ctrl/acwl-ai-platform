@@ -26,10 +26,15 @@ async def get_users(
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     search: str = Query(None, description="搜索关键词"),
     role: str = Query(None, description="角色筛选"),
+    status: str = Query(None, description="状态筛选：active/disabled/pending"),
     current_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
 ) -> PaginatedResponse[UserResponse]:
-    """获取用户列表（仅管理员）"""
+    """获取用户列表（仅管理员）
+    
+    - 支持按 `search`(用户名/邮箱)、`role`、`status` 过滤
+    - 按 `created_at` 倒序分页
+    """
     
     # 构建查询
     query = select(User)
@@ -45,6 +50,10 @@ async def get_users(
     if role:
         query = query.where(User.role == role)
     
+    # 状态筛选
+    if status:
+        query = query.where(User.status == status)
+    
     # 获取总数
     count_query = select(func.count(User.id))
     if search:
@@ -54,6 +63,8 @@ async def get_users(
         )
     if role:
         count_query = count_query.where(User.role == role)
+    if status:
+        count_query = count_query.where(User.status == status)
     
     total_result = await db.execute(count_query)
     total = total_result.scalar()
