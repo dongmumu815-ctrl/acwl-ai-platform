@@ -477,10 +477,9 @@ class DatasourceService:
             self.logger.error(f"MySQL连接测试失败: {str(e)}")
             raise ValidationError(f"MySQL连接失败: {str(e)}")
         finally:
-            # 确保连接正确关闭
             if connection:
                 try:
-                    connection.close()
+                    await connection.close()
                 except Exception as e:
                     self.logger.warning(f"关闭MySQL测试连接失败: {str(e)}")
     
@@ -1049,7 +1048,7 @@ class DatasourceService:
                 })
             
             await cursor.close()
-            connection.close()
+            await connection.close()
             
             return tables
             
@@ -1482,7 +1481,7 @@ class DatasourceService:
                 
             finally:
                 await cursor.close()
-                connection.close()
+                await connection.close()
                 
         except Exception as e:
             self.logger.error(f"获取MySQL表字段失败: {str(e)}")
@@ -1654,7 +1653,7 @@ class DatasourceService:
                 
             finally:
                 await cursor.close()
-                connection.close()
+                await connection.close()
                 
         except Exception as e:
             self.logger.error(f"获取Doris表字段失败 - Schema: {schema_name}, Table: {table_name}, 错误: {str(e)}")
@@ -1829,7 +1828,7 @@ class DatasourceService:
         finally:
             if connection:
                 try:
-                    connection.close()
+                    await connection.close()
                 except Exception as e:
                     self.logger.warning(f"关闭MySQL连接失败: {str(e)}")
     
@@ -1961,7 +1960,7 @@ class DatasourceService:
         finally:
             if connection:
                 try:
-                    connection.close()
+                    await connection.close()
                 except Exception as e:
                     self.logger.warning(f"关闭Doris连接失败: {str(e)}")
     

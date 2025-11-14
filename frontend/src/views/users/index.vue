@@ -579,6 +579,7 @@ import {
   Clock
 } from '@element-plus/icons-vue'
 import { roleApi } from '@/api/roles'
+import { authApi, userApi } from '@/api/auth'
 
 const router = useRouter()
 
@@ -953,6 +954,17 @@ const handleCloseUserDialog = () => {
   userDialogVisible.value = false
 }
 
+/**
+ * 提交用户信息（创建/更新）
+ *
+ * 创建流程：
+ * - 调用后端注册接口 `/auth/register` 创建用户
+ * - 若选择了 `admin` 或 `user` 主角色，调用 `/users/{id}` 更新角色
+ * - 将新用户插入本地列表并更新统计
+ *
+ * 更新流程：
+ * - 本地更新演示（可根据后端需求扩展为实际接口调用）
+ */
 const submitUser = async () => {
   if (!userFormRef.value) return
   
@@ -972,26 +984,48 @@ const submitUser = async () => {
       
       ElMessage.success('用户更新成功')
     } else {
-      // 这里应该调用实际的API创建用户
-      // await userApi.createUser(userForm)
-      
+      // 调用后端注册接口创建用户
+      const registerPayload = {
+        username: userForm.username,
+        email: userForm.email,
+        password: userForm.password,
+        // 后端字段为 confirm_password，这里进行映射
+        confirm_password: userForm.confirmPassword
+      }
+
+      const resp = await authApi.register(registerPayload as any)
+      const createdUser = (resp as any)?.user ?? resp
+
+      // 根据选择的主角色更新后端角色（仅支持 admin/user）
       const primaryRole = Array.isArray(userForm.roles) ? (userForm.roles[0] || '') : ''
+      let finalRole: string = createdUser?.role || 'user'
+      if (primaryRole && ['admin', 'user'].includes(primaryRole) && primaryRole !== finalRole) {
+        try {
+          const updated = await userApi.updateUser(createdUser.id, { role: primaryRole })
+          finalRole = (updated as any)?.role ?? primaryRole
+        } catch (e) {
+          console.warn('更新用户角色失败，保留默认角色', e)
+        }
+      }
+
+      // 合并后端返回与表单信息，插入到本地列表
       const newUser = {
-        ...userForm,
-        role: primaryRole,
-        id: Date.now().toString(),
+        id: String(createdUser.id),
+        username: createdUser.username,
+        email: createdUser.email,
+        role: finalRole,
+        status: userForm.status,
+        department: userForm.department || '',
+        phone: userForm.phone || '',
         avatar: '',
         is_online: false,
         last_login: null,
-        created_at: new Date().toISOString(),
-        stats: {
-          models: 0,
-          trainings: 0,
-          deployments: 0
-        }
+        created_at: createdUser.created_at || new Date().toISOString(),
+        stats: { models: 0, trainings: 0, deployments: 0 },
+        remark: userForm.remark || ''
       }
+
       users.value.unshift(newUser)
-      
       ElMessage.success('用户创建成功')
     }
     
@@ -999,7 +1033,8 @@ const submitUser = async () => {
     handleCloseUserDialog()
   } catch (error: any) {
     console.error('提交用户信息失败:', error)
-    ElMessage.error('操作失败，请稍后重试')
+    const serverMsg = error?.response?.data?.detail || error?.message || '操作失败，请稍后重试'
+    ElMessage.error(serverMsg)
   } finally {
     submitting.value = false
   }

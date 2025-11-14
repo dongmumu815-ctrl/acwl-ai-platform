@@ -21,6 +21,7 @@ from starlette.responses import Response
 from starlette.concurrency import iterate_in_threadpool
 
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from app.core.database import get_db_context
 from app.core.security import decode_access_token
@@ -629,6 +630,12 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
         return cols
 
     async def dispatch(self, request: Request, call_next):
+        """
+        统一用户操作日志记录中间件入口
+        
+        - 路由白名单：跳过文档、静态资源与认证相关接口，避免不必要的数据库写入
+        - 错误降级：对数据库连接过多（1040）进行用户友好提示
+        """
         # 过滤不必要的请求，例如静态、文档、健康检查、预检
         path = request.url.path
         method = request.method.upper()
@@ -654,6 +661,8 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
             or path.startswith('/api/v1/user-operation-logs/')
             or path.startswith('/api/v1/data-upload-logs')
             or path.startswith('/ui/assets')
+            or path.startswith('/api/v1/auth/login')
+            or path.startswith('/api/v1/auth/register')
         ):
             return await call_next(request)
 
@@ -744,13 +753,20 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
                 response_text = None
                 response_size = 0
         except Exception as e:
-            # 下游异常
             status_code = 500
             error_message = str(e)
             stack_trace = traceback.format_exc()
+            http_status = 500
+            detail_text = "Internal Server Error"
+            try:
+                if isinstance(e, OperationalError) and ('1040' in str(e) or 'Too many connections' in str(e)):
+                    http_status = 503
+                    detail_text = "数据库连接过多，请稍后重试"
+            except Exception:
+                pass
             response = Response(
-                content=json.dumps({"detail": "Internal Server Error"}, ensure_ascii=False),
-                status_code=500,
+                content=json.dumps({"detail": detail_text}, ensure_ascii=False),
+                status_code=http_status,
                 media_type="application/json"
             )
             response_text = None

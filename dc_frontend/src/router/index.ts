@@ -401,7 +401,7 @@ const authRoutes: RouteRecordRaw[] = [
           icon: 'Grid',
           requiresAuth: true,
           // 页面访问权限：资源中心-表管理查看
-          permission: 'data:resource_center:view',
+          permission: 'data:resource_center:manage',
           strictPermission: true,
           hideFooter: true
         }
@@ -429,7 +429,7 @@ const authRoutes: RouteRecordRaw[] = [
           icon: 'Collection',
           requiresAuth: true,
           // 页面访问权限：资源中心-类型查看
-          permission: 'data:resource_center:view',
+          permission: 'data:resource_center:type',
           strictPermission: true
         }
       }

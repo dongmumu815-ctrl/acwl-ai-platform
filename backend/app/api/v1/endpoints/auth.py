@@ -16,6 +16,8 @@ from app.core.config import settings
 from app.core.exceptions import AuthenticationError, ValidationError
 from app.models.user import User
 from app.schemas.auth import Token, UserLogin, UserRegister, UserResponse, LoginResponse
+from sqlalchemy.exc import OperationalError
+from app.core.exceptions import ACWLException
 from app.core.security import (
     verify_password,
     get_password_hash,
@@ -130,35 +132,42 @@ async def login_json(
     user_data: UserLogin,
     db: AsyncSession = Depends(get_db)
 ) -> LoginResponse:
-    """JSON格式用户登录"""
+    """
+    JSON格式用户登录
     
-    # 查找用户（支持用户名或邮箱登录）
-    if user_data.email:
-        result = await db.execute(select(User).where(User.email == user_data.email))
-    else:
-        result = await db.execute(select(User).where(User.username == user_data.username))
-    
-    user = result.scalar_one_or_none()
-    
-    if not user or not verify_password(user_data.password, user.password_hash):
-        raise AuthenticationError("用户名或密码错误")
-    
-    if not user.is_active:
-        raise AuthenticationError("用户已被禁用")
-    
-    # 创建访问令牌
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": str(user.id)},
-        expires_delta=access_token_expires
-    )
-    
-    return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=UserResponse.model_validate(user)
-    )
+    - 支持用户名或邮箱登录
+    - 针对数据库连接过多（1040）进行友好降级提示
+    """
+    try:
+        if user_data.email:
+            result = await db.execute(select(User).where(User.email == user_data.email))
+        else:
+            result = await db.execute(select(User).where(User.username == user_data.username))
+        user = result.scalar_one_or_none()
+
+        if not user or not verify_password(user_data.password, user.password_hash):
+            raise AuthenticationError("用户名或密码错误")
+
+        if not user.is_active:
+            raise AuthenticationError("用户已被禁用")
+
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": str(user.id)},
+            expires_delta=access_token_expires
+        )
+
+        return LoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            user=UserResponse.model_validate(user)
+        )
+    except OperationalError as e:
+        msg = str(e)
+        if '1040' in msg or 'Too many connections' in msg:
+            raise ACWLException(message="数据库连接过多，请稍后重试", status_code=503, error_code="DB_CONNECTION_LIMIT", detail=msg)
+        raise ACWLException(message="数据库错误", status_code=500, error_code="DB_ERROR", detail=msg)
 
 
 @router.get("/me", response_model=UserResponse, summary="获取当前用户信息")

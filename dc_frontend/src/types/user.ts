@@ -28,7 +28,8 @@ export interface User {
  * 登录请求数据
  */
 export interface LoginRequest {
-  email: string
+  email?: string
+  username?: string
   password: string
   remember?: boolean
 }
