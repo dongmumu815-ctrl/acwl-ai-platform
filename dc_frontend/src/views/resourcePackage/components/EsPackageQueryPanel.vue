@@ -1858,13 +1858,13 @@ function getTitleField(row: Record<string, any>): string {
   return keys.length ? keys[0] : "";
 }
 const KEY_FIELDS = [
-  "pageNumber",
-  "snippet",
-  "abstract",
+  "language",
   "publication_category",
   "data_source",
   "publisher",
-  "language"
+  "pageNumber",
+  "snippet",
+  "abstract"
 ];
 function getKeyFields(row: Record<string, any>): string[] {
   const r = row || {};
@@ -1884,6 +1884,17 @@ function copyRow(row: Record<string, any>) {
 
 // 获取字段显示名称（优先显示 display_name，其次注释comment，最后字段名）
 function getFieldDisplayName(fieldName: string): string {
+  // 特殊映射：pages 字段在下拉与展示层统一显示为“全文”
+  if (fieldName === "pages" || fieldName === "pages.content") {
+    return "全文";
+  }
+  // 特殊映射：命中文本信息
+  if (fieldName === "pageNumber") {
+    return "命中全文页码";
+  }
+  if (fieldName === "snippet") {
+    return "节选";
+  }
   const fieldMapping = fieldMappings.value[fieldName];
   if (fieldMapping?.display_name) {
     return fieldMapping.display_name;

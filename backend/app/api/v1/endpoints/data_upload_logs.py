@@ -133,7 +133,8 @@ async def _query_doris_logs(
 
             return {"items": items, "total": total}
     finally:
-        await connection.close()
+        # aiomysql.Connection.close() 是同步方法，不能使用 await
+        connection.close()
 
 
 @router.get("/", summary="获取数据上传日志（Doris）")
