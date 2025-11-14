@@ -68,7 +68,12 @@ async def register(
     user_data: UserRegister,
     db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
-    """用户注册"""
+    """用户注册
+    
+    - 接受基础信息：`username`、`email`、`password`、`confirm_password`
+    - 支持可选字段：`department`、`phone`、`status`、`remark`
+    - `role` 字段仅用于兼容，出于安全考虑注册时强制为 `user`
+    """
     
     # 检查用户名是否已存在
     result = await db.execute(select(User).where(User.username == user_data.username))
@@ -82,11 +87,17 @@ async def register(
     
     # 创建新用户
     hashed_password = get_password_hash(user_data.password)
+    # 角色安全限制：注册阶段一律为普通用户
+    # 其他可选字段按需设置
     new_user = User(
         username=user_data.username,
         email=user_data.email,
         password_hash=hashed_password,
-        role="user"  # 默认角色
+        role="user",
+        department=user_data.department,
+        phone=user_data.phone,
+        status=(user_data.status or "active"),
+        remark=user_data.remark
     )
     
     db.add(new_user)

@@ -276,6 +276,24 @@ def get_role_users(
     )
 
 
+@router.get("/users/{user_id}/roles", response_model=ResponseModel[List[RoleResponse]])
+def get_user_roles(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取指定用户的角色列表（函数级注释）
+
+    - 基于用户ID查询当前有效角色
+    - 返回 `RoleResponse` 数组，便于前端进行差异同步
+    """
+    roles = crud_user_role.get_roles_by_user(db=db, user_id=user_id)
+    return ResponseModel(
+        data=[RoleResponse.model_validate(r) for r in roles],
+        message="获取用户角色成功"
+    )
+
+
 @router.post("/assign-user", response_model=ResponseModel[UserRoleResponse])
 def assign_role_to_user(
     user_role_in: UserRoleCreate,
@@ -322,3 +340,21 @@ def remove_role_from_user(
         data=True,
         message="移除角色成功"
     )
+
+
+@router.delete("/remove-user/{user_id}/{role_id}", response_model=ResponseModel[bool])
+def remove_role_from_user_path(
+    user_id: int,
+    role_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """移除用户的角色（函数级注释）
+
+    - 使用路径参数明确传递 `user_id` 与 `role_id`
+    - 避免与 `/{role_id}` 动态路由匹配冲突，确保稳定删除
+    """
+    success = crud_user_role.delete(db=db, user_id=user_id, role_id=role_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="移除角色失败")
+    return ResponseModel(data=True, message="移除角色成功")

@@ -163,9 +163,14 @@ class ResourcePackageService:
         if not package:
             raise HTTPException(status_code=404, detail="资源包不存在")
         
-        # 检查权限
-        if not await self._check_permission(package_id, user_id, PermissionType.READ):
-            raise HTTPException(status_code=403, detail="无权限访问此资源包")
+        # # 检查权限
+        # if not await self._check_permission(package_id, user_id, PermissionType.READ):
+        #     raise HTTPException(status_code=403, detail="无权限访问此资源包")
+
+        
+        #   // 页面访问权限：资源中心查询
+        #   permission: 'data:resource_center:query',
+        #   strictPermission: true,
         
         return package
     

@@ -7,7 +7,7 @@
 from sqlalchemy import Integer, String, Boolean, TIMESTAMP, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Optional
 
 from app.core.database import Base, TimestampMixin
 
@@ -63,6 +63,31 @@ class User(Base, TimestampMixin):
         nullable=False,
         default="user",
         comment="用户角色，如admin、user等"
+    )
+
+    department: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="部门"
+    )
+
+    phone: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="手机号"
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="active",
+        comment="用户状态：active/disabled/pending"
+    )
+
+    remark: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="备注"
     )
     
     # 关联关系
@@ -238,8 +263,11 @@ class User(Base, TimestampMixin):
     
     @property
     def is_active(self) -> bool:
-        """用户是否激活（可扩展）"""
-        return True
+        """用户是否激活（根据状态字段）"""
+        try:
+            return (self.status or "active") == "active"
+        except Exception:
+            return True
     
     # 新的角色权限系统方法
     def get_roles(self):

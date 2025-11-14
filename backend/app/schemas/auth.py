@@ -30,6 +30,11 @@ class UserRegister(BaseModel):
     email: EmailStr = Field(..., description="邮箱地址")
     password: str = Field(..., min_length=6, max_length=128, description="密码")
     confirm_password: str = Field(..., min_length=6, max_length=128, description="确认密码")
+    role: Optional[str] = Field(None, description="角色（admin/user）")
+    department: Optional[str] = Field(None, description="部门")
+    phone: Optional[str] = Field(None, description="手机号")
+    status: Optional[str] = Field("active", description="状态：active/disabled/pending")
+    remark: Optional[str] = Field(None, description="备注")
     
     @validator('confirm_password')
     def passwords_match(cls, v, values, **kwargs):
@@ -50,6 +55,11 @@ class UserResponse(BaseModel):
     username: str
     email: str
     role: str
+    status: str
+    department: Optional[str] = None
+    phone: Optional[str] = None
+    remark: Optional[str] = None
+    is_active: bool
     created_at: datetime
     updated_at: datetime
     
@@ -61,6 +71,10 @@ class UserUpdate(BaseModel):
     """用户更新模式"""
     email: Optional[EmailStr] = None
     role: Optional[str] = Field(None, pattern=r'^(admin|user)$')
+    department: Optional[str] = None
+    phone: Optional[str] = None
+    status: Optional[str] = Field(None, pattern=r'^(active|disabled|pending)$')
+    remark: Optional[str] = None
     
     @validator('role')
     def validate_role(cls, v):

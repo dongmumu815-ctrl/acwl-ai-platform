@@ -196,14 +196,11 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="role" label="角色" width="100">
+            <el-table-column label="角色" width="200">
               <template #default="{ row }">
-                <el-tag
-                  :type="getRoleType(row.role)"
-                  size="small"
-                >
-                  {{ getRoleText(row.role) }}
-                </el-tag>
+                <template v-for="r in getRoles(row)" :key="r">
+                  <el-tag :type="getRoleType(r)" size="small" style="margin-right:4px">{{ getRoleText(r) }}</el-tag>
+                </template>
               </template>
             </el-table-column>
             
@@ -431,7 +428,7 @@
             v-model:current-page="pagination.currentPage"
             v-model:page-size="pagination.pageSize"
             :page-sizes="[10, 20, 50, 100]"
-            :total="filteredUsers.length"
+            :total="filters.status ? filteredUsers.length : totalCount"
             layout="total, sizes, prev, pager, next, jumper"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
@@ -614,6 +611,8 @@ const pagination = reactive({
 
 // 用户列表
 const users = ref<any[]>([])
+// 总记录条数（后端分页返回）
+const totalCount = ref(0)
 
 // 用户表单
 const userForm = reactive({
@@ -675,31 +674,14 @@ const userRules: FormRules = {
 
 // 计算属性
 const filteredUsers = computed(() => {
+  // 后端已处理搜索与角色筛选，这里仅进行状态与本地排序处理
   let result = [...users.value]
-  
-  // 搜索过滤
-  if (filters.search) {
-    const search = filters.search.toLowerCase()
-    result = result.filter(user => 
-      user.username.toLowerCase().includes(search) ||
-      user.email.toLowerCase().includes(search)
-    )
-  }
-  
-  // 角色过滤（支持多角色）
-  if (filters.role) {
-    result = result.filter(user => {
-      const roles = getRoles(user)
-      return roles.includes(filters.role)
-    })
-  }
-  
-  // 状态过滤
+
   if (filters.status) {
     result = result.filter(user => user.status === filters.status)
   }
-  
-  // 排序
+
+  // 本地排序（仅对当前页数据进行展示排序）
   result.sort((a, b) => {
     const field = filters.sortBy
     if (field === 'created_at' || field === 'last_login') {
@@ -709,14 +691,13 @@ const filteredUsers = computed(() => {
     }
     return 0
   })
-  
+
   return result
 })
 
 const paginatedUsers = computed(() => {
-  const start = (pagination.currentPage - 1) * pagination.pageSize
-  const end = start + pagination.pageSize
-  return filteredUsers.value.slice(start, end)
+  // 后端分页已生效，此处直接返回过滤后的当前页数据
+  return filteredUsers.value
 })
 
 // 方法
@@ -737,22 +718,45 @@ const getRoles = (user: any): string[] => {
   return []
 }
 
-const getRoleType = (role: string) => {
-  const roleMap: Record<string, string> = {
-    admin: 'danger',
-    user: 'primary',
-    guest: 'info'
-  }
-  return roleMap[role] || 'info'
+/**
+ * 解析主角色（函数级注释）
+ *
+ * - 输入为选择的角色代码列表（可能来源于后端不同命名，如 ADMIN）
+ * - 优先返回 `admin`，其次返回 `user`
+ * - 匹配规则：大小写不敏感；包含关键字 `admin`/`user` 即命中
+ */
+const resolvePrimaryRole = (codes: string[]): string => {
+  const norm = (s: string) => (s || '').toLowerCase()
+  const hasAdmin = codes.some(c => norm(c) === 'admin')
+  if (hasAdmin) return 'admin'
+  const hasUser = codes.some(c => norm(c) === 'user')
+  if (hasUser) return 'user'
+  return ''
 }
 
+/**
+ * 角色类型样式映射（函数级注释）
+ *
+ * - admin 使用高亮 danger
+ * - user 使用 primary
+ * - 其他自定义角色统一使用 info
+ */
+const getRoleType = (role: string) => {
+  const r = (role || '').toLowerCase()
+  if (r === 'admin') return 'danger'
+  if (r === 'user') return 'primary'
+  return 'info'
+}
+
+/**
+ * 角色显示文本（函数级注释）
+ *
+ * - 优先从后端加载的 `roleOptions` 中取名称
+ * - 若未命中，回退显示代码本身
+ */
 const getRoleText = (role: string) => {
-  const roleMap: Record<string, string> = {
-    admin: '管理员',
-    user: '普通用户',
-    guest: '访客'
-  }
-  return roleMap[role] || role
+  const found = roleOptions.value.find(r => r.code === role)
+  return found?.name || role
 }
 
 const getStatusType = (status: string) => {
@@ -773,16 +777,31 @@ const getStatusText = (status: string) => {
   return statusMap[status] || status
 }
 
+/**
+ * 搜索触发（函数级注释）
+ * 将页码重置为1并请求后端列表接口
+ */
 const handleSearch = () => {
   pagination.currentPage = 1
+  refreshUsers()
 }
 
+/**
+ * 过滤触发（函数级注释）
+ * 包含角色/状态变更；统一重置页码并请求后端列表接口
+ */
 const handleFilter = () => {
   pagination.currentPage = 1
+  refreshUsers()
 }
 
+/**
+ * 排序选项变化（函数级注释）
+ * 仅影响本地展示排序，同时重置页码并刷新列表
+ */
 const handleSort = () => {
   pagination.currentPage = 1
+  refreshUsers()
 }
 
 const resetFilters = () => {
@@ -791,131 +810,85 @@ const resetFilters = () => {
   filters.status = ''
   filters.sortBy = 'created_at'
   pagination.currentPage = 1
+  refreshUsers()
 }
 
+/**
+ * 表格排序变化（函数级注释）
+ * 同步排序字段并刷新后端数据（后端不处理排序，主要影响本地展示）
+ */
 const handleTableSort = ({ prop, order }: any) => {
   if (order) {
     filters.sortBy = prop
   }
+  refreshUsers()
 }
 
+/**
+ * 分页大小变化（函数级注释）
+ * 更新每页大小并重新请求后端数据
+ */
 const handleSizeChange = (size: number) => {
   pagination.pageSize = size
   pagination.currentPage = 1
+  refreshUsers()
 }
 
+/**
+ * 页码变化（函数级注释）
+ * 更新当前页并重新请求后端数据
+ */
 const handleCurrentChange = (page: number) => {
   pagination.currentPage = page
+  refreshUsers()
 }
 
+/**
+ * 刷新用户列表（函数级注释）
+ *
+ * - 对接后端用户查询接口 `/users/`
+ * - 传递分页、搜索与角色筛选参数
+ * - 兼容不同响应结构（直接对象或 { data } 包裹）
+ * - 更新本地列表与统计数据
+ */
 const refreshUsers = async () => {
   try {
-    // 这里应该调用实际的API
-    // const response = await userApi.getUsers()
-    // users.value = response.data
-    
-    // 模拟数据
-    users.value = [
-      {
-        id: '1',
-        username: 'admin',
-        email: 'admin@acwl.ai',
-        role: 'admin',
-        status: 'active',
-        department: '技术部',
-        phone: '13800138000',
-        avatar: '',
-        is_online: true,
-        last_login: '2024-01-21T10:30:00Z',
-        created_at: '2024-01-01T00:00:00Z',
-        stats: {
-          models: 15,
-          trainings: 8,
-          deployments: 5
-        },
-        remark: '系统管理员'
-      },
-      {
-        id: '2',
-        username: 'john_doe',
-        email: 'john@example.com',
-        role: 'user',
-        status: 'active',
-        department: '算法部',
-        phone: '13800138001',
-        avatar: '',
-        is_online: false,
-        last_login: '2024-01-20T15:45:00Z',
-        created_at: '2024-01-05T10:20:00Z',
-        stats: {
-          models: 8,
-          trainings: 12,
-          deployments: 3
-        },
-        remark: '算法工程师'
-      },
-      {
-        id: '3',
-        username: 'jane_smith',
-        email: 'jane@example.com',
-        role: 'user',
-        status: 'active',
-        department: '产品部',
-        phone: '13800138002',
-        avatar: '',
-        is_online: true,
-        last_login: '2024-01-21T09:15:00Z',
-        created_at: '2024-01-08T14:30:00Z',
-        stats: {
-          models: 3,
-          trainings: 5,
-          deployments: 2
-        },
-        remark: '产品经理'
-      },
-      {
-        id: '4',
-        username: 'guest_user',
-        email: 'guest@example.com',
-        role: 'guest',
-        status: 'pending',
-        department: '',
-        phone: '',
-        avatar: '',
-        is_online: false,
-        last_login: null,
-        created_at: '2024-01-20T16:45:00Z',
-        stats: {
-          models: 0,
-          trainings: 0,
-          deployments: 0
-        },
-        remark: '访客用户'
-      },
-      {
-        id: '5',
-        username: 'disabled_user',
-        email: 'disabled@example.com',
-        role: 'user',
-        status: 'disabled',
-        department: '测试部',
-        phone: '13800138003',
-        avatar: '',
-        is_online: false,
-        last_login: '2024-01-15T12:00:00Z',
-        created_at: '2024-01-10T09:00:00Z',
-        stats: {
-          models: 2,
-          trainings: 1,
-          deployments: 0
-        },
-        remark: '已禁用用户'
+    const params = {
+      page: pagination.currentPage,
+      size: pagination.pageSize,
+      search: (filters.search?.trim() || undefined),
+      role: (filters.role || undefined),
+      status: (filters.status || undefined)
+    }
+
+    const resp = await userApi.getUsers(params as any)
+    const data = (resp && (resp as any).data) ? (resp as any).data : resp
+
+    const items = (data as any)?.items ?? (Array.isArray(data) ? data : [])
+    users.value = items
+    totalCount.value = (data as any)?.total ?? items.length
+
+    /**
+     * 依据服务端角色数据丰富用户的多角色（函数级注释）
+     *
+     * - 为列表中的每个用户拉取当前角色集合并写入 `roles` 数组
+     * - 这样表格与卡片视图即可显示自定义且多选的角色
+     */
+    try {
+      for (const u of users.value) {
+        try {
+          const rResp = await roleApi.getUserRoles(Number(u.id))
+          const rData = (rResp as any)?.data || rResp
+          u.roles = Array.isArray(rData) ? rData.map((r: any) => r.code) : []
+        } catch (e) {
+          console.warn('加载用户角色失败:', e)
+        }
       }
-    ]
-    
-    // 更新统计数据
+    } catch (e) {
+      console.warn('批量加载用户角色失败:', e)
+    }
+
     updateStats()
-    
     ElMessage.success('用户列表已刷新')
   } catch (error) {
     console.error('刷新用户列表失败:', error)
@@ -973,15 +946,42 @@ const submitUser = async () => {
     submitting.value = true
     
     if (isEditing.value) {
-      // 这里应该调用实际的API更新用户
-      // await userApi.updateUser(userForm.id, userForm)
-      
-      const index = users.value.findIndex(u => u.id === userForm.id)
-      if (index > -1) {
-        const primaryRole = Array.isArray(userForm.roles) ? (userForm.roles[0] || '') : ''
-        users.value[index] = { ...users.value[index], ...userForm, role: primaryRole }
+      /**
+       * 更新用户信息（函数级注释）
+       *
+       * - 将角色、邮箱、部门、手机号、状态、备注提交至服务端
+       * - 仅允许角色为 `admin` 或 `user`，其余角色不提交
+       * - 成功后同步本地列表并刷新统计
+       */
+      /**
+       * 选择主角色（优先 admin，其次 user）
+       * 保证多选时也能正确上传角色（函数级注释）
+       */
+      const selectedRoles = Array.isArray(userForm.roles) ? userForm.roles : []
+      const primaryRole = resolvePrimaryRole(selectedRoles)
+
+      const payload: any = {
+        email: userForm.email || undefined,
+        department: userForm.department || undefined,
+        phone: userForm.phone || undefined,
+        status: userForm.status || undefined,
+        remark: userForm.remark || undefined
       }
-      
+      // 仅当选择了允许的主角色时才更新角色字段
+      if (primaryRole) {
+        payload.role = primaryRole
+      }
+
+      const updatedUser = await userApi.updateUser(Number(userForm.id), payload)
+      await syncUserRoles(Number(userForm.id), selectedRoles)
+
+      const index = users.value.findIndex(u => String(u.id) === String(userForm.id))
+      if (index > -1) {
+        const finalRole = (updatedUser as any)?.role ?? (payload.role || '')
+        users.value[index] = { ...users.value[index], ...userForm, role: finalRole }
+      }
+
+      updateStats()
       ElMessage.success('用户更新成功')
     } else {
       // 调用后端注册接口创建用户
@@ -997,15 +997,34 @@ const submitUser = async () => {
       const createdUser = (resp as any)?.user ?? resp
 
       // 根据选择的主角色更新后端角色（仅支持 admin/user）
-      const primaryRole = Array.isArray(userForm.roles) ? (userForm.roles[0] || '') : ''
+      /**
+       * 选择主角色（优先 admin，其次 user）
+       * 保证多选时也能正确上传角色（函数级注释）
+       */
+      const selectedRoles = Array.isArray(userForm.roles) ? userForm.roles : []
+      const primaryRole = resolvePrimaryRole(selectedRoles)
       let finalRole: string = createdUser?.role || 'user'
-      if (primaryRole && ['admin', 'user'].includes(primaryRole) && primaryRole !== finalRole) {
-        try {
-          const updated = await userApi.updateUser(createdUser.id, { role: primaryRole })
-          finalRole = (updated as any)?.role ?? primaryRole
-        } catch (e) {
-          console.warn('更新用户角色失败，保留默认角色', e)
+
+      /**
+       * 注册后补充用户详细信息（函数级注释）
+       * 将角色、部门、手机号、状态、备注一次性更新到服务端
+       */
+      try {
+        const updatePayload: any = {
+          department: userForm.department || undefined,
+          phone: userForm.phone || undefined,
+          status: userForm.status || 'active',
+          remark: userForm.remark || undefined
         }
+        if (primaryRole && ['admin', 'user'].includes(primaryRole)) {
+          updatePayload.role = primaryRole
+        }
+
+        const updatedUser = await userApi.updateUser(createdUser.id, updatePayload)
+        await syncUserRoles(Number(createdUser.id), selectedRoles)
+        finalRole = (updatedUser as any)?.role ?? finalRole
+      } catch (e) {
+        console.warn('更新用户详细信息失败，保留默认角色与本地显示字段', e)
       }
 
       // 合并后端返回与表单信息，插入到本地列表
@@ -1014,6 +1033,7 @@ const submitUser = async () => {
         username: createdUser.username,
         email: createdUser.email,
         role: finalRole,
+        roles: selectedRoles,
         status: userForm.status,
         department: userForm.department || '',
         phone: userForm.phone || '',
@@ -1064,10 +1084,19 @@ const resetPassword = async (user: any) => {
       }
     )
     
-    // 这里应该调用实际的API
-    // await userApi.resetPassword(user.id)
-    
-    ElMessage.success('密码重置成功，新密码已发送到用户邮箱')
+    /**
+     * 重置用户密码（函数级注释）
+     *
+     * - 触发后端忘记密码流程，向该用户邮箱发送重置邮件
+     * - 若后端返回错误（例如接口未提供或权限限制），进行友好提示
+     */
+    try {
+      await authApi.forgotPassword(user.email)
+      ElMessage.success('已发送密码重置邮件到用户邮箱')
+    } catch (e) {
+      console.error('重置密码接口调用失败:', e)
+      ElMessage.error('重置密码失败，后端未提供重置接口或权限不足')
+    }
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error('重置密码失败:', error)
@@ -1090,12 +1119,17 @@ const toggleUserStatus = async (user: any) => {
       }
     )
     
-    // 这里应该调用实际的API
-    // await userApi.toggleUserStatus(user.id)
-    
-    user.status = user.status === 'active' ? 'disabled' : 'active'
+    /**
+     * 切换用户状态（函数级注释）
+     *
+     * - 使用更新接口提交新的状态：active/disabled
+     * - 成功后同步本地数据并更新统计
+     */
+    const newStatus = user.status === 'active' ? 'disabled' : 'active'
+    await userApi.updateUser(Number(user.id), { status: newStatus } as any)
+
+    user.status = newStatus
     updateStats()
-    
     ElMessage.success(`用户${action}成功`)
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -1121,8 +1155,13 @@ const deleteUser = async (user: any) => {
       }
     )
     
-    // 这里应该调用实际的API
-    // await userApi.deleteUser(user.id)
+    /**
+     * 删除用户（函数级注释）
+     *
+     * - 调用后端删除接口 `/users/{id}`
+     * - 成功后从本地列表移除并更新统计
+     */
+    await userApi.deleteUser(Number(user.id))
     
     const index = users.value.findIndex(u => u.id === user.id)
     if (index > -1) {
@@ -1140,7 +1179,7 @@ const deleteUser = async (user: any) => {
 }
 
 // 角色选项列表（默认静态，后端加载后覆盖）
-const roleOptions = ref<Array<{ code: string; name: string }>>([
+const roleOptions = ref<Array<{ code: string; name: string; id?: number }>>([
   { code: 'admin', name: '管理员' },
   { code: 'user', name: '普通用户' },
   { code: 'guest', name: '访客' }
@@ -1148,18 +1187,61 @@ const roleOptions = ref<Array<{ code: string; name: string }>>([
 
 /**
  * 加载角色选项（函数级注释）
- *
- * - 优先从后端获取可用角色列表 `/roles/`
- * - 将后端返回的 `code`/`name` 映射为下拉选项
- * - 若请求失败，保留静态默认选项，避免界面不可用
+ * 包含 `code/name/id`，用于后续角色分配接口使用
  */
 const loadRoleOptions = async () => {
   try {
     const resp = await roleApi.getRoles({ size: 100 })
     const items = resp?.data?.items || []
-    roleOptions.value = items.map((r: any) => ({ code: r.code, name: r.name }))
+    roleOptions.value = items.map((r: any) => ({ code: r.code, name: r.name, id: r.id }))
   } catch (e) {
     console.warn('加载角色列表失败，使用内置默认选项', e)
+  }
+}
+
+/**
+ * 同步用户多角色到服务端（函数级注释）
+ *
+ * - 根据选择的角色代码计算增删差异
+ * - 调用 `/roles/assign-user` 与 `/roles/remove-user` 完成同步
+ */
+const syncUserRoles = async (userId: number, selectedRoleCodes: string[]) => {
+  try {
+    // 确保拥有最新角色映射
+    await loadRoleOptions()
+    const codeToId = new Map(roleOptions.value.map(r => [r.code, r.id]))
+
+    // 获取当前服务端角色列表
+    const currentResp = await roleApi.getUserRoles(userId)
+    const currentRoles = ((currentResp as any)?.data || currentResp) as Array<any>
+    const currentIds = new Set<number>((currentRoles || []).map(r => r.id))
+
+    // 目标角色ID集合
+    const targetIds = new Set<number>()
+    for (const code of selectedRoleCodes) {
+      const id = codeToId.get(code)
+      if (id) targetIds.add(id)
+    }
+
+    // 计算需要新增与移除的角色
+    const toAdd: number[] = []
+    const toRemove: number[] = []
+    for (const id of targetIds) {
+      if (!currentIds.has(id)) toAdd.push(id)
+    }
+    for (const id of currentIds) {
+      if (!targetIds.has(id)) toRemove.push(id)
+    }
+
+    // 执行新增与移除
+    for (const roleId of toAdd) {
+      await roleApi.assignRole({ user_id: userId, role_id: roleId })
+    }
+    for (const roleId of toRemove) {
+      await roleApi.removeRole(userId, roleId)
+    }
+  } catch (e) {
+    console.warn('同步用户角色失败:', e)
   }
 }
 
