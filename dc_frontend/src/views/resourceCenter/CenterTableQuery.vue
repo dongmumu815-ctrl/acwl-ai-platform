@@ -58,10 +58,12 @@
       <!-- 查询面板（基于包类型） -->
       <SqlPackageQueryPanel
         v-if="packageData?.type === 'sql' && packageData"
+        ref="panelRef"
         :packageData="packageData"
       />
       <EsPackageQueryPanel
         v-else-if="packageData?.type === 'elasticsearch' && packageData"
+        ref="panelRef"
         :packageData="packageData"
       />
     </div>
@@ -69,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import {
   resourcePackageApi,
@@ -91,6 +93,8 @@ const FIXED_PACKAGE_ID = 2;
 const loading = ref(false);
 const packageData = ref<ExtendedResourcePackage | null>(null);
 const datasources = ref<DataSource[]>([]);
+// 子面板引用，用于触发默认查询
+const panelRef = ref<any>(null);
 
 const getDatasourceName = computed(() => {
   return (datasourceId: number) => {
@@ -192,6 +196,40 @@ const loadDatasources = async () => {
 onMounted(() => {
   loadDatasources();
   loadFixedPackageData();
+});
+
+// 包数据加载完成后，自动触发一次查询
+watch(packageData, async (val) => {
+  if (val) {
+    await nextTick();
+    try {
+      if (val.type === "sql") {
+        if (panelRef.value?.handleUserQuery) {
+          panelRef.value.handleUserQuery();
+        } else if (panelRef.value?.executeQuery) {
+          panelRef.value.executeQuery();
+        }
+      } else if (val.type === "elasticsearch") {
+        // 仅在索引就绪后触发查询，避免“缺少索引信息”提示
+        if (panelRef.value?.isIndicesReady) {
+          panelRef.value?.executeQuery?.();
+        } else {
+          const unwatch = watch(
+            () => panelRef.value?.isIndicesReady,
+            (ready) => {
+              if (ready) {
+                panelRef.value?.executeQuery?.();
+                unwatch();
+              }
+            },
+            { immediate: false }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("进入资源中心默认查询触发失败:", e);
+    }
+  }
 });
 </script>
 

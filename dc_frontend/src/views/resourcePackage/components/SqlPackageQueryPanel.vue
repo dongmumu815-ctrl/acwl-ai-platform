@@ -523,6 +523,12 @@ watch(() => props.packageData, (newVal) => {
   }
 }, { immediate: true })
 
+// 暴露查询方法，便于父组件在进入页面时触发默认查询
+defineExpose({
+  executeQuery,
+  handleUserQuery
+})
+
 </script>
 
 <style scoped>

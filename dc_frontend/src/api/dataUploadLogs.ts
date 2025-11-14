@@ -35,6 +35,8 @@ export interface DataUploadLogsQuery extends PaginationParams {
   start_time?: string
   /** 按时间范围过滤：结束时间 */
   end_time?: string
+  /** 排除的数据源名称（后端支持则生效） */
+  exclude_data_source_name?: string
 }
 
 export const dataUploadLogsApi = {
@@ -51,7 +53,23 @@ export const dataUploadLogsApi = {
         batch_id: params?.batch_id,
         // 透传时间范围查询参数（如果存在）
         start_time: params?.start_time,
-        end_time: params?.end_time
+        end_time: params?.end_time,
+        // 排除指定数据源
+        exclude_data_source_name: params?.exclude_data_source_name
+      }
+    })
+  },
+  /**
+   * 获取指定批次的明细数据（通过后端路由到 task_db 与 doris-read）
+   */
+  getBatchDetails(batchId: string, params?: { limit?: number; offset?: number; q?: string }): Promise<ApiResponse<{ batch_id: string; table_name: string; limit: number; offset: number; items: any[]; count: number }>> {
+    return request({
+      url: `/data-upload-logs/details/${batchId}`,
+      method: 'get',
+      params: {
+        limit: params?.limit ?? 200,
+        offset: params?.offset ?? 0,
+        q: params?.q
       }
     })
   }
