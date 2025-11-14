@@ -57,6 +57,15 @@ class Role(Base):
         """获取角色的所有权限代码"""
         return [rp.permission.code for rp in self.role_permissions if rp.permission.status]
 
+    @property
+    def permissions(self):
+        """角色权限列表属性
+        说明：为Pydantic模型（如RoleWithPermissions）提供可序列化的`permissions`字段，
+        以便通过`from_attributes=True`正确映射到权限响应模型。
+        返回值：启用状态的`Permission`对象列表。
+        """
+        return self.get_permissions()
+
 
 class UserRole(Base):
     """用户角色关联模型"""

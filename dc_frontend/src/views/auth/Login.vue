@@ -16,12 +16,12 @@
         class="login-form"
         @keyup.enter="handleLogin"
       >
-        <el-form-item prop="email">
+        <el-form-item prop="account">
           <el-input
-            v-model="loginForm.email"
-            placeholder="请输入邮箱"
+            v-model="loginForm.account"
+            placeholder="请输入用户名或邮箱"
             size="large"
-            prefix-icon="Message"
+            prefix-icon="User"
             clearable
           />
         </el-form-item>
@@ -83,10 +83,10 @@ const userStore = useUserStore()
 const loginFormRef = ref<FormInstance>()
 
 /**
- * 登录表单数据
+ * 登录表单视图数据（用户名或邮箱 + 密码）
  */
-const loginForm = reactive<LoginRequest>({
-  email: 'admin@acwl.ai',
+const loginForm = reactive({
+  account: 'admin',
   password: 'password'
 })
 
@@ -94,9 +94,8 @@ const loginForm = reactive<LoginRequest>({
  * 表单验证规则
  */
 const loginRules: FormRules = {
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+  account: [
+    { required: true, message: '请输入用户名或邮箱', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -105,7 +104,8 @@ const loginRules: FormRules = {
 }
 
 /**
- * 处理登录
+ * 提交登录
+ * 将单一输入的“用户名或邮箱”映射为后端所需的 `username` 或 `email` 字段
  */
 const handleLogin = async () => {
   if (!loginFormRef.value) return
@@ -113,8 +113,14 @@ const handleLogin = async () => {
   try {
     const valid = await loginFormRef.value.validate()
     if (!valid) return
+
+    const isEmail = /.+@.+\..+/.test(loginForm.account)
+    const payload: LoginRequest = {
+      password: loginForm.password,
+      ...(isEmail ? { email: loginForm.account } : { username: loginForm.account })
+    }
     
-    await userStore.login(loginForm)
+    await userStore.login(payload)
     
     // 跳转到仪表盘或之前访问的页面
     const redirect = router.currentRoute.value.query.redirect as string
@@ -128,11 +134,14 @@ const handleLogin = async () => {
 /**
  * 处理测试登录
  */
+/**
+ * 处理测试登录
+ */
 const handleTestLogin = async () => {
   try {
     // 使用默认的测试账号
     const testLoginData: LoginRequest = {
-      email: 'admin@acwl.ai',
+      username: 'admin',
       password: 'password'
     }
     

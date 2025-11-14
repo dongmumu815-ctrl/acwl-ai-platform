@@ -133,7 +133,7 @@ async def _query_doris_logs(
 
             return {"items": items, "total": total}
     finally:
-        connection.close()
+        await connection.close()
 
 
 @router.get("/", summary="获取数据上传日志（Doris）")

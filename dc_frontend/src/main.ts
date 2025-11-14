@@ -29,6 +29,7 @@ async function initApp() {
   // 恢复用户状态
   const userStore = useUserStore()
   userStore.restoreFromStorage()
+  await userStore.refreshPermissions()
   
   // 初始化路由
   app.use(router)

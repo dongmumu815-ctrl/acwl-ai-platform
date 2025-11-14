@@ -27,11 +27,11 @@
           size="large"
           @keyup.enter="handleLogin"
         >
-          <el-form-item prop="email">
+          <el-form-item prop="account">
             <el-input
-              v-model="loginForm.email"
-              placeholder="请输入邮箱"
-              prefix-icon="Message"
+              v-model="loginForm.account"
+              placeholder="请输入用户名或邮箱"
+              prefix-icon="User"
               clearable
             />
           </el-form-item>
@@ -114,18 +114,17 @@ const userStore = useUserStore()
 const loginFormRef = ref<FormInstance>()
 const loading = ref(false)
 
-// 登录表单数据
-const loginForm = reactive<LoginForm>({
-  email: 'admin@acwl.ai',
+// 登录表单视图数据（用户名或邮箱 + 密码）
+const loginForm = reactive({
+  account: 'admin',
   password: 'password',
   remember: false
 })
 
 // 表单验证规则
 const loginRules: FormRules = {
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+  account: [
+    { required: true, message: '请输入用户名或邮箱', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -133,15 +132,27 @@ const loginRules: FormRules = {
   ]
 }
 
-// 处理登录
+/**
+ * 提交登录
+ * 将单一输入的“用户名或邮箱”映射为后端所需的 `username` 或 `email` 字段
+ */
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   
   try {
     await loginFormRef.value.validate()
     loading.value = true
+
+    // 判定是否为邮箱
+    const isEmail = /.+@.+\..+/.test(loginForm.account)
+    // 构造后端需要的登录数据
+    const payload: LoginForm = {
+      password: loginForm.password,
+      ...(isEmail ? { email: loginForm.account } : { username: loginForm.account }),
+      remember: loginForm.remember
+    }
     
-    await userStore.login(loginForm)
+    await userStore.login(payload)
     
     ElMessage.success('登录成功')
     
@@ -156,7 +167,9 @@ const handleLogin = async () => {
   }
 }
 
-// 第三方登录
+/**
+ * 第三方登录入口
+ */
 const handleSocialLogin = (provider: string) => {
   ElMessage.info(`${provider} 登录功能开发中...`)
 }

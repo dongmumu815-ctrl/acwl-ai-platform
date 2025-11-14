@@ -14,6 +14,18 @@
           <el-icon><Plus /></el-icon>
           新建权限
         </el-button>
+        <el-button type="danger" @click="scanAndRemoveDataPlatformPermissions">
+          <el-icon><Delete /></el-icon>
+          扫描并移除数据中台权限
+        </el-button>
+        <el-button type="danger" @click="deleteAllDataPlatformPermissionDefinitions">
+          <el-icon><Delete /></el-icon>
+          删除数据中台权限定义
+        </el-button>
+        <el-button type="danger" @click="rebuildPermissionsFromDcMenu">
+          <el-icon><Refresh /></el-icon>
+          清空并按数据中台菜单重建
+        </el-button>
         <el-button type="warning" @click="syncPermissionsFromConstants">
           <el-icon><Refresh /></el-icon>
           同步权限常量
@@ -120,7 +132,22 @@
             <el-option label="数据管理" value="data" />
           </el-select>
         </el-form-item>
-        
+
+        <el-form-item label="平台">
+          <el-select
+            v-model="filters.platform"
+            placeholder="选择平台"
+            clearable
+            style="width: 150px"
+            @change="handleFilter"
+          >
+            <el-option label="全部" value="" />
+            <el-option label="AI中台" value="AI中台" />
+            <el-option label="数据中台" value="数据中台" />
+            <el-option label="其他" value="其他" />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="状态">
           <el-select
             v-model="filters.status"
@@ -172,7 +199,10 @@
         <template #default="{ node, data }">
           <div class="tree-node">
             <div class="node-content">
-              <el-icon v-if="data.type === 'module'" class="module-icon">
+              <el-icon v-if="data.type === 'platform'" class="platform-icon">
+                <OfficeBuilding />
+              </el-icon>
+              <el-icon v-else-if="data.type === 'module'" class="module-icon">
                 <Grid />
               </el-icon>
               <el-icon v-else class="permission-icon">
@@ -347,9 +377,11 @@ import {
   UserFilled,
   Search,
   RefreshLeft,
-  Refresh
+  Refresh,
+  OfficeBuilding,
+  Delete
 } from '@element-plus/icons-vue'
-import { permissionApi, type Permission } from '@/api/roles'
+import { permissionApi, roleApi, type Permission } from '@/api/roles'
 import { PERMISSIONS } from '@/utils/permission'
 
 // 响应式数据
@@ -374,6 +406,8 @@ const stats = reactive({
 const filters = reactive({
   search: '',
   module: '',
+  // 新增平台筛选：'' | 'AI中台' | '数据中台' | '其他'
+  platform: '' as '' | 'AI中台' | '数据中台' | '其他',
   status: '' as boolean | ''
 })
 
@@ -402,6 +436,61 @@ const treeProps = {
   key: 'id'
 }
 
+/**
+ * 平台与模块映射关系
+ * 用于在前端对后端返回的模块进行平台分组，以最小改动实现“AI中台/数据中台”两级结构。
+ */
+const PLATFORM_MODULE_MAP: Record<'AI中台' | '数据中台', string[]> = {
+  AI中台: [
+    // 前端（AI中台）路由中涉及的功能模块
+    'agent',
+    'model',
+    'instruction_set',
+    'deployment',
+    'training',
+    'system',
+    'user',
+    'role',
+    'permission',
+    'dataset',
+    'datasource',
+    'project'
+  ],
+  数据中台: [
+    // 数据中台路由中涉及的功能模块（以 data 前缀聚合）
+    'data'
+  ]
+}
+
+/**
+ * 根据模块及其权限码推断所属平台
+ * 规则来源：
+ * - AI中台功能来自 `frontend/src/router/index.ts`
+ * - 数据中台功能来自 `dc_frontend/src/router/index.ts`
+ * 推断策略：
+ * 1) 若模块下存在权限码以 `data:` 开头，则归为“数据中台”
+ * 2) 若模块下存在权限码以 `ai:` 开头，则归为“AI中台”
+ * 3) 否则，按模块名在 AI/数据中台清单中匹配
+ * 4) 仍无法匹配则归为“其他”（避免误归到 AI）
+ * @param mod 模块名（后端返回的 module 字段）
+ * @param children 模块下权限节点列表，用于观察权限码前缀
+ * @returns 平台名字：'AI中台'|'数据中台'|'其他'
+ */
+function getPlatformForModule(mod: string, children?: any[]): 'AI中台' | '数据中台' | '其他' {
+  const codes = Array.isArray(children) ? children.map((p:any) => p?.code).filter((c:string) => typeof c === 'string') : []
+  const parts = codes.map((c:string) => (c.includes(':') ? c.split(':')[0] : c)).filter(Boolean)
+  const hasDataPrefix = codes.some((c:string) => c.startsWith('data:')) || parts.includes('data')
+  const hasAiPrefix = codes.some((c:string) => c.startsWith('ai:')) || parts.includes('ai')
+  if (hasDataPrefix) return '数据中台'
+  if (hasAiPrefix) return 'AI中台'
+  // 若权限码的模块段命中 AI 中台清单，则归 AI
+  if (parts.some(p => PLATFORM_MODULE_MAP['AI中台'].includes(p))) return 'AI中台'
+  // 兜底：使用模块名匹配（后端可能返回英文模块名）
+  if (PLATFORM_MODULE_MAP['AI中台'].includes(mod)) return 'AI中台'
+  if (PLATFORM_MODULE_MAP['数据中台'].includes(mod)) return '数据中台'
+  return '其他'
+}
+
 // 对话框标题
 const dialogTitle = computed(() => {
   if (isCreatingPermission.value) {
@@ -411,8 +500,20 @@ const dialogTitle = computed(() => {
 })
 
 // 模块选项
+/**
+ * 模块选项（支持平台分组后的嵌套结构）
+ * 在创建具体权限时为“所属模块”下拉提供数据来源。
+ */
 const moduleOptions = computed(() => {
-  return permissionTree.value.filter(item => item.type === 'module')
+  const mods: any[] = []
+  const walk = (nodes: any[]) => {
+    nodes.forEach(n => {
+      if (n.type === 'module') mods.push(n)
+      if (n.children && n.children.length) walk(n.children)
+    })
+  }
+  walk(permissionTree.value)
+  return mods
 })
 
 // 表单验证规则
@@ -426,7 +527,9 @@ const permissionRules: FormRules = {
   ],
   code: [
     { required: true, message: '请输入权限代码', trigger: 'blur' },
-    { pattern: /^[a-z]+:[a-z]+$/, message: '权限代码格式为：模块:操作', trigger: 'blur' }
+    // 支持两到四段格式，例如：user:read、data:resource:view、data:user:profile:view
+    { pattern: /^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*){1,3}$/,
+      message: '权限代码格式为：模块:操作 / 模块:资源:操作 / 模块:资源子级:操作', trigger: 'blur' }
   ],
   parent_id: [
     { required: true, message: '请选择所属模块', trigger: 'change' }
@@ -442,14 +545,21 @@ const permissionRules: FormRules = {
 /**
  * 加载权限树
  */
+/**
+ * 加载权限树
+ * - 从后端拉取模块与权限
+ * - 前端按平台（AI中台/数据中台）聚合为两级树结构
+ *   归类规则：若模块任何子权限码以 `data:` 开头，则归“数据中台”，否则归“AI中台”
+ * - 应用平台筛选（如选择了 filters.platform，仅渲染对应平台节点）
+ */
 const loadPermissionTree = async () => {
   treeLoading.value = true
   try {
     const response = await permissionApi.getPermissionTree()
     // 后端返回 ResponseModel，data: { modules: Array<{ module: string; permissions: PermissionTreeNode[] }> }
     const modules = (response as any)?.data?.modules || []
-    // 统一转换为 el-tree 可用的节点结构
-    permissionTree.value = modules.map((mod: any) => ({
+    // 统一转换为 el-tree 可用的节点结构（先构建模块节点）
+    const moduleNodes = modules.map((mod: any) => ({
       id: `module:${mod.module}`,
       name: mod.module,
       type: 'module',
@@ -459,11 +569,67 @@ const loadPermissionTree = async () => {
         id: perm.id,
         name: perm.name,
         code: perm.code,
+        resource: perm.resource,
+        action: perm.action,
         type: 'permission',
         is_active: perm.status,
         is_system: perm.is_system
       }))
     }))
+
+    // 将“数据中台”模块按左侧菜单分组为三级结构：模块→分组→权限
+    moduleNodes.forEach((m) => {
+      if (m.name === 'data') {
+        m.children = groupDcModulePermissionsByMenu(m.children)
+      }
+    })
+
+    // 前端分组为平台节点
+    const aiModules: any[] = []
+    const dcModules: any[] = []
+    const otherModules: any[] = []
+    moduleNodes.forEach((m) => {
+      const pf = getPlatformForModule(m.name, m.children)
+      if (pf === 'AI中台') aiModules.push(m)
+      else if (pf === '数据中台') dcModules.push(m)
+      else otherModules.push(m)
+    })
+
+    let groupedTree: any[] = [
+      {
+        id: 'platform:ai',
+        name: 'AI中台',
+        type: 'platform',
+        is_active: true,
+        is_system: true,
+        children: aiModules
+      },
+      {
+        id: 'platform:dc',
+        name: '数据中台',
+        type: 'platform',
+        is_active: true,
+        is_system: true,
+        children: dcModules
+      }
+    ]
+    if (otherModules.length > 0) {
+      groupedTree.push({
+        id: 'platform:other',
+        name: '其他',
+        type: 'platform',
+        is_active: true,
+        is_system: true,
+        children: otherModules
+      })
+    }
+
+    // 应用平台筛选（仅渲染选择的平台）
+    if (filters.platform) {
+      permissionTree.value = groupedTree.filter(n => n.name === filters.platform)
+    } else {
+      permissionTree.value = groupedTree
+    }
     
     // 计算统计数据
     updateStats()
@@ -473,6 +639,57 @@ const loadPermissionTree = async () => {
   } finally {
     treeLoading.value = false
   }
+}
+
+/**
+ * 按数据中台左侧菜单对模块内权限分组
+ * 输入为原始的权限节点列表（扁平：module→permissions），输出为带“分组”中间层的树：
+ * 模块(data) → 分组（如：数据中心概览、数据资源管理） → 权限项（如：仪表盘、资源列表）
+ * 分组匹配基于 permission.resource，必要时使用静态映射补充父子关系。
+ */
+function groupDcModulePermissionsByMenu(children: any[]): any[] {
+  const categories = [
+    { key: 'overview', label: '数据中心概览', match: (r: string | null) => r === 'overview' || r === 'dashboard' },
+    { key: 'resource', label: '数据资源管理', match: (r: string | null) => r === 'resource' },
+    { key: 'datasource', label: '数据源管理', match: (r: string | null) => r === 'datasource' },
+    { key: 'resource_center', label: '资源中心管理', match: (r: string | null) => r === 'resource_center' },
+    { key: 'api', label: 'API接口管理', match: (r: string | null) => r === 'api' || r === 'customer' },
+    { key: 'logs', label: '日志管理', match: (r: string | null) => r === 'logs' || r === 'logs:user_operation' || r === 'logs:data_upload' }
+  ]
+
+  const grouped: any[] = []
+  for (const cat of categories) {
+    const catChildren = children.filter(c => cat.match(c.resource || null))
+    if (catChildren.length === 0) continue
+    grouped.push({
+      id: `category:${cat.key}`,
+      name: cat.label,
+      type: 'category',
+      is_active: true,
+      is_system: true,
+      children: catChildren
+    })
+  }
+
+  // 未匹配到分类的权限，放入“其他”分类，避免遗漏
+  const matchedIds = new Set(grouped.flatMap(g => g.children.map((c: any) => c.id)))
+  const others = children.filter(c => !matchedIds.has(c.id))
+  if (others.length > 0) {
+    grouped.push({
+      id: 'category:others',
+      name: '其他',
+      type: 'category',
+      is_active: true,
+      is_system: true,
+      children: others
+    })
+  }
+
+  // 分类内按已有排序字段排序；无则保持原序
+  grouped.forEach(g => {
+    g.children.sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  })
+  return grouped
 }
 
 /**
@@ -511,6 +728,9 @@ const updateStats = () => {
 /**
  * 展开全部
  */
+/**
+ * 展开全部
+ */
 const expandAll = () => {
   const allKeys: string[] = []
   const collectKeys = (nodes: any[]) => {
@@ -531,6 +751,9 @@ const expandAll = () => {
 /**
  * 收起全部
  */
+/**
+ * 收起全部
+ */
 const collapseAll = () => {
   const allKeys: string[] = []
   const collectKeys = (nodes: any[]) => {
@@ -548,6 +771,9 @@ const collapseAll = () => {
   })
 }
 
+/**
+ * 刷新权限树
+ */
 /**
  * 刷新权限树
  */
@@ -606,8 +832,8 @@ const showCreatePermissionDialog = (module: any) => {
  * 仅支持编辑具体权限节点，模块节点为聚合显示不可编辑
  */
 const showEditDialog = (data: any) => {
-  if (data.type === 'module') {
-    ElMessage.warning('模块节点为聚合显示，不支持直接编辑')
+  if (data.type === 'module' || data.type === 'platform') {
+    ElMessage.warning('该节点为聚合显示，不支持直接编辑')
     return
   }
   isEditing.value = true
@@ -627,9 +853,13 @@ const handleFilter = () => {
 /**
  * 重置筛选条件
  */
+/**
+ * 重置筛选条件
+ */
 const resetFilters = () => {
   filters.search = ''
   filters.module = ''
+  filters.platform = ''
   filters.status = ''
   handleFilter()
 }
@@ -647,8 +877,8 @@ const handleCloseDialog = () => {
  */
 /**
  * 提交表单
- * - 创建：从 code 中拆分 module/action，提交 status 与 sort_order
- * - 更新：支持更新 name/code/description/status/sort_order 及 module/action
+ * - 解析 code 支持两到四段：module[:resource[...]]:action
+ * - 创建/更新时：module 取首段，action 取末段，resource 为中间段合并（若存在）
  */
 const handleSubmit = async () => {
   if (!permissionFormRef.value) return
@@ -659,28 +889,34 @@ const handleSubmit = async () => {
     
     if (isEditing.value) {
       // 更新权限
-      // 从 code 拆分 module 与 action（如：user:create）
-      const [mod, act] = (permissionForm.code || '').split(':')
+      // 从 code 拆分 module/resource/action，支持分级权限码
+      const parts = (permissionForm.code || '').split(':')
+      const mod = parts[0]
+      const act = parts[parts.length - 1]
+      const res = parts.length > 2 ? parts.slice(1, -1).join(':') : ''
       await permissionApi.updatePermission(permissionForm.id, {
         name: permissionForm.name,
         code: permissionForm.code,
         description: permissionForm.description,
         module: mod,
         action: act,
-        resource: permissionForm.resource || '',
+        resource: permissionForm.resource || res,
         status: permissionForm.is_active,
         sort_order: permissionForm.sort
       })
       ElMessage.success('权限更新成功')
     } else {
       // 创建权限
-      const [mod, act] = (permissionForm.code || '').split(':')
+      const parts = (permissionForm.code || '').split(':')
+      const mod = parts[0]
+      const act = parts[parts.length - 1]
+      const res = parts.length > 2 ? parts.slice(1, -1).join(':') : ''
       await permissionApi.createPermission({
         name: permissionForm.name,
         code: permissionForm.code,
         description: permissionForm.description,
         module: mod,
-        resource: permissionForm.resource || '',
+        resource: permissionForm.resource || res,
         action: act,
         status: permissionForm.is_active,
         sort_order: permissionForm.sort
@@ -706,8 +942,8 @@ const handleSubmit = async () => {
  * - 限制：模块节点为聚合展示，不能删除
  */
 const handleDelete = async (data: any) => {
-  if (data.type === 'module') {
-    ElMessage.warning('模块节点为聚合显示，不能直接删除')
+  if (data.type === 'module' || data.type === 'platform') {
+    ElMessage.warning('该节点为聚合显示，不能直接删除')
     return
   }
   try {
@@ -739,12 +975,32 @@ const handleDelete = async (data: any) => {
  * @param action 动作标识（如：read、create、update、delete）
  * @returns 默认的中文权限名称，例如："数据源:读取"
  */
-function getDefaultPermissionName(module: string, action: string): string {
+/**
+ * 根据权限代码生成默认中文名称（支持两段或三段）
+ * @param moduleOrCode 模块或完整权限代码（形如：user:read 或 data:resource:view）
+ * @param action 可选动作（仅当传入两段时使用）
+ * @returns 例如："数据源:查看"、"资源:查询"
+ */
+/**
+ * 根据权限代码生成默认中文名称（支持两到四段代码）
+ * 示例：
+ * - 两段：data:view -> 数据:查看
+ * - 三段：data:resource:view -> 资源:查看
+ * - 四段：data:user:profile:view -> 用户资料:查看
+ * @param moduleOrCode 模块或完整权限代码
+ * @param action 可选动作（仅当传入两段时使用）
+ */
+function getDefaultPermissionName(moduleOrCode: string, action?: string): string {
   const actionMap: Record<string, string> = {
     read: '读取',
+    view: '查看',
+    query: '查询',
     create: '创建',
     update: '更新',
+    edit: '编辑',
     delete: '删除',
+    export: '导出',
+    save: '保存',
     deploy: '部署',
     monitor: '监控',
     test: '测试'
@@ -760,9 +1016,36 @@ function getDefaultPermissionName(module: string, action: string): string {
     instruction_set: '指令集',
     datasource: '数据源',
     agent: '智能体',
-    training: '微调'
+    training: '微调',
+    data: '数据',
+    ai: 'AI'
   }
-  return `${moduleMap[module] || module}:${actionMap[action] || action}`
+  // 支持资源与子级的中文映射（包含常见组合）
+  const resourceLabelMap: Record<string, string> = {
+    resource: '资源',
+    resource_center: '资源中心',
+    resource_package: '资源包',
+    datasource: '数据源',
+    elasticsearch: 'Elasticsearch',
+    api: 'API',
+    customer: '平台',
+    overview: '概览',
+    dashboard: '仪表盘',
+    'user:profile': '用户资料',
+    'logs:user_operation': '用户操作日志',
+    'logs:data_upload': '数据上传日志'
+  }
+
+  const code = action ? `${moduleOrCode}:${action}` : moduleOrCode
+  const parts = code.split(':')
+  if (parts.length >= 3) {
+    const act = parts[parts.length - 1]
+    const mid = parts.slice(1, -1).join(':')
+    const label = resourceLabelMap[mid] || resourceLabelMap[parts[1]] || moduleMap[parts[1]] || mid
+    return `${label}:${actionMap[act] || act}`
+  }
+  const [mod, act] = parts
+  return `${moduleMap[mod] || mod}:${actionMap[act] || act}`
 }
 
 /**
@@ -800,9 +1083,24 @@ const syncPermissionsFromConstants = async () => {
       })
     }
 
-    // 前端常量中的所有权限代码
+    // 2.1 前端（AI中台）常量中的所有权限代码
     const constantCodes: string[] = Object.values(PERMISSIONS)
-    const missingCodes = constantCodes.filter(code => !existingCodes.has(code))
+
+    // 2.2 解析 dc_frontend 路由中的权限代码（数据中台）
+    const dcRouterPaths = [
+      'D:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts',
+      'd:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts'
+    ]
+    let dcText: string | null = null
+    for (const p of dcRouterPaths) {
+      dcText = await loadExternalRouterText(p)
+      if (dcText) break
+    }
+    const dcCodes = dcText ? extractPermissionCodesFromRouterText(dcText) : []
+
+    // 合并两侧代码并去重
+    const unionCodes = Array.from(new Set<string>([...constantCodes, ...dcCodes]))
+    const missingCodes = unionCodes.filter(code => !existingCodes.has(code))
 
     if (missingCodes.length === 0) {
       ElMessage.success('权限常量已与数据库一致，无需同步')
@@ -811,13 +1109,16 @@ const syncPermissionsFromConstants = async () => {
 
     // 构造批量创建的权限数据
     const payloads = missingCodes.map(code => {
-      const [module, action] = code.split(':')
+      const parts = code.split(':')
+      const module = parts[0]
+      const action = parts[parts.length - 1]
+      const resource = parts.length > 2 ? parts.slice(1, -1).join(':') : null
       return {
-        name: getDefaultPermissionName(module, action),
+        name: getDefaultPermissionName(code),
         code,
-        description: `同步自前端常量 ${code}`,
+        description: `同步自前端常量/路由 ${code}`,
         module,
-        resource: null,
+        resource,
         action,
         status: true,
         sort_order: 0
@@ -875,10 +1176,437 @@ const syncPermissionsFromConstants = async () => {
   }
 }
 
+/**
+ * 加载外部路由文件文本内容（通过 Vite 的 /@fs 机制）
+ * @param absPath Windows 绝对路径，如 D:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts
+ */
+async function loadExternalRouterText(absPath: string): Promise<string | null> {
+  const normalized = absPath.replace(/\\/g, '/').replace(/^\//, '')
+  // 使用 ?raw 强制以纯文本返回，避免 Vite 对 TS 文件做导入解析
+  const url = `/@fs/${normalized}?raw`
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) return null
+    const text = await resp.text()
+    return text
+  } catch (e) {
+    console.warn('读取外部路由失败:', absPath, e)
+    return null
+  }
+}
+
+/**
+ * 从路由源码中提取权限代码
+ * 支持：
+ * - 单个字段：meta.permission
+ * - 数组字段：meta.permissionsAny / meta.permissionsAll
+ * - 任意常量字符串中出现的 ai:/data: 前缀权限码
+ * 代码段支持两到四段，例如 data:resource:view、data:user:profile:view
+ */
+function extractPermissionCodesFromRouterText(text: string): string[] {
+  const codes = new Set<string>()
+  // 匹配 'data:resource:view' 或 "ai:model:read" 等（允许中划线与最多四段）
+  const codeRegex = /["']((?:data|ai):[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*){1,3})["']/g
+  let m: RegExpExecArray | null
+  while ((m = codeRegex.exec(text)) !== null) {
+    codes.add(m[1])
+  }
+  return Array.from(codes)
+}
+
+/**
+ * 从数据中台路由文本中提取“菜单项（title）与权限码（code）”的映射
+ * 规则：
+ * - 仅处理 `meta` 区块；忽略含有 `hideInMenu: true` 的项
+ * - 在 `meta` 文本块中抽取 `title: 'xxx'` 与出现的权限码（permission/permissionsAny/permissionsAll）
+ * - 一个区块可能包含多个权限码（Any/All），为简单起见分别生成多条映射，均使用同一个 title
+ */
+function extractMenuItemsFromDcMenuText(text: string): Array<{ code: string; title: string | null }> {
+  const items: Array<{ code: string; title: string | null }> = []
+  const metaBlockRegex = /meta\s*:\s*\{([\s\S]*?)\}/g
+  let m: RegExpExecArray | null
+  while ((m = metaBlockRegex.exec(text)) !== null) {
+    const block = m[1]
+    // 跳过隐藏项
+    if (/hideInMenu\s*:\s*true/.test(block)) continue
+    // 提取 title
+    const tMatch = /title\s*:\s*["']([\s\S]*?)["']/.exec(block)
+    const title = tMatch ? tMatch[1].trim() : null
+    // 提取权限码
+    const codes = extractPermissionCodesFromRouterText(block)
+    codes.forEach(code => items.push({ code, title }))
+  }
+  return items
+}
+
+/**
+ * 从 AI 中台（frontend 路由）文本中提取菜单项的权限代码与标题
+ * - 支持 PERMISSIONS 常量映射到字符串权限码
+ * - 过滤 hidden/hideInMenu 项
+ */
+function extractMenuItemsFromAiRouterText(text: string): Array<{ code: string; title: string | null }> {
+  const items: Array<{ code: string; title: string | null }> = []
+  const seen = new Set<string>()
+  const metaBlockRegex = /meta\s*:\s*\{([\s\S]*?)\}/g
+  let m: RegExpExecArray | null
+  while ((m = metaBlockRegex.exec(text)) !== null) {
+    const block = m[1]
+    if (/hideInMenu\s*:\s*true/.test(block) || /hidden\s*:\s*true/.test(block)) continue
+    const tMatch = /title\s*:\s*['"]([\s\S]*?)['"]/.exec(block)
+    const title = tMatch ? tMatch[1].trim() : null
+
+    // 单个权限
+    const permToken = block.match(/permission\s*:\s*([^,\n]+)/)
+    const singlePerms: string[] = []
+    if (permToken) {
+      const token = permToken[1].trim()
+      const constMatch = token.match(/PERMISSIONS\.(\w+)/)
+      if (constMatch && PERMISSIONS[constMatch[1] as keyof typeof PERMISSIONS]) {
+        singlePerms.push(PERMISSIONS[constMatch[1] as keyof typeof PERMISSIONS])
+      } else {
+        const strMatch = token.match(/['"]([\w:-]+)['"]/)
+        if (strMatch) singlePerms.push(strMatch[1])
+      }
+    }
+
+    // 多个权限
+    const multiBlocks = block.match(/permissions\s*:\s*\[([\s\S]*?)\]|requireAllPermissions\s*:\s*\[([\s\S]*?)\]/g) || []
+    const multiPerms: string[] = []
+    for (const mb of multiBlocks) {
+      const constTokens = mb.match(/PERMISSIONS\.(\w+)/g) || []
+      for (const t of constTokens) {
+        const key = t.split('.')[1]
+        const val = PERMISSIONS[key as keyof typeof PERMISSIONS]
+        if (val) multiPerms.push(val)
+      }
+      const strTokens = mb.match(/['"]([\w:-]+)['"]/g) || []
+      for (const st of strTokens) {
+        const v = st.replace(/['"]/g, '')
+        multiPerms.push(v)
+      }
+    }
+
+    const allCodes = [...singlePerms, ...multiPerms]
+    for (const code of allCodes) {
+      if (!seen.has(code)) {
+        seen.add(code)
+        items.push({ code, title })
+      }
+    }
+  }
+  return items
+}
+
 // 初始化
 onMounted(() => {
   loadPermissionTree()
 })
+
+/**
+ * 扫描拥有“数据中台”权限的角色与用户，并移除角色的 data:* 权限
+ * 步骤：
+ * 1) 拉取所有角色；逐个查询其权限列表，筛选 code 以 `data:` 开头的权限
+ * 2) 查询这些角色对应的用户列表，统计受影响用户
+ * 3) 弹窗确认后，批量移除各角色的上述权限映射
+ * 4) 操作完成后刷新权限树
+ */
+const scanAndRemoveDataPlatformPermissions = async () => {
+  treeLoading.value = true
+  try {
+    // 拉取所有角色
+    const rolesResp = await roleApi.getRoles({ size: 1000 })
+    const rolesList = (rolesResp as any)?.data?.items || []
+    const targetRoles: Array<{ role: any; permissionIds: number[]; users: any[] }> = []
+
+    // 逐角色扫描 data:* 权限与关联用户
+    for (const role of rolesList) {
+      const permsResp = await roleApi.getRolePermissions(role.id)
+      const roleWithPerms = (permsResp as any)?.data || {}
+      const dataPerms = (roleWithPerms.permissions || []).filter((p: any) => typeof p.code === 'string' && p.code.startsWith('data:'))
+      if (dataPerms.length === 0) continue
+
+      const userResp = await roleApi.getRoleUsers(role.id)
+      const users = (userResp as any)?.data || []
+      targetRoles.push({ role, permissionIds: dataPerms.map((p: any) => p.id), users })
+    }
+
+    if (targetRoles.length === 0) {
+      ElMessage.success('没有角色拥有数据中台权限，无需删除')
+      return
+    }
+
+    const totalUsers = targetRoles.reduce((acc, r) => acc + (r.users?.length || 0), 0)
+    const totalMappings = targetRoles.reduce((acc, r) => acc + (r.permissionIds?.length || 0), 0)
+
+    // 生成摘要文本：列出前若干个角色与用户
+    const previewLines: string[] = []
+    targetRoles.slice(0, 5).forEach(r => {
+      const userNames = (r.users || []).slice(0, 5).map((u: any) => u.username || u.email || `#${u.id}`)
+      previewLines.push(`角色 ${r.role.name}（${r.role.code}） -> 权限数 ${r.permissionIds.length}，用户：${userNames.join(', ')}${(r.users?.length || 0) > 5 ? ' 等' : ''}`)
+    })
+    const summary = `将在 ${targetRoles.length} 个角色中移除共 ${totalMappings} 个数据中台权限映射，影响约 ${totalUsers} 名用户。\n\n示例：\n${previewLines.join('\n')}`
+
+    await ElMessageBox.confirm(summary, '确认删除数据中台权限', { type: 'warning', confirmButtonText: '执行删除', cancelButtonText: '取消' })
+
+    // 执行批量删除
+    let successOps = 0
+    for (const r of targetRoles) {
+      if (!r.permissionIds || r.permissionIds.length === 0) continue
+      try {
+        await roleApi.removePermissions(r.role.id, r.permissionIds)
+        successOps++
+      } catch (e: any) {
+        console.warn('批量移除失败，尝试逐条：', r.role?.code)
+        // 降级逐条删除
+        for (const pid of r.permissionIds) {
+          try { await roleApi.removePermission(r.role.id, pid) } catch { /* 忽略 */ }
+        }
+      }
+    }
+
+    ElMessage.success(`已处理 ${successOps} 个角色的数据中台权限移除`)
+    await loadPermissionTree()
+  } catch (error: any) {
+    if (!error?.message?.includes('cancel')) {
+      console.error('扫描并移除失败:', error)
+      ElMessage.error(error.response?.data?.message || '扫描并移除失败')
+    }
+  } finally {
+    treeLoading.value = false
+  }
+}
+
+/**
+ * 删除所有“数据中台”权限定义（code 以 data: 开头）
+ * 安全流程：
+ * 1) 扫描所有角色，先移除其持有的 data:* 权限映射，避免外键约束或后端校验失败
+ * 2) 拉取所有权限定义，筛选 code 以 data: 开头的项，二次确认后逐条删除
+ * 3) 完成后刷新权限树并提示结果
+ */
+const deleteAllDataPlatformPermissionDefinitions = async () => {
+  treeLoading.value = true
+  try {
+    // 第一步：移除角色上的 data:* 权限映射
+    const rolesResp = await roleApi.getRoles({ size: 1000 })
+    const rolesList = (rolesResp as any)?.data?.items || []
+    let affectedRoles = 0
+    for (const role of rolesList) {
+      const permsResp = await roleApi.getRolePermissions(role.id)
+      const roleWithPerms = (permsResp as any)?.data || {}
+      const dataPerms = (roleWithPerms.permissions || []).filter((p: any) => typeof p.code === 'string' && p.code.startsWith('data:'))
+      if (dataPerms.length === 0) continue
+      try {
+        await roleApi.removePermissions(role.id, dataPerms.map((p: any) => p.id))
+        affectedRoles++
+      } catch (e: any) {
+        // 降级逐条删除
+        for (const p of dataPerms) {
+          try { await roleApi.removePermission(role.id, p.id) } catch {}
+        }
+        affectedRoles++
+      }
+    }
+
+    // 第二步：删除权限定义
+    // 全量拉取权限（分页累加）
+    const allPerms: Permission[] = []
+    let skip = 0
+    const limit = 200
+    while (true) {
+      const listResp = await permissionApi.getPermissions({ skip, limit })
+      const items = (listResp as any)?.data?.items || []
+      allPerms.push(...items)
+      if (items.length < limit) break
+      skip += limit
+    }
+    const dataPermDefs = allPerms.filter(p => typeof p.code === 'string' && p.code.startsWith('data:'))
+
+    if (dataPermDefs.length === 0) {
+      ElMessage.success('没有可删除的数据中台权限定义')
+      await loadPermissionTree()
+      return
+    }
+
+    const preview = dataPermDefs.slice(0, 6).map(p => `${p.code}（#${p.id}）`).join('\n')
+    await ElMessageBox.confirm(`将删除 ${dataPermDefs.length} 条数据中台权限定义。\n示例：\n${preview}`, '确认删除权限定义', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+
+    let success = 0
+    for (const p of dataPermDefs) {
+      try {
+        await permissionApi.deletePermission(p.id)
+        success++
+      } catch (e: any) {
+        console.warn('删除权限失败：', p.code, e?.message)
+      }
+    }
+
+    ElMessage.success(`已移除 ${affectedRoles} 个角色的映射，并删除 ${success}/${dataPermDefs.length} 条权限定义`)
+    await loadPermissionTree()
+  } catch (error: any) {
+    if (!error?.message?.includes('cancel')) {
+      console.error('删除数据中台权限定义失败:', error)
+      ElMessage.error(error.response?.data?.message || '删除数据中台权限定义失败')
+    }
+  } finally {
+    treeLoading.value = false
+  }
+}
+
+/**
+ * 按数据中台左侧树形菜单重建权限
+ * 实现思路：
+ * 1) 确认并删除当前所有“非系统”权限，避免历史结构干扰
+ * 2) 读取 dc_frontend 路由源码文本，解析其中的 meta 区块
+ * 3) 过滤掉 meta.hideInMenu === true 的菜单项，仅保留左侧菜单可见项
+ * 4) 从可见项的 meta 中提取权限码（支持 permission、permissionsAny、permissionsAll），生成批量创建数据
+ * 5) 批量创建后刷新权限树
+ */
+const rebuildPermissionsFromDcMenu = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '此操作将删除当前所有非系统权限，并按数据中台菜单重新生成。是否继续？',
+      '重建权限',
+      { type: 'warning' }
+    )
+
+    treeLoading.value = true
+    // 1) 删除现有非系统权限
+    const listResp = await permissionApi.getPermissions({ skip: 0, limit: 2000 })
+    const items: Permission[] = ((listResp as any)?.data?.items || []) as Permission[]
+    let deletedCount = 0
+    for (const p of items) {
+      // 仅删除非系统权限，保留 is_system
+      if (!p.is_system) {
+        try {
+          await permissionApi.deletePermission(p.id)
+          deletedCount++
+        } catch (delErr: any) {
+          // 可能因外键/角色关联导致删除失败，记录并继续
+          console.warn('删除权限失败（忽略继续）:', p.code, delErr?.response?.data || delErr)
+        }
+      }
+    }
+
+    // 2) 读取 AI 中台与数据中台路由文本
+    const aiRouterPaths = [
+      'D:/works/codes/acwl-ai-data/frontend/src/router/index.ts',
+      'd:/works/codes/acwl-ai-data/frontend/src/router/index.ts'
+    ]
+    const dcRouterPaths = [
+      'D:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts',
+      'd:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts'
+    ]
+    let aiText: string | null = null
+    let dcText: string | null = null
+    for (const p of aiRouterPaths) {
+      aiText = await loadExternalRouterText(p)
+      if (aiText) break
+    }
+    for (const p of dcRouterPaths) {
+      dcText = await loadExternalRouterText(p)
+      if (dcText) break
+    }
+    if (!aiText && !dcText) {
+      ElMessage.error('无法读取前端与数据中台路由文件，重建终止')
+      return
+    }
+
+    // 3) 从菜单可见项提取权限项（title+code），优先 AI 中台
+    const aiMenuItems = aiText ? extractMenuItemsFromAiRouterText(aiText) : []
+    const dcMenuItems = dcText ? extractMenuItemsFromDcMenuText(dcText) : []
+    const mergedMap = new Map<string, string | null>()
+    for (const it of aiMenuItems) {
+      if (!mergedMap.has(it.code)) mergedMap.set(it.code, it.title)
+    }
+    for (const it of dcMenuItems) {
+      if (!mergedMap.has(it.code)) mergedMap.set(it.code, it.title)
+    }
+    const menuItems = Array.from(mergedMap.entries()).map(([code, title]) => ({ code, title }))
+    if (menuItems.length === 0) {
+      ElMessage.warning('未从菜单提取到任何权限码')
+    }
+
+    // 4) 构造批量创建的权限数据
+    const payloads = menuItems.map(({ code, title }) => {
+      const parts = code.split(':')
+      const module = parts[0]
+      const action = parts[parts.length - 1]
+      const resource = parts.length > 2 ? parts.slice(1, -1).join(':') : null
+      return {
+        name: title || getDefaultPermissionName(code),
+        code,
+        description: `按菜单重建：${code}`,
+        module,
+        resource,
+        action,
+        status: true,
+        sort_order: 0
+      }
+    })
+
+    if (payloads.length > 0) {
+      try {
+        await permissionApi.batchCreatePermissions(payloads)
+        ElMessage.success(`已重建 ${payloads.length} 个权限（删除 ${deletedCount} 个）`)
+      } catch (batchErr: any) {
+        console.warn('批量重建失败，降级逐条创建', batchErr?.response?.data || batchErr)
+        let success = 0
+        for (const p of payloads) {
+          try {
+            await permissionApi.createPermission(p)
+            success++
+          } catch (singleErr: any) {
+            console.warn('单条创建失败（忽略继续）:', p.code, singleErr?.response?.data || singleErr)
+          }
+        }
+        ElMessage.success(`已重建 ${success} 个权限（删除 ${deletedCount} 个）`)
+      }
+    } else {
+      ElMessage.info('没有可重建的权限代码')
+    }
+
+    // 5) 刷新权限树
+    await loadPermissionTree()
+  } catch (error: any) {
+    if (!error?.message?.includes('cancel')) {
+      console.error('重建权限失败:', error)
+      ElMessage.error(error.response?.data?.message || '重建权限失败')
+    }
+  } finally {
+    treeLoading.value = false
+  }
+}
+
+/**
+ * 仅从数据中台左侧菜单可见项提取权限码
+ * 解析策略：
+ * - 基于正则抽取所有 meta 区块文本（meta: { ... }）
+ * - 过滤掉包含 `hideInMenu: true` 的区块（隐藏项不作为菜单权限）
+ * - 在可见区块中抽取 permission/permissionsAny/permissionsAll 中出现的权限码
+ * - 权限码匹配支持两到四段：`data:resource:view`、`data:user:profile:view` 等
+ * @param text 路由源码纯文本
+ * @returns 唯一的权限码列表
+ */
+function extractPermissionCodesFromDcMenuText(text: string): string[] {
+  const codes = new Set<string>()
+  // 抽取 meta 块：宽松匹配花括号内内容
+  const metaBlockRegex = /meta\s*:\s*\{([\s\S]*?)\}/g
+  let m: RegExpExecArray | null
+  while ((m = metaBlockRegex.exec(text)) !== null) {
+    const block = m[1]
+    // 过滤隐藏菜单项
+    const hideMatch = /hideInMenu\s*:\s*true/.test(block)
+    if (hideMatch) continue
+    // 在块内抽取权限码
+    const innerCodes = extractPermissionCodesFromRouterText(block)
+    innerCodes.forEach(c => codes.add(c))
+  }
+  return Array.from(codes)
+}
 </script>
 
 <style scoped>
@@ -1013,6 +1741,10 @@ onMounted(() => {
 
 .module-icon {
   color: #1890ff;
+}
+
+.platform-icon {
+  color: #fa8c16;
 }
 
 .permission-icon {

@@ -1,13 +1,13 @@
 <template>
   <div class="datasource-container">
     <!-- 页面标题和操作栏 -->
-    <div class="page-header">
+  <div class="page-header">
       <div class="header-left">
         <h2>数据源管理</h2>
         <p class="page-description">管理和配置多种数据源连接</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" @click="showCreateDialog" :icon="Plus">
+        <el-button type="primary" @click="showCreateDialog" :icon="Plus" :disabled="!canCreate">
           新建数据源
         </el-button>
       </div>
@@ -191,6 +191,7 @@
                 @click="testConnection(datasource)"
                 :loading="datasource.testing"
                 :icon="Connection"
+                :disabled="!canTest"
               >
                 测试连接
               </el-button>
@@ -198,10 +199,10 @@
                 <el-button size="small" :icon="MoreFilled" />
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="edit" :icon="Edit">
+                    <el-dropdown-item command="edit" :icon="Edit" :disabled="!canEdit">
                       编辑
                     </el-dropdown-item>
-                    <el-dropdown-item command="delete" :icon="Delete" divided>
+                    <el-dropdown-item command="delete" :icon="Delete" divided :disabled="!canDelete">
                       删除
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -254,6 +255,7 @@
               <el-switch
                 v-model="row.enabled"
                 @change="toggleEnabled(row)"
+                :disabled="!canToggle"
               />
             </template>
           </el-table-column>
@@ -267,6 +269,7 @@
                 @click="testConnection(row)"
                 :loading="row.testing"
                 :icon="Connection"
+                :disabled="!canTest"
               >
                 测试
               </el-button>
@@ -274,6 +277,7 @@
                 size="small"
                 @click="editDatasource(row)"
                 :icon="Edit"
+                :disabled="!canEdit"
               >
                 编辑
               </el-button>
@@ -282,6 +286,7 @@
                 size="small"
                 @click="deleteDatasource(row)"
                 :icon="Delete"
+                :disabled="!canDelete"
               >
                 删除
               </el-button>
@@ -330,6 +335,7 @@ import {
 import DatasourceDialog from './components/DatasourceDialog.vue'
 import TestResultDialog from './components/TestResultDialog.vue'
 import { datasourceApi } from '@/api/datasourceV2'
+import { useUserStore } from '@/stores/user'
 
 // 响应式数据
 const loading = ref(false)
@@ -342,6 +348,14 @@ const currentDatasource = ref(null)
 const testResult = ref(null)
 const viewMode = ref('grid')
 const datasourceTemplates = ref([])
+// 用户与权限
+const userStore = useUserStore()
+const canView = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:view'))
+const canCreate = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:create'))
+const canEdit = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:edit'))
+const canDelete = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:delete'))
+const canTest = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:test'))
+const canToggle = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:toggle'))
 
 // 统计数据
 const stats = ref({
@@ -469,19 +483,43 @@ const handleSelectionChange = (selection) => {
   selectedDatasources.value = selection
 }
 
+/**
+ * 显示新建数据源弹窗
+ * 权限要求：data:datasource:create 或 admin 角色
+ */
 const showCreateDialog = () => {
+  if (!canCreate.value) {
+    ElMessage.warning('您没有新建数据源的权限')
+    return
+  }
   dialogMode.value = 'create'
   currentDatasource.value = null
   dialogVisible.value = true
 }
 
+/**
+ * 打开编辑数据源弹窗
+ * 权限要求：data:datasource:edit 或 admin 角色
+ */
 const editDatasource = (row) => {
+  if (!canEdit.value) {
+    ElMessage.warning('您没有编辑数据源的权限')
+    return
+  }
   dialogMode.value = 'edit'
   currentDatasource.value = { ...row }
   dialogVisible.value = true
 }
 
+/**
+ * 测试数据源连接
+ * 权限要求：data:datasource:test 或 admin 角色
+ */
 const testConnection = async (row) => {
+  if (!canTest.value) {
+    ElMessage.warning('您没有测试连接的权限')
+    return
+  }
   try {
     row.testing = true
     const response = await datasourceApi.testDatasourceConnection(row.id, {
@@ -500,7 +538,17 @@ const testConnection = async (row) => {
   }
 }
 
+/**
+ * 切换数据源启用状态
+ * 权限要求：data:datasource:toggle 或 admin 角色
+ */
 const toggleEnabled = async (row) => {
+  if (!canToggle.value) {
+    ElMessage.warning('您没有启用/禁用数据源的权限')
+    // 恢复UI显示为原状态
+    row.enabled = !row.enabled
+    return
+  }
   try {
     if (row.enabled) {
       await datasourceApi.enableDatasource(row.id)
@@ -517,7 +565,15 @@ const toggleEnabled = async (row) => {
   }
 }
 
+/**
+ * 删除数据源
+ * 权限要求：data:datasource:delete 或 admin 角色
+ */
 const deleteDatasource = async (row) => {
+  if (!canDelete.value) {
+    ElMessage.warning('您没有删除数据源的权限')
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `确定要删除数据源 "${row.name}" 吗？此操作不可恢复。`,

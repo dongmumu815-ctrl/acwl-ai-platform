@@ -10,7 +10,8 @@ import type {
   User,
   UserPermission,
   UserRole,
-  ApiResponse
+  ApiResponse,
+  MyPermissionsResponse
 } from '@/types/user'
 
 /**
@@ -140,6 +141,19 @@ export const authApi = {
   }>> {
     return request({
       url: '/auth/permissions',
+      method: 'GET'
+    })
+  },
+
+  /**
+   * 获取当前认证用户权限（基于认证信息）
+   *
+   * - 调用后端 `/permissions/me`，无需传入用户ID
+   * - 返回字段包含：`permissions`、`permission_codes`、`role_codes`
+   */
+  getMyPermissions(): Promise<ApiResponse<MyPermissionsResponse>> {
+    return request({
+      url: '/permissions/me',
       method: 'GET'
     })
   },
