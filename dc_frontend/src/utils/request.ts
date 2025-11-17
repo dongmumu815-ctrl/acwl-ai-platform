@@ -12,6 +12,8 @@ export interface RequestConfig extends AxiosRequestConfig {
   skipErrorHandler?: boolean
   showLoading?: boolean
   showSuccessMessage?: boolean
+  // 权限码，用于前端权限收集与后端鉴权提示
+  permission?: string | string[]
 }
 
 /**
@@ -44,6 +46,19 @@ const createAxiosInstance = (): AxiosInstance => {
       // 添加认证token
       if (!config.skipAuth && userStore.token) {
         config.headers.Authorization = `Bearer ${userStore.token}`
+      }
+      
+      // 注入权限码到请求头，并记录使用情况
+      if (config.permission) {
+        const perms = Array.isArray(config.permission) ? config.permission : [config.permission]
+        // 记录到用户store，便于后续收集与配置
+        try {
+          if (typeof userStore.recordUsedPermission === 'function') {
+            userStore.recordUsedPermission(perms)
+          }
+        } catch {}
+        // 设置请求头供后端可选使用（不强制要求后端读取）
+        config.headers['X-Permission-Code'] = perms.join(',')
       }
       
       // 添加请求ID用于追踪

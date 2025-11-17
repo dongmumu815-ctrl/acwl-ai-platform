@@ -33,7 +33,8 @@ export const getUsers = (params: UserQuery): Promise<PaginatedUserResponse<User>
   return request({
     url: '/api/users',
     method: 'get',
-    params
+    params,
+    permission: 'system:user:view'
   })
 }
 
@@ -43,7 +44,8 @@ export const getUsers = (params: UserQuery): Promise<PaginatedUserResponse<User>
 export const getUserById = (id: string): Promise<UserResponse<User>> => {
   return request({
     url: `/api/users/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'system:user:view'
   })
 }
 
@@ -53,7 +55,8 @@ export const getUserById = (id: string): Promise<UserResponse<User>> => {
 export const getUserDetail = (id: string): Promise<UserResponse<User>> => {
   return request({
     url: `/api/users/${id}/detail`,
-    method: 'get'
+    method: 'get',
+    permission: 'system:user:view'
   })
 }
 
@@ -70,7 +73,8 @@ export const getUserStats = (id: string): Promise<UserResponse<{
 }>> => {
   return request({
     url: `/api/users/${id}/stats`,
-    method: 'get'
+    method: 'get',
+    permission: 'system:user:stats:view'
   })
 }
 
@@ -96,7 +100,8 @@ export const getUserActivities = (id: string, params?: {
   return request({
     url: `/api/users/${id}/activities`,
     method: 'get',
-    params
+    params,
+    permission: 'system:user:activities:view'
   })
 }
 
@@ -107,7 +112,8 @@ export const createUser = (data: UserCreateData): Promise<UserResponse<User>> =>
   return request({
     url: '/api/users',
     method: 'post',
-    data
+    data,
+    permission: 'system:user:create'
   })
 }
 
@@ -118,7 +124,8 @@ export const updateUser = (id: string, data: UserUpdateData): Promise<UserRespon
   return request({
     url: `/api/users/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'system:user:edit'
   })
 }
 
@@ -128,7 +135,8 @@ export const updateUser = (id: string, data: UserUpdateData): Promise<UserRespon
 export const deleteUser = (id: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/users/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'system:user:delete'
   })
 }
 
@@ -139,7 +147,8 @@ export const batchDeleteUsers = (ids: string[]): Promise<UserResponse<void>> => 
   return request({
     url: '/api/users/batch-delete',
     method: 'post',
-    data: { ids }
+    data: { ids },
+    permission: 'system:user:delete'
   })
 }
 
@@ -150,7 +159,8 @@ export const toggleUser = (id: string, enabled: boolean): Promise<UserResponse<v
   return request({
     url: `/api/users/${id}/toggle`,
     method: 'patch',
-    data: { enabled }
+    data: { enabled },
+    permission: 'system:user:edit'
   })
 }
 
@@ -161,7 +171,8 @@ export const updateUserStatus = (id: string, status: boolean): Promise<UserRespo
   return request({
     url: `/api/users/${id}/status`,
     method: 'patch',
-    data: { is_active: status }
+    data: { is_active: status },
+    permission: 'system:user:edit'
   })
 }
 
@@ -172,7 +183,8 @@ export const resetUserPassword = (id: string, newPassword?: string): Promise<Use
   return request({
     url: `/api/users/${id}/reset-password`,
     method: 'post',
-    data: { newPassword }
+    data: { newPassword },
+    permission: 'system:user:password:reset'
   })
 }
 
@@ -182,7 +194,8 @@ export const resetUserPassword = (id: string, newPassword?: string): Promise<Use
 export const forcePasswordChange = (id: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/users/${id}/force-password-change`,
-    method: 'patch'
+    method: 'patch',
+    permission: 'system:user:password:force_change'
   })
 }
 
@@ -231,7 +244,8 @@ export const refreshToken = (refreshToken: string): Promise<UserResponse<{ token
 export const getCurrentUser = (): Promise<UserResponse<User>> => {
   return request({
     url: '/api/auth/me',
-    method: 'get'
+    method: 'get',
+    permission: 'auth:me:view'
   })
 }
 
@@ -245,7 +259,8 @@ export const changePassword = (data: {
   return request({
     url: '/api/auth/change-password',
     method: 'post',
-    data
+    data,
+    permission: 'auth:password:change'
   })
 }
 
@@ -256,7 +271,8 @@ export const forgotPassword = (email: string): Promise<UserResponse<void>> => {
   return request({
     url: '/api/auth/forgot-password',
     method: 'post',
-    data: { email }
+    data: { email },
+    permission: 'auth:password:forgot'
   })
 }
 
@@ -270,7 +286,8 @@ export const resetPassword = (data: {
   return request({
     url: '/api/auth/reset-password',
     method: 'post',
-    data
+    data,
+    permission: 'auth:password:reset'
   })
 }
 
@@ -281,7 +298,8 @@ export const verifyEmail = (token: string): Promise<UserResponse<void>> => {
   return request({
     url: '/api/auth/verify-email',
     method: 'post',
-    data: { token }
+    data: { token },
+    permission: 'auth:email:verify'
   })
 }
 
@@ -291,7 +309,8 @@ export const verifyEmail = (token: string): Promise<UserResponse<void>> => {
 export const sendEmailVerification = (): Promise<UserResponse<void>> => {
   return request({
     url: '/api/auth/send-email-verification',
-    method: 'post'
+    method: 'post',
+    permission: 'auth:email:send_verification'
   })
 }
 
@@ -304,7 +323,8 @@ export const getUserProfile = (id?: string): Promise<UserResponse<UserProfile>> 
   const url = id ? `/api/users/${id}/profile` : '/api/auth/profile'
   return request({
     url,
-    method: 'get'
+    method: 'get',
+    permission: id ? 'system:user:profile:view' : 'auth:profile:view'
   })
 }
 
@@ -315,7 +335,8 @@ export const updateUserProfile = (data: Partial<UserProfile>): Promise<UserRespo
   return request({
     url: '/api/auth/profile',
     method: 'put',
-    data
+    data,
+    permission: 'auth:profile:edit'
   })
 }
 
@@ -331,7 +352,8 @@ export const uploadAvatar = (file: File): Promise<UserResponse<{ avatar: string 
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    permission: 'auth:profile:avatar'
   })
 }
 
@@ -341,7 +363,8 @@ export const uploadAvatar = (file: File): Promise<UserResponse<{ avatar: string 
 export const getUserPreferences = (): Promise<UserResponse<UserPreferences>> => {
   return request({
     url: '/api/auth/preferences',
-    method: 'get'
+    method: 'get',
+    permission: 'auth:preferences:view'
   })
 }
 
@@ -352,7 +375,8 @@ export const updateUserPreferences = (data: Partial<UserPreferences>): Promise<U
   return request({
     url: '/api/auth/preferences',
     method: 'put',
-    data
+    data,
+    permission: 'auth:preferences:edit'
   })
 }
 
@@ -365,7 +389,8 @@ export const getUserSessions = (id?: string): Promise<UserResponse<UserSession[]
   const url = id ? `/api/users/${id}/sessions` : '/api/auth/sessions'
   return request({
     url,
-    method: 'get'
+    method: 'get',
+    permission: 'auth:sessions:view'
   })
 }
 
@@ -375,7 +400,8 @@ export const getUserSessions = (id?: string): Promise<UserResponse<UserSession[]
 export const terminateSession = (sessionId: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/auth/sessions/${sessionId}/terminate`,
-    method: 'post'
+    method: 'post',
+    permission: 'auth:sessions:terminate'
   })
 }
 
@@ -385,7 +411,8 @@ export const terminateSession = (sessionId: string): Promise<UserResponse<void>>
 export const terminateOtherSessions = (): Promise<UserResponse<void>> => {
   return request({
     url: '/api/auth/sessions/terminate-others',
-    method: 'post'
+    method: 'post',
+    permission: 'auth:sessions:terminate_others'
   })
 }
 
@@ -395,7 +422,8 @@ export const terminateOtherSessions = (): Promise<UserResponse<void>> => {
 export const terminateUserSessions = (id: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/users/${id}/sessions/terminate-all`,
-    method: 'post'
+    method: 'post',
+    permission: 'system:user:sessions:terminate_all'
   })
 }
 
@@ -423,7 +451,8 @@ export const getUserLoginLogs = (params: {
   return request({
     url: '/api/users/login-logs',
     method: 'get',
-    params
+    params,
+    permission: 'system:user:login_logs:view'
   })
 }
 
@@ -442,7 +471,8 @@ export const getUserOperationLogs = (params: {
   return request({
     url: '/api/users/operation-logs',
     method: 'get',
-    params
+    params,
+    permission: 'system:user:operation_logs:view'
   })
 }
 
@@ -455,7 +485,8 @@ export const getRoles = (params?: RoleQuery): Promise<PaginatedUserResponse<Role
   return request({
     url: '/api/roles',
     method: 'get',
-    params
+    params,
+    permission: 'system:role:view'
   })
 }
 
@@ -465,7 +496,8 @@ export const getRoles = (params?: RoleQuery): Promise<PaginatedUserResponse<Role
 export const getRoleById = (id: string): Promise<UserResponse<Role>> => {
   return request({
     url: `/api/roles/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'system:role:view'
   })
 }
 
@@ -476,7 +508,8 @@ export const createRole = (data: RoleCreateData): Promise<UserResponse<Role>> =>
   return request({
     url: '/api/roles',
     method: 'post',
-    data
+    data,
+    permission: 'system:role:create'
   })
 }
 
@@ -487,7 +520,8 @@ export const updateRole = (id: string, data: RoleUpdateData): Promise<UserRespon
   return request({
     url: `/api/roles/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'system:role:edit'
   })
 }
 
@@ -497,7 +531,8 @@ export const updateRole = (id: string, data: RoleUpdateData): Promise<UserRespon
 export const deleteRole = (id: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/roles/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'system:role:delete'
   })
 }
 
@@ -508,7 +543,8 @@ export const toggleRole = (id: string, enabled: boolean): Promise<UserResponse<v
   return request({
     url: `/api/roles/${id}/toggle`,
     method: 'patch',
-    data: { enabled }
+    data: { enabled },
+    permission: 'system:role:edit'
   })
 }
 
@@ -519,7 +555,8 @@ export const assignRoleToUser = (userId: string, roleId: string): Promise<UserRe
   return request({
     url: `/api/users/${userId}/roles`,
     method: 'post',
-    data: { roleId }
+    data: { roleId },
+    permission: 'system:role:assign'
   })
 }
 
@@ -529,7 +566,8 @@ export const assignRoleToUser = (userId: string, roleId: string): Promise<UserRe
 export const removeRoleFromUser = (userId: string, roleId: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/users/${userId}/roles/${roleId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'system:role:remove'
   })
 }
 
@@ -540,7 +578,8 @@ export const batchAssignRoles = (userIds: string[], roleIds: string[]): Promise<
   return request({
     url: '/api/users/batch-assign-roles',
     method: 'post',
-    data: { userIds, roleIds }
+    data: { userIds, roleIds },
+    permission: 'system:role:assign'
   })
 }
 
@@ -553,7 +592,8 @@ export const getPermissions = (params?: PermissionQuery): Promise<PaginatedUserR
   return request({
     url: '/api/permissions',
     method: 'get',
-    params
+    params,
+    permission: 'system:permission:view'
   })
 }
 
@@ -563,7 +603,8 @@ export const getPermissions = (params?: PermissionQuery): Promise<PaginatedUserR
 export const getPermissionById = (id: string): Promise<UserResponse<Permission>> => {
   return request({
     url: `/api/permissions/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'system:permission:view'
   })
 }
 
@@ -581,7 +622,8 @@ export const createPermission = (data: {
   return request({
     url: '/api/permissions',
     method: 'post',
-    data
+    data,
+    permission: 'system:permission:create'
   })
 }
 
@@ -596,7 +638,8 @@ export const updatePermission = (id: string, data: {
   return request({
     url: `/api/permissions/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'system:permission:edit'
   })
 }
 
@@ -606,7 +649,8 @@ export const updatePermission = (id: string, data: {
 export const deletePermission = (id: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/permissions/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'system:permission:delete'
   })
 }
 
@@ -617,7 +661,8 @@ export const assignPermissionToRole = (roleId: string, permissionId: string): Pr
   return request({
     url: `/api/roles/${roleId}/permissions`,
     method: 'post',
-    data: { permissionId }
+    data: { permissionId },
+    permission: 'system:permission:assign'
   })
 }
 
@@ -627,7 +672,8 @@ export const assignPermissionToRole = (roleId: string, permissionId: string): Pr
 export const removePermissionFromRole = (roleId: string, permissionId: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/roles/${roleId}/permissions/${permissionId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'system:permission:remove'
   })
 }
 
@@ -638,7 +684,8 @@ export const batchAssignPermissions = (roleId: string, permissionIds: string[]):
   return request({
     url: `/api/roles/${roleId}/permissions/batch-assign`,
     method: 'post',
-    data: { permissionIds }
+    data: { permissionIds },
+    permission: 'system:permission:assign'
   })
 }
 
@@ -649,7 +696,8 @@ export const checkUserPermission = (permission: string, resource?: string): Prom
   return request({
     url: '/api/auth/check-permission',
     method: 'get',
-    params: { permission, resource }
+    params: { permission, resource },
+    permission: 'system:permission:check'
   })
 }
 
@@ -660,7 +708,8 @@ export const getUserPermissions = (id?: string): Promise<UserResponse<Permission
   const url = id ? `/api/users/${id}/permissions` : '/api/auth/permissions'
   return request({
     url,
-    method: 'get'
+    method: 'get',
+    permission: id ? 'system:user:permissions:view' : 'auth:permissions:view'
   })
 }
 
@@ -678,7 +727,8 @@ export const getUserGroups = (params?: {
   return request({
     url: '/api/user-groups',
     method: 'get',
-    params
+    params,
+    permission: 'system:user_group:view'
   })
 }
 
@@ -688,7 +738,8 @@ export const getUserGroups = (params?: {
 export const getUserGroupById = (id: string): Promise<UserResponse<UserGroup>> => {
   return request({
     url: `/api/user-groups/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'system:user_group:view'
   })
 }
 
@@ -704,7 +755,8 @@ export const createUserGroup = (data: {
   return request({
     url: '/api/user-groups',
     method: 'post',
-    data
+    data,
+    permission: 'system:user_group:create'
   })
 }
 
@@ -719,7 +771,8 @@ export const updateUserGroup = (id: string, data: {
   return request({
     url: `/api/user-groups/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'system:user_group:edit'
   })
 }
 
@@ -729,7 +782,8 @@ export const updateUserGroup = (id: string, data: {
 export const deleteUserGroup = (id: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/user-groups/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'system:user_group:delete'
   })
 }
 
@@ -740,7 +794,8 @@ export const addUserToGroup = (groupId: string, userId: string): Promise<UserRes
   return request({
     url: `/api/user-groups/${groupId}/users`,
     method: 'post',
-    data: { userId }
+    data: { userId },
+    permission: 'system:user_group:assign'
   })
 }
 
@@ -750,7 +805,8 @@ export const addUserToGroup = (groupId: string, userId: string): Promise<UserRes
 export const removeUserFromGroup = (groupId: string, userId: string): Promise<UserResponse<void>> => {
   return request({
     url: `/api/user-groups/${groupId}/users/${userId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'system:user_group:remove'
   })
 }
 
@@ -761,7 +817,8 @@ export const batchAddUsersToGroup = (groupId: string, userIds: string[]): Promis
   return request({
     url: `/api/user-groups/${groupId}/users/batch-add`,
     method: 'post',
-    data: { userIds }
+    data: { userIds },
+    permission: 'system:user_group:assign'
   })
 }
 
@@ -776,7 +833,8 @@ export const getGroupMembers = (groupId: string, params?: {
   return request({
     url: `/api/user-groups/${groupId}/members`,
     method: 'get',
-    params
+    params,
+    permission: 'system:user_group:view'
   })
 }
 
@@ -794,7 +852,8 @@ export const searchUsers = (params: {
   return request({
     url: '/api/users/search',
     method: 'get',
-    params
+    params,
+    permission: 'system:user:search'
   })
 }
 
@@ -809,7 +868,8 @@ export const searchRoles = (params: {
   return request({
     url: '/api/roles/search',
     method: 'get',
-    params
+    params,
+    permission: 'system:role:search'
   })
 }
 
@@ -825,7 +885,8 @@ export const searchPermissions = (params: {
   return request({
     url: '/api/permissions/search',
     method: 'get',
-    params
+    params,
+    permission: 'system:permission:search'
   })
 }
 
@@ -834,15 +895,13 @@ export const searchPermissions = (params: {
 /**
  * 导出用户列表
  */
-export const exportUsers = (params: {
-  format: 'excel' | 'csv'
-  filters?: Record<string, any>
-}): Promise<Blob> => {
+export const exportUsers = (params: any): Promise<ApiResponse<Blob>> => {
   return request({
     url: '/api/users/export',
     method: 'post',
     data: params,
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'system:user:export'
   })
 }
 
@@ -877,7 +936,8 @@ export const validateUserImport = (formData: FormData): Promise<UserResponse<{
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    permission: 'system:user:import'
   })
 }
 
@@ -893,18 +953,20 @@ export const importUsers = (file: File): Promise<UserResponse<{ success: number;
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    permission: 'system:user:import'
   })
 }
 
 /**
  * 下载用户导入模板
  */
-export const downloadUserTemplate = (): Promise<Blob> => {
+export const downloadUserTemplate = (): Promise<ApiResponse<Blob>> => {
   return request({
     url: '/api/users/import-template',
     method: 'get',
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'system:user:import_template'
   })
 }
 
@@ -924,7 +986,8 @@ export const getUserStatistics = (): Promise<UserResponse<{
 }>> => {
   return request({
     url: '/api/users/statistics',
-    method: 'get'
+    method: 'get',
+    permission: 'system:user:statistics:view'
   })
 }
 
@@ -938,7 +1001,8 @@ export const getRoleStatistics = (): Promise<UserResponse<{
 }>> => {
   return request({
     url: '/api/roles/statistics',
-    method: 'get'
+    method: 'get',
+    permission: 'system:role:statistics:view'
   })
 }
 
@@ -952,6 +1016,40 @@ export const getPermissionStatistics = (): Promise<UserResponse<{
 }>> => {
   return request({
     url: '/api/permissions/statistics',
-    method: 'get'
+    method: 'get',
+    permission: 'system:permission:statistics:view'
+  })
+}
+
+/**
+ * 获取权限树（按模块分组）
+ */
+export const getPermissionTree = (): Promise<UserResponse<any>> => {
+  return request({
+    url: '/api/permissions/tree',
+    method: 'get',
+    permission: 'system:permission:view'
+  })
+}
+
+/**
+ * 批量创建权限
+ * @param permissions 权限创建数据列表
+ */
+export const batchCreatePermissions = (permissions: Array<{
+  name: string
+  code: string
+  description?: string
+  module: string
+  resource?: string
+  action: string
+  status?: boolean
+  sort_order?: number
+}>): Promise<UserResponse<any>> => {
+  return request({
+    url: '/api/permissions/batch',
+    method: 'post',
+    data: permissions,
+    permission: 'system:permission:create'
   })
 }

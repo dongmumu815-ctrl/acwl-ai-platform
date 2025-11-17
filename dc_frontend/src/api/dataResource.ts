@@ -44,7 +44,8 @@ export const dataResourceApi = {
     return request({
       url: '/data-resources/',
       method: 'GET',
-      params: apiParams
+      params: apiParams,
+      permission: 'data:resource:view'
     })
   },
 
@@ -55,7 +56,8 @@ export const dataResourceApi = {
   getResourceDetail(id: number): Promise<ApiResponse<DataResource>> {
     return request({
       url: `/data-resources/${id}`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:resource:view'
     })
   },
 
@@ -67,7 +69,8 @@ export const dataResourceApi = {
     return request({
       url: '/data-resources/',
       method: 'POST',
-      data
+      data,
+      permission: 'data:resource:create'
     })
   },
 
@@ -80,7 +83,8 @@ export const dataResourceApi = {
     return request({
       url: `/data-resources/${id}`,
       method: 'PUT',
-      data
+      data,
+      permission: 'data:resource:edit'
     })
   },
 
@@ -91,7 +95,8 @@ export const dataResourceApi = {
   deleteResource(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/data-resources/${id}`,
-      method: 'DELETE'
+      method: 'DELETE',
+      permission: 'data:resource:delete'
     })
   },
 
@@ -108,7 +113,8 @@ export const dataResourceApi = {
     return request({
       url: '/data-resources/search',
       method: 'GET',
-      params
+      params,
+      permission: 'data:resource:search'
     })
   },
 
@@ -123,7 +129,8 @@ export const dataResourceApi = {
   }>> {
     return request({
       url: `/data-resources/${id}/schema`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:resource:fields:view'
     })
   },
 
@@ -139,7 +146,8 @@ export const dataResourceApi = {
     return request({
       url: `/data-resources/${id}/preview`,
       method: 'GET',
-      params
+      params,
+      permission: 'data:resource:preview'
     })
   },
 
@@ -152,7 +160,8 @@ export const dataResourceApi = {
     return request({
       url: `/data-resources/${id}/query`,
       method: 'POST',
-      data
+      data,
+      permission: 'data:resource:query'
     })
   },
 
@@ -168,7 +177,8 @@ export const dataResourceApi = {
     return request({
       url: `/data-resources/${id}/query-history`,
       method: 'GET',
-      params
+      params,
+      permission: 'data:resource:query_history:view'
     })
   },
 
@@ -179,7 +189,8 @@ export const dataResourceApi = {
   toggleFavorite(id: number): Promise<ApiResponse<{ is_favorited: boolean }>> {
     return request({
       url: `/data-resources/${id}/favorite`,
-      method: 'POST'
+      method: 'POST',
+      permission: 'data:resource:favorite'
     })
   },
 
@@ -194,7 +205,8 @@ export const dataResourceApi = {
     return request({
       url: '/data-resources/favorites',
       method: 'GET',
-      params
+      params,
+      permission: 'data:resource:favorite:view'
     })
   },
 
@@ -205,7 +217,8 @@ export const dataResourceApi = {
   syncResourceSchema(id: number): Promise<ApiResponse<DataResourceSyncStatus>> {
     return request({
       url: `/data-resources/${id}/sync`,
-      method: 'POST'
+      method: 'POST',
+      permission: 'data:resource:sync'
     })
   },
 
@@ -216,7 +229,8 @@ export const dataResourceApi = {
   checkResourceHealth(id: number): Promise<ApiResponse<DataResourceHealthCheck>> {
     return request({
       url: `/data-resources/${id}/health`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:resource:health:view'
     })
   },
 
@@ -232,7 +246,8 @@ export const dataResourceApi = {
     return request({
       url: '/data-resources/batch',
       method: 'POST',
-      data
+      data,
+      permission: 'data:resource:batch'
     })
   },
 
@@ -261,7 +276,8 @@ export const dataResourceApi = {
       data: formData,
       headers: {
         'Content-Type': 'multipart/form-data'
-      }
+      },
+      permission: 'data:resource:import'
     })
   },
 
@@ -274,7 +290,8 @@ export const dataResourceApi = {
       url: '/data-resources/export',
       method: 'POST',
       data,
-      responseType: 'blob'
+      responseType: 'blob',
+      permission: 'data:resource:export'
     })
   }
 }
@@ -294,7 +311,8 @@ export const categoryApi = {
     return request({
       url: '/categories',
       method: 'GET',
-      params
+      params,
+      permission: 'data:category:view'
     })
   },
 
@@ -304,7 +322,8 @@ export const categoryApi = {
   getCategoryTree(): Promise<ApiResponse<DataResourceCategory[]>> {
     return request({
       url: '/categories/tree',
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:category:tree:view'
     })
   },
 
@@ -315,7 +334,8 @@ export const categoryApi = {
   getCategoryDetail(id: number): Promise<ApiResponse<DataResourceCategory>> {
     return request({
       url: `/categories/${id}`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:category:view'
     })
   },
 
@@ -332,7 +352,8 @@ export const categoryApi = {
     return request({
       url: '/categories',
       method: 'POST',
-      data
+      data,
+      permission: 'data:category:create'
     })
   },
 
@@ -351,7 +372,8 @@ export const categoryApi = {
     return request({
       url: `/categories/${id}`,
       method: 'PUT',
-      data
+      data,
+      permission: 'data:category:edit'
     })
   },
 
@@ -362,7 +384,8 @@ export const categoryApi = {
   deleteCategory(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/categories/${id}`,
-      method: 'DELETE'
+      method: 'DELETE',
+      permission: 'data:category:delete'
     })
   },
 
@@ -378,7 +401,8 @@ export const categoryApi = {
     return request({
       url: `/categories/${id}/move`,
       method: 'POST',
-      data
+      data,
+      permission: 'data:category:move'
     })
   }
 }
@@ -400,7 +424,8 @@ export const tagApi = {
     return request({
       url: '/data-resources/tags/',
       method: 'GET',
-      params
+      params,
+      permission: 'data:tags:view'
     })
   },
 
@@ -414,7 +439,8 @@ export const tagApi = {
       params: {
         page: 1,
         page_size: 1000 // 设置大的page_size来获取所有标签
-      }
+      },
+      permission: 'data:tags:view'
     }).then(response => {
       // 转换分页响应为简单数组响应
       if (response.success && response.data && response.data.list) {
@@ -434,7 +460,8 @@ export const tagApi = {
   getTagDetail(id: number): Promise<ApiResponse<DataResourceTag>> {
     return request({
       url: `/data-resources/tags/${id}`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:tags:view'
     })
   },
 
@@ -450,7 +477,8 @@ export const tagApi = {
     return request({
       url: '/data-resources/tags/',
       method: 'POST',
-      data
+      data,
+      permission: 'data:tags:create'
     })
   },
 
@@ -467,7 +495,8 @@ export const tagApi = {
     return request({
       url: `/data-resources/tags/${id}`,
       method: 'PUT',
-      data
+      data,
+      permission: 'data:tags:edit'
     })
   },
 
@@ -478,7 +507,8 @@ export const tagApi = {
   deleteTag(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/data-resources/tags/${id}`,
-      method: 'DELETE'
+      method: 'DELETE',
+      permission: 'data:tags:delete'
     })
   },
 
@@ -489,7 +519,8 @@ export const tagApi = {
   toggleTagStatus(id: number): Promise<ApiResponse<DataResourceTag>> {
     return request({
       url: `/data-resources/tags/${id}/toggle-status`,
-      method: 'POST'
+      method: 'POST',
+      permission: 'data:tags:toggle'
     })
   },
 
@@ -505,7 +536,8 @@ export const tagApi = {
     return request({
       url: '/data-resources/tags/batch-delete',
       method: 'POST',
-      data: { tag_ids: ids }
+      data: { tag_ids: ids },
+      permission: 'data:tags:batch_delete'
     })
   },
 
@@ -520,7 +552,8 @@ export const tagApi = {
   }>> {
     return request({
       url: `/data-resources/tags/${id}/usage-stats`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:tags:usage:view'
     })
   }
 }
@@ -541,7 +574,8 @@ export const permissionApi = {
     return request({
       url: `/data-resources/${resourceId}/permissions`,
       method: 'GET',
-      params
+      params,
+      permission: 'data:resource:permission:view'
     })
   },
 
@@ -554,7 +588,8 @@ export const permissionApi = {
     return request({
       url: `/data-resources/${resourceId}/permissions`,
       method: 'POST',
-      data
+      data,
+      permission: 'data:resource:permission:grant'
     })
   },
 
@@ -566,7 +601,8 @@ export const permissionApi = {
   revokePermission(resourceId: number, permissionId: number): Promise<ApiResponse<void>> {
     return request({
       url: `/data-resources/${resourceId}/permissions/${permissionId}`,
-      method: 'DELETE'
+      method: 'DELETE',
+      permission: 'data:resource:permission:revoke'
     })
   },
 
@@ -584,7 +620,8 @@ export const permissionApi = {
     return request({
       url: `/data-resources/${resourceId}/permissions/${permissionId}`,
       method: 'PUT',
-      data
+      data,
+      permission: 'data:resource:permission:edit'
     })
   },
 
@@ -600,7 +637,8 @@ export const permissionApi = {
     return request({
       url: '/permissions/my',
       method: 'GET',
-      params
+      params,
+      permission: 'auth:permissions:view'
     })
   }
 }
@@ -615,7 +653,8 @@ export const statisticsApi = {
   getResourceStats(): Promise<ApiResponse<DataResourceStats>> {
     return request({
       url: '/statistics/resources',
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:statistics:view'
     })
   },
 
@@ -632,7 +671,8 @@ export const statisticsApi = {
     return request({
       url: '/statistics/access',
       method: 'GET',
-      params
+      params,
+      permission: 'data:statistics:access:view'
     })
   },
 
@@ -648,7 +688,8 @@ export const statisticsApi = {
     return request({
       url: '/statistics/user-activity',
       method: 'GET',
-      params
+      params,
+      permission: 'data:statistics:user_activity:view'
     })
   },
 
@@ -663,7 +704,8 @@ export const statisticsApi = {
     return request({
       url: '/statistics/popular-resources',
       method: 'GET',
-      params
+      params,
+      permission: 'data:statistics:popular:view'
     })
   }
 }

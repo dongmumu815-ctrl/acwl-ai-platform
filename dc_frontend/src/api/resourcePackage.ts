@@ -239,35 +239,35 @@ export const resourcePackageApi = {
    * 创建资源包
    */
   create(data: ResourcePackageCreateRequest): Promise<ApiResponse<ResourcePackage>> {
-    return post('/resource-packages/', data)
+    return post('/resource-packages/', data, { permission: 'data:resource_package:create' })
   },
 
   /**
    * 获取资源包详情
    */
   get(id: number): Promise<ApiResponse<ResourcePackage>> {
-    return get(`/resource-packages/${id}`)
+    return get(`/resource-packages/${id}`, undefined, { permission: 'data:resource_package:view' })
   },
 
   /**
    * 更新资源包
    */
   update(id: number, data: ResourcePackageUpdateRequest): Promise<ApiResponse<ResourcePackage>> {
-    return put(`/resource-packages/${id}`, data)
+    return put(`/resource-packages/${id}`, data, { permission: 'data:resource_package:edit' })
   },
 
   /**
    * 删除资源包
    */
   delete(id: number): Promise<ApiResponse<{ message: string }>> {
-    return del(`/resource-packages/${id}`)
+    return del(`/resource-packages/${id}`, { permission: 'data:resource_package:delete' })
   },
 
   /**
    * 搜索资源包
    */
   search(params: ResourcePackageSearchRequest): Promise<ApiResponse<ResourcePackageListResponse>> {
-    return post('/resource-packages/search', params)
+    return post('/resource-packages/search', params, { permission: 'data:resource_package:search' })
   },
 
 
@@ -276,7 +276,7 @@ export const resourcePackageApi = {
    * 查询资源包数据
    */
   query(id: number, params: ResourcePackageQueryRequest): Promise<ApiResponse<ResourcePackageQueryResponse>> {
-    return post(`/resource-packages/${id}/query`, params)
+    return post(`/resource-packages/${id}/query`, params, { permission: 'data:resource_package:query' })
   },
 
   /**
@@ -284,14 +284,14 @@ export const resourcePackageApi = {
    */
   generateExcel(id: number, payload: Record<string, any>): Promise<ApiResponse<any>> {
     // 为长耗时任务单独提升超时到180秒
-    return post(`/resource-packages/${id}/generate-excel`, payload, { timeout: 180000 })
+    return post(`/resource-packages/${id}/generate-excel`, payload, { timeout: 180000, permission: 'data:resource_package:excel' })
   },
 
   /**
    * 下载最新资源包（更新download_time）
    */
   downloadLatest(id: number): Promise<ApiResponse<any>> {
-    return post(`/resource-packages/${id}/download-latest`, {})
+    return post(`/resource-packages/${id}/download-latest`, {}, { permission: 'data:resource_package:download' })
   },
 
   /**
@@ -299,14 +299,14 @@ export const resourcePackageApi = {
    * 专为ResourcePackageQueryPage.vue页面设计
    */
   secureQuery(id: number, params: ResourcePackageQueryRequest): Promise<ApiResponse<ResourcePackageQueryResponse>> {
-    return post(`/resource-packages/${id}/secure-query`, params)
+    return post(`/resource-packages/${id}/secure-query`, params, { permission: 'data:resource_package:query' })
   },
 
   /**
    * 获取安全查询历史记录
    */
   getSecureQueryHistory(id: number, page: number = 1, size: number = 20): Promise<ApiResponse<any>> {
-    return get(`/resource-packages/${id}/query-history?page=${page}&size=${size}`)
+    return get(`/resource-packages/${id}/query-history?page=${page}&size=${size}`, undefined, { permission: 'data:resource_package:history:view' })
   },
 
   /**
@@ -315,21 +315,21 @@ export const resourcePackageApi = {
   getHistory(id: number, page: number = 1, size: number = 20): Promise<ApiResponse<any>> {
     return get(`/resource-packages/${id}/history`, {
       page, size
-    })
+    }, { permission: 'data:resource_package:history:view' })
   },
 
   /**
    * 列出历史Excel文件
    */
   listFiles(id: number, page: number = 1, size: number = 20): Promise<ApiResponse<{ items: ResourcePackageFile[]; total: number; page: number; size: number }>> {
-    return get(`/resource-packages/${id}/files`, { page, size })
+    return get(`/resource-packages/${id}/files`, { page, size }, { permission: 'data:resource_package:files:view' })
   },
 
   /**
    * 下载指定历史文件（返回预签名URL）
    */
   downloadFile(id: number, fileId: number): Promise<ApiResponse<{ download_url: string; filename: string; object_path: string }>> {
-    return post(`/resource-packages/${id}/files/${fileId}/download`, {})
+    return post(`/resource-packages/${id}/files/${fileId}/download`, {}, { permission: 'data:resource_package:download' })
   }
 }
 
@@ -348,11 +348,11 @@ export const templateApi = {
 
     if (params?.type === PackageType.ELASTICSEARCH) {
       // ES模板端点
-      return get('/es/templates', query)
+      return get('/es/templates', query, { permission: 'data:es:templates:view' })
     }
     // 默认SQL模板端点（并标记为模板）
     query.isTemplate = true
-    return get('/sql/templates', query)
+    return get('/sql/templates', query, { permission: 'data:sql:templates:view' })
   },
 
   /**
@@ -360,30 +360,30 @@ export const templateApi = {
    */
   get(id: number, type: PackageType): Promise<{ data: Template }> {
     if (type === PackageType.ELASTICSEARCH) {
-      return get(`/es/templates/${id}`)
+      return get(`/es/templates/${id}`, undefined, { permission: 'data:es:templates:view' })
     }
-    return get(`/sql/templates/${id}`)
+    return get(`/sql/templates/${id}`, undefined, { permission: 'data:sql:templates:view' })
   },
 
   /**
    * 创建模板
    */
   create(data: Omit<Template, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<Template> {
-    return post('/templates/', data)
+    return post('/templates/', data, { permission: 'data:templates:create' })
   },
 
   /**
    * 更新模板
    */
   update(id: number, data: Partial<Omit<Template, 'id' | 'created_at' | 'updated_at' | 'created_by'>>): Promise<Template> {
-    return put(`/templates/${id}`, data)
+    return put(`/templates/${id}`, data, { permission: 'data:templates:edit' })
   },
 
   /**
    * 删除模板
    */
   delete(id: number): Promise<{ message: string }> {
-    return del(`/templates/${id}`)
+    return del(`/templates/${id}`, { permission: 'data:templates:delete' })
   }
 }
 

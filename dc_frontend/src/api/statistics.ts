@@ -38,7 +38,8 @@ export const getStatistics = (params?: StatisticsQuery): Promise<StatisticsRespo
   return request({
     url: '/api/statistics/overview',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:view'
   })
 }
 
@@ -49,7 +50,8 @@ export const getAccessTrend = (params: AccessTrendQuery): Promise<StatisticsResp
   return request({
     url: '/api/statistics/access-trend',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:access_trend:view'
   })
 }
 
@@ -59,7 +61,8 @@ export const getAccessTrend = (params: AccessTrendQuery): Promise<StatisticsResp
 export const getResourceTypeDistribution = (): Promise<StatisticsResponse<ResourceTypeDistribution[]>> => {
   return request({
     url: '/api/statistics/resource-type-distribution',
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:view'
   })
 }
 
@@ -70,7 +73,8 @@ export const getPopularResources = (params: PopularResourceQuery): Promise<Stati
   return request({
     url: '/api/statistics/popular-resources',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:popular:view'
   })
 }
 
@@ -81,7 +85,8 @@ export const getUserActivity = (params: UserActivityQuery): Promise<StatisticsRe
   return request({
     url: '/api/statistics/user-activity',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:user_activity:view'
   })
 }
 
@@ -92,7 +97,8 @@ export const getAccessRecords = (params: AccessRecordQuery): Promise<PaginatedSt
   return request({
     url: '/api/statistics/access-records',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:access_records:view'
   })
 }
 
@@ -102,19 +108,21 @@ export const getAccessRecords = (params: AccessRecordQuery): Promise<PaginatedSt
 export const getAccessRecordById = (id: string): Promise<StatisticsResponse<AccessRecord>> => {
   return request({
     url: `/api/statistics/access-records/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:access_records:view'
   })
 }
 
 /**
  * 导出统计数据
  */
-export const exportStatistics = (params: ExportQuery): Promise<Blob> => {
+export const exportStatistics = (params: ExportQuery): Promise<ApiResponse<Blob>> => {
   return request({
     url: '/api/statistics/export',
     method: 'post',
     data: params,
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'data:statistics:export'
   })
 }
 
@@ -124,7 +132,8 @@ export const exportStatistics = (params: ExportQuery): Promise<Blob> => {
 export const getRealTimeStats = (): Promise<StatisticsResponse<RealTimeStats>> => {
   return request({
     url: '/api/statistics/realtime',
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:realtime:view'
   })
 }
 
@@ -135,7 +144,8 @@ export const getPerformanceMetrics = (params?: StatisticsQuery): Promise<Statist
   return request({
     url: '/api/statistics/performance',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:performance:view'
   })
 }
 
@@ -146,7 +156,8 @@ export const getResourceUsageStats = (params?: StatisticsQuery): Promise<Statist
   return request({
     url: '/api/statistics/resource-usage',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:resource_usage:view'
   })
 }
 
@@ -157,7 +168,8 @@ export const getUserBehaviorStats = (params?: StatisticsQuery): Promise<Statisti
   return request({
     url: '/api/statistics/user-behavior',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:user_behavior:view'
   })
 }
 
@@ -167,7 +179,8 @@ export const getUserBehaviorStats = (params?: StatisticsQuery): Promise<Statisti
 export const getSystemHealth = (): Promise<StatisticsResponse<SystemHealth>> => {
   return request({
     url: '/api/statistics/system-health',
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:system_health:view'
   })
 }
 
@@ -178,7 +191,8 @@ export const getDataQualityStats = (params?: StatisticsQuery): Promise<Statistic
   return request({
     url: '/api/statistics/data-quality',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:data_quality:view'
   })
 }
 
@@ -189,7 +203,8 @@ export const getCostAnalysis = (params?: StatisticsQuery): Promise<StatisticsRes
   return request({
     url: '/api/statistics/cost-analysis',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:cost:view'
   })
 }
 
@@ -199,7 +214,8 @@ export const getCostAnalysis = (params?: StatisticsQuery): Promise<StatisticsRes
 export const getCapacityPlanning = (): Promise<StatisticsResponse<CapacityPlanning>> => {
   return request({
     url: '/api/statistics/capacity-planning',
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:capacity:view'
   })
 }
 
@@ -209,7 +225,8 @@ export const getCapacityPlanning = (): Promise<StatisticsResponse<CapacityPlanni
 export const getComplianceStats = (): Promise<StatisticsResponse<ComplianceStats>> => {
   return request({
     url: '/api/statistics/compliance',
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:compliance:view'
   })
 }
 
@@ -221,7 +238,8 @@ export const getComplianceStats = (): Promise<StatisticsResponse<ComplianceStats
 export const getAlertRules = (): Promise<StatisticsResponse<AlertRule[]>> => {
   return request({
     url: '/api/statistics/alert-rules',
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:alerts:view'
   })
 }
 
@@ -232,7 +250,8 @@ export const createAlertRule = (data: Partial<AlertRule>): Promise<StatisticsRes
   return request({
     url: '/api/statistics/alert-rules',
     method: 'post',
-    data
+    data,
+    permission: 'data:statistics:alerts:create'
   })
 }
 
@@ -243,7 +262,8 @@ export const updateAlertRule = (id: string, data: Partial<AlertRule>): Promise<S
   return request({
     url: `/api/statistics/alert-rules/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'data:statistics:alerts:edit'
   })
 }
 
@@ -253,7 +273,8 @@ export const updateAlertRule = (id: string, data: Partial<AlertRule>): Promise<S
 export const deleteAlertRule = (id: string): Promise<StatisticsResponse<void>> => {
   return request({
     url: `/api/statistics/alert-rules/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:statistics:alerts:delete'
   })
 }
 
@@ -264,7 +285,8 @@ export const toggleAlertRule = (id: string, enabled: boolean): Promise<Statistic
   return request({
     url: `/api/statistics/alert-rules/${id}/toggle`,
     method: 'patch',
-    data: { enabled }
+    data: { enabled },
+    permission: 'data:statistics:alerts:edit'
   })
 }
 
@@ -282,7 +304,8 @@ export const getAlertRecords = (params?: {
   return request({
     url: '/api/statistics/alert-records',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:alerts:view'
   })
 }
 
@@ -292,7 +315,8 @@ export const getAlertRecords = (params?: {
 export const getAlertRecordById = (id: string): Promise<StatisticsResponse<AlertRecord>> => {
   return request({
     url: `/api/statistics/alert-records/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:alerts:view'
   })
 }
 
@@ -302,7 +326,8 @@ export const getAlertRecordById = (id: string): Promise<StatisticsResponse<Alert
 export const acknowledgeAlert = (id: string): Promise<StatisticsResponse<void>> => {
   return request({
     url: `/api/statistics/alert-records/${id}/acknowledge`,
-    method: 'patch'
+    method: 'patch',
+    permission: 'data:statistics:alerts:ack'
   })
 }
 
@@ -313,7 +338,8 @@ export const resolveAlert = (id: string, comment?: string): Promise<StatisticsRe
   return request({
     url: `/api/statistics/alert-records/${id}/resolve`,
     method: 'patch',
-    data: { comment }
+    data: { comment },
+    permission: 'data:statistics:alerts:resolve'
   })
 }
 
@@ -328,12 +354,13 @@ export const generateReport = (params: {
   endDate?: string
   format: 'pdf' | 'excel' | 'html'
   includeCharts?: boolean
-}): Promise<Blob> => {
+}): Promise<ApiResponse<Blob>> => {
   return request({
     url: '/api/statistics/reports/generate',
     method: 'post',
     data: params,
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'data:statistics:report:generate'
   })
 }
 
@@ -343,7 +370,8 @@ export const generateReport = (params: {
 export const getReportTemplates = (): Promise<StatisticsResponse<any[]>> => {
   return request({
     url: '/api/statistics/report-templates',
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:report:view'
   })
 }
 
@@ -354,7 +382,8 @@ export const createReportTemplate = (data: any): Promise<StatisticsResponse<any>
   return request({
     url: '/api/statistics/report-templates',
     method: 'post',
-    data
+    data,
+    permission: 'data:statistics:report:create'
   })
 }
 
@@ -365,7 +394,8 @@ export const updateReportTemplate = (id: string, data: any): Promise<StatisticsR
   return request({
     url: `/api/statistics/report-templates/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'data:statistics:report:edit'
   })
 }
 
@@ -375,7 +405,8 @@ export const updateReportTemplate = (id: string, data: any): Promise<StatisticsR
 export const deleteReportTemplate = (id: string): Promise<StatisticsResponse<void>> => {
   return request({
     url: `/api/statistics/report-templates/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:statistics:report:delete'
   })
 }
 
@@ -393,7 +424,8 @@ export const getDataInsights = (params?: {
   return request({
     url: '/api/statistics/insights',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:insights:view'
   })
 }
 
@@ -409,7 +441,8 @@ export const getAnomalyDetection = (params?: {
   return request({
     url: '/api/statistics/anomaly-detection',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:anomaly:view'
   })
 }
 
@@ -424,7 +457,8 @@ export const getForecastAnalysis = (params: {
   return request({
     url: '/api/statistics/forecast',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:forecast:view'
   })
 }
 
@@ -439,7 +473,8 @@ export const getCorrelationAnalysis = (params: {
   return request({
     url: '/api/statistics/correlation',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:correlation:view'
   })
 }
 
@@ -460,7 +495,8 @@ export const executeCustomQuery = (query: {
   return request({
     url: '/api/statistics/custom-query',
     method: 'post',
-    data: query
+    data: query,
+    permission: 'data:statistics:custom_query'
   })
 }
 
@@ -471,7 +507,8 @@ export const validateQuery = (query: string): Promise<StatisticsResponse<{ valid
   return request({
     url: '/api/statistics/validate-query',
     method: 'post',
-    data: { query }
+    data: { query },
+    permission: 'data:statistics:validate_query'
   })
 }
 
@@ -486,7 +523,8 @@ export const getQueryHistory = (params?: {
   return request({
     url: '/api/statistics/query-history',
     method: 'get',
-    params
+    params,
+    permission: 'data:statistics:query_history:view'
   })
 }
 
@@ -502,7 +540,8 @@ export const saveQuery = (data: {
   return request({
     url: '/api/statistics/saved-queries',
     method: 'post',
-    data
+    data,
+    permission: 'data:statistics:query:save'
   })
 }
 
@@ -512,7 +551,8 @@ export const saveQuery = (data: {
 export const getSavedQueries = (): Promise<StatisticsResponse<any[]>> => {
   return request({
     url: '/api/statistics/saved-queries',
-    method: 'get'
+    method: 'get',
+    permission: 'data:statistics:query:view'
   })
 }
 
@@ -522,6 +562,7 @@ export const getSavedQueries = (): Promise<StatisticsResponse<any[]>> => {
 export const deleteSavedQuery = (id: string): Promise<StatisticsResponse<void>> => {
   return request({
     url: `/api/statistics/saved-queries/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:statistics:query:delete'
   })
 }

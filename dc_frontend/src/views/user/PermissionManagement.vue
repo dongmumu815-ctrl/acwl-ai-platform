@@ -24,6 +24,10 @@
               <el-icon><Minus /></el-icon>
               收起全部
             </el-button>
+            <el-button size="small" @click="syncFrontendPermissions" :loading="syncing">
+              <el-icon><Connection /></el-icon>
+              同步前端权限
+            </el-button>
             <el-button type="primary" size="small" @click="addPermission">
               <el-icon><Plus /></el-icon>
               新增权限
@@ -242,7 +246,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, ElTree } from 'element-plus'
-import { getPermissions, createPermission, updatePermission, deletePermission } from '@/api/user'
+import { getPermissions, createPermission, updatePermission, deletePermission, getPermissionTree, batchCreatePermissions } from '@/api/user'
+import { useUserStore } from '@/stores/user'
 
 // 响应式数据
 const permissionTreeRef = ref<InstanceType<typeof ElTree>>()
@@ -252,6 +257,13 @@ const selectedPermission = ref<any>(null)
 const permissionDialogVisible = ref(false)
 const isEditMode = ref(false)
 const saving = ref(false)
+const syncing = ref(false)
+const loadingTree = ref(false)
+const userStore = useUserStore()
+
+// 已存在与缺失的权限码收集
+const existingPermissionCodes = ref<string[]>([])
+const missingPermissionCodes = ref<string[]>([])
 
 // 树形组件配置
 const treeProps = {
@@ -292,297 +304,91 @@ const permissionRules = {
   ]
 }
 
-// 权限树数据
-const permissionTree = ref([
-  {
-    id: 1,
-    name: '系统管理',
-    code: 'system',
-    type: 'menu',
-    enabled: true,
-    sort: 1,
-    description: '系统管理模块',
-    createdAt: '2024-01-01 00:00:00',
-    children: [
-      {
-        id: 2,
-        name: '用户管理',
-        code: 'system:user',
+// 权限树数据（从后端加载）
+const permissionTree = ref<any[]>([])
+
+/**
+ * 依据后端权限树响应构建前端展示树
+ */
+const transformPermissionTreeResponse = (modules: Array<{ module: string; permissions: any[] }>): any[] => {
+  const result: any[] = []
+  for (const mod of modules) {
+    const moduleNode: any = {
+      id: `module:${mod.module}`,
+      name: mod.module,
+      code: mod.module,
+      type: 'menu',
+      enabled: true,
+      sort: 0,
+      description: `${mod.module} 模块`,
+      createdAt: new Date().toISOString(),
+      children: []
+    }
+    // 按 resource 分组
+    const resourceGroups: Record<string, any[]> = {}
+    for (const perm of mod.permissions) {
+      const resourceKey = String(perm.resource || 'common')
+      if (!resourceGroups[resourceKey]) resourceGroups[resourceKey] = []
+      resourceGroups[resourceKey].push(perm)
+    }
+    for (const [resource, perms] of Object.entries(resourceGroups)) {
+      const resourceNode: any = {
+        id: `module:${mod.module}:resource:${resource}`,
+        name: resource === 'common' ? '通用' : resource,
+        code: resource === 'common' ? `${mod.module}` : `${mod.module}:${resource}`,
         type: 'menu',
         enabled: true,
-        sort: 1,
-        description: '用户管理页面',
-        createdAt: '2024-01-01 00:00:00',
-        children: [
-          {
-            id: 3,
-            name: '查看用户',
-            code: 'system:user:view',
-            type: 'button',
-            enabled: true,
-            sort: 1,
-            description: '查看用户列表',
-            createdAt: '2024-01-01 00:00:00',
-            roles: [{ id: 1, name: '管理员' }, { id: 2, name: '操作员' }],
-            users: [{ id: 1, name: '张三', avatar: '' }]
-          },
-          {
-            id: 4,
-            name: '新增用户',
-            code: 'system:user:add',
-            type: 'button',
-            enabled: true,
-            sort: 2,
-            description: '新增用户',
-            createdAt: '2024-01-01 00:00:00',
-            roles: [{ id: 1, name: '管理员' }]
-          },
-          {
-            id: 5,
-            name: '编辑用户',
-            code: 'system:user:edit',
-            type: 'button',
-            enabled: true,
-            sort: 3,
-            description: '编辑用户信息',
-            createdAt: '2024-01-01 00:00:00',
-            roles: [{ id: 1, name: '管理员' }]
-          },
-          {
-            id: 6,
-            name: '删除用户',
-            code: 'system:user:delete',
-            type: 'button',
-            enabled: false,
-            sort: 4,
-            description: '删除用户',
-            createdAt: '2024-01-01 00:00:00',
-            roles: [{ id: 1, name: '管理员' }]
-          }
-        ]
-      },
-      {
-        id: 7,
-        name: '角色管理',
-        code: 'system:role',
-        type: 'menu',
-        enabled: true,
-        sort: 2,
-        description: '角色管理页面',
-        createdAt: '2024-01-01 00:00:00',
-        children: [
-          {
-            id: 8,
-            name: '查看角色',
-            code: 'system:role:view',
-            type: 'button',
-            enabled: true,
-            sort: 1,
-            description: '查看角色列表',
-            createdAt: '2024-01-01 00:00:00'
-          }
-        ]
+        sort: 0,
+        description: `${mod.module}:${resource} 权限`,
+        createdAt: new Date().toISOString(),
+        children: []
       }
-    ]
-  },
-  {
-    id: 9,
-    name: '数据中心',
-    code: 'data',
-    type: 'menu',
-    enabled: true,
-    sort: 2,
-    description: '数据中心模块',
-    createdAt: '2024-01-01 00:00:00',
-    children: [
-      {
-        id: 10,
-        name: '数据资源',
-        code: 'data:resource',
-        type: 'menu',
-        enabled: true,
-        sort: 1,
-        description: '数据资源管理',
-        createdAt: '2024-01-01 00:00:00',
-        children: [
-          {
-            id: 11,
-            name: '查看资源',
-            code: 'data:resource:view',
-            type: 'button',
-            enabled: true,
-            sort: 1,
-            description: '查看数据资源',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 12,
-            name: '下载资源',
-            code: 'data:resource:download',
-            type: 'api',
-            enabled: true,
-            sort: 2,
-            description: '下载数据资源',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 13,
-            name: '创建资源',
-            code: 'data:resource:create',
-            type: 'button',
-            enabled: true,
-            sort: 3,
-            description: '创建数据资源',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 14,
-            name: '编辑资源',
-            code: 'data:resource:edit',
-            type: 'button',
-            enabled: true,
-            sort: 4,
-            description: '编辑数据资源',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 15,
-            name: '删除资源',
-            code: 'data:resource:delete',
-            type: 'button',
-            enabled: true,
-            sort: 5,
-            description: '删除数据资源',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 16,
-            name: '分享资源',
-            code: 'data:resource:share',
-            type: 'button',
-            enabled: true,
-            sort: 6,
-            description: '分享数据资源',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 17,
-            name: '查询数据',
-            code: 'data:resource:query',
-            type: 'api',
-            enabled: true,
-            sort: 7,
-            description: '查询资源数据',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 18,
-            name: '导出数据',
-            code: 'data:resource:export',
-            type: 'api',
-            enabled: true,
-            sort: 8,
-            description: '导出查询结果',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 19,
-            name: '保存查询',
-            code: 'data:resource:save',
-            type: 'button',
-            enabled: true,
-            sort: 9,
-            description: '保存查询设定',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 20,
-            name: 'ES查询',
-            code: 'data:elasticsearch:query',
-            type: 'api',
-            enabled: true,
-            sort: 10,
-            description: 'Elasticsearch 查询权限',
-            createdAt: '2024-01-01 00:00:00'
-          }
-        ]
+      for (const p of perms) {
+        resourceNode.children.push({
+          id: p.id,
+          name: p.name,
+          code: p.code,
+          type: getTypeByAction(p.action),
+          enabled: Boolean(p.status),
+          sort: Number(p.sort_order || 0),
+          description: `${p.module}${p.resource ? ':' + p.resource : ''}:${p.action}`,
+          createdAt: new Date().toISOString()
+        })
       }
-      ,
-      {
-        id: 21,
-        name: '数据源管理',
-        code: 'data:datasource',
-        type: 'menu',
-        enabled: true,
-        sort: 2,
-        description: '数据源管理模块',
-        createdAt: '2024-01-01 00:00:00',
-        children: [
-          {
-            id: 22,
-            name: '查看数据源',
-            code: 'data:datasource:view',
-            type: 'button',
-            enabled: true,
-            sort: 1,
-            description: '查看数据源列表',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 23,
-            name: '新建数据源',
-            code: 'data:datasource:create',
-            type: 'button',
-            enabled: true,
-            sort: 2,
-            description: '创建新数据源',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 24,
-            name: '编辑数据源',
-            code: 'data:datasource:edit',
-            type: 'button',
-            enabled: true,
-            sort: 3,
-            description: '编辑数据源配置',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 25,
-            name: '删除数据源',
-            code: 'data:datasource:delete',
-            type: 'button',
-            enabled: true,
-            sort: 4,
-            description: '删除数据源',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 26,
-            name: '测试连接',
-            code: 'data:datasource:test',
-            type: 'api',
-            enabled: true,
-            sort: 5,
-            description: '测试数据源连接',
-            createdAt: '2024-01-01 00:00:00'
-          },
-          {
-            id: 27,
-            name: '启用/禁用',
-            code: 'data:datasource:enable',
-            type: 'button',
-            enabled: true,
-            sort: 6,
-            description: '启用或禁用数据源',
-            createdAt: '2024-01-01 00:00:00'
-          }
-        ]
-      }
-    ]
+      moduleNode.children.push(resourceNode)
+    }
+    result.push(moduleNode)
   }
-])
+  return result
+}
+
+/**
+ * 根据后端 action 字段推断显示类型
+ */
+const getTypeByAction = (action: string): string => {
+  const apiActions = ['query', 'export', 'download', 'upload', 'check', 'assign', 'remove']
+  if (apiActions.includes(action)) return 'api'
+  const buttonActions = ['view', 'create', 'edit', 'delete', 'enable', 'disable']
+  if (buttonActions.includes(action)) return 'button'
+  return 'data'
+}
+
+/**
+ * 加载后端权限树并渲染
+ */
+const loadPermissionTree = async (): Promise<void> => {
+  try {
+    loadingTree.value = true
+    const resp = await getPermissionTree()
+    if (!resp.success) throw new Error(resp.message || '获取权限树失败')
+    const modules = (resp.data?.modules || []) as Array<{ module: string; permissions: any[] }>
+    permissionTree.value = transformPermissionTreeResponse(modules)
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载权限树失败')
+  } finally {
+    loadingTree.value = false
+  }
+}
 
 /**
  * 过滤后的权限树
@@ -832,6 +638,98 @@ const savePermission = () => {
 }
 
 /**
+ * 同步前端 API 权限到后端（静态扫描 src/api 目录）
+ * - 使用 Vite 的 import.meta.glob 以原始文本方式载入所有 API 文件
+ * - 正则提取 "permission:" 标注的权限码
+ * - 与后端现有权限对比，批量创建缺失项
+ */
+const syncFrontendPermissions = async (): Promise<void> => {
+  try {
+    syncing.value = true
+    // 1) 静态扫描前端 API 代码，提取权限码
+    const codes = await collectAllFrontendPermissions()
+    const uniqueCodes = Array.from(new Set(codes)).filter(Boolean)
+    // 2) 拉取后端现有权限码
+    const existingResp = await getPermissions({ limit: 5000, skip: 0 })
+    const existingCodes = existingResp.success ? (existingResp.data.items || []).map((i: any) => i.code) : []
+    existingPermissionCodes.value = existingCodes
+    // 3) 计算缺失并批量创建
+    const toCreateCodes = uniqueCodes.filter(c => !existingCodes.includes(c))
+    missingPermissionCodes.value = toCreateCodes
+    if (toCreateCodes.length === 0) {
+      ElMessage.success('前端权限已与后端同步，无需创建')
+      return
+    }
+    const payload = toCreateCodes.map(code => buildPermissionCreateFromCode(code))
+    const createResp = await batchCreatePermissions(payload)
+    if (!createResp.success) throw new Error(createResp.message || '批量创建权限失败')
+    ElMessage.success(`已创建 ${payload.length} 个缺失权限`)
+    await loadPermissionTree()
+  } catch (error: any) {
+    ElMessage.error(error.message || '同步前端权限失败')
+  } finally {
+    syncing.value = false
+  }
+}
+
+/**
+ * 收集 src/api/*.ts 内所有权限码
+ */
+const collectAllFrontendPermissions = async (): Promise<string[]> => {
+  const modules: Record<string, () => Promise<string>> = import.meta.glob('@/api/*.ts', {
+    as: 'raw'
+  }) as any
+  const codes: string[] = []
+  const permissionRegex = /permission\s*:\s*(["'`])([^"'`]+)\1/g
+  for (const loader of Object.values(modules)) {
+    try {
+      const content = await loader()
+      let match: RegExpExecArray | null
+      while ((match = permissionRegex.exec(content)) !== null) {
+        const code = match[2]
+        if (code) codes.push(code)
+      }
+    } catch {}
+  }
+  return codes
+}
+
+/**
+ * 将权限码解析为后端创建所需结构
+ */
+const buildPermissionCreateFromCode = (code: string): {
+  name: string
+  code: string
+  description?: string
+  module: string
+  resource?: string
+  action: string
+  status?: boolean
+  sort_order?: number
+} => {
+  const parts = code.split(':')
+  const module = parts[0] || 'system'
+  const resource = parts.length > 2 ? parts[1] : (parts.length === 2 ? parts[1] : undefined)
+  const action = parts[parts.length - 1] || 'view'
+  const actionNameMap: Record<string, string> = {
+    view: '查看', create: '创建', edit: '编辑', delete: '删除',
+    export: '导出', download: '下载', query: '查询', assign: '分配', remove: '移除', enable: '启用', disable: '禁用'
+  }
+  const resLabel = resource ? resource : '通用'
+  const name = `${actionNameMap[action] || action}${resLabel === '通用' ? '' : resLabel}`
+  return {
+    name,
+    code,
+    description: '由前端API自动收集导入',
+    module,
+    resource,
+    action,
+    status: true,
+    sort_order: 0
+  }
+}
+
+/**
  * 重置权限表单
  */
 const resetPermissionForm = () => {
@@ -874,10 +772,12 @@ watch(treeSearchKeyword, (val) => {
  * 组件挂载时初始化
  */
 onMounted(() => {
-  // 初始化时展开第一级节点
-  nextTick(() => {
-    const firstLevelKeys = permissionTree.value.map(item => item.id.toString())
-    permissionTreeRef.value?.setExpandedKeys(firstLevelKeys)
+  // 加载后端权限树
+  loadPermissionTree().then(() => {
+    nextTick(() => {
+      const firstLevelKeys = permissionTree.value.map(item => String(item.id))
+      permissionTreeRef.value?.setExpandedKeys(firstLevelKeys)
+    })
   })
 })
 </script>

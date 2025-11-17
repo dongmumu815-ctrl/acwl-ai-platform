@@ -37,7 +37,8 @@ export const getResources = (params: ResourceQuery): Promise<PaginatedResourceRe
   return request({
     url: '/api/resources',
     method: 'get',
-    params
+    params,
+    permission: 'data:resource:view'
   })
 }
 
@@ -47,7 +48,8 @@ export const getResources = (params: ResourceQuery): Promise<PaginatedResourceRe
 export const getResourceById = (id: string): Promise<ResourceResponse<DataResource>> => {
   return request({
     url: `/api/resources/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:view'
   })
 }
 
@@ -58,7 +60,8 @@ export const createResource = (data: ResourceCreateData): Promise<ResourceRespon
   return request({
     url: '/api/resources',
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:create'
   })
 }
 
@@ -69,7 +72,8 @@ export const updateResource = (id: string, data: ResourceUpdateData): Promise<Re
   return request({
     url: `/api/resources/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'data:resource:edit'
   })
 }
 
@@ -79,7 +83,8 @@ export const updateResource = (id: string, data: ResourceUpdateData): Promise<Re
 export const deleteResource = (id: string): Promise<ResourceResponse<void>> => {
   return request({
     url: `/api/resources/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:resource:delete'
   })
 }
 
@@ -90,7 +95,8 @@ export const batchDeleteResources = (ids: string[]): Promise<ResourceResponse<vo
   return request({
     url: '/api/resources/batch-delete',
     method: 'post',
-    data: { ids }
+    data: { ids },
+    permission: 'data:resource:delete'
   })
 }
 
@@ -101,7 +107,8 @@ export const copyResource = (id: string, data: { name: string; description?: str
   return request({
     url: `/api/resources/${id}/copy`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:create'
   })
 }
 
@@ -112,7 +119,8 @@ export const toggleResource = (id: string, enabled: boolean): Promise<ResourceRe
   return request({
     url: `/api/resources/${id}/toggle`,
     method: 'patch',
-    data: { enabled }
+    data: { enabled },
+    permission: 'data:resource:edit'
   })
 }
 
@@ -125,7 +133,8 @@ export const testConnection = (data: ResourceTestConnection): Promise<ResourceRe
   return request({
     url: '/api/resources/test-connection',
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:test'
   })
 }
 
@@ -135,7 +144,8 @@ export const testConnection = (data: ResourceTestConnection): Promise<ResourceRe
 export const testResourceConnection = (id: string): Promise<ResourceResponse<{ success: boolean; message: string; details?: any }>> => {
   return request({
     url: `/api/resources/${id}/test-connection`,
-    method: 'post'
+    method: 'post',
+    permission: 'data:resource:test'
   })
 }
 
@@ -148,7 +158,8 @@ export const syncResourceStructure = (id: string, data?: ResourceSyncData): Prom
   return request({
     url: `/api/resources/${id}/sync`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:sync'
   })
 }
 
@@ -159,7 +170,8 @@ export const getSyncHistory = (id: string, params?: { page?: number; size?: numb
   return request({
     url: `/api/resources/${id}/sync-history`,
     method: 'get',
-    params
+    params,
+    permission: 'data:resource:sync:view'
   })
 }
 
@@ -169,7 +181,8 @@ export const getSyncHistory = (id: string, params?: { page?: number; size?: numb
 export const getSyncStatus = (id: string): Promise<ResourceResponse<{ status: string; progress?: number; message?: string }>> => {
   return request({
     url: `/api/resources/${id}/sync-status`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:sync:view'
   })
 }
 
@@ -187,7 +200,8 @@ export const previewResourceData = (id: string, params?: {
   return request({
     url: `/api/resources/${id}/preview`,
     method: 'get',
-    params
+    params,
+    permission: 'data:resource:preview'
   })
 }
 
@@ -206,7 +220,8 @@ export const queryResourceData = (id: string, data: {
   return request({
     url: `/api/resources/${id}/query`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:query'
   })
 }
 
@@ -219,7 +234,8 @@ export const getResourceFields = (id: string, table?: string): Promise<ResourceR
   return request({
     url: `/data-resources/${id}/schema`,
     method: 'get',
-    params: { table }
+    params: { table },
+    permission: 'data:resource:fields:view'
   })
 }
 
@@ -230,7 +246,8 @@ export const updateFieldDescription = (id: string, fieldId: string, description:
   return request({
     url: `/api/resources/${id}/fields/${fieldId}`,
     method: 'patch',
-    data: { description }
+    data: { description },
+    permission: 'data:resource:fields:edit'
   })
 }
 
@@ -241,7 +258,8 @@ export const batchUpdateFieldDescriptions = (id: string, fields: { fieldId: stri
   return request({
     url: `/api/resources/${id}/fields/batch-update`,
     method: 'patch',
-    data: { fields }
+    data: { fields },
+    permission: 'data:resource:fields:edit'
   })
 }
 
@@ -261,7 +279,8 @@ export const getResourceAccessRecords = (id: string, params?: {
   return request({
     url: `/api/resources/${id}/access-records`,
     method: 'get',
-    params
+    params,
+    permission: 'data:resource:logs:view'
   })
 }
 
@@ -277,7 +296,8 @@ export const recordResourceAccess = (id: string, data: {
   return request({
     url: `/api/resources/${id}/access`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:logs:create'
   })
 }
 
@@ -289,7 +309,8 @@ export const recordResourceAccess = (id: string, data: {
 export const getResourcePermissions = (id: string): Promise<ResourceResponse<ResourcePermission[]>> => {
   return request({
     url: `/api/resources/${id}/permissions`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:permission:view'
   })
 }
 
@@ -304,7 +325,8 @@ export const addResourcePermission = (id: string, data: {
   return request({
     url: `/api/resources/${id}/permissions`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:permission:grant'
   })
 }
 
@@ -317,7 +339,8 @@ export const updateResourcePermission = (id: string, permissionId: string, data:
   return request({
     url: `/api/resources/${id}/permissions/${permissionId}`,
     method: 'put',
-    data
+    data,
+    permission: 'data:resource:permission:edit'
   })
 }
 
@@ -327,7 +350,8 @@ export const updateResourcePermission = (id: string, permissionId: string, data:
 export const deleteResourcePermission = (id: string, permissionId: string): Promise<ResourceResponse<void>> => {
   return request({
     url: `/api/resources/${id}/permissions/${permissionId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:resource:permission:revoke'
   })
 }
 
@@ -338,7 +362,8 @@ export const checkResourcePermission = (id: string, permission: string): Promise
   return request({
     url: `/api/resources/${id}/check-permission`,
     method: 'get',
-    params: { permission }
+    params: { permission },
+    permission: 'data:resource:permission:check'
   })
 }
 
@@ -350,7 +375,8 @@ export const checkResourcePermission = (id: string, permission: string): Promise
 export const getResourceTags = (id: string): Promise<ResourceResponse<ResourceTag[]>> => {
   return request({
     url: `/api/resources/${id}/tags`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:tags:view'
   })
 }
 
@@ -361,7 +387,8 @@ export const addResourceTags = (id: string, tags: string[]): Promise<ResourceRes
   return request({
     url: `/api/resources/${id}/tags`,
     method: 'post',
-    data: { tags }
+    data: { tags },
+    permission: 'data:resource:tags:edit'
   })
 }
 
@@ -372,7 +399,8 @@ export const removeResourceTags = (id: string, tags: string[]): Promise<Resource
   return request({
     url: `/api/resources/${id}/tags`,
     method: 'delete',
-    data: { tags }
+    data: { tags },
+    permission: 'data:resource:tags:edit'
   })
 }
 
@@ -382,7 +410,8 @@ export const removeResourceTags = (id: string, tags: string[]): Promise<Resource
 export const getAvailableTags = (): Promise<ResourceResponse<ResourceTag[]>> => {
   return request({
     url: '/api/resources/tags',
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:tags:view'
   })
 }
 
@@ -394,7 +423,8 @@ export const getAvailableTags = (): Promise<ResourceResponse<ResourceTag[]>> => 
 export const getResourceVersions = (id: string): Promise<ResourceResponse<ResourceVersion[]>> => {
   return request({
     url: `/api/resources/${id}/versions`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:version:view'
   })
 }
 
@@ -409,7 +439,8 @@ export const createResourceVersion = (id: string, data: {
   return request({
     url: `/api/resources/${id}/versions`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:version:create'
   })
 }
 
@@ -419,7 +450,8 @@ export const createResourceVersion = (id: string, data: {
 export const restoreResourceVersion = (id: string, versionId: string): Promise<ResourceResponse<void>> => {
   return request({
     url: `/api/resources/${id}/versions/${versionId}/restore`,
-    method: 'post'
+    method: 'post',
+    permission: 'data:resource:version:restore'
   })
 }
 
@@ -430,7 +462,8 @@ export const compareResourceVersions = (id: string, fromVersion: string, toVersi
   return request({
     url: `/api/resources/${id}/versions/compare`,
     method: 'get',
-    params: { fromVersion, toVersion }
+    params: { fromVersion, toVersion },
+    permission: 'data:resource:version:view'
   })
 }
 
@@ -447,7 +480,8 @@ export const createResourceBackup = (id: string, data: {
   return request({
     url: `/api/resources/${id}/backups`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:backup:create'
   })
 }
 
@@ -457,7 +491,8 @@ export const createResourceBackup = (id: string, data: {
 export const getResourceBackups = (id: string): Promise<ResourceResponse<ResourceBackup[]>> => {
   return request({
     url: `/api/resources/${id}/backups`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:backup:view'
   })
 }
 
@@ -467,7 +502,8 @@ export const getResourceBackups = (id: string): Promise<ResourceResponse<Resourc
 export const restoreResourceBackup = (id: string, backupId: string): Promise<ResourceResponse<void>> => {
   return request({
     url: `/api/resources/${id}/backups/${backupId}/restore`,
-    method: 'post'
+    method: 'post',
+    permission: 'data:resource:backup:restore'
   })
 }
 
@@ -477,7 +513,8 @@ export const restoreResourceBackup = (id: string, backupId: string): Promise<Res
 export const deleteResourceBackup = (id: string, backupId: string): Promise<ResourceResponse<void>> => {
   return request({
     url: `/api/resources/${id}/backups/${backupId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:resource:backup:delete'
   })
 }
 
@@ -494,7 +531,8 @@ export const getResourceMetrics = (id: string, params?: {
   return request({
     url: `/api/resources/${id}/metrics`,
     method: 'get',
-    params
+    params,
+    permission: 'data:resource:metrics:view'
   })
 }
 
@@ -504,7 +542,8 @@ export const getResourceMetrics = (id: string, params?: {
 export const getResourceHealth = (id: string): Promise<ResourceResponse<{ status: string; details: any }>> => {
   return request({
     url: `/api/resources/${id}/health`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:health:view'
   })
 }
 
@@ -521,7 +560,8 @@ export const validateResourceData = (id: string, data?: {
   return request({
     url: `/api/resources/${id}/validate`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:validate'
   })
 }
 
@@ -531,7 +571,8 @@ export const validateResourceData = (id: string, data?: {
 export const getDataQualityReport = (id: string): Promise<ResourceResponse<any>> => {
   return request({
     url: `/api/resources/${id}/quality-report`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource:quality:view'
   })
 }
 
@@ -544,7 +585,8 @@ export const getResourceTemplates = (type?: string): Promise<ResourceResponse<Re
   return request({
     url: '/api/resources/templates',
     method: 'get',
-    params: { type }
+    params: { type },
+    permission: 'data:resource:template:view'
   })
 }
 
@@ -560,7 +602,8 @@ export const createResourceFromTemplate = (templateId: string, data: {
   return request({
     url: `/api/resources/templates/${templateId}/create`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:template:create'
   })
 }
 
@@ -575,7 +618,8 @@ export const saveResourceAsTemplate = (id: string, data: {
   return request({
     url: `/api/resources/${id}/save-as-template`,
     method: 'post',
-    data
+    data,
+    permission: 'data:resource:template:create'
   })
 }
 
@@ -584,12 +628,13 @@ export const saveResourceAsTemplate = (id: string, data: {
 /**
  * 导出资源配置
  */
-export const exportResourceConfig = (id: string, format: 'json' | 'yaml' | 'xml'): Promise<Blob> => {
+export const exportResourceConfig = (id: string, format: 'json' | 'yaml' | 'xml'): Promise<ApiResponse<Blob>> => {
   return request({
     url: `/api/resources/${id}/export`,
     method: 'get',
     params: { format },
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'data:resource:export'
   })
 }
 
@@ -605,7 +650,8 @@ export const importResourceConfig = (file: File): Promise<ResourceResponse<DataR
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    permission: 'data:resource:import'
   })
 }
 
@@ -616,19 +662,21 @@ export const batchImportResources = (data: ResourceImportData[]): Promise<Resour
   return request({
     url: '/api/resources/batch-import',
     method: 'post',
-    data: { resources: data }
+    data: { resources: data },
+    permission: 'data:resource:import'
   })
 }
 
 /**
  * 批量导出资源
  */
-export const batchExportResources = (ids: string[], format: 'json' | 'yaml' | 'xml' | 'excel'): Promise<Blob> => {
+export const batchExportResources = (ids: string[], format: 'json' | 'yaml' | 'xml' | 'excel'): Promise<ApiResponse<Blob>> => {
   return request({
     url: '/api/resources/batch-export',
     method: 'post',
     data: { ids, format },
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'data:resource:export'
   })
 }
 
@@ -641,7 +689,8 @@ export const batchUpdateResources = (operations: ResourceBatchOperation[]): Prom
   return request({
     url: '/api/resources/batch-update',
     method: 'post',
-    data: { operations }
+    data: { operations },
+    permission: 'data:resource:edit'
   })
 }
 
@@ -652,7 +701,8 @@ export const batchMoveResources = (ids: string[], categoryId: string): Promise<R
   return request({
     url: '/api/resources/batch-move',
     method: 'post',
-    data: { ids, categoryId }
+    data: { ids, categoryId },
+    permission: 'data:resource:edit'
   })
 }
 
@@ -663,7 +713,8 @@ export const batchAddTags = (ids: string[], tags: string[]): Promise<ResourceRes
   return request({
     url: '/api/resources/batch-add-tags',
     method: 'post',
-    data: { ids, tags }
+    data: { ids, tags },
+    permission: 'data:resource:tags:edit'
   })
 }
 
@@ -674,7 +725,8 @@ export const batchRemoveTags = (ids: string[], tags: string[]): Promise<Resource
   return request({
     url: '/api/resources/batch-remove-tags',
     method: 'post',
-    data: { ids, tags }
+    data: { ids, tags },
+    permission: 'data:resource:tags:edit'
   })
 }
 
@@ -696,7 +748,8 @@ export const searchResources = (params: {
   return request({
     url: '/api/resources/search',
     method: 'get',
-    params
+    params,
+    permission: 'data:resource:search'
   })
 }
 
@@ -715,7 +768,8 @@ export const advancedSearchResources = (query: {
   return request({
     url: '/api/resources/advanced-search',
     method: 'post',
-    data: query
+    data: query,
+    permission: 'data:resource:search'
   })
 }
 

@@ -15,6 +15,8 @@ export const useUserStore = defineStore('user', () => {
   const permissions = ref<string[]>([])
   const roles = ref<string[]>([])
   const loading = ref(false)
+  // 已使用的权限码收集（前端发起API时标注的权限）
+  const usedPermissions = ref<string[]>([])
 
   // 计算属性
   const isLoggedIn = computed(() => {
@@ -249,12 +251,14 @@ export const useUserStore = defineStore('user', () => {
       const storedUser = localStorage.getItem('user')
       const storedPermissions = localStorage.getItem('permissions')
       const storedRoles = localStorage.getItem('roles')
+      const storedUsedPerms = localStorage.getItem('used_permissions')
       
       if (storedToken && storedUser) {
         token.value = storedToken
         user.value = JSON.parse(storedUser)
         permissions.value = storedPermissions ? JSON.parse(storedPermissions) : []
         roles.value = storedRoles ? JSON.parse(storedRoles) : []
+        usedPermissions.value = storedUsedPerms ? JSON.parse(storedUsedPerms) : []
       }
     } catch (error) {
       console.error('恢复用户状态失败:', error)
@@ -263,6 +267,7 @@ export const useUserStore = defineStore('user', () => {
       localStorage.removeItem('user')
       localStorage.removeItem('permissions')
       localStorage.removeItem('roles')
+      localStorage.removeItem('used_permissions')
     }
   }
 
@@ -357,6 +362,24 @@ export const useUserStore = defineStore('user', () => {
     permissions.value = []
     roles.value = []
     loading.value = false
+    usedPermissions.value = []
+    localStorage.removeItem('used_permissions')
+  }
+
+  /**
+   * 记录前端使用到的权限码
+   * @param perm 权限码或权限码列表
+   */
+  const recordUsedPermission = (perm: string | string[]): void => {
+    const list = Array.isArray(perm) ? perm : [perm]
+    for (const p of list) {
+      const code = String(p || '').trim()
+      if (!code) continue
+      if (!usedPermissions.value.includes(code)) {
+        usedPermissions.value.push(code)
+      }
+    }
+    localStorage.setItem('used_permissions', JSON.stringify(usedPermissions.value))
   }
 
   // 初始化时从本地存储恢复状态
@@ -369,6 +392,7 @@ export const useUserStore = defineStore('user', () => {
     permissions,
     roles,
     loading,
+    usedPermissions,
     
     // 计算属性
     isLoggedIn,
@@ -390,7 +414,8 @@ export const useUserStore = defineStore('user', () => {
     hasPermissionStrict,
     updateUserInfo,
     refreshPermissions,
-    reset
+    reset,
+    recordUsedPermission
   }
 })
 

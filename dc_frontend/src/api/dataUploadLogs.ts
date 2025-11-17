@@ -52,7 +52,8 @@ export const dataUploadLogsApi = {
         // 透传时间范围查询参数（如果存在）
         start_time: params?.start_time,
         end_time: params?.end_time
-      }
+      },
+      permission: 'logs:data_uploads:view'
     })
   }
 }

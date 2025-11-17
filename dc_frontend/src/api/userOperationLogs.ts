@@ -41,13 +41,15 @@ export const userOperationLogsApi = {
     return request({
       url: '/user-operation-logs/',
       method: 'get',
-      params
+      params,
+      permission: 'logs:user_operation:view'
     })
   },
   getLogDetail(id: number): Promise<ApiResponse<UserOperationLogDetail>> {
     return request({
       url: `/user-operation-logs/${id}`,
-      method: 'get'
+      method: 'get',
+      permission: 'logs:user_operation:view'
     })
   }
 }

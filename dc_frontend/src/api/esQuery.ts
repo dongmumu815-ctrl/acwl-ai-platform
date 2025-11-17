@@ -102,7 +102,8 @@ export function getESDatasources(): Promise<{ data: ESDatasource[] }> {
     method: 'get',
     params: {
       datasource_type: 'elasticsearch'
-    }
+    },
+    permission: 'data:es:datasource:view'
   })
 }
 
@@ -114,7 +115,8 @@ export function getESDatasources(): Promise<{ data: ESDatasource[] }> {
 export function getESDatasource(id: number): Promise<{ data: ESDatasource }> {
   return request({
     url: `/datasources/${id}/`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:es:datasource:view'
   })
 }
 
@@ -133,7 +135,8 @@ export function testESConnection(datasourceId: number): Promise<{
 }> {
   return request({
     url: `/datasources/${datasourceId}/test/`,
-    method: 'post'
+    method: 'post',
+    permission: 'data:es:datasource:test'
   })
 }
 
@@ -145,7 +148,8 @@ export function testESConnection(datasourceId: number): Promise<{
 export function getESIndices(datasourceId: number): Promise<{ data: ESIndex[] }> {
   return request({
     url: `/datasources/${datasourceId}/tables/`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:es:index:view'
   })
 }
 
@@ -164,7 +168,8 @@ export function getESIndexInfo(datasourceId: number, indexName: string): Promise
 }> {
   return request({
     url: `/datasources/${datasourceId}/tables/${indexName}/`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:es:index:view'
   })
 }
 
@@ -180,7 +185,8 @@ export function getESFieldMapping(datasourceId: number, indices: string[]): Prom
     method: 'get',
     params: {
       indices: indices.join(',')
-    }
+    },
+    permission: 'data:es:fields:view'
   });
 }
 
@@ -197,7 +203,8 @@ export function executeESQuery(queryRequest: ESQueryRequest): Promise<{
   return request({
     url: '/es/query',
     method: 'post',
-    data: queryRequest
+    data: queryRequest,
+    permission: 'data:es:query'
   })
 }
 
@@ -217,7 +224,8 @@ export function validateESQuery(datasourceId: number, query: any): Promise<{
   return request({
     url: `/datasources/${datasourceId}/validate/`,
     method: 'post',
-    data: { query }
+    data: { query },
+    permission: 'data:es:validate'
   })
 }
 
@@ -237,7 +245,8 @@ export function explainESQuery(datasourceId: number, index: string, query: any):
     data: {
       index,
       query
-    }
+    },
+    permission: 'data:es:explain'
   })
 }
 
@@ -263,7 +272,8 @@ export function getESQuerySuggestions(datasourceId: number, index: string, field
       index,
       field,
       text
-    }
+    },
+    permission: 'data:es:suggest'
   })
 }
 
@@ -300,7 +310,8 @@ export function getESAggregations(
       aggregations,
       query,
       timeout
-    }
+    },
+    permission: 'data:es:aggregations'
   })
 }
 
@@ -310,7 +321,7 @@ export function getESAggregations(
  * @param format 导出格式 (csv, json, excel)
  * @returns 导出文件流
  */
-export function exportESQueryResult(queryRequest: ESQueryRequest, format: 'csv' | 'json' | 'excel' = 'csv'): Promise<Blob> {
+export function exportESQueryResult(queryRequest: ESQueryRequest, format: 'csv' | 'json' | 'excel' = 'csv'): Promise<ApiResponse<Blob>> {
   return request({
     url: '/es/export',
     method: 'post',
@@ -318,7 +329,8 @@ export function exportESQueryResult(queryRequest: ESQueryRequest, format: 'csv' 
       ...queryRequest,
       format
     },
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'data:es:export'
   })
 }
 
@@ -342,7 +354,8 @@ export function saveESQueryTemplate(template: {
   return request({
     url: '/es/templates',
     method: 'post',
-    data: template
+    data: template,
+    permission: 'data:es:templates:create'
   })
 }
 
@@ -370,7 +383,8 @@ export function getESQueryTemplates(datasourceId?: number): Promise<{
   return request({
     url: '/es/templates',
     method: 'get',
-    params: datasourceId ? { datasourceId } : {}
+    params: datasourceId ? { datasourceId } : {},
+    permission: 'data:es:templates:view'
   })
 }
 
@@ -394,7 +408,8 @@ export function updateESQueryTemplate(templateId: number, template: {
   return request({
     url: `/es/templates/${templateId}`,
     method: 'put',
-    data: template
+    data: template,
+    permission: 'data:es:templates:edit'
   })
 }
 
@@ -406,7 +421,8 @@ export function updateESQueryTemplate(templateId: number, template: {
 export function deleteESQueryTemplate(templateId: number): Promise<{ data: { success: boolean } }> {
   return request({
     url: `/es/templates/${templateId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:es:templates:delete'
   })
 }
 
@@ -434,7 +450,8 @@ export function getESClusterStats(datasourceId: number): Promise<{
 }> {
   return request({
     url: `/datasources/${datasourceId}/stats/`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:es:stats:view'
   })
 }
 
@@ -460,6 +477,7 @@ export function getESIndexStats(datasourceId: number, indexName: string): Promis
 }> {
   return request({
     url: `/datasources/${datasourceId}/tables/${indexName}/stats/`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:es:index:view'
   })
 }

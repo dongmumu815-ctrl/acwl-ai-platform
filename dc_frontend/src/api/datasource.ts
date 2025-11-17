@@ -23,7 +23,8 @@ export const datasourceApi = {
     return request({
       url: '/datasources/',
       method: 'GET',
-      params
+      params,
+      permission: 'data:datasource:view'
     })
   },
 
@@ -34,7 +35,8 @@ export const datasourceApi = {
   getDataSourceDetail(id: number): Promise<ApiResponse<DataSource>> {
     return request({
       url: `/datasources/${id}`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:datasource:view'
     })
   },
 
@@ -46,7 +48,8 @@ export const datasourceApi = {
     return request({
       url: '/datasources/',
       method: 'POST',
-      data
+      data,
+      permission: 'data:datasource:create'
     })
   },
 
@@ -59,7 +62,8 @@ export const datasourceApi = {
     return request({
       url: `/datasources/${id}`,
       method: 'PUT',
-      data
+      data,
+      permission: 'data:datasource:update'
     })
   },
 
@@ -70,7 +74,8 @@ export const datasourceApi = {
   deleteDataSource(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/datasources/${id}`,
-      method: 'DELETE'
+      method: 'DELETE',
+      permission: 'data:datasource:delete'
     })
   },
 
@@ -82,7 +87,8 @@ export const datasourceApi = {
     return request({
       url: '/datasources/test-connection/',
       method: 'POST',
-      data
+      data,
+      permission: 'data:datasource:test'
     })
   },
 
@@ -93,7 +99,8 @@ export const datasourceApi = {
   testDataSourceConnection(id: number): Promise<ApiResponse<DataSourceConnectionStatus>> {
     return request({
       url: `/datasources/${id}/test-connection`,
-      method: 'POST'
+      method: 'POST',
+      permission: 'data:datasource:test'
     })
   },
 
@@ -103,7 +110,8 @@ export const datasourceApi = {
   getDataSourceStats(): Promise<ApiResponse<DataSourceStats>> {
     return request({
       url: '/datasources/stats/',
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:datasource:stats:view'
     })
   },
 
@@ -113,7 +121,8 @@ export const datasourceApi = {
   getDataSourceTypes(): Promise<ApiResponse<string[]>> {
     return request({
       url: '/datasources/types/',
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:datasource:type:view'
     })
   },
 
@@ -125,7 +134,8 @@ export const datasourceApi = {
     return request({
       url: '/datasources/batch-delete/',
       method: 'POST',
-      data: { ids }
+      data: { ids },
+      permission: 'data:datasource:delete'
     })
   },
 
@@ -138,7 +148,8 @@ export const datasourceApi = {
     return request({
       url: `/datasources/${id}/toggle`,
       method: 'PATCH',
-      data: { enabled }
+      data: { enabled },
+      permission: 'data:datasource:update'
     })
   },
 
@@ -149,7 +160,8 @@ export const datasourceApi = {
   syncMetadata(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/datasources/${id}/sync-metadata`,
-      method: 'POST'
+      method: 'POST',
+      permission: 'data:datasource:sync'
     })
   },
 
@@ -160,7 +172,8 @@ export const datasourceApi = {
   getHealthStatus(id: number): Promise<ApiResponse<DataSourceConnectionStatus>> {
     return request({
       url: `/datasources/${id}/health`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:datasource:health:view'
     })
   },
 
@@ -171,7 +184,8 @@ export const datasourceApi = {
   getDataSourceTables(id: number): Promise<ApiResponse<Array<{name: string, type: string, schema?: string}>>> {
     return request({
       url: `/datasources/${id}/tables/`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:datasource:tables:view'
     })
   },
 
@@ -182,7 +196,8 @@ export const datasourceApi = {
   getDataSourceSchemas(id: number): Promise<ApiResponse<Array<{name: string}>>> {
     return request({
       url: `/datasources/${id}/schemas/`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:datasource:schemas:view'
     })
   },
 
@@ -194,7 +209,8 @@ export const datasourceApi = {
   getDataSourceTablesWithSchema(id: number, schema: string): Promise<ApiResponse<Array<{name: string, type: string}>>> {
     return request({
       url: `/datasources/${id}/schemas/${schema}/tables/`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:datasource:tables:view'
     })
   },
 
@@ -207,7 +223,8 @@ export const datasourceApi = {
   getDataSourceTableFields(id: number, schema: string, table: string): Promise<ApiResponse<Array<{name: string, type: string, nullable?: boolean, comment?: string}>>> {
     return request({
       url: `/datasources/${id}/schemas/${schema}/tables/${table}/fields/`,
-      method: 'GET'
+      method: 'GET',
+      permission: 'data:datasource:fields:view'
     })
   }
 }

@@ -26,21 +26,21 @@ export const listResourceTypes = (
   params: ListParams = {}
 ): Promise<ApiResponse<ResourceTypeListResponse>> => {
   const { page = 1, page_size = 10, name } = params
-  return get<ResourceTypeListResponse>(`${BASE}/list`, { page, page_size, name })
+  return get<ResourceTypeListResponse>(`${BASE}/list`, { page, page_size, name }, { permission: 'data:resource_type:view' })
 }
 
 export const getResourceType = (id: string): Promise<ApiResponse<ResourceTypeItem>> => {
-  return get<ResourceTypeItem>(`${BASE}/${id}`)
+  return get<ResourceTypeItem>(`${BASE}/${id}`, undefined, { permission: 'data:resource_type:view' })
 }
 
 export const createResourceType = (data: CreatePayload): Promise<ApiResponse<ResourceTypeItem>> => {
-  return post<ResourceTypeItem>(`${BASE}/create`, data)
+  return post<ResourceTypeItem>(`${BASE}/create`, data, { permission: 'data:resource_type:create' })
 }
 
 export const updateResourceType = (id: string, data: UpdatePayload): Promise<ApiResponse<ResourceTypeItem>> => {
-  return put<ResourceTypeItem>(`${BASE}/${id}`, data)
+  return put<ResourceTypeItem>(`${BASE}/${id}`, data, { permission: 'data:resource_type:edit' })
 }
 
 export const deleteResourceType = (id: string): Promise<ApiResponse<void>> => {
-  return del<void>(`${BASE}/${id}`)
+  return del<void>(`${BASE}/${id}`, { permission: 'data:resource_type:delete' })
 }

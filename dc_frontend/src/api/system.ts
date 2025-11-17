@@ -19,7 +19,8 @@ import type { ApiResponse, PaginatedResponse } from '@/types/common'
 export const getSystemInfo = (): Promise<ApiResponse<SystemInfo>> => {
   return request({
     url: '/api/system/info',
-    method: 'get'
+    method: 'get',
+    permission: 'system:info:view'
   })
 }
 
@@ -29,7 +30,8 @@ export const getSystemInfo = (): Promise<ApiResponse<SystemInfo>> => {
 export const getSystemStatus = (): Promise<ApiResponse<SystemStatus>> => {
   return request({
     url: '/api/system/status',
-    method: 'get'
+    method: 'get',
+    permission: 'system:status:view'
   })
 }
 
@@ -39,7 +41,8 @@ export const getSystemStatus = (): Promise<ApiResponse<SystemStatus>> => {
 export const getSystemSettings = (): Promise<ApiResponse<SystemSettings>> => {
   return request({
     url: '/api/system/settings',
-    method: 'get'
+    method: 'get',
+    permission: 'system:settings:view'
   })
 }
 
@@ -50,7 +53,8 @@ export const updateSystemSettings = (data: Partial<SystemSettings>): Promise<Api
   return request({
     url: '/api/system/settings',
     method: 'put',
-    data
+    data,
+    permission: 'system:settings:update'
   })
 }
 
@@ -60,7 +64,8 @@ export const updateSystemSettings = (data: Partial<SystemSettings>): Promise<Api
 export const resetSystemSettings = (): Promise<ApiResponse<void>> => {
   return request({
     url: '/api/system/settings/reset',
-    method: 'post'
+    method: 'post',
+    permission: 'system:settings:reset'
   })
 }
 
@@ -71,7 +76,8 @@ export const testEmailConnection = (data: EmailTestRequest): Promise<ApiResponse
   return request({
     url: '/api/system/email/test',
     method: 'post',
-    data
+    data,
+    permission: 'system:email:test'
   })
 }
 
@@ -82,7 +88,8 @@ export const sendTestEmail = (data: { to: string; subject?: string; content?: st
   return request({
     url: '/api/system/email/send-test',
     method: 'post',
-    data
+    data,
+    permission: 'system:email:send'
   })
 }
 
@@ -98,7 +105,8 @@ export const getBackupList = (params?: {
   return request({
     url: '/api/system/backups',
     method: 'get',
-    params
+    params,
+    permission: 'system:backup:view'
   })
 }
 
@@ -109,7 +117,8 @@ export const createSystemBackup = (data?: BackupCreateRequest): Promise<ApiRespo
   return request({
     url: '/api/system/backups',
     method: 'post',
-    data
+    data,
+    permission: 'system:backup:create'
   })
 }
 
@@ -119,18 +128,20 @@ export const createSystemBackup = (data?: BackupCreateRequest): Promise<ApiRespo
 export const restoreSystemBackup = (backupId: string): Promise<ApiResponse<void>> => {
   return request({
     url: `/api/system/backups/${backupId}/restore`,
-    method: 'post'
+    method: 'post',
+    permission: 'system:backup:restore'
   })
 }
 
 /**
  * 下载备份文件
  */
-export const downloadBackup = (backupId: string): Promise<Blob> => {
+export const downloadBackup = (backupId: string): Promise<ApiResponse<Blob>> => {
   return request({
     url: `/api/system/backups/${backupId}/download`,
     method: 'get',
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'system:backup:download'
   })
 }
 
@@ -140,7 +151,8 @@ export const downloadBackup = (backupId: string): Promise<Blob> => {
 export const deleteBackup = (backupId: string): Promise<ApiResponse<void>> => {
   return request({
     url: `/api/system/backups/${backupId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'system:backup:delete'
   })
 }
 
@@ -151,7 +163,8 @@ export const getSystemLogs = (params: LogQueryParams): Promise<PaginatedResponse
   return request({
     url: '/api/system/logs',
     method: 'get',
-    params
+    params,
+    permission: 'system:logs:view'
   })
 }
 
@@ -166,19 +179,21 @@ export const clearSystemLogs = (data: {
   return request({
     url: '/api/system/logs/clear',
     method: 'post',
-    data
+    data,
+    permission: 'system:logs:clear'
   })
 }
 
 /**
  * 导出系统日志
  */
-export const exportSystemLogs = (params: LogQueryParams): Promise<Blob> => {
+export const exportSystemLogs = (params: LogQueryParams): Promise<ApiResponse<Blob>> => {
   return request({
     url: '/api/system/logs/export',
     method: 'get',
     params,
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'system:logs:export'
   })
 }
 
@@ -193,7 +208,8 @@ export const getPerformanceMetrics = (params?: {
   return request({
     url: '/api/system/performance',
     method: 'get',
-    params
+    params,
+    permission: 'system:performance:view'
   })
 }
 
@@ -212,7 +228,8 @@ export const getSystemHealthCheck = (): Promise<ApiResponse<{
 }>> => {
   return request({
     url: '/api/system/health',
-    method: 'get'
+    method: 'get',
+    permission: 'system:health:view'
   })
 }
 
@@ -222,7 +239,8 @@ export const getSystemHealthCheck = (): Promise<ApiResponse<{
 export const restartSystemService = (serviceName: string): Promise<ApiResponse<void>> => {
   return request({
     url: `/api/system/services/${serviceName}/restart`,
-    method: 'post'
+    method: 'post',
+    permission: 'system:services:restart'
   })
 }
 
@@ -239,7 +257,8 @@ export const getSystemServices = (): Promise<ApiResponse<Array<{
 }>>> => {
   return request({
     url: '/api/system/services',
-    method: 'get'
+    method: 'get',
+    permission: 'system:services:view'
   })
 }
 
@@ -250,7 +269,8 @@ export const updateSystem = (data: SystemUpdateRequest): Promise<ApiResponse<{ u
   return request({
     url: '/api/system/update',
     method: 'post',
-    data
+    data,
+    permission: 'system:update:run'
   })
 }
 
@@ -266,7 +286,8 @@ export const getUpdateStatus = (updateId: string): Promise<ApiResponse<{
 }>> => {
   return request({
     url: `/api/system/update/${updateId}/status`,
-    method: 'get'
+    method: 'get',
+    permission: 'system:update:view'
   })
 }
 
@@ -283,7 +304,8 @@ export const checkSystemUpdate = (): Promise<ApiResponse<{
 }>> => {
   return request({
     url: '/api/system/update/check',
-    method: 'get'
+    method: 'get',
+    permission: 'system:update:view'
   })
 }
 
@@ -293,7 +315,8 @@ export const checkSystemUpdate = (): Promise<ApiResponse<{
 export const getSystemConfigTemplate = (): Promise<ApiResponse<Record<string, any>>> => {
   return request({
     url: '/api/system/config/template',
-    method: 'get'
+    method: 'get',
+    permission: 'system:config:view'
   })
 }
 
@@ -307,18 +330,20 @@ export const importSystemConfig = (data: FormData): Promise<ApiResponse<{ import
     data,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    permission: 'system:config:import'
   })
 }
 
 /**
  * 导出系统配置
  */
-export const exportSystemConfig = (): Promise<Blob> => {
+export const exportSystemConfig = (): Promise<ApiResponse<Blob>> => {
   return request({
     url: '/api/system/config/export',
     method: 'get',
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'system:config:export'
   })
 }
 
@@ -337,7 +362,8 @@ export const getSystemLicense = (): Promise<ApiResponse<{
 }>> => {
   return request({
     url: '/api/system/license',
-    method: 'get'
+    method: 'get',
+    permission: 'system:license:view'
   })
 }
 
@@ -348,7 +374,8 @@ export const updateSystemLicense = (data: { license_key: string }): Promise<ApiR
   return request({
     url: '/api/system/license',
     method: 'put',
-    data
+    data,
+    permission: 'system:license:update'
   })
 }
 
@@ -367,7 +394,8 @@ export const getSystemStatistics = (): Promise<ApiResponse<{
 }>> => {
   return request({
     url: '/api/system/statistics',
-    method: 'get'
+    method: 'get',
+    permission: 'system:statistics:view'
   })
 }
 
@@ -378,7 +406,8 @@ export const clearSystemCache = (cacheType?: string): Promise<ApiResponse<{ clea
   return request({
     url: '/api/system/cache/clear',
     method: 'post',
-    data: { cache_type: cacheType }
+    data: { cache_type: cacheType },
+    permission: 'system:cache:clear'
   })
 }
 
@@ -398,6 +427,7 @@ export const getCacheStatistics = (): Promise<ApiResponse<{
 }>> => {
   return request({
     url: '/api/system/cache/statistics',
-    method: 'get'
+    method: 'get',
+    permission: 'system:cache:view'
   })
 }

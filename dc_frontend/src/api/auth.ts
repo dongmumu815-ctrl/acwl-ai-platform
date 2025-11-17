@@ -26,7 +26,8 @@ export const authApi = {
     return request({
       url: '/auth/login/json',
       method: 'POST',
-      data
+      data,
+      permission: 'auth:login'
     })
   },
 
@@ -36,7 +37,8 @@ export const authApi = {
   logout(): Promise<ApiResponse<void>> {
     return request({
       url: '/auth/logout',
-      method: 'POST'
+      method: 'POST',
+      permission: 'auth:logout'
     })
   },
 
@@ -48,7 +50,8 @@ export const authApi = {
     return request({
       url: '/auth/register',
       method: 'POST',
-      data
+      data,
+      permission: 'auth:register'
     })
   },
 
@@ -60,7 +63,8 @@ export const authApi = {
     return request({
       url: '/auth/forgot-password',
       method: 'POST',
-      data
+      data,
+      permission: 'auth:password:forgot'
     })
   },
 
@@ -72,7 +76,8 @@ export const authApi = {
     return request({
       url: '/auth/reset-password',
       method: 'POST',
-      data
+      data,
+      permission: 'auth:password:reset'
     })
   },
 
@@ -84,7 +89,8 @@ export const authApi = {
     return request({
       url: '/auth/change-password',
       method: 'POST',
-      data
+      data,
+      permission: 'auth:password:change'
     })
   },
 
@@ -98,7 +104,8 @@ export const authApi = {
   }>> {
     return request({
       url: '/auth/me',
-      method: 'GET'
+      method: 'GET',
+      permission: 'auth:me:view'
     })
   },
 
@@ -110,7 +117,8 @@ export const authApi = {
     return request({
       url: '/auth/profile',
       method: 'PUT',
-      data
+      data,
+      permission: 'auth:profile:edit'
     })
   },
 
@@ -128,7 +136,8 @@ export const authApi = {
       data: formData,
       headers: {
         'Content-Type': 'multipart/form-data'
-      }
+      },
+      permission: 'auth:profile:avatar'
     })
   },
 
@@ -141,7 +150,8 @@ export const authApi = {
   }>> {
     return request({
       url: '/auth/permissions',
-      method: 'GET'
+      method: 'GET',
+      permission: 'auth:permissions:view'
     })
   },
 
@@ -154,7 +164,8 @@ export const authApi = {
   getMyPermissions(): Promise<ApiResponse<MyPermissionsResponse>> {
     return request({
       url: '/permissions/me',
-      method: 'GET'
+      method: 'GET',
+      permission: 'auth:permissions:view'
     })
   },
 
@@ -164,7 +175,8 @@ export const authApi = {
   refreshToken(): Promise<ApiResponse<{ token: string; expires_in: number }>> {
     return request({
       url: '/auth/refresh',
-      method: 'POST'
+      method: 'POST',
+      permission: 'auth:token:refresh'
     })
   },
 
@@ -174,7 +186,8 @@ export const authApi = {
   verifyToken(): Promise<ApiResponse<{ valid: boolean }>> {
     return request({
       url: '/auth/verify',
-      method: 'GET'
+      method: 'GET',
+      permission: 'auth:token:verify'
     })
   },
 
@@ -184,7 +197,8 @@ export const authApi = {
   getUserSessions(): Promise<ApiResponse<any[]>> {
     return request({
       url: '/auth/sessions',
-      method: 'GET'
+      method: 'GET',
+      permission: 'auth:sessions:view'
     })
   },
 
@@ -195,7 +209,8 @@ export const authApi = {
   terminateSession(sessionId: string): Promise<ApiResponse<void>> {
     return request({
       url: `/auth/sessions/${sessionId}`,
-      method: 'DELETE'
+      method: 'DELETE',
+      permission: 'auth:sessions:terminate'
     })
   },
 
@@ -205,7 +220,8 @@ export const authApi = {
   terminateOtherSessions(): Promise<ApiResponse<void>> {
     return request({
       url: '/auth/sessions/others',
-      method: 'DELETE'
+      method: 'DELETE',
+      permission: 'auth:sessions:terminate_others'
     })
   },
 
@@ -223,7 +239,8 @@ export const authApi = {
     return request({
       url: '/auth/activities',
       method: 'GET',
-      params
+      params,
+      permission: 'auth:activities:view'
     })
   },
 
@@ -233,7 +250,8 @@ export const authApi = {
   getUserPreferences(): Promise<ApiResponse<any>> {
     return request({
       url: '/auth/preferences',
-      method: 'GET'
+      method: 'GET',
+      permission: 'auth:preferences:view'
     })
   },
 
@@ -245,7 +263,8 @@ export const authApi = {
     return request({
       url: '/auth/preferences',
       method: 'PUT',
-      data
+      data,
+      permission: 'auth:preferences:edit'
     })
   },
 
@@ -255,7 +274,8 @@ export const authApi = {
   getUserStats(): Promise<ApiResponse<any>> {
     return request({
       url: '/auth/stats',
-      method: 'GET'
+      method: 'GET',
+      permission: 'auth:stats:view'
     })
   },
 
@@ -265,7 +285,8 @@ export const authApi = {
   enableTwoFactor(): Promise<ApiResponse<{ qr_code: string; secret: string }>> {
     return request({
       url: '/auth/2fa/enable',
-      method: 'POST'
+      method: 'POST',
+      permission: 'auth:2fa:enable'
     })
   },
 
@@ -277,7 +298,8 @@ export const authApi = {
     return request({
       url: '/auth/2fa/confirm',
       method: 'POST',
-      data: { code }
+      data: { code },
+      permission: 'auth:2fa:confirm'
     })
   },
 
@@ -289,7 +311,8 @@ export const authApi = {
     return request({
       url: '/auth/2fa/disable',
       method: 'POST',
-      data: { code }
+      data: { code },
+      permission: 'auth:2fa:disable'
     })
   },
 
@@ -301,7 +324,8 @@ export const authApi = {
     return request({
       url: '/auth/2fa/verify',
       method: 'POST',
-      data: { code }
+      data: { code },
+      permission: 'auth:2fa:verify'
     })
   },
 
@@ -311,7 +335,8 @@ export const authApi = {
   generateBackupCodes(): Promise<ApiResponse<{ backup_codes: string[] }>> {
     return request({
       url: '/auth/2fa/backup-codes',
-      method: 'POST'
+      method: 'POST',
+      permission: 'auth:2fa:backup_codes'
     })
   }
 }

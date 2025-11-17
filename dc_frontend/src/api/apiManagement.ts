@@ -37,7 +37,8 @@ export const getCustomers = (params?: PaginationParams): Promise<ApiResponse<Pag
   return request({
     url: '/customers',
     method: 'get',
-    params
+    params,
+    permission: 'data:customer:view'
   })
 }
 
@@ -47,7 +48,8 @@ export const getCustomers = (params?: PaginationParams): Promise<ApiResponse<Pag
 export const getCustomer = (id: number): Promise<ApiResponse<Customer>> => {
   return request({
     url: `/customers/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:customer:view'
   })
 }
 
@@ -69,7 +71,8 @@ export const createCustomer = (data: CustomerCreate): Promise<ApiResponse<Custom
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    permission: 'data:customer:create'
   })
 }
 
@@ -92,7 +95,8 @@ export const updateCustomer = (id: number, data: CustomerUpdate): Promise<ApiRes
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    permission: 'data:customer:edit'
   })
 }
 
@@ -102,7 +106,8 @@ export const updateCustomer = (id: number, data: CustomerUpdate): Promise<ApiRes
 export const deleteCustomer = (id: number): Promise<ApiResponse<void>> => {
   return request({
     url: `/customers/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:customer:delete'
   })
 }
 
@@ -112,7 +117,8 @@ export const deleteCustomer = (id: number): Promise<ApiResponse<void>> => {
 export const resetCustomerSecret = (id: number): Promise<ApiResponse<{ app_secret: string }>> => {
   return request({
     url: `/customers/${id}/reset-secret`,
-    method: 'post'
+    method: 'post',
+    permission: 'data:customer:reset_secret'
   })
 }
 
@@ -127,7 +133,8 @@ export const resetCustomerPassword = (
   return request({
     url: `/customers/${id}/reset-password`,
     method: 'post',
-    data: password ? { password } : undefined
+    data: password ? { password } : undefined,
+    permission: 'data:customer:reset_password'
   })
 }
 
@@ -140,7 +147,8 @@ export const getApis = (params?: PaginationParams): Promise<ApiResponse<Paginate
   return request({
     url: '/apis',
     method: 'get',
-    params
+    params,
+    permission: 'data:api:view'
   })
 }
 
@@ -150,7 +158,8 @@ export const getApis = (params?: PaginationParams): Promise<ApiResponse<Paginate
 export const getApi = (id: number): Promise<ApiResponse<CustomApi>> => {
   return request({
     url: `/apis/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:api:view'
   })
 }
 
@@ -161,7 +170,8 @@ export const createApi = (data: CustomApiCreate): Promise<ApiResponse<CustomApi>
   return request({
     url: '/apis',
     method: 'post',
-    data
+    data,
+    permission: 'data:api:create'
   })
 }
 
@@ -172,7 +182,8 @@ export const updateApi = (id: number, data: CustomApiUpdate): Promise<ApiRespons
   return request({
     url: `/apis/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'data:api:edit'
   })
 }
 
@@ -182,7 +193,8 @@ export const updateApi = (id: number, data: CustomApiUpdate): Promise<ApiRespons
 export const deleteApi = (id: number): Promise<ApiResponse<void>> => {
   return request({
     url: `/apis/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:api:delete'
   })
 }
 
@@ -193,7 +205,8 @@ export const copyApi = (id: number, data: { target_customer_id: number; new_api_
   return request({
     url: `/apis/${id}/copy`,
     method: 'post',
-    data
+    data,
+    permission: 'data:api:copy'
   })
 }
 
@@ -205,7 +218,8 @@ export const copyApi = (id: number, data: { target_customer_id: number; new_api_
 export const getApiFields = (apiId: number): Promise<ApiResponse<ApiField[]>> => {
   return request({
     url: `/apis/${apiId}/fields`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:api_field:view'
   })
 }
 
@@ -216,7 +230,8 @@ export const createApiField = (apiId: number, data: ApiFieldCreate): Promise<Api
   return request({
     url: `/apis/${apiId}/fields`,
     method: 'post',
-    data
+    data,
+    permission: 'data:api_field:create'
   })
 }
 
@@ -227,7 +242,8 @@ export const updateApiField = (apiId: number, fieldId: number, data: ApiFieldUpd
   return request({
     url: `/apis/${apiId}/fields/${fieldId}`,
     method: 'put',
-    data
+    data,
+    permission: 'data:api_field:edit'
   })
 }
 
@@ -237,7 +253,8 @@ export const updateApiField = (apiId: number, fieldId: number, data: ApiFieldUpd
 export const deleteApiField = (apiId: number, fieldId: number): Promise<ApiResponse<void>> => {
   return request({
     url: `/apis/${apiId}/fields/${fieldId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:api_field:delete'
   })
 }
 
@@ -248,7 +265,8 @@ export const updateFieldsOrder = (apiId: number, fields: Array<{ id: number; fie
   return request({
     url: `/apis/${apiId}/fields/order`,
     method: 'put',
-    data: { fields }
+    data: { fields },
+    permission: 'data:api_field:edit'
   })
 }
 
@@ -261,7 +279,8 @@ export const getBatches = (params?: PaginationParams): Promise<ApiResponse<Pagin
   return request({
     url: '/batches',
     method: 'get',
-    params
+    params,
+    permission: 'data:batch:view'
   })
 }
 
@@ -271,7 +290,8 @@ export const getBatches = (params?: PaginationParams): Promise<ApiResponse<Pagin
 export const getBatch = (id: number): Promise<ApiResponse<DataBatch>> => {
   return request({
     url: `/batches/${id}`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:batch:view'
   })
 }
 
@@ -291,7 +311,8 @@ export const createBatch = (data: DataBatchCreate): Promise<ApiResponse<DataBatc
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    permission: 'data:batch:create'
   })
 }
 
@@ -302,7 +323,8 @@ export const updateBatch = (id: number, data: DataBatchUpdate): Promise<ApiRespo
   return request({
     url: `/batches/${id}`,
     method: 'put',
-    data
+    data,
+    permission: 'data:batch:edit'
   })
 }
 
@@ -312,7 +334,8 @@ export const updateBatch = (id: number, data: DataBatchUpdate): Promise<ApiRespo
 export const deleteBatch = (id: number): Promise<ApiResponse<void>> => {
   return request({
     url: `/batches/${id}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:batch:delete'
   })
 }
 
@@ -322,7 +345,8 @@ export const deleteBatch = (id: number): Promise<ApiResponse<void>> => {
 export const startBatchProcessing = (id: number): Promise<ApiResponse<void>> => {
   return request({
     url: `/batches/${id}/start`,
-    method: 'post'
+    method: 'post',
+    permission: 'data:batch:start'
   })
 }
 
@@ -332,7 +356,8 @@ export const startBatchProcessing = (id: number): Promise<ApiResponse<void>> => 
 export const stopBatchProcessing = (id: number): Promise<ApiResponse<void>> => {
   return request({
     url: `/batches/${id}/stop`,
-    method: 'post'
+    method: 'post',
+    permission: 'data:batch:stop'
   })
 }
 
@@ -343,7 +368,8 @@ export const downloadBatchResult = (id: number): Promise<Blob> => {
   return request({
     url: `/batches/${id}/download`,
     method: 'get',
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'data:batch:download'
   })
 }
 
@@ -359,7 +385,8 @@ export const getApiUsageLogs = (params?: PaginationParams & {
   return request({
     url: '/logs/api-usage',
     method: 'get',
-    params
+    params,
+    permission: 'logs:api_usage:view'
   })
 }
 
@@ -373,7 +400,8 @@ export const getDataUploads = (params?: PaginationParams & {
   return request({
     url: '/logs/data-uploads',
     method: 'get',
-    params
+    params,
+    permission: 'logs:data_uploads:view'
   })
 }
 
@@ -383,7 +411,8 @@ export const getDataUploads = (params?: PaginationParams & {
 export const getSystemStats = (): Promise<ApiResponse<SystemStats>> => {
   return request({
     url: '/stats/system',
-    method: 'get'
+    method: 'get',
+    permission: 'system:stats:view'
   })
 }
 
@@ -394,7 +423,8 @@ export const getTypeCountTrend = (params?: { days?: number; start_date?: string;
   return request({
     url: '/stats/type-count-trend',
     method: 'get',
-    params
+    params,
+    permission: 'system:stats:view'
   })
 }
 
@@ -404,7 +434,8 @@ export const getTypeCountTrend = (params?: { days?: number; start_date?: string;
 export const getBatchStatusStats = (): Promise<ApiResponse<BatchStatusStats>> => {
   return request({
     url: '/stats/batch-status',
-    method: 'get'
+    method: 'get',
+    permission: 'system:stats:view'
   })
 }
 
@@ -420,7 +451,8 @@ export const getApiCallStats = (params?: {
   return request({
     url: '/stats/api-calls',
     method: 'get',
-    params
+    params,
+    permission: 'system:stats:view'
   })
 }
 
@@ -435,7 +467,8 @@ export const getCustomerActivityStats = (params?: {
   return request({
     url: '/stats/customer-activity',
     method: 'get',
-    params
+    params,
+    permission: 'system:stats:view'
   })
 }
 
@@ -447,7 +480,8 @@ export const getCustomerActivityStats = (params?: {
 export const getSystemConfig = (): Promise<ApiResponse<Record<string, any>>> => {
   return request({
     url: '/config',
-    method: 'get'
+    method: 'get',
+    permission: 'system:config:view'
   })
 }
 
@@ -458,7 +492,8 @@ export const updateSystemConfig = (data: Record<string, any>): Promise<ApiRespon
   return request({
     url: '/config',
     method: 'put',
-    data
+    data,
+    permission: 'system:config:update'
   })
 }
 
@@ -475,7 +510,8 @@ export const testApiConnection = (apiId: number, testData?: Record<string, any>)
   return request({
     url: `/apis/${apiId}/test`,
     method: 'post',
-    data: testData || {}
+    data: testData || {},
+    permission: 'data:api:test'
   })
 }
 
@@ -490,6 +526,7 @@ export const getResourceTypes = (): Promise<ApiResponse<{
 }>> => {
   return request({
     url: '/resource-types',
-    method: 'get'
+    method: 'get',
+    permission: 'data:resource_type:view'
   })
 }

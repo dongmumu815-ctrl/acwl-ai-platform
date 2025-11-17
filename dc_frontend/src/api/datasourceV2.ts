@@ -103,7 +103,7 @@ export interface DatasourceStats {
 export const datasourceApi = {
   /** 获取数据源列表 */
   getDatasources(params?: DatasourceQueryParams) {
-    return get<PaginatedResponse<Datasource>>('/datasources/', params).then(res => {
+    return get<PaginatedResponse<Datasource>>('/datasources/', params, { permission: 'data:datasource:view' }).then(res => {
       // 保留 ApiResponse 结构，确保视图能读取 response.data.items
       const total = res?.data?.total ?? 0
       return { ...res, total }
@@ -112,26 +112,26 @@ export const datasourceApi = {
 
   /** 获取数据源详情 */
   getDatasource(datasourceId: number) {
-    return get<Datasource>(`/datasources/${datasourceId}`)
+    return get<Datasource>(`/datasources/${datasourceId}`, undefined, { permission: 'data:datasource:view' })
   },
 
   /** 创建数据源（字段转换以匹配后端） */
   createDatasource(data: DatasourceForm) {
     const { database, ...rest } = data
     const backendData = { ...rest, database_name: database }
-    return post<Datasource>('/datasources/', backendData)
+    return post<Datasource>('/datasources/', backendData, { permission: 'data:datasource:create' })
   },
 
   /** 更新数据源（字段转换以匹配后端） */
   updateDatasource(datasourceId: number, data: Partial<DatasourceForm>) {
     const { database, ...rest } = data
     const backendData = database !== undefined ? { ...rest, database_name: database } : rest
-    return put<{ message: string }>(`/datasources/${datasourceId}`, backendData)
+    return put<{ message: string }>(`/datasources/${datasourceId}`, backendData, { permission: 'data:datasource:update' })
   },
 
   /** 删除数据源 */
   deleteDatasource(datasourceId: number) {
-    return del<{ message: string }>(`/datasources/${datasourceId}`)
+    return del<{ message: string }>(`/datasources/${datasourceId}`, { permission: 'data:datasource:delete' })
   },
 
   /** 临时测试数据源连接（不保存） */
@@ -140,7 +140,8 @@ export const datasourceApi = {
     const backendData = { ...rest, database_name: database }
     return post<{ success: boolean; message: string; response_time?: number; test_time?: string; connection_info?: any; error_details?: string }>(
       '/datasources/test-temp',
-      { datasource_data: backendData, ...params }
+      { datasource_data: backendData, ...params },
+      { permission: 'data:datasource:test' }
     ).then(res => res.data)
   },
 
@@ -148,44 +149,45 @@ export const datasourceApi = {
   testDatasourceConnection(datasourceId: number, params?: TestConnectionParams) {
     return post<{ success: boolean; message: string; response_time?: number; test_time?: string; connection_info?: any; error_details?: string }>(
       `/datasources/${datasourceId}/test`,
-      params
+      params,
+      { permission: 'data:datasource:test' }
     ).then(res => res.data)
   },
 
   /** 启用数据源 */
   enableDatasource(datasourceId: number) {
-    return post<{ message: string }>(`/datasources/${datasourceId}/enable`)
+    return post<{ message: string }>(`/datasources/${datasourceId}/enable`, undefined, { permission: 'data:datasource:update' })
   },
 
   /** 停用数据源 */
   disableDatasource(datasourceId: number) {
-    return post<{ message: string }>(`/datasources/${datasourceId}/disable`)
+    return post<{ message: string }>(`/datasources/${datasourceId}/disable`, undefined, { permission: 'data:datasource:update' })
   },
 
   /** 获取数据源统计信息 */
   getDatasourceStats() {
-    return get<DatasourceStats>('/datasources/stats/overview').then(res => res.data?.data ?? res.data)
+    return get<DatasourceStats>('/datasources/stats/overview', undefined, { permission: 'data:datasource:stats:view' }).then(res => res.data?.data ?? res.data)
   },
 
   /** 获取数据源测试日志 */
   getDatasourceTestLogs(datasourceId: number, params?: { page?: number; size?: number }) {
-    return get<PaginatedResponse<any>>(`/datasources/${datasourceId}/test-logs`, params)
+    return get<PaginatedResponse<any>>(`/datasources/${datasourceId}/test-logs`, params, { permission: 'data:datasource:logs:view' })
   },
 
   /** 获取数据源配置模板 */
   getDatasourceTemplates(datasourceType?: DatasourceType) {
     const params = datasourceType ? { datasource_type: datasourceType } : {}
-    return get<Record<string, any>>('/datasources/templates/', params).then(res => res.data?.data ?? res.data)
+    return get<Record<string, any>>('/datasources/templates/', params, { permission: 'data:datasource:templates:view' }).then(res => res.data?.data ?? res.data)
   },
 
   /** 获取数据源连接信息 */
   getDatasourceConnectionInfo(datasourceId: number) {
-    return get<Record<string, any>>(`/datasources/${datasourceId}/connection-info`).then(res => res.data?.data ?? res.data)
+    return get<Record<string, any>>(`/datasources/${datasourceId}/connection-info`, undefined, { permission: 'data:datasource:connection:view' }).then(res => res.data?.data ?? res.data)
   },
 
   /** 执行数据源查询 */
   executeDatasourceQuery(datasourceId: number, data: DatasourceQuery) {
-    return post<{ columns: string[]; rows: any[][]; total: number }>(`/datasources/${datasourceId}/query`, data).then(res => res.data?.data ?? res.data)
+    return post<{ columns: string[]; rows: any[][]; total: number }>(`/datasources/${datasourceId}/query`, data, { permission: 'data:datasource:query' }).then(res => res.data?.data ?? res.data)
   }
 }
 

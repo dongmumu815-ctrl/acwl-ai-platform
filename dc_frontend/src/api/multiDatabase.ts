@@ -30,7 +30,8 @@ import type {
 export const getAllDatabases = (): Promise<ApiResponse<Record<string, DatabaseResponse>>> => {
   return request({
     url: '/api/v1/multi-db/databases',
-    method: 'get'
+    method: 'get',
+    permission: 'data:multi_db:config:view'
   })
 }
 
@@ -41,7 +42,8 @@ export const createDatabaseConfig = (data: DatabaseConfigCreate): Promise<ApiRes
   return request({
     url: '/api/v1/multi-db/databases',
     method: 'post',
-    data
+    data,
+    permission: 'data:multi_db:config:create'
   })
 }
 
@@ -55,7 +57,8 @@ export const updateDatabaseConfig = (
   return request({
     url: `/api/v1/multi-db/databases/${dbName}`,
     method: 'put',
-    data
+    data,
+    permission: 'data:multi_db:config:update'
   })
 }
 
@@ -65,7 +68,8 @@ export const updateDatabaseConfig = (
 export const deleteDatabaseConfig = (dbName: string): Promise<ApiResponse<{ message: string }>> => {
   return request({
     url: `/api/v1/multi-db/databases/${dbName}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:multi_db:config:delete'
   })
 }
 
@@ -77,7 +81,8 @@ export const deleteDatabaseConfig = (dbName: string): Promise<ApiResponse<{ mess
 export const testDatabaseConnection = (dbName: string): Promise<ApiResponse<ConnectionTestResult>> => {
   return request({
     url: `/api/v1/multi-db/databases/${dbName}/test`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:multi_db:test'
   })
 }
 
@@ -87,7 +92,8 @@ export const testDatabaseConnection = (dbName: string): Promise<ApiResponse<Conn
 export const testAllDatabaseConnections = (): Promise<ApiResponse<Record<string, boolean>>> => {
   return request({
     url: '/api/v1/multi-db/databases/test-all',
-    method: 'get'
+    method: 'get',
+    permission: 'data:multi_db:test'
   })
 }
 
@@ -100,7 +106,8 @@ export const executeSQLQuery = (data: SQLQueryRequest): Promise<ApiResponse<Quer
   return request({
     url: '/api/v1/multi-db/query',
     method: 'post',
-    data
+    data,
+    permission: 'data:multi_db:query'
   })
 }
 
@@ -111,7 +118,8 @@ export const executeBatchSQLQueries = (data: BatchSQLQueryRequest): Promise<ApiR
   return request({
     url: '/api/v1/multi-db/query/batch',
     method: 'post',
-    data
+    data,
+    permission: 'data:multi_db:query'
   })
 }
 
@@ -130,7 +138,8 @@ export const executeSimpleQuery = (
   return request({
     url: '/api/v1/multi-db/query/simple',
     method: 'get',
-    params
+    params,
+    permission: 'data:multi_db:query'
   })
 }
 
@@ -142,7 +151,8 @@ export const executeSimpleQuery = (
 export const getRoutingInfo = (): Promise<ApiResponse<RoutingInfo>> => {
   return request({
     url: '/api/v1/multi-db/routing/info',
-    method: 'get'
+    method: 'get',
+    permission: 'data:multi_db:routing:view'
   })
 }
 
@@ -152,7 +162,8 @@ export const getRoutingInfo = (): Promise<ApiResponse<RoutingInfo>> => {
 export const getDatabasesByTag = (tag: string): Promise<ApiResponse<DatabaseResponse[]>> => {
   return request({
     url: `/api/v1/multi-db/databases/by-tag/${tag}`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:multi_db:config:view'
   })
 }
 
@@ -162,7 +173,8 @@ export const getDatabasesByTag = (tag: string): Promise<ApiResponse<DatabaseResp
 export const getHealthCheck = (): Promise<ApiResponse<HealthCheckResponse>> => {
   return request({
     url: '/api/v1/multi-db/health',
-    method: 'get'
+    method: 'get',
+    permission: 'data:multi_db:health:view'
   })
 }
 
@@ -176,7 +188,8 @@ export const getDatabaseStats = (dbName?: string): Promise<ApiResponse<DatabaseS
   return request({
     url: '/api/v1/multi-db/stats',
     method: 'get',
-    params
+    params,
+    permission: 'data:multi_db:stats:view'
   })
 }
 
@@ -198,7 +211,8 @@ export const getQueryHistory = (params?: {
   return request({
     url: '/api/v1/multi-db/query/history',
     method: 'get',
-    params
+    params,
+    permission: 'data:multi_db:query_history:view'
   })
 }
 
@@ -213,7 +227,8 @@ export const getDatabaseTables = (
   return request({
     url: `/api/v1/multi-db/databases/${dbName}/tables`,
     method: 'get',
-    params
+    params,
+    permission: 'data:multi_db:tables:view'
   })
 }
 
@@ -229,7 +244,8 @@ export const getTableColumns = (
   return request({
     url: `/api/v1/multi-db/databases/${dbName}/tables/${tableName}/columns`,
     method: 'get',
-    params
+    params,
+    permission: 'data:multi_db:columns:view'
   })
 }
 
@@ -247,7 +263,8 @@ export const getDatabasePerformance = (
   return request({
     url: '/api/v1/multi-db/performance',
     method: 'get',
-    params
+    params,
+    permission: 'data:multi_db:performance:view'
   })
 }
 
@@ -256,12 +273,13 @@ export const getDatabasePerformance = (
  */
 export const exportQueryResult = (
   data: SQLQueryRequest & { format?: 'csv' | 'excel' | 'json' }
-): Promise<Blob> => {
+): Promise<ApiResponse<Blob>> => {
   return request({
     url: '/api/v1/multi-db/query/export',
     method: 'post',
     data,
-    responseType: 'blob'
+    responseType: 'blob',
+    permission: 'data:multi_db:export'
   })
 }
 
@@ -279,7 +297,8 @@ export const saveQueryTemplate = (data: {
   return request({
     url: '/api/v1/multi-db/query/templates',
     method: 'post',
-    data
+    data,
+    permission: 'data:multi_db:templates:create'
   })
 }
 
@@ -310,6 +329,7 @@ export const getQueryTemplates = (params?: {
   return request({
     url: '/api/v1/multi-db/query/templates',
     method: 'get',
-    params
+    params,
+    permission: 'data:multi_db:templates:view'
   })
 }

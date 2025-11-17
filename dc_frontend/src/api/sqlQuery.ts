@@ -64,7 +64,8 @@ export function saveSQLTemplate(template: SQLTemplateRequest): Promise<{ data: S
   return request({
     url: '/sql/templates',
     method: 'post',
-    data: template
+    data: template,
+    permission: 'data:sql:templates:create'
   })
 }
 
@@ -106,7 +107,8 @@ export function getSQLTemplates(params?: {
   return request({
     url: '/sql/templates',
     method: 'get',
-    params: apiParams
+    params: apiParams,
+    permission: 'data:sql:templates:view'
   })
 }
 
@@ -118,7 +120,8 @@ export function getSQLTemplates(params?: {
 export function getSQLTemplate(templateId: number): Promise<{ data: SQLTemplateResponse }> {
   return request({
     url: `/sql/templates/${templateId}`,
-    method: 'get'
+    method: 'get',
+    permission: 'data:sql:templates:view'
   })
 }
 
@@ -132,7 +135,8 @@ export function updateSQLTemplate(templateId: number, template: Partial<SQLTempl
   return request({
     url: `/sql/templates/${templateId}`,
     method: 'put',
-    data: template
+    data: template,
+    permission: 'data:sql:templates:edit'
   })
 }
 
@@ -144,7 +148,8 @@ export function updateSQLTemplate(templateId: number, template: Partial<SQLTempl
 export function deleteSQLTemplate(templateId: number): Promise<{ data: { success: boolean } }> {
   return request({
     url: `/sql/templates/${templateId}`,
-    method: 'delete'
+    method: 'delete',
+    permission: 'data:sql:templates:delete'
   })
 }
 
@@ -163,7 +168,8 @@ export function executeSQLQuery(queryRequest: SQLQueryRequest): Promise<{ data: 
       query: requestData.query,
       limit: requestData.limit || 1000,
       timeout: 30
-    }
+    },
+    permission: 'data:sql:query'
   })
 }
 
@@ -176,7 +182,8 @@ export function exportSQLQueryResult(queryRequest: SQLQueryRequest): Promise<{ d
   return request({
     url: '/sql/export',
     method: 'post',
-    data: queryRequest
+    data: queryRequest,
+    permission: 'data:sql:export'
   })
 }
 
@@ -196,6 +203,7 @@ export function searchSQLTemplates(keyword: string, datasourceId?: number): Prom
   return request({
     url: '/sql/templates/search',
     method: 'get',
-    params: apiParams
+    params: apiParams,
+    permission: 'data:sql:templates:view'
   })
 }
