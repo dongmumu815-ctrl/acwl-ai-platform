@@ -142,11 +142,9 @@
                 <div class="type-card-desc">{{ rt.describe || '无描述' }}</div>
                 <div class="type-card-actions">
                   <el-button size="small" text @click.stop="openEditTypeDialog(rt)">
-                    <el-icon><Edit /></el-icon>
                     编辑
                   </el-button>
                   <el-button size="small" text type="danger" @click.stop="confirmDeleteType(rt)">
-                    <el-icon><Delete /></el-icon>
                     删除
                   </el-button>
                 </div>
@@ -1201,7 +1199,7 @@ onMounted(() => {
       .type-card.active { border-color: var(--el-color-primary); }
       .type-card-title { font-weight: 600; margin-bottom: 6px; }
       .type-card-desc { color: var(--el-text-color-secondary); font-size: 12px; }
-      .type-card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s ease; }
+.type-card-actions { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s ease; }
       .type-card:hover .type-card-actions { opacity: 1; }
     }
   }
