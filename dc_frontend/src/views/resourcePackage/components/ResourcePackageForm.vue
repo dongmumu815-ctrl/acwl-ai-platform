@@ -36,7 +36,7 @@
           <el-col :span="12">
             <el-form-item label="是否可删除">
               <el-switch 
-                v-model="form.is_deletable" 
+                v-model="is_deletable" 
                 active-text="可删除" 
                 inactive-text="不可删除"
                 :active-value="true"
@@ -191,7 +191,7 @@ import {
   type Template,
   PackageType
 } from '@/api/resourcePackage'
-import { datasourceApi, type Datasource } from '@/api/datasource'
+import { datasourceApi } from '@/api/datasource'
 import { dataResourceApi } from '@/api/dataResource'
 
 // Props
@@ -375,7 +375,12 @@ const loadTemplates = async () => {
     }
     
     console.log('调用 templateApi.list，参数:', { datasource_id, type: form.type, data_resource_id })
-    const templates_data = await templateApi.list({datasource_id, type:form.type, data_resource_id})
+    // 修复：确保正确传递类型参数，并转换为数字类型
+    const templates_data = await templateApi.list({
+      datasource_id: parseInt(datasource_id),
+      type: form.type,
+      data_resource_id: parseInt(data_resource_id)
+    })
     console.log(templates_data,'templates_data')
     templates.value = templates_data.data || []
   } catch (error) {
@@ -501,12 +506,21 @@ const handleSubmit = async () => {
       await resourcePackageApi.update(props.packageData.id, updateData)
       ElMessage.success('更新成功')
     } else {
-      // 创建模式下提交完整数据
-      const submitData = {
-        ...form,
-        datasource_id: Number(form.datasource_id)
+      // 创建模式下提交完整数据，修复类型转换问题
+      const submitData: ResourcePackageCreateRequest = {
+        name: form.name,
+        description: form.description,
+        type: form.type,
+        datasource_id: parseInt(form.datasource_id),
+        resource_id: parseInt(form.resource_id),
+        template_id: parseInt(form.template_id),
+        template_type: form.template_type,
+        dynamic_params: form.dynamic_params,
+        is_active: form.is_active,
+        is_lock: form.is_lock,
+        tags: form.tags
       }
-      await resourcePackageApi.create(submitData as ResourcePackageCreateRequest)
+      await resourcePackageApi.create(submitData)
       ElMessage.success('创建成功')
     }
     

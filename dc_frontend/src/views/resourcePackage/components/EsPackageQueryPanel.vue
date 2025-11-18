@@ -4,7 +4,7 @@
     <el-card class="header-card package-info-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="card-title">中心表查询</span>
+          <span class="card-title">资源中心查询</span>
           <div class="header-actions">
             <el-button
               type="primary"
@@ -115,11 +115,12 @@
             </div>
             <div class="conditions" v-show="!conditionsCollapsed">
               <div v-for="(c, i) in conditions" :key="i" class="condition-item">
-                <el-select v-model="c.logic" size="small" style="width: 90px">
+                <el-select v-if="i > 0" v-model="c.logic" size="small" style="width: 90px">
                   <el-option label="AND" value="must" />
                   <el-option label="OR" value="should" />
                   <el-option label="NOT" value="must_not" />
                 </el-select>
+                <div v-else :style="{ width: '90px', display: 'inline-block' }"></div>
 
                 <el-select
                   v-model="c.field"
@@ -194,10 +195,10 @@
           <span class="section-title">聚合结果</span>
           <div class="header-actions">
             <div class="view-switch">
-              <el-radio-group v-model="viewMode" size="small">
+              <!-- <el-radio-group v-model="viewMode" size="small">
                 <el-radio-button label="card">卡片</el-radio-button>
                 <el-radio-button label="list">列表</el-radio-button>
-              </el-radio-group>
+              </el-radio-group> -->
               <div class="display-toggles">
                 <el-switch
                   v-model="compactMode"
@@ -271,7 +272,7 @@
                         <div class="agg-body agg-scroll">
                           <template v-if="agg.type === 'terms'">
                             <div
-                              v-for="bucket in agg.buckets.slice(0, 1000)"
+                              v-for="bucket in agg.buckets.slice(0, 4000)"
                               :key="bucket.key"
                               class="agg-row clickable"
                               @click="onAggBucketClick(String(aggName), bucket)"
@@ -366,10 +367,10 @@
                     <!-- <div class="result-summary">
                       检索结果：为您检索到 {{ totalHits }} 条结果
                     </div> -->
-                    <div class="cards-container">
+                    <div class="cards-container" @scroll="onCardsScroll">
                       <div class="cards" :class="{ compact: compactMode }">
                         <el-card
-                          v-for="(row, idx) in records"
+                          v-for="(row, idx) in visibleRecords"
                           :key="idx"
                           class="result-card"
                           shadow="never"
@@ -468,7 +469,7 @@
                     <el-pagination
                       v-model:current-page="currentPage"
                       v-model:page-size="pageSize"
-                      :page-sizes="[10, 20, 50, 100,1000]"
+                      :page-sizes="[10, 20, 50, 100,4000]"
                       layout="total, sizes, prev, pager, next, jumper"
                       :total="totalHits"
                       @current-change="onPageChange"
@@ -513,7 +514,7 @@
                               class="detail-form"
                             >
                               <el-form-item
-                                v-for="f in displayFields"
+                                v-for="f in basicDisplayFields"
                                 :key="f"
                                 :label="getFieldDisplayName(f) + '：'"
                               >
@@ -690,10 +691,126 @@ const activeAggs = ref<string[]>([]);
 // 抽屉内展开项
 const activeInfos = ref<string[]>(["basic", "pdfInfo"]);
 const results = ref<any | null>(null);
+
+function stripTags(html: string): string {
+  if (!html) return "";
+  return html.replace(/<[^>]*>/g, "");
+}
+function extractSentence(text: string, keyword: string, maxLen = 200): string {
+  if (!text) return "";
+  if (!keyword) return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
+  const lower = text.toLowerCase();
+  const k = keyword.toLowerCase();
+  const idx = lower.indexOf(k);
+  if (idx < 0) {
+    return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
+  }
+  // 寻找句子边界（中英文常见标点）
+  const left = Math.max(
+    text.lastIndexOf("。", idx),
+    text.lastIndexOf("！", idx),
+    text.lastIndexOf("？", idx),
+    text.lastIndexOf(";", idx),
+    text.lastIndexOf(".", idx),
+    text.lastIndexOf("!", idx),
+    text.lastIndexOf("?", idx)
+  );
+  const rightCandidates = [
+    text.indexOf("。", idx),
+    text.indexOf("！", idx),
+    text.indexOf("？", idx),
+    text.indexOf(";", idx),
+    text.indexOf(".", idx),
+    text.indexOf("!", idx),
+    text.indexOf("?", idx)
+  ].filter((v) => v >= 0);
+  const right = rightCandidates.length ? Math.min(...rightCandidates) : -1;
+  const start = left >= 0 ? left + 1 : 0;
+  const end = right >= 0 ? right + 1 : text.length;
+  const sentence = text.slice(start, end).trim();
+  if (sentence.length > maxLen) {
+    // 过长时，以关键词为中心截取
+    const half = Math.floor(maxLen / 2);
+    const s = Math.max(0, idx - half);
+    const e = Math.min(text.length, idx + k.length + half);
+    return (s > 0 ? "…" : "") + text.slice(s, e) + (e < text.length ? "…" : "");
+  }
+  return sentence;
+}
+
 const records = computed<any[]>(() => {
   const hits = results.value?.hits?.hits || [];
-  return hits.map((h: any) => h._source);
+  const keyword = executedSearchValue.value?.trim() || "";
+  const isPagesSearch = Boolean(
+    defaultSearchField.value &&
+      (defaultSearchField.value === "pages" || defaultSearchField.value.startsWith("pages"))
+  );
+  const expanded: any[] = [];
+
+  hits.forEach((h: any) => {
+    const src = h?._source || {};
+    const common = { ...src };
+
+    if (isPagesSearch) {
+      const inner = h?.inner_hits?.pages?.hits?.hits || [];
+      if (inner.length) {
+        inner.forEach((ih: any) => {
+          const fragments: string[] = ih?.highlight?.["pages.content"] || [];
+          const fragHtml = fragments[0] || "";
+          const fragPlain = stripTags(fragHtml);
+          let pageNum: any = ih?._source?.pages?.pageNumber;
+          if (pageNum === undefined || pageNum === null) {
+            const pagesArr = Array.isArray(src?.pages) ? src.pages : [];
+            const found = pagesArr.find((p: any) =>
+              typeof p?.content === "string" && p.content.includes(fragPlain)
+            );
+            pageNum = found?.pageNumber ?? null;
+          }
+          expanded.push({ ...common, pageNumber: pageNum ?? null, snippet: fragPlain });
+        });
+        return;
+      }
+      // fallback：未返回 inner_hits 时，遍历 pages 数组
+      const pagesArr = Array.isArray(src?.pages) ? src.pages : [];
+      pagesArr.forEach((p: any) => {
+        const content: string = String(p?.content ?? "");
+        if (!content) return;
+        if (!keyword || content.toLowerCase().includes(keyword.toLowerCase())) {
+          const sent = extractSentence(content, keyword);
+          expanded.push({ ...common, pageNumber: p?.pageNumber ?? null, snippet: sent });
+        }
+      });
+      return;
+    }
+
+    // 非 pages 检索，直接使用原始 _source
+    expanded.push(src);
+  });
+
+  return expanded;
 });
+// 卡片视图：增量渲染（滚动加载）
+const CARD_INITIAL_BATCH = 50;
+const CARD_BATCH_SIZE = 50;
+const visibleCount = ref<number>(CARD_INITIAL_BATCH);
+const visibleRecords = computed<any[]>(() =>
+  records.value.slice(0, Math.max(0, visibleCount.value))
+);
+function loadMoreCards() {
+  if (visibleCount.value >= records.value.length) return;
+  visibleCount.value = Math.min(
+    visibleCount.value + CARD_BATCH_SIZE,
+    records.value.length
+  );
+}
+function onCardsScroll(e: Event) {
+  const el = e.target as HTMLElement;
+  if (!el) return;
+  const threshold = 200; // 距底部 200px 触发加载
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
+    loadMoreCards();
+  }
+}
 // 全字段搜索与列排序
 const sortState = ref<{
   field: string | null;
@@ -783,6 +900,8 @@ watch(
 watch(
   records,
   (rows) => {
+    // 记录变化时重置可见数量（卡片视图）
+    visibleCount.value = Math.min(CARD_INITIAL_BATCH, rows.length);
     // 卡片选择默认全选
     selectedCardIndices.value = new Set((rows || []).map((_, i) => i));
   },
@@ -832,7 +951,7 @@ const toggleSelectAll = () => {
   }
 };
 
-// 导出当前查询结果到 Excel
+// 导出当前查询结果到 CSV
 const exportResults = async () => {
   const exportRows =
     viewMode.value === "list"
@@ -852,21 +971,37 @@ const exportResults = async () => {
       type: "info"
     });
 
-    const wb = XLSX.utils.book_new();
-    const exportData = exportRows.map((row: Record<string, any>) => {
-      const newRow: Record<string, any> = {};
+    // 构建CSV内容
+    let csvContent = "";
+    
+    // 添加表头
+    const headers = displayFields.value.map(field => `"${getFieldDisplayName(field).replace(/"/g, '""')}"`);
+    csvContent += headers.join(",") + "\n";
+    
+    // 添加数据行
+    exportRows.forEach((row: Record<string, any>) => {
+      const values: string[] = [];
       displayFields.value.forEach((field: string) => {
         const v = row?.[field];
-        newRow[field] = typeof v === "object" ? JSON.stringify(v) : v ?? "";
+        let cellValue = typeof v === "object" ? JSON.stringify(v) : v ?? "";
+        // 处理CSV特殊字符
+        cellValue = String(cellValue).replace(/"/g, '""');
+        values.push(`"${cellValue}"`);
       });
-      return newRow;
+      csvContent += values.join(",") + "\n";
     });
-    const ws = XLSX.utils.json_to_sheet(exportData, { header: displayFields.value });
-    XLSX.utils.book_append_sheet(wb, ws, "查询结果");
+
+    // 创建并下载CSV文件
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     const fileName = `${props.packageData?.name || "资源包查询"}_${new Date()
       .toISOString()
-      .slice(0, 10)}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+      .slice(0, 10)}.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    
     ElMessage.success("导出成功");
   } catch (error: any) {
     if (error !== "cancel") {
@@ -896,7 +1031,7 @@ const openPdf = () => {
 
 // 分页
 const currentPage = ref(1);
-const pageSize = ref(1000);
+const pageSize = ref(4000);
 // 滑动查询相关状态
 const MAX_RESULT_WINDOW = 10000;
 const pagingMode = ref<"offset" | "search_after">("offset");
@@ -952,8 +1087,8 @@ const totalHits = computed<number>(() => {
 // 重复的深分页状态与方法已移除，统一使用上方 onPageChange 实现
 
 // 按字段值长度构建一致的字段顺序
-const fieldOrder = ref<string[]>([]);
-const displayFields = computed<string[]>(() => {
+  const fieldOrder = ref<string[]>([]);
+  const displayFields = computed<string[]>(() => {
   // 收集所有潜在字段（来源于映射或当前记录）
   const allFields = new Set<string>();
   if (sourceFields.value.length) {
@@ -974,6 +1109,52 @@ const displayFields = computed<string[]>(() => {
   }
   // 否则直接使用全部字段集合
   return Array.from(allFields);
+});
+
+// 详情面板的“基本信息”字段集合：避免首次默认搜索展示所有字段
+// 优先使用模板提供的 _source 字段；若无则基于常用字段与已选行数据挑选有限字段
+const basicDisplayFields = computed<string[]>(() => {
+  const row = selectedRow.value || {};
+  const hasField = (f: string) => row && f in row;
+
+  // 模板提供了 _source 时，直接按该集展示，限制最多 20 个并仅显示当前行存在的字段
+  if (sourceFields.value.length) {
+    return sourceFields.value.filter(hasField).slice(0, 20);
+  }
+
+  // 常见基础字段优先级列表（标题 + 关键字段 + 常用元信息）
+  const preferred = Array.from(
+    new Set<string>([
+      // 标题候选
+      ...TITLE_FIELDS,
+      // 关键字段候选
+      ...KEY_FIELDS,
+      // 常用基础字段
+      "publication_category",
+      "data_type",
+      "type",
+      "publish_time",
+      "published_at",
+      "create_time",
+      "authors",
+      "keywords",
+      "language",
+      "publisher",
+      "data_source",
+      "source",
+      "pdf_url",
+      "abstract"
+    ])
+  );
+
+  const preferredPresent = preferred.filter(hasField);
+  if (preferredPresent.length) {
+    return preferredPresent.slice(0, 20);
+  }
+
+  // 兜底：按全局字段顺序选择有限数量，避免一次性展示全部字段
+  const ordered = displayFields.value.filter(hasField);
+  return ordered.slice(0, 12);
 });
 
 // 规范化聚合结果，便于左侧展示
@@ -1139,6 +1320,11 @@ async function ensureIndicesFromResource() {
   }
 }
 
+// 索引就绪状态：有数据源ID且已解析到索引
+const isIndicesReady = computed(() => {
+  return Boolean(props.packageData?.datasource_id) && selectedIndices.value.length > 0;
+});
+
 function addCondition() {
   const field = availableFieldNames.value[0];
   if (!field) {
@@ -1223,10 +1409,38 @@ function buildDSL(): any {
   // 默认搜索条件（如果有输入值）
   if (defaultSearchValue.value && defaultSearchValue.value.trim()) {
     if (defaultSearchField.value) {
-      // 指定字段搜索，使用match查询
-      bool.must.push({
-        match: { [defaultSearchField.value]: defaultSearchValue.value.trim() }
-      });
+      const keyword = defaultSearchValue.value.trim();
+      const fld = defaultSearchField.value;
+      // 指定字段为 pages（嵌套）时，构造 nested + inner_hits 高亮
+      if (fld === "pages" || fld.startsWith("pages")) {
+        bool.must.push({
+          nested: {
+            path: "pages",
+            query: {
+              match: { "pages.content": keyword }
+            },
+            inner_hits: {
+              name: "pages",
+              highlight: {
+                fields: {
+                  "pages.content": {
+                    fragment_size: 200,
+                    number_of_fragments: 5,
+                    pre_tags: ["<em>"],
+                    post_tags: ["</em>"]
+                  }
+                }
+              },
+              size: 20
+            }
+          }
+        });
+      } else {
+        // 非嵌套字段，使用 match 查询
+        bool.must.push({
+          match: { [fld]: keyword }
+        });
+      }
     } else {
       // 未指定字段时，对所有可用字段进行multi_match查询
       if (availableFieldNames.value.length > 0) {
@@ -1253,6 +1467,96 @@ function buildDSL(): any {
   conditions.forEach((c) => {
     if (!c.field) return;
     let clause: any = {};
+    // pages 字段为嵌套类型，改造为 nested 查询，并附带 inner_hits 高亮
+    const isPagesField = c.field === "pages" || c.field.startsWith("pages");
+    if (isPagesField) {
+      const f = "pages.content";
+      switch (c.type) {
+        case "term":
+          clause = {
+            nested: {
+              path: "pages",
+              query: { term: { [f]: c.value } },
+              inner_hits: {
+                name: "pages",
+                highlight: {
+                  fields: {
+                    "pages.content": {
+                      fragment_size: 200,
+                      number_of_fragments: 5,
+                      pre_tags: ["<em>"],
+                      post_tags: ["</em>"]
+                    }
+                  }
+                },
+                size: 20
+              }
+            }
+          };
+          break;
+        case "match":
+          clause = {
+            nested: {
+              path: "pages",
+              query: { match: { [f]: c.value } },
+              inner_hits: {
+                name: "pages",
+                highlight: {
+                  fields: {
+                    "pages.content": {
+                      fragment_size: 200,
+                      number_of_fragments: 5,
+                      pre_tags: ["<em>"],
+                      post_tags: ["</em>"]
+                    }
+                  }
+                },
+                size: 20
+              }
+            }
+          };
+          break;
+        case "prefix":
+          clause = {
+            nested: {
+              path: "pages",
+              query: { prefix: { [f]: c.value } },
+              inner_hits: { name: "pages" }
+            }
+          };
+          break;
+        case "wildcard":
+          clause = {
+            nested: {
+              path: "pages",
+              query: { wildcard: { [f]: c.value } },
+              inner_hits: { name: "pages" }
+            }
+          };
+          break;
+        case "exists":
+          clause = {
+            nested: {
+              path: "pages",
+              query: { exists: { field: f } },
+              inner_hits: { name: "pages" }
+            }
+          };
+          break;
+        case "range":
+          const range: any = {};
+          if (c.value?.gte !== undefined) range.gte = c.value.gte;
+          if (c.value?.lte !== undefined) range.lte = c.value.lte;
+          clause = {
+            nested: {
+              path: "pages",
+              query: { range: { [f]: range } },
+              inner_hits: { name: "pages" }
+            }
+          };
+          break;
+      }
+    } else {
     switch (c.type) {
       case "term":
         clause = { term: { [c.field]: c.value } };
@@ -1275,6 +1579,7 @@ function buildDSL(): any {
         if (c.value?.lte !== undefined) range.lte = c.value.lte;
         clause = { range: { [c.field]: range } };
         break;
+    }
     }
     if (Object.keys(clause).length) {
       bool[c.logic].push(clause);
@@ -1347,6 +1652,70 @@ async function executeQuery() {
     if (dsl.sort) req.sort = dsl.sort;
     if (dsl._source) req._source = dsl._source;
     if (dsl.aggs) req.aggs = dsl.aggs;
+    
+    // 添加模板中预设的查询条件（如果存在）
+    const tplQuery = templateDetail.value?.query || templateDetail.value?.query_content;
+    if (tplQuery && tplQuery.query) {
+      // 修复查询结构，确保不会出现 {match_all: {}, bool: {...}} 这种非法结构
+      if (tplQuery.query.bool) {
+        // 如果模板中有bool查询条件，则与动态构建的查询合并
+        if (req.query.bool) {
+          // 合并must条件
+          if (tplQuery.query.bool.must && Array.isArray(tplQuery.query.bool.must)) {
+            req.query.bool.must = [...req.query.bool.must, ...tplQuery.query.bool.must];
+          }
+          // 合并should条件
+          if (tplQuery.query.bool.should && Array.isArray(tplQuery.query.bool.should)) {
+            req.query.bool.should = [...req.query.bool.should, ...tplQuery.query.bool.should];
+          }
+          // 合并must_not条件
+          if (tplQuery.query.bool.must_not && Array.isArray(tplQuery.query.bool.must_not)) {
+            req.query.bool.must_not = [...req.query.bool.must_not, ...tplQuery.query.bool.must_not];
+          }
+        } else {
+          // 如果动态查询没有bool条件，则直接使用模板的bool条件
+          req.query.bool = tplQuery.query.bool;
+        }
+      } else if (tplQuery.query.match_all) {
+        // 如果模板查询是match_all，则将其添加到bool查询的must条件中
+        if (req.query.bool) {
+          req.query.bool.must = req.query.bool.must || [];
+          req.query.bool.must.push({ match_all: {} });
+        } else {
+          // 如果既没有动态bool查询也没有模板bool查询，则直接使用模板查询
+          req.query = tplQuery.query;
+        }
+      } else if (Object.keys(tplQuery.query).length > 0) {
+        // 如果模板查询有其他类型的查询条件，则将其添加到bool查询的must条件中
+        if (req.query.bool) {
+          req.query.bool.must = req.query.bool.must || [];
+          req.query.bool.must.push(tplQuery.query);
+        } else {
+          // 创建新的bool查询并添加模板查询条件
+          req.query = {
+            bool: {
+              must: [tplQuery.query],
+              should: [],
+              must_not: []
+            }
+          };
+        }
+      }
+    }
+    
+    // 确保查询结构正确，修复可能的非法结构
+    if (req.query && req.query.match_all !== undefined && req.query.bool) {
+      // 将match_all和bool合并为合法的bool查询
+      const matchAllClause = { match_all: req.query.match_all || {} };
+      req.query = {
+        bool: {
+          must: [matchAllClause, ...(req.query.bool.must || [])],
+          should: req.query.bool.should || [],
+          must_not: req.query.bool.must_not || []
+        }
+      };
+    }
+    
     // 滑动查询：不传 from，传递 search_after
     if (pagingMode.value === "search_after") {
       delete req.from;
@@ -1371,6 +1740,8 @@ async function executeQuery() {
 
       // 设置 ES 查询结果
       results.value = esData;
+      // 重置卡片增量渲染数量
+      visibleCount.value = Math.min(CARD_INITIAL_BATCH, records.value.length);
       // 更新下一页的游标（search_after）
       try {
         const cursor = esData?.cursor || (resp as any)?.cursor;
@@ -1569,9 +1940,11 @@ function getTitleField(row: Record<string, any>): string {
 }
 const KEY_FIELDS = [
   "language",
-  "publisher",
-  "data_source",
   "publication_category",
+  "data_source",
+  "publisher",
+  "pageNumber",
+  "snippet",
   "abstract"
 ];
 function getKeyFields(row: Record<string, any>): string[] {
@@ -1592,6 +1965,17 @@ function copyRow(row: Record<string, any>) {
 
 // 获取字段显示名称（优先显示 display_name，其次注释comment，最后字段名）
 function getFieldDisplayName(fieldName: string): string {
+  // 特殊映射：pages 字段在下拉与展示层统一显示为“全文”
+  if (fieldName === "pages" || fieldName === "pages.content") {
+    return "全文";
+  }
+  // 特殊映射：命中文本信息
+  if (fieldName === "pageNumber") {
+    return "命中全文页码";
+  }
+  if (fieldName === "snippet") {
+    return "节选";
+  }
   const fieldMapping = fieldMappings.value[fieldName];
   if (fieldMapping?.display_name) {
     return fieldMapping.display_name;
@@ -1931,6 +2315,11 @@ async function handleDownloadLatest() {
     latestDownloadLoading.value = false;
   }
 }
+// 暴露查询方法，便于父组件在进入页面时触发默认查询
+defineExpose({
+  executeQuery,
+  isIndicesReady
+})
 </script>
 
 <style scoped lang="scss">

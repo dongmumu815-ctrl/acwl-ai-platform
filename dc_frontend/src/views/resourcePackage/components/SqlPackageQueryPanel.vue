@@ -172,7 +172,7 @@
           <el-pagination
             v-model:current-page="currentPage"
             v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
+            :page-sizes="[10, 20, 50, 100,500,1000,2000,3000,4000]"
             :total="queryResults?.total_count || 0"
             layout="total, sizes, prev, pager, next, jumper"
             @size-change="handleSizeChange"
@@ -193,7 +193,6 @@
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Search, Download } from '@element-plus/icons-vue'
-import * as XLSX from 'xlsx'
 import PdfViewer from '@/components/PdfViewer.vue'
 import { 
   resourcePackageApi, 
@@ -448,19 +447,36 @@ const exportResults = async () => {
       cancelButtonText: '取消',
       type: 'info'
     })
-    const wb = XLSX.utils.book_new()
-    const exportData = queryResults.value.data.map((row: any[]) => {
-      const newRow: Record<string, any> = {}
+
+    // 构建CSV内容
+    let csvContent = "";
+    
+    // 添加表头
+    const headers = displayFields.value.map(field => `"${String(field).replace(/"/g, '""')}"`);
+    csvContent += headers.join(",") + "\n";
+    
+    // 添加数据行
+    queryResults.value.data.forEach((row: any[]) => {
+      const values: string[] = [];
       displayFields.value.forEach((field: string, idx: number) => {
-        const cell = row[idx]
-        newRow[field] = typeof cell === 'object' ? JSON.stringify(cell) : cell
-      })
-      return newRow
-    })
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    XLSX.utils.book_append_sheet(wb, ws, '查询结果')
-    const fileName = `${props.packageData?.name || '资源包查询'}_${new Date().toISOString().slice(0, 10)}.xlsx`
-    XLSX.writeFile(wb, fileName)
+        const cell = row[idx];
+        let cellValue = typeof cell === 'object' ? JSON.stringify(cell) : cell ?? "";
+        // 处理CSV特殊字符
+        cellValue = String(cellValue).replace(/"/g, '""');
+        values.push(`"${cellValue}"`);
+      });
+      csvContent += values.join(",") + "\n";
+    });
+
+    // 创建并下载CSV文件
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const fileName = `${props.packageData?.name || '资源包查询'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    
     ElMessage.success('导出成功')
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -522,6 +538,12 @@ watch(() => props.packageData, (newVal) => {
     initializeForm()
   }
 }, { immediate: true })
+
+// 暴露查询方法，便于父组件在进入页面时触发默认查询
+defineExpose({
+  executeQuery,
+  handleUserQuery
+})
 
 </script>
 

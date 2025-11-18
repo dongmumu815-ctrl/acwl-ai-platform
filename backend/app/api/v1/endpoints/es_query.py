@@ -12,17 +12,19 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 from elasticsearch import AsyncElasticsearch, ConnectionError as ESConnectionError
-from elasticsearch.exceptions import AuthenticationException, RequestError
+from elasticsearch.exceptions import AuthenticationException, RequestError, ConnectionTimeout
 
 from app.core.database import get_db
 from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
 from app.services.datasource import DatasourceService
 from app.services.es_query_template import ESQueryTemplateService
-from app.core.logger import get_logger
+
+# 直接使用logging模块
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
-logger = get_logger(__name__)
 
 # Pydantic模型定义
 class ESQueryRequest(BaseModel):
@@ -34,7 +36,7 @@ class ESQueryRequest(BaseModel):
     from_: Optional[int] = Field(0, alias="from", description="起始位置")
     sort: Optional[List[Dict[str, Any]]] = Field(None, description="排序条件")
     source: Optional[List[str]] = Field(None, alias="_source", description="返回字段")
-    timeout: Optional[str] = Field("30s", description="查询超时时间")
+    timeout: Optional[str] = Field("60s", description="查询超时时间")
     aggs: Optional[Dict[str, Any]] = Field(None, description="聚合查询")
     # 深分页支持
     search_after: Optional[List[Any]] = Field(None, alias="search_after", description="search_after 游标值数组")
@@ -175,10 +177,15 @@ async def execute_es_query(
             logger.info(f"count查询结果: {total_count}")
             
             # 执行主查询
+            response = None
             if search_mode == "scroll" and request.scroll_id:
                 # 已在上方通过 scroll() 获取 response
                 pass
             else:
+                response = await es_client.search(**search_params)
+            
+            # 确保response变量已定义
+            if response is None:
                 response = await es_client.search(**search_params)
             
             # 将count查询的结果替换到response中的total值
@@ -213,12 +220,12 @@ async def execute_es_query(
             # 构建统计信息
             stats = {
                 "totalHits": total_count,  # 使用count查询的准确结果
-                "took": response["took"],
-                "maxScore": response["hits"].get("max_score", 0),
+                "took": response.get("took", 0),
+                "maxScore": response.get("hits", {}).get("max_score", 0),
                 "shardsInfo": {
-                    "total": response["_shards"]["total"],
-                    "successful": response["_shards"]["successful"],
-                    "failed": response["_shards"]["failed"]
+                    "total": response.get("_shards", {}).get("total", 0),
+                    "successful": response.get("_shards", {}).get("successful", 0),
+                    "failed": response.get("_shards", {}).get("failed", 0)
                 },
                 "mode": search_mode
             }
@@ -236,10 +243,23 @@ async def execute_es_query(
             except Exception as _:
                 pass
             
+            # 将ES响应对象转换为字典
+            if hasattr(response, 'body'):
+                response_dict = response.body
+            else:
+                # 对于旧版本的elasticsearch库，直接使用响应对象
+                response_dict = {}
+                for key in dir(response):
+                    if not key.startswith('_'):
+                        try:
+                            response_dict[key] = getattr(response, key)
+                        except:
+                            pass
+            
             return {
                 "success": True,
                 "data": {
-                    **response,
+                    **response_dict,
                     "stats": stats,
                     "fieldMappings": field_mappings,
                     **({"cursor": next_cursor} if next_cursor else {})
@@ -267,6 +287,12 @@ async def execute_es_query(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"查询请求错误: {str(e)}"
+        )
+    except ConnectionTimeout as e:
+        logger.error(f"ES查询超时: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=f"查询超时，请稍后重试: {str(e)}"
         )
     except Exception as e:
         logger.error(f"ES查询执行失败: {str(e)}")
@@ -314,11 +340,24 @@ async def export_es_query_result(
             # 执行查询
             response = await es_client.search(**search_params)
             
+            # 将ES响应对象转换为字典
+            if hasattr(response, 'body'):
+                response_dict = response.body
+            else:
+                # 对于旧版本的elasticsearch库，直接使用响应对象
+                response_dict = {}
+                for key in dir(response):
+                    if not key.startswith('_'):
+                        try:
+                            response_dict[key] = getattr(response, key)
+                        except:
+                            pass
+            
             # 生成导出数据
             if request.format.lower() == "csv":
-                return _generate_csv_response(response)
+                return _generate_csv_response(response_dict)
             elif request.format.lower() == "json":
-                return _generate_json_response(response)
+                return _generate_json_response(response_dict)
             else:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -696,6 +735,13 @@ async def _create_es_client(datasource) -> AsyncElasticsearch:
     """
     创建ES客户端
     """
+    # 获取连接参数
+    connection_params = datasource.connection_params or {}
+    
+    # 设置默认超时时间和重试次数
+    timeout = connection_params.get('timeout', 60)  # 默认60秒超时
+    max_retries = connection_params.get('max_retries', 3)  # 默认重试3次
+    
     if datasource.username and datasource.password:
         return AsyncElasticsearch(
             [{
@@ -704,7 +750,10 @@ async def _create_es_client(datasource) -> AsyncElasticsearch:
                 'port': datasource.port
             }],
             basic_auth=(datasource.username, datasource.password),
-            verify_certs=False
+            verify_certs=False,
+            request_timeout=timeout,
+            max_retries=max_retries,
+            retry_on_timeout=True
         )
     else:
         return AsyncElasticsearch(
@@ -713,7 +762,10 @@ async def _create_es_client(datasource) -> AsyncElasticsearch:
                 'host': datasource.host,
                 'port': datasource.port
             }],
-            verify_certs=False
+            verify_certs=False,
+            request_timeout=timeout,
+            max_retries=max_retries,
+            retry_on_timeout=True
         )
 
 def _generate_csv_response(es_response: Dict[str, Any]) -> StreamingResponse:

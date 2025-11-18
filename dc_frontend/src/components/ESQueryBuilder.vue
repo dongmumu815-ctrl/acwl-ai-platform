@@ -95,9 +95,10 @@
         <!-- 索引选择 -->
         <div v-if="!shouldHideIndexSelector" class="query-section">
             <!-- <div  class="query-section"> -->
-          <label class="section-label">索引选择:{{ visualQuery.indices }},{{ esQueryConfig.availableIndices }}</label>
+          <!-- <label class="section-label">索引选择:{{ visualQuery.indices }},{{ esQueryConfig.availableIndices }}</label>
+          -->
           <el-select
-            v-model="visualQuery.indices"
+            v-model="visualQuery.indices[0]"
             placeholder="请选择索引"
             @change="onIndicesChange"
             style="width: 100%"
@@ -1053,7 +1054,9 @@ const loadTemplates = async () => {
       
       console.log('🎯 自动选择最新模板:', latestTemplate.name, 'ID:', latestTemplate.id)
       selectedTemplateId.value = latestTemplate.id
-      
+      visualQuery.indices = [latestTemplate.indices[0]]
+      saveForm.name = latestTemplate.name
+      saveForm.description = latestTemplate.description
       // 触发模板变更事件，自动加载模板内容
       await onTemplateChange()
     }
@@ -1080,7 +1083,8 @@ const onEsDatasourceChange = async () => {
     // 如果有初始索引（从URL参数传入），优先使用初始索引，不需要从服务器获取
     if (props.initialIndices && props.initialIndices.length > 0) {
       esQueryConfig.availableIndices = [...props.initialIndices]
-      visualQuery.indices = [...props.initialIndices]
+      // 对于单选模式，只选择第一个索引
+      visualQuery.indices = props.initialIndices[0]
     } else {
       // 只有在没有初始索引时，才从服务器加载索引列表
       const indicesResponse = await getESIndices(parseInt(esQueryConfig.datasourceId))
@@ -1110,16 +1114,39 @@ const onEsDatasourceChange = async () => {
  * 加载选中索引的字段信息
  */
 const loadFieldsForIndices = async () => {
-  if (!visualQuery.indices.length) {
+  // 确保visualQuery.indices是数组，如果不是则转换为数组
+  const selectedIndices = Array.isArray(visualQuery.indices) ? visualQuery.indices : 
+                         (visualQuery.indices ? [visualQuery.indices] : []);
+  
+  console.log('🔍 loadFieldsForIndices 调用，当前状态:', {
+    datasourceId: esQueryConfig.datasourceId,
+    indices: selectedIndices,
+    indicesLength: selectedIndices.length
+  });
+  
+  if (!selectedIndices.length) {
+    console.log('⚠️ 没有选中的索引');
+    esQueryConfig.availableFields = []
+    return
+  }
+  
+  // 确保数据源ID存在
+  if (!esQueryConfig.datasourceId) {
+    console.warn('❌ 数据源ID为空');
     esQueryConfig.availableFields = []
     return
   }
   
   try {
+    console.log('📡 请求字段映射信息:', {
+      datasourceId: esQueryConfig.datasourceId,
+      indices: selectedIndices
+    });
+    
     // 加载选中索引的字段映射信息
     const fieldsResponse = await getESFieldMapping(
       parseInt(esQueryConfig.datasourceId), 
-      visualQuery.indices
+      selectedIndices
     )
     console.log('字段API响应:', fieldsResponse)
     
@@ -1145,10 +1172,8 @@ const onTemplateChange = async () => {
     saveForm.description = ''
     return
   }
-  
   const template = availableTemplates.value.find(t => t.id === selectedTemplateId.value)
   if (!template) return
-  
   try {
     // 处理 query 字段可能是对象或字符串的情况
     let query
@@ -1167,6 +1192,8 @@ const onTemplateChange = async () => {
     // 填充保存表单的名称和描述
     saveForm.name = template.name || ''
     saveForm.description = template.description || ''
+
+    // alert(3)
     
     console.log('加载模板成功，设置当前模板ID为编辑状态:', currentTemplateId.value)
     
@@ -1587,7 +1614,7 @@ const executeESQuery = async () => {
     // 构建标准的ES查询请求
     const queryRequest = {
       datasourceId: parseInt(esQueryConfig.datasourceId),
-      index: queryType.value === 'visual' ? visualQuery.indices : [esQueryConfig.selectedIndex],
+      index: queryType.value === 'visual' ? (Array.isArray(visualQuery.indices) ? visualQuery.indices : [visualQuery.indices]) : [esQueryConfig.selectedIndex],
       query: queryPart, // 只传递query部分
       size: sizePart,
       from: fromPart
@@ -1657,8 +1684,8 @@ const saveESQuery = () => {
     return
   }
   
-  saveForm.name = ''
-  saveForm.description = ''
+  // saveForm.name = ''
+  // saveForm.description = ''
   saveDialogVisible.value = true
 }
 
@@ -1689,7 +1716,7 @@ const confirmSaveQuery = async () => {
       name: saveForm.name,
       description: saveForm.description,
       datasourceId: esQueryConfig.datasourceId, // 后端要求的字段名
-      indices: esQueryConfig.indexName ? [esQueryConfig.indexName] : [], // 后端要求的字段名和格式
+      indices: queryType.value === 'visual' ? (Array.isArray(visualQuery.indices) ? visualQuery.indices : [visualQuery.indices]) : (esQueryConfig.selectedIndex ? [esQueryConfig.selectedIndex] : []), // 后端要求的字段名和格式
       query: queryObject, // 解析后的查询对象，而不是字符串
       tags: [],
       dataResourceId: props.dataResourceId, // 添加数据资源ID字段，使用驼峰命名
@@ -2287,7 +2314,7 @@ defineExpose({
   clearQuery,
   executeQuery: executeESQuery,
   getQuery: () => buildQuery(),
-  getSelectedIndices: () => (queryType.value === 'visual' ? visualQuery.indices : (esQueryConfig.selectedIndex ? [esQueryConfig.selectedIndex] : []))
+  getSelectedIndices: () => (queryType.value === 'visual' ? (Array.isArray(visualQuery.indices) ? visualQuery.indices : [visualQuery.indices]) : (esQueryConfig.selectedIndex ? [esQueryConfig.selectedIndex] : []))
 })
 </script>
 

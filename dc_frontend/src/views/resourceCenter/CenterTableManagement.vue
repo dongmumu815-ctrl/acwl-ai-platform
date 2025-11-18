@@ -142,11 +142,9 @@
                 <div class="type-card-desc">{{ rt.describe || '无描述' }}</div>
                 <div class="type-card-actions">
                   <el-button size="small" text @click.stop="openEditTypeDialog(rt)">
-                    <el-icon><Edit /></el-icon>
                     编辑
                   </el-button>
                   <el-button size="small" text type="danger" @click.stop="confirmDeleteType(rt)">
-                    <el-icon><Delete /></el-icon>
                     删除
                   </el-button>
                 </div>
@@ -315,7 +313,8 @@
            <el-form-item label="字段名称" prop="column_name">
              <el-input
                v-model="editFieldForm.column_name"
-               placeholder="请输入新的字段名称"
+               placeholder="字段名称不可修改"
+               disabled
              />
            </el-form-item>
            <el-form-item label="数据类型">
@@ -901,7 +900,7 @@ const submitEditField = async () => {
       operation_type: 'modify_column',
       column_data: {
         original_name: editFieldForm.original_name,
-        name: editFieldForm.column_name,
+        name: editFieldForm.original_name, // 禁止重命名：与原始名保持一致
         type: editFieldForm.data_type,
         comment: editFieldForm.column_comment,
         default: editFieldForm.column_default,
@@ -925,14 +924,11 @@ const submitEditField = async () => {
         if (columnIndex !== -1) {
           tableDetail.value.columns[columnIndex] = {
             ...tableDetail.value.columns[columnIndex],
-            column_name: editFieldForm.column_name,
             column_comment: editFieldForm.column_comment,
             column_default: editFieldForm.column_default,
             is_nullable: editFieldForm.is_nullable
           }
         }
-        // 同步勾选状态中的键名（若该字段被勾选）
-        checkedKeys.value = checkedKeys.value.map(k => (k === originalKey ? newKey : k))
       }
       
       // 关闭编辑对话框
@@ -1203,7 +1199,7 @@ onMounted(() => {
       .type-card.active { border-color: var(--el-color-primary); }
       .type-card-title { font-weight: 600; margin-bottom: 6px; }
       .type-card-desc { color: var(--el-text-color-secondary); font-size: 12px; }
-      .type-card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s ease; }
+.type-card-actions { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s ease; }
       .type-card:hover .type-card-actions { opacity: 1; }
     }
   }

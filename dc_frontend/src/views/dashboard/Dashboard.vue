@@ -334,7 +334,11 @@ const loadDistribution = async () => {
     }
     distributionLoading.value = true
 
-    const indexCandidates = ['cpc_dw_publication', 'cpc_dw_publication*']
+    // 为避免同时查询别名与通配造成重复计数，仅在两者之间择一尝试
+    const indexSets: string[][] = [
+      [primaryIndexName],
+      [primaryIndexName + '*']
+    ]
     const fieldsToTry = [
       'publication_category',
       'category',
@@ -348,10 +352,10 @@ const loadDistribution = async () => {
       const rawField = field
       const keywordField = ensureKeywordField(field)
 
-      const callAgg = async (aggField: string, existsField: string) => {
+      const callAggOnIndices = async (indices: string[], aggField: string, existsField: string) => {
         const res = await getESAggregations(
           esDatasourceId.value as number,
-          indexCandidates,
+          indices,
           {
             category_terms: {
               terms: {
@@ -371,11 +375,20 @@ const loadDistribution = async () => {
       }
 
       // 优先尝试 keyword 子字段，exists 过滤使用原始字段
-      let { ok, buckets } = await callAgg(keywordField, rawField)
-
-      // 回退：如果失败或无数据，尝试原始字段（适配字段已是keyword类型的情况）
-      if (!ok || buckets.length === 0) {
-        ({ ok, buckets } = await callAgg(rawField, rawField))
+      let ok = false
+      let buckets: any[] = []
+      // 先尝试主索引；若无数据或失败，再回退到通配索引
+      for (const indices of indexSets) {
+        // 优先尝试 keyword 子字段，exists 过滤使用原始字段
+        const r1 = await callAggOnIndices(indices, keywordField, rawField)
+        ok = r1.ok
+        buckets = r1.buckets
+        if (ok && buckets.length > 0) break
+        // 回退尝试原始字段（适配字段本身即为 keyword 的情况）
+        const r2 = await callAggOnIndices(indices, rawField, rawField)
+        ok = r2.ok
+        buckets = r2.buckets
+        if (ok && buckets.length > 0) break
       }
 
       const filtered = Array.isArray(buckets) ? buckets.filter((b: any) => String(b.key) !== '未分类') : []

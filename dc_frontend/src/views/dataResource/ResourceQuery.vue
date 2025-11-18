@@ -109,17 +109,43 @@ const sqlActiveTab = ref('builder')
 
 // 计算属性：获取当前数据源ID（URL中的ID直接是数据源ID）
 const initialDatasourceId = computed(() => {
-  return route.params.id ? parseInt(route.params.id) : null
+  console.log('🔍 计算 initialDatasourceId，route.params:', route.params)
+  const id = route.params.id ? parseInt(route.params.id) : null
+  console.log('✅ initialDatasourceId 计算结果8:', id,currentResourceId)
+  return id
 })
 
-// 计算属性：获取当前数据资源ID（根据数据源ID查找对应的数据资源）
+// 计算属性：获取当前数据资源ID（优先从路由参数获取，如果没有则通过数据源ID查找）
 const currentResourceId = computed(() => {
+  // 首先检查路由查询参数中是否有直接传递的数据资源ID
+  const routeDataResourceId = route.query.dataResourceId
+  if (routeDataResourceId) {
+    console.log('🔍 从路由参数获取 dataResourceId:', routeDataResourceId)
+    return parseInt(routeDataResourceId)
+  }
+  
+  console.log('🔍 计算 currentResourceId:', {
+    initialDatasourceId: initialDatasourceId.value,
+    sqlResourcesLength: sqlResources.value.length,
+    sqlResources: sqlResources.value
+  })
+  
   if (!initialDatasourceId.value || !sqlResources.value.length) {
+    console.log('❌ currentResourceId 返回 null，条件不满足')
     return null
   }
+  
   // 查找当前数据源对应的数据资源
-  const resource = sqlResources.value.find(r => r.datasource_id === initialDatasourceId.value)
-  return resource ? resource.id : null
+  const resource = sqlResources.value.find(r => {
+    const match = r.datasource_id === initialDatasourceId.value
+    console.log(`🔍 匹配检查: resource.datasource_id(${r.datasource_id}) === initialDatasourceId(${initialDatasourceId.value}) = ${match}`)
+    return match
+  })
+  console.log('🔍 查找结果:', resource)
+  
+  const result = resource ? resource.id : null
+  console.log('✅ currentResourceId 计算结果:', result)
+  return result
 })
 
 // 计算属性：获取初始Schema
@@ -134,6 +160,22 @@ const initialTableName = computed(() => {
 
 // 计算属性：获取初始索引列表
 const initialIndices = computed(() => {
+  // 首先检查是否有initialIndices参数（JSON格式的字符串）
+  const initialIndicesParam = route.query.initialIndices
+  if (initialIndicesParam) {
+    try {
+      // 尝试解析JSON格式的索引列表
+      const parsed = JSON.parse(initialIndicesParam)
+      if (Array.isArray(parsed)) {
+        // 如果是对象数组，提取name属性；如果是字符串数组，直接返回
+        return parsed.map(item => typeof item === 'string' ? item : item.name)
+      }
+    } catch (e) {
+      console.warn('解析initialIndices参数失败:', e)
+    }
+  }
+  
+  // 回退到原来的indices参数处理逻辑
   const indices = route.query.indices
   if (typeof indices === 'string') {
     return [indices]
@@ -177,6 +219,7 @@ const dataSecurity = computed(() => {
  * 初始化组件，处理路由参数
  */
 onMounted(() => {
+  console.log('🚀 ResourceQuery 组件挂载，route:', route)
   // 处理路由参数
   const { datasourceType } = route.query
   
@@ -201,12 +244,14 @@ const loadDataSources = async () => {
   try {
     // 加载数据资源列表
     const response = await dataResourceApi.getResourceList()
+    console.log('📡 数据资源列表API响应:', response)
     if (response.data && response.data.items) {
       // 转换数据格式，将后端的 datasource_id 字段映射为前端的 datasourceId 字段
       sqlResources.value = response.data.items.map(item => ({
         ...item,
         datasourceId: item.datasource_id // 字段映射
       }))
+      console.log('💾 sqlResources 已更新:', sqlResources.value)
     }
   } catch (error) {
     console.error('加载数据资源失败:', error)

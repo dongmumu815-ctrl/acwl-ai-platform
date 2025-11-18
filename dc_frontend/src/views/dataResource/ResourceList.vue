@@ -1907,9 +1907,22 @@ const queryData = (resource: any) => {
   console.log("点击的资源:", resource);
   console.log("资源ID:", resource.id);
   console.log("资源名称:", resource.name);
+  console.log("数据源ID:", resource.datasourceId); // 修复：使用正确的属性名
   console.log("当前路由:", route.path);
   console.log("准备跳转到数据查询页面");
   console.log("========================");
+
+  // 检查必需的字段
+  if (!resource.id) {
+    ElMessage.error("资源ID缺失，无法查询");
+    return;
+  }
+
+  // 修复：使用正确的属性名 datasourceId
+  if (!resource.datasourceId) {
+    ElMessage.error("数据源ID缺失，无法查询");
+    return;
+  }
 
   // 记录审计日志
   if (securityConfig.auditLog) {
@@ -1921,25 +1934,30 @@ const queryData = (resource: any) => {
 
   // 跳转到数据查询页面，传递完整的数据源信息
   const queryParams: any = {
-    datasourceType: resource.datasourceType
+    datasourceType: resource.type === 'index' ? 'elasticsearch' : 'sql'
   };
 
   // 根据数据源类型传递不同的参数
-  if (resource.datasourceType === "elasticsearch") {
-    // ES数据源传递索引信息
-    if (resource.tableName) {
-      queryParams.indices = resource.tableName;
+  if (resource.type === 'index') {
+    // ES数据源传递索引信息，确保格式正确
+    if (resource.index_name) {
+      // 传递初始索引列表，格式为对象数组
+      queryParams.initialIndices = JSON.stringify([{ name: resource.index_name }]);
     }
   } else {
     // SQL数据源传递schema和表名信息
-    if (resource.database) {
-      queryParams.schema = resource.database;
+    if (resource.database_name) {
+      queryParams.schema = resource.database_name;
     }
-    if (resource.tableName) {
-      queryParams.tableName = resource.tableName;
+    if (resource.table_name) {
+      queryParams.tableName = resource.table_name;
     }
   }
 
+  // 直接传递数据资源ID作为查询参数
+  queryParams.dataResourceId = resource.id;
+
+  // 修复：使用正确的属性名 datasourceId
   router.push({
     path: `/data-resources/query/${resource.datasourceId}`,
     query: queryParams
