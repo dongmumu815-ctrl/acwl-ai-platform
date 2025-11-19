@@ -2,14 +2,15 @@
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_, func, text, select
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.response import success_response
-from app.api.v1.endpoints.auth import get_current_user
+from app.core.config import settings
 from app.models.user import User
 from app.models.resource_package import (
     ResourcePackage, ResourcePackagePermission,
@@ -25,10 +26,10 @@ from app.schemas.resource_package import (
 from app.services.data_resource_service import DataResourceService
 from app.services.elasticsearch_service import ElasticsearchService
 from app.services.excel_service import ExcelService
-from app.core.config import settings
-from minio import Minio
-from minio.error import S3Error
+from app.services.async_export_service import AsyncExportService
+from app.api.v1.endpoints.auth import get_current_user
 import json
+import hashlib
 import time
 import logging
 from jinja2 import Template
@@ -189,20 +190,20 @@ class ResourcePackageService:
         
         # 更新基本信息
         if package_data.name is not None:
-            package.name = package_data.name
+            package.name = str(package_data.name)
         if package_data.description is not None:
-            package.description = package_data.description
+            package.description = str(package_data.description)
         if package_data.template_id is not None:
-            package.template_id = package_data.template_id
+            package.template_id = int(package_data.template_id) if package_data.template_id is not None else None
         if package_data.template_type is not None:
-            package.template_type = package_data.template_type
+            package.template_type = str(package_data.template_type)
         if package_data.dynamic_params is not None:
             package.dynamic_params = package_data.dynamic_params
         if package_data.is_active is not None:
-            package.is_active = package_data.is_active
+            package.is_active = bool(package_data.is_active)
         # 支持更新删除锁定状态（0 可删除，1 禁止删除）
         if package_data.is_lock is not None:
-            package.is_lock = package_data.is_lock
+            package.is_lock = str(package_data.is_lock)
         
         package.updated_at = datetime.utcnow()
         
@@ -238,6 +239,8 @@ class ResourcePackageService:
         )
         reload_result = await self.db.execute(reload_query)
         updated_package = reload_result.scalar_one_or_none()
+        if updated_package is None:
+            raise HTTPException(status_code=404, detail="资源包不存在")
         return updated_package
     
     async def delete_package(self, package_id: int, user_id: int):
@@ -303,7 +306,8 @@ class ResourcePackageService:
                 items=[],
                 total=0,
                 page=search_req.page,
-                size=search_req.size
+                size=search_req.size,
+                pages=0
             )
         
         # 添加搜索条件
@@ -346,7 +350,8 @@ class ResourcePackageService:
                     items=[],
                     total=0,
                     page=search_req.page,
-                    size=search_req.size
+                    size=search_req.size,
+                    pages=0
                 )
         
         if conditions:
@@ -404,13 +409,12 @@ class ResourcePackageService:
         packages = result.scalars().all()
         
         return ResourcePackageListResponse(
-            items=packages,
+            items=list(packages),
             total=total,
             page=search_req.page,
-            size=search_req.size
+            size=search_req.size,
+            pages=(total + search_req.size - 1) // search_req.size if search_req.size > 0 else 0
         )
-    
-
     
     async def query_package(self, package_id: int, query_req: ResourcePackageQueryRequest, user_id: int) -> ResourcePackageQueryResponse:
         """执行资源包查询"""
@@ -599,8 +603,8 @@ class ResourcePackageService:
         return user_level >= required_level
     
     async def _record_query_history(self, package_id: int, user_id: int, dynamic_params: Dict[str, Any],
-                            generated_query: Optional[str], result_count: int, execution_time: int,
-                            status: QueryStatus, error_message: Optional[str] = None):
+                           generated_query: Optional[str], result_count: int, execution_time: int,
+                           status: QueryStatus, error_message: Optional[str] = None):
         """记录查询历史"""
         history = ResourcePackageQueryHistory(
             package_id=package_id,
@@ -696,7 +700,6 @@ async def search_resource_packages(
         data=result.model_dump(),
         message="查询成功"
     )
-
 
 
 @router.post("/{package_id}/query", response_model=ResourcePackageQueryResponse)
@@ -1015,3 +1018,186 @@ async def download_resource_package_file(
         },
         message="下载链接生成成功",
     )
+
+
+@router.post("/{package_id}/export-all")
+async def export_all_resource_package_results(
+    package_id: int,
+    query_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """异步导出资源包全部查询结果"""
+    service = ResourcePackageService(db)
+    
+    # 检查权限
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+    
+    try:
+        async_export_service = AsyncExportService()
+        result = await async_export_service.export_all_results(
+            package_id=package_id,
+            query_data=query_data,
+            db=db
+        )
+        
+        # 直接返回字典，让FastAPI自动处理响应
+        return {
+            "success": True,
+            "message": "已开始导出全部结果",
+            "data": result
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"导出全部结果失败: {e}")
+        raise HTTPException(status_code=500, detail="导出失败，请稍后重试")
+
+
+@router.get("/{package_id}/export-status/{task_id}")
+async def get_export_status(
+    package_id: int,
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取导出任务状态"""
+    service = ResourcePackageService(db)
+    
+    # 检查权限
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+    
+    try:
+        async_export_service = AsyncExportService()
+        status = await async_export_service.get_task_status(task_id)
+        return {
+            "success": True,
+            "data": status
+        }
+    except Exception as e:
+        logger.error(f"获取导出状态失败: {e}")
+        raise HTTPException(status_code=500, detail="获取状态失败")
+
+
+@router.get("/{package_id}/export-file")
+async def get_latest_export_file(
+    package_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取最新的导出文件，如果文件超过1小时则重新生成"""
+    service = ResourcePackageService(db)
+    
+    # 检查权限
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+    
+    try:
+        async_export_service = AsyncExportService()
+        
+        # 检查是否有最新的导出文件且未过期
+        latest_file = await async_export_service.get_latest_export_file(package_id, db)
+        
+        if latest_file:
+            return {
+                "success": True,
+                "data": latest_file,
+                "message": "找到最新的导出文件"
+            }
+        else:
+            # 文件不存在或已过期，需要重新生成
+            return {
+                "success": False,
+                "message": "没有可用的导出文件或文件已过期，请重新导出"
+            }
+    except Exception as e:
+        logger.error(f"获取导出文件失败: {e}")
+        raise HTTPException(status_code=500, detail="获取文件失败")
+
+
+@router.delete("/{package_id}/export-file/{file_id}")
+async def delete_export_file(
+    package_id: int,
+    file_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """删除导出文件"""
+    service = ResourcePackageService(db)
+    
+    # 检查权限
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+    
+    try:
+        async_export_service = AsyncExportService()
+        success = await async_export_service.delete_export_file(file_id, db)
+        
+        if success:
+            return {
+                "success": True,
+                "message": "文件删除成功"
+            }
+        else:
+            return {
+                "success": False,
+                "message": "文件删除失败"
+            }
+    except Exception as e:
+        logger.error(f"删除导出文件失败: {e}")
+        raise HTTPException(status_code=500, detail="删除文件失败")
+
+
+@router.post("/{package_id}/export-file/check")
+async def get_latest_export_file_by_query(
+    package_id: int,
+    query_data: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """按查询条件获取最新的导出文件
+    
+    功能：
+    - 根据 index + query + _source 生成查询哈希
+    - 仅当1小时内存在匹配该哈希的文件时返回下载链接
+    """
+    service = ResourcePackageService(db)
+    
+    # 检查权限
+    if not await service._check_permission(package_id, current_user.id, PermissionType.READ):
+        raise HTTPException(status_code=403, detail="无权限访问此资源包")
+    
+    try:
+        async_export_service = AsyncExportService()
+
+        # 计算查询哈希（与导出逻辑保持一致）
+        try:
+            query_fingerprint = {
+                "index": query_data.get("index"),
+                "query": query_data.get("query"),
+                "_source": query_data.get("_source"),
+            }
+            qstr = json.dumps(query_fingerprint, ensure_ascii=False, sort_keys=True)
+        except Exception:
+            qstr = json.dumps(query_data, ensure_ascii=False, sort_keys=True)
+        query_hash = hashlib.md5(f"{package_id}:{qstr}".encode("utf-8")).hexdigest()
+
+        # 查询匹配的最新文件
+        latest_file = await async_export_service.get_matching_export_file(package_id, db, query_hash)
+
+        if latest_file:
+            return {
+                "success": True,
+                "data": latest_file,
+                "message": "找到匹配查询条件的导出文件"
+            }
+        else:
+            return {
+                "success": False,
+                "message": "没有匹配查询条件的导出文件或文件已过期，请重新导出"
+            }
+    except Exception as e:
+        logger.error(f"按查询条件获取导出文件失败: {e}")
+        raise HTTPException(status_code=500, detail="获取文件失败")

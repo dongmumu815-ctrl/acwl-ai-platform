@@ -14,8 +14,50 @@
               @click="exportResults"
             >
               <el-icon><Download /></el-icon>
-              导出查询结果
+              导出当前页结果
             </el-button>
+            <el-tooltip :content="exportStatus === 'processing' ? '服务端正在打包生成中' : ''" :disabled="exportStatus !== 'processing'" placement="top">
+              <el-button
+                type="primary"
+                size="small"
+                plain
+                :disabled="selectedCount === 0 || exportStatus === 'processing'"
+                @click="exportAllResults"
+                :loading="exportAllLoading"
+              >
+                <el-icon><Download /></el-icon>
+                导出全部结果
+              </el-button>
+            </el-tooltip>
+            <!-- 导出进度显示 -->
+            <div v-if="exportStatus === 'processing' || exportStatus === 'completed' || latestFileAvailable" class="export-progress">
+              <el-progress 
+                v-if="exportPercentage !== undefined"
+                :percentage="exportPercentage" 
+                :stroke-width="8" 
+                :status="exportStatus === 'failed' ? 'exception' : (exportStatus === 'completed' ? 'success' : undefined)"
+                style="width: 180px; margin-left: 8px;"
+              />
+              <div v-if="exportProgress" class="export-progress-text">
+                <span v-if="exportProgress?.total != null">已处理 {{ formatNumber(exportProgress?.processed) }} / {{ formatNumber(exportProgress?.total) }}</span>
+                <span v-else>已处理 {{ formatNumber(exportProgress?.processed || 0) }}</span>
+                <span class="divider">|</span>
+                <span>页 {{ exportProgress?.pages_fetched || 0 }}</span>
+                <span class="divider">|</span>
+                <span>分片 {{ exportProgress?.files_generated || 0 }}</span>
+              </div>
+              <div v-else class="export-progress-text">已有可下载文件</div>
+              <el-link
+                v-if="canDownloadNow || latestFileAvailable"
+                type="primary"
+                :underline="true"
+                @click="downloadExportFile"
+                style="margin-left: 8px;"
+              >
+                <el-icon><Download /></el-icon>
+                下载文件
+              </el-link>
+            </div>
           </div>
         </div>
       </template>
@@ -469,7 +511,7 @@
                     <el-pagination
                       v-model:current-page="currentPage"
                       v-model:page-size="pageSize"
-                      :page-sizes="[10, 20, 50, 100,4000]"
+                      :page-sizes="[10, 20, 50, 100,1000,2000,3000,4000]"
                       layout="total, sizes, prev, pager, next, jumper"
                       :total="totalHits"
                       @current-change="onPageChange"
@@ -599,7 +641,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, nextTick } from "vue";
+import { ref, reactive, computed, onMounted, watch, nextTick, onUnmounted } from "vue";
+
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Lock,
@@ -1031,7 +1074,7 @@ const openPdf = () => {
 
 // 分页
 const currentPage = ref(1);
-const pageSize = ref(4000);
+const pageSize = ref(100);
 // 滑动查询相关状态
 const MAX_RESULT_WINDOW = 10000;
 const pagingMode = ref<"offset" | "search_after">("offset");
@@ -1338,6 +1381,10 @@ function removeCondition(i: number) {
   conditions.splice(i, 1);
 }
 
+/**
+ * 重置查询条件
+ * 行为：清空查询与分页状态，同时隐藏导出进度与下载入口
+ */
 function resetConditions() {
   conditions.splice(0, conditions.length);
   defaultSearchField.value = "";
@@ -1349,6 +1396,17 @@ function resetConditions() {
   lastPageLoaded.value = 1;
   lastSearchAfter.value = null;
   pagingMode.value = "offset";
+
+  // 清空导出状态，确保重置后不显示进度或下载
+  exportStatus.value = null;
+  exportProgress.value = null;
+  exportFileUrl.value = null;
+  latestFileAvailable.value = false;
+  latestDownloadUrl.value = null;
+  if (exportPollingTimer.value) {
+    clearInterval(exportPollingTimer.value);
+    exportPollingTimer.value = null;
+  }
 }
 
 function formatFixedCondition(cond: any): string {
@@ -1627,6 +1685,10 @@ function buildDSL(): any {
   return query;
 }
 
+/**
+ * 执行查询
+ * 行为：在发起新的查询前清空导出相关状态并隐藏进度区
+ */
 async function executeQuery() {
   try {
     if (!props.packageData?.datasource_id) {
@@ -1636,6 +1698,17 @@ async function executeQuery() {
     if (!selectedIndices.value.length) {
       ElMessage.error("缺少索引信息，无法进行查询");
       return;
+    }
+
+    // 清空导出状态，避免在重新/重置查询后仍显示进度或下载
+    exportStatus.value = null;
+    exportProgress.value = null;
+    exportFileUrl.value = null;
+    latestFileAvailable.value = false;
+    latestDownloadUrl.value = null;
+    if (exportPollingTimer.value) {
+      clearInterval(exportPollingTimer.value);
+      exportPollingTimer.value = null;
     }
 
     loading.value = true;
@@ -1728,7 +1801,7 @@ async function executeQuery() {
     // 处理响应数据
     if (resp?.data) {
       // 从 resp.data 中提取 fieldMappings 和 stats
-      const { fieldMappings: respFieldMappings, stats, ...esData } = resp.data;
+      const { fieldMappings: respFieldMappings, stats, ...esData } = resp.data as any;
 
       // 更新 fieldMappings
       if (respFieldMappings) {
@@ -1744,15 +1817,15 @@ async function executeQuery() {
       visibleCount.value = Math.min(CARD_INITIAL_BATCH, records.value.length);
       // 更新下一页的游标（search_after）
       try {
-        const cursor = esData?.cursor || (resp as any)?.cursor;
+        const cursor = (esData as any)?.cursor || (resp as any)?.cursor;
         const nextSearchAfter = cursor?.nextSearchAfter;
         if (pagingMode.value === "search_after") {
           if (nextSearchAfter) {
             lastSearchAfter.value = nextSearchAfter;
           } else {
             const hits = esData?.hits?.hits || [];
-            if (hits.length > 0 && Array.isArray(hits[hits.length - 1]?.sort)) {
-              lastSearchAfter.value = hits[hits.length - 1].sort;
+            if (hits.length > 0 && Array.isArray((hits[hits.length - 1] as any)?.sort)) {
+              lastSearchAfter.value = (hits[hits.length - 1] as any).sort;
             }
           }
         } else {
@@ -2315,6 +2388,237 @@ async function handleDownloadLatest() {
     latestDownloadLoading.value = false;
   }
 }
+
+const exportAllLoading = ref(false);
+const exportTaskId = ref(null);
+const exportPollingTimer = ref(null);
+const exportStatus = ref<'started' | 'processing' | 'completed' | 'failed' | null>(null);
+const exportProgress = ref<{
+  total?: number;
+  processed: number;
+  percentage?: number;
+  pages_fetched: number;
+  files_generated: number;
+  current_file_rows: number;
+} | null>(null);
+const exportFileUrl = ref<string | null>(null);
+const latestFileAvailable = ref<boolean>(false);
+const latestDownloadUrl = ref<string | null>(null);
+const latestFileCheckTimer = ref<any>(null);
+const exportPercentage = computed<number | undefined>(() => {
+  if (!exportProgress.value) return undefined;
+  const p = exportProgress.value;
+  if (typeof p.percentage === 'number') return Math.max(0, Math.min(100, p.percentage));
+  if (typeof p.total === 'number' && p.total > 0) {
+    const val = Math.round((p.processed * 10000) / p.total) / 100;
+    return Math.max(0, Math.min(100, val));
+  }
+  return undefined;
+});
+
+// 可下载状态：导出已完成且进度100%
+const canDownloadNow = computed<boolean>(() => {
+  const statusOk = exportStatus.value === 'completed';
+  const percent = exportPercentage.value;
+  const progressPercent = exportProgress.value?.percentage;
+  const isFull = (typeof percent === 'number' && Math.round(percent) >= 100) || progressPercent === 100 || progressPercent === 100.0;
+  return Boolean(statusOk && isFull);
+});
+
+/**
+ * 格式化数字为本地化字符串
+ * @param num 数字或字符串
+ */
+function formatNumber(num: number | string | undefined): string {
+  if (num === null || num === undefined || num === '') return '';
+  const numValue = typeof num === 'string' ? parseFloat(num) : num;
+  if (isNaN(numValue as number)) return String(num);
+  return (numValue as number).toLocaleString('zh-CN');
+}
+
+/**
+ * 导出全部结果（异步导出）
+ * 触发后端异步任务，返回 task_id，并开始轮询任务状态以展示进度。
+ */
+const exportAllResults = async () => {
+  try {
+    await ElMessageBox.confirm("确定要导出全部查询结果吗？这可能需要一些时间，导出完成后会提供下载链接。", "确认导出", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "info"
+    });
+
+    exportAllLoading.value = true;
+    
+    // 构建查询数据
+    const dsl = buildDSL();
+    const queryData = {
+      index: selectedIndices.value,
+      query: dsl.query,
+      _source: dsl._source
+    };
+
+    // 优先检查是否有与当前查询条件完全匹配的缓存文件（有效期1小时）
+    const cacheResp = await resourcePackageApi.getLatestExportFileByQuery(props.packageData.id, queryData);
+    if (cacheResp.success) {
+      const fileData = cacheResp.data;
+      latestFileAvailable.value = true;
+      latestDownloadUrl.value = fileData?.download_url || null;
+      ElMessage.success("命中缓存，正在下载...");
+      if (fileData?.download_url) {
+        window.open(fileData.download_url, '_blank');
+      }
+      // 命中缓存则不再触发导出任务
+      return;
+    }
+
+    // 调用后端异步导出API（统一请求封装）
+    const resp = await resourcePackageApi.exportAllResults(props.packageData.id, queryData);
+    if (!resp.success) {
+      throw new Error(resp.message || "导出请求失败");
+    }
+    ElMessage.success("已开始导出全部结果");
+    exportTaskId.value = resp.data?.task_id;
+    exportStatus.value = 'started';
+    exportProgress.value = null;
+    startPollingExportStatus();
+  } catch (error: any) {
+    if (error !== "cancel") {
+      console.error("导出全部结果失败:", error);
+      ElMessage.error(error.message || "导出请求失败");
+    }
+  } finally {
+    exportAllLoading.value = false;
+  }
+};
+
+/**
+ * 开始轮询导出状态
+ * 定时请求后端任务状态，更新进度与状态，完成后自动触发下载。
+ */
+const startPollingExportStatus = () => {
+  // 清除之前的轮询定时器
+  if (exportPollingTimer.value) {
+    clearInterval(exportPollingTimer.value);
+  }
+  
+  // 每5秒轮询一次任务状态
+  exportPollingTimer.value = setInterval(async () => {
+    if (!exportTaskId.value) {
+      clearInterval(exportPollingTimer.value);
+      return;
+    }
+    
+    try {
+      const resp = await resourcePackageApi.getExportStatus(props.packageData.id, exportTaskId.value);
+      if (resp.success) {
+        const status = resp.data;
+        exportStatus.value = status?.status || null;
+        exportProgress.value = status?.progress || null;
+        exportFileUrl.value = status?.file_url || exportFileUrl.value;
+        exportFileUrl.value = status?.file_url || exportFileUrl.value;
+        
+        if (status.status === "completed") {
+          // 导出完成，提供下载链接
+          clearInterval(exportPollingTimer.value);
+          ElMessage.success("导出完成，准备下载文件");
+          downloadExportFile();
+          exportTaskId.value = null;
+        } else if (status.status === "failed") {
+          // 导出失败
+          clearInterval(exportPollingTimer.value);
+          ElMessage.error(status?.message || "导出失败");
+          exportTaskId.value = null;
+        }
+        // 其他状态（started, processing）继续轮询
+      } else {
+        console.error("获取导出状态失败:", resp.message);
+      }
+    } catch (error) {
+      console.error("轮询导出状态失败:", error);
+    }
+  }, 5000); // 每5秒轮询一次
+};
+
+/**
+ * 检查最新的导出文件
+ * 功能：
+ * - 主动查询后端是否已有未过期的导出文件
+ * - 若存在，则设置 latestFileAvailable 与 latestDownloadUrl 用于显示下载链接
+ */
+async function checkLatestExportFile() {
+  try {
+    if (!props.packageData?.id) return;
+    // 构建与导出一致的查询指纹
+    const dsl = buildDSL();
+    const queryData = {
+      index: selectedIndices.value,
+      query: dsl.query,
+      _source: dsl._source
+    };
+    // 先按查询条件检查匹配的缓存文件
+    const respByQuery = await resourcePackageApi.getLatestExportFileByQuery(props.packageData.id, queryData);
+    if (respByQuery.success) {
+      latestFileAvailable.value = true;
+      latestDownloadUrl.value = respByQuery.data?.download_url || null;
+      return;
+    }
+    // 回退：获取包维度的最新文件（可能与当前查询不一致，不显示下载链接）
+    latestFileAvailable.value = false;
+    latestDownloadUrl.value = null;
+  } catch (e) {
+    latestFileAvailable.value = false;
+    latestDownloadUrl.value = null;
+  }
+}
+
+/**
+ * 下载导出文件
+ * 功能：
+ * - 在导出完成后获取最新的预签名下载链接并发起下载
+ * - 保留文件1小时（后端策略），不再进行前端的自动删除
+ */
+const downloadExportFile = async () => {
+  try {
+    // 首先检查是否有最新的导出文件
+    const dsl = buildDSL();
+    const queryData = {
+      index: selectedIndices.value,
+      query: dsl.query,
+      _source: dsl._source
+    };
+    const respByQuery = await resourcePackageApi.getLatestExportFileByQuery(props.packageData.id, queryData);
+    if (respByQuery.success) {
+      const fileData = respByQuery.data;
+      window.open(fileData.download_url, '_blank');
+      latestFileAvailable.value = true;
+      latestDownloadUrl.value = fileData.download_url;
+      return;
+    }
+    // 回退：若轮询状态中有URL则使用
+    if (exportFileUrl.value) {
+      window.open(exportFileUrl.value, '_blank');
+      return;
+    }
+    ElMessage.warning(respByQuery.message || "没有可用的导出文件或文件已过期，请重新导出");
+  } catch (error) {
+    console.error("下载导出文件失败:", error);
+    ElMessage.error("下载导出文件失败");
+  }
+};
+
+// 组件卸载时清除定时器
+onUnmounted(() => {
+  if (exportPollingTimer.value) {
+    clearInterval(exportPollingTimer.value);
+  }
+  if (latestFileCheckTimer.value) {
+    clearInterval(latestFileCheckTimer.value);
+  }
+});
+
+// 按需求：仅在用户点击“导出全部结果”后进行缓存检查，此处不在页面加载时自动检查
+
 // 暴露查询方法，便于父组件在进入页面时触发默认查询
 defineExpose({
   executeQuery,

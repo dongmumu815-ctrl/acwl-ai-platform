@@ -608,14 +608,9 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
         return text[:max_len] + "..."
 
     def _should_capture_response_body(self, method: str, status_code: Optional[int]) -> bool:
-        """判断是否需要捕获响应体：
-        - 对于成功的 GET 响应不抓取响应体，减少 I/O 与内存占用
-        - 其他方法或错误响应则抓取以便排错
-        """
-        m = (method or '').upper()
-        if m == 'GET' and (status_code is not None and status_code < 400):
+        if status_code is None:
             return False
-        return True
+        return status_code >= 400
 
     async def _get_table_columns_cached(self, db, table_name: str) -> Set[str]:
         """获取指定表的列集合，使用内存缓存避免每次请求都访问 INFORMATION_SCHEMA"""
@@ -739,13 +734,21 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
             # 根据需要决定是否捕获响应体（避免对 GET 成功响应的额外读取）
             if self._should_capture_response_body(method, status_code):
                 try:
-                    resp_body = [section async for section in response.body_iterator]
-                    response.body_iterator = iterate_in_threadpool(iter(resp_body))
-                    response_body = b"".join(resp_body)
+                    response_body = None
+                    body_iter = getattr(response, "body_iterator", None)
+                    if body_iter is not None:
+                        chunks = [section async for section in body_iter]
+                        response.body_iterator = iterate_in_threadpool(iter(chunks))
+                        response_body = b"".join(chunks)
+                    else:
+                        body_bytes = getattr(response, "body", None)
+                        if body_bytes is not None:
+                            response_body = body_bytes
                     response_text = response_body.decode('utf-8', errors='ignore') if response_body else None
                     response_size = len(response_body) if response_body else 0
-                    # 截断过长的响应体
                     response_text = self._truncate_text(response_text, 4096)
+                    if 'content-length' in response.headers:
+                        response.headers['content-length'] = str(response_size or 0)
                 except Exception:
                     response_text = None
                     response_size = 0

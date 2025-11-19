@@ -326,18 +326,15 @@ export const request = async <T = any>(config: RequestConfig): Promise<ApiRespon
   try {
     const response = await axiosInstance.request<T>(config)
     
-    // 检查响应数据是否已经是ApiResponse格式（必须同时包含success与data字段）
-    if (
-      response.data &&
-      typeof response.data === 'object' &&
-      'success' in response.data &&
-      'data' in response.data
-    ) {
+    /**
+     * 处理带有服务端标准字段的响应
+     * 只要响应体包含 `success` 字段，即视为标准响应并按该字段解析；`data` 允许缺省
+     */
+    if (response.data && typeof response.data === 'object' && 'success' in response.data) {
       const rd: any = response.data
       return {
-        ...rd,
         success: Boolean(rd.success),
-        data: rd.data as T,
+        data: (rd.data ?? undefined) as T,
         message: typeof rd.message === 'string' ? rd.message : undefined,
         code: typeof rd.code === 'number' ? rd.code : undefined,
       } as ApiResponse<T>
@@ -352,16 +349,15 @@ export const request = async <T = any>(config: RequestConfig): Promise<ApiRespon
   } catch (error) {
     // 如果是axios错误且有响应数据，返回响应数据
     if (axios.isAxiosError(error) && error.response?.data) {
-      // 检查错误响应是否已经是ApiResponse格式（必须同时包含success与data字段）
-      if (
-        typeof error.response.data === 'object' &&
-        'success' in error.response.data &&
-        'data' in error.response.data
-      ) {
+      /**
+       * 处理服务端返回的错误格式
+       * 只要包含 `success` 字段，即按标准响应解析；`data` 可缺省
+       */
+      if (typeof error.response.data === 'object' && 'success' in error.response.data) {
         const rd: any = error.response.data
         return {
           success: Boolean(rd.success),
-          data: rd.data as T,
+          data: (rd.data ?? undefined) as T,
           message: typeof rd.message === 'string' ? rd.message : undefined,
           code: typeof rd.code === 'number' ? rd.code : undefined
         } as ApiResponse<T>

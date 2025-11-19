@@ -280,6 +280,49 @@ export const resourcePackageApi = {
   },
 
   /**
+   * 异步导出全部查询结果
+   */
+  exportAllResults(id: number, payload: Record<string, any>): Promise<ApiResponse<{ task_id: string }>> {
+    return post(`/resource-packages/${id}/export-all`, payload, { permission: 'data:resource_package:export' })
+  },
+
+  /**
+   * 获取导出任务状态
+   */
+  /**
+   * 获取导出任务状态（长轮询）
+   *
+   * 为避免长耗时导出进度查询超时，将超时提升到10分钟
+   */
+  getExportStatus(id: number, taskId: string): Promise<ApiResponse<{ status: string; message?: string; progress?: any; created_at?: string; file_url?: string }>> {
+    return get(`/resource-packages/${id}/export-status/${taskId}`, undefined, {
+      permission: 'data:resource_package:export:status',
+      timeout: 600000
+    })
+  },
+
+  /**
+   * 获取最新导出文件
+   */
+  getLatestExportFile(id: number): Promise<ApiResponse<{ download_url: string; file_id: number }>> {
+    return get(`/resource-packages/${id}/export-file`, undefined, { permission: 'data:resource_package:export:file' })
+  },
+
+  /**
+   * 按查询条件获取最新导出文件（仅当查询条件完全匹配时返回）
+   */
+  getLatestExportFileByQuery(id: number, payload: Record<string, any>): Promise<ApiResponse<{ download_url: string; file_id: number }>> {
+    return post(`/resource-packages/${id}/export-file/check`, payload, { permission: 'data:resource_package:export:file' })
+  },
+
+  /**
+   * 删除指定导出文件
+   */
+  deleteExportFile(id: number, fileId: number): Promise<ApiResponse<{ message: string }>> {
+    return del(`/resource-packages/${id}/export-file/${fileId}`, { permission: 'data:resource_package:export:file:delete' })
+  },
+
+  /**
    * 生成Excel（更新excel_time与download_url）
    */
   generateExcel(id: number, payload: Record<string, any>): Promise<ApiResponse<any>> {
