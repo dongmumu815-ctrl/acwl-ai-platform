@@ -530,3 +530,13 @@ export const getResourceTypes = (): Promise<ApiResponse<{
     permission: 'data:resource_type:view'
   })
 }
+
+/**
+ * 获取关联任务类型列表
+ */
+export const getLinkTypes = (): Promise<ApiResponse<any[]>> => {
+  return request({
+    url: '/link-types',
+    method: 'get'
+  })
+}
