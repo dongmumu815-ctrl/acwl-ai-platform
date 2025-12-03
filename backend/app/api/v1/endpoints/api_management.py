@@ -27,6 +27,7 @@ from app.core.multi_db_manager import get_db_session
 from app.models.api_management import Customer, CustomApi, ApiField, DataBatch, ApiUsageLog, DataUpload
 from app.models.resource_type import DataResourceType
 from app.core.config import settings
+from app.services.db_service import LinkTaskService
 import redis
 
 router = APIRouter()
@@ -71,6 +72,22 @@ def invalidate_api_fields_cache(api_id: int):
 # Mock数据已删除，现在使用真实的数据库操作
 
 # ==================== 平台管理 ====================
+
+@router.get("/link-types", summary="获取关联任务类型")
+async def get_link_types(
+    current_user: User = Depends(get_current_active_user)
+):
+    """获取关联任务类型列表"""
+    try:
+        service = LinkTaskService()
+        result = service.get_link_menu_types()
+        
+        if not result['success']:
+            raise HTTPException(status_code=500, detail=result.get('error', '获取任务类型失败'))
+            
+        return success_response(data=result['data'])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/customers", summary="获取客户列表")
 async def get_customers(
@@ -531,6 +548,7 @@ async def get_apis(
                     "request_format": getattr(api, 'request_format', 'json'),  # 安全访问
                     "response_format": api.response_format,
                     "resource_type_id": getattr(api, 'resource_type_id', None),
+                    "link_read_id": getattr(api, 'link_read_id', None),
                     "is_active": api.status == 1,        # 正确的状态转换
                     "total_calls": api.total_calls or 0,
                     "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,
@@ -596,6 +614,7 @@ async def get_api(
                 "request_format": getattr(api, 'request_format', 'json'),
                 "response_format": api.response_format,
                 "resource_type_id": getattr(api, 'resource_type_id', None),
+                "link_read_id": getattr(api, 'link_read_id', None),
                 "is_active": api.status == 1,
                 "total_calls": api.total_calls or 0,
                 "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,
@@ -644,6 +663,7 @@ async def create_api(
             http_method = api_data.get("http_method", "POST")
             response_format = api_data.get("response_format", "json")
             resource_type_id = api_data.get("resource_type_id")
+            link_read_id = api_data.get("link_read_id")
             
             # 验证必需字段
             if not all([customer_id, api_name, api_code]):
@@ -667,6 +687,7 @@ async def create_api(
                 http_method=http_method,
                 response_format=response_format,
                 resource_type_id=resource_type_id,
+                link_read_id=link_read_id,
                 status=1,  # 默认激活
                 total_calls=0,
                 created_at=datetime.now(),
@@ -692,6 +713,7 @@ async def create_api(
                 "http_method": new_api.http_method,
                 "response_format": new_api.response_format,
                 "resource_type_id": new_api.resource_type_id,
+                "link_read_id": new_api.link_read_id,
                 "is_active": new_api.status == 1,
                 "total_calls": new_api.total_calls,
                 "created_at": new_api.created_at.isoformat(),
@@ -769,6 +791,8 @@ async def update_api(
                 api.status = 1 if update_data.status else 0
             if update_data.resource_type_id is not None:
                 api.resource_type_id = update_data.resource_type_id
+            if update_data.link_read_id is not None:
+                api.link_read_id = update_data.link_read_id
             
             # 更新时间戳
             api.updated_at = datetime.now()
@@ -795,6 +819,7 @@ async def update_api(
                 "request_format": getattr(api, 'request_format', 'json'),
                 "response_format": api.response_format,
                 "resource_type_id": getattr(api, 'resource_type_id', None),
+                "link_read_id": getattr(api, 'link_read_id', None),
                 "is_active": api.status == 1,
                 "total_calls": api.total_calls or 0,
                 "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,

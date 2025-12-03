@@ -68,6 +68,7 @@ export interface CustomApi {
   customer?: Customer
   fields?: ApiField[]
   resource_type_id?: string
+  link_read_id?: string | number
 }
 
 /**
@@ -97,6 +98,7 @@ export interface CustomApiUpdate {
   request_format?: 'json' | 'form' | 'xml'
   response_format?: 'json' | 'xml' | 'text'
   resource_type_id?: string
+  link_read_id?: string | number
   is_active?: boolean
 }
 

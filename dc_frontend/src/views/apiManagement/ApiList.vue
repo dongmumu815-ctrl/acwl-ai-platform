@@ -282,15 +282,20 @@
                   <el-icon><Setting /></el-icon>
                   字段
                 </el-button>
-                <el-button size="small" type="success" @click="testApi(row)">
+                <!-- <el-button size="small" type="success" @click="testApi(row)">
                   <el-icon><VideoPlay /></el-icon>
                   测试
+                </el-button> -->
+                 <el-button size="small" type="success" @click="handleDocumentCommand('markdown', row)">
+                  <el-icon><Document /></el-icon>
+                  文档
                 </el-button>
+
                 <el-button size="small" @click="viewLogs(row)">
                   <el-icon><View /></el-icon>
                   查看日志
                 </el-button>
-                <el-dropdown
+                <!-- <el-dropdown
                   @command="(command) => handleDocumentCommand(command, row)"
                   size="small"
                 >
@@ -311,7 +316,7 @@
                       </el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
-                </el-dropdown>
+                </el-dropdown> -->
                 <el-button size="small" type="warning" @click="copyApi(row)">
                   <el-icon><CopyDocument /></el-icon>
                   复制
@@ -452,10 +457,11 @@
                           <el-icon><Setting /></el-icon>
                           字段
                         </el-dropdown-item>
-                        <!-- <el-dropdown-item @click="testApi(api)">
-                          <el-icon><VideoPlay /></el-icon>
-                          测试
-                        </el-dropdown-item> -->
+                        <el-dropdown-item @click="handleDocumentCommand('markdown', api)">
+                          <el-icon><Document /></el-icon>
+                          文档
+                        </el-dropdown-item>
+
                         <el-dropdown-item @click="viewLogs(api)">
                           <el-icon><View /></el-icon>
                           日志
@@ -552,6 +558,30 @@
                 <span>{{ resourceType.name }}</span>
                 <span style="color: #8492a6; font-size: 13px">{{
                   resourceType.describe
+                }}</span>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="关联任务类型" prop="link_read_id">
+          <el-select
+            v-model="form.link_read_id"
+            placeholder="请选择关联任务类型"
+            style="width: 100%"
+            filterable
+            clearable
+          >
+            <el-option
+              v-for="item in linkTypes"
+              :key="item.id"
+              :label="item.link_menu_name"
+              :value="item.id"
+            >
+              <div style="display: flex; justify-content: space-between">
+                <span>{{ item.link_menu_name }}</span>
+                <span style="color: #8492a6; font-size: 13px">{{
+                  item.name
                 }}</span>
               </div>
             </el-option>
@@ -795,7 +825,8 @@ import {
   deleteApi as deleteApiRequest,
   copyApi as copyApiRequest,
   testApiConnection,
-  getResourceTypes
+  getResourceTypes,
+  getLinkTypes
 } from "@/api/apiManagement";
 import { getCustomers } from "@/api/apiManagement";
 import type {
@@ -818,6 +849,7 @@ const loading = ref(false);
 const apis = ref<CustomApi[]>([]);
 const customers = ref<Customer[]>([]);
 const resourceTypes = ref<ResourceType[]>([]);
+const linkTypes = ref<any[]>([]);
 const searchQuery = ref("");
 const customerFilter = ref<number | "">("");
 const statusFilter = ref("");
@@ -849,6 +881,7 @@ const form = reactive<CustomApiCreate & { is_active?: boolean; id?: number }>({
   http_method: "POST",
   response_format: "json",
   resource_type_id: undefined as any,
+  link_read_id: undefined as any,
   is_active: true
 });
 
@@ -974,6 +1007,8 @@ const apiStats = computed(() => {
 onMounted(() => {
   loadApis();
   loadCustomers();
+  loadLinkTypes();
+  loadResourceTypes();
 });
 
 /**
@@ -1037,6 +1072,20 @@ const loadResourceTypes = async () => {
 };
 
 /**
+ * 加载关联任务类型列表
+ */
+const loadLinkTypes = async () => {
+  try {
+    const response = await getLinkTypes();
+    if (response.success) {
+      linkTypes.value = response.data;
+    }
+  } catch (error) {
+    console.error("加载关联任务类型列表失败:", error);
+  }
+};
+
+/**
  * 获取请求方法标签类型
  */
 const getMethodTagType = (
@@ -1090,6 +1139,8 @@ const showEditDialog = (api: CustomApi) => {
     // 资源类型ID统一为字符串，避免选择器匹配失败
     resource_type_id:
       api.resource_type_id != null ? String(api.resource_type_id) : undefined,
+    link_read_id:
+      api.link_read_id != null ? Number(api.link_read_id) : undefined,
     is_active: api.is_active
   });
 
@@ -1112,6 +1163,7 @@ const resetForm = () => {
     http_method: "POST",
     response_format: "json",
     resource_type_id: undefined as any,
+    link_read_id: undefined as any,
     is_active: true
   });
 
@@ -1136,6 +1188,7 @@ const submitForm = async () => {
         http_method: form.http_method,
         response_format: form.response_format,
         resource_type_id: form.resource_type_id,
+        link_read_id: form.link_read_id,
         is_active: form.is_active
       };
 
@@ -1161,7 +1214,8 @@ const submitForm = async () => {
         api_description: form.api_description,
         http_method: form.http_method,
         response_format: form.response_format,
-        resource_type_id: form.resource_type_id
+        resource_type_id: form.resource_type_id,
+        link_read_id: form.link_read_id
       };
 
       console.log("创建API数据:", createData);
