@@ -8,18 +8,23 @@
 
     <!-- 主要内容：左右两栏布局 -->
     <div class="content-wrapper">
-      <div class="two-column-layout">
+      <div class="two-column-layout" :class="{ 'is-collapsed': isLeftCollapsed }">
         <!-- 左侧：中心表结构 -->
         <el-card
           class="main-card left-col"
+          :class="{ 'collapsed-card': isLeftCollapsed }"
           v-loading="tableDetailLoading"
           element-loading-text="加载表结构..."
           element-loading-background="rgba(255,255,255,0.7)"
         >
-        <template #header>
+        
+        <template #header v-if="!isLeftCollapsed">
           <div class="card-header">
             <span>中心表结构详情</span>
             <div class="header-actions">
+              <el-button link @click="isLeftCollapsed = true" title="折叠面板">
+                <el-icon><Fold /></el-icon>
+              </el-button>
               <el-button @click="loadTableDetail" :loading="tableDetailLoading" size="small">
                 <el-icon><Refresh /></el-icon>
                 刷新数据
@@ -36,6 +41,15 @@
           </div>
         </template>
 
+        <!-- 折叠后的显示内容 -->
+        <div v-if="isLeftCollapsed" class="collapsed-view" @click="isLeftCollapsed = false" title="点击展开">
+           <div class="collapsed-content">
+             <el-icon size="16"><Expand /></el-icon>
+             <span class="vertical-text">中心表结构详情</span>
+           </div>
+        </div>
+
+        <div v-else>
         <!-- 表基本信息 -->
         <!-- <div v-if="tableDetail" class="table-info-section" style="margin-bottom: 20px;">
           <el-descriptions :column="3" border>
@@ -103,6 +117,7 @@
         <!-- 加载状态 -->
         <div v-if="!tableDetail && !tableDetailLoading" class="empty-state">
           <el-empty description="点击刷新数据按钮加载表详情" />
+        </div>
         </div>
         </el-card>
 
@@ -480,7 +495,7 @@ import { ref, reactive, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { Search, Refresh, Plus, Delete, Key, Edit, WarningFilled, Loading } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete, Key, Edit, WarningFilled, Loading, Fold, Expand } from '@element-plus/icons-vue'
 import { dataInsightAPI } from '@/api/dataInsight'
 import type { DataSource, TableInfo, TableDetail, TableColumn, TableDataRequest, FieldUpdateRequest } from '@/api/dataInsight'
 import { listResourceTypes, createResourceType, updateResourceType, deleteResourceType } from '@/api/resourceType'
@@ -506,6 +521,9 @@ const tableDataLoading = ref(false)
 const editFieldLoading = ref(false)
 const deleteFieldLoading = ref(false)
 const addFieldLoading = ref(false)
+
+// 左侧面板折叠状态
+const isLeftCollapsed = ref(false)
 
 // 表相关
 const tableDetail = ref<TableDetail | null>(null)
@@ -1115,6 +1133,11 @@ onMounted(() => {
       gap: 16px;
       height: 100%;       /* 填满内容区高度 */
       min-height: 0;      /* 使网格子项可在高度上收缩以使用内部滚动 */
+      transition: grid-template-columns 0.3s ease;
+
+      &.is-collapsed {
+        grid-template-columns: 48px 1fr;
+      }
 
       // .right-col, .el-card__body {
       //   padding: 8px !important;
@@ -1148,6 +1171,43 @@ onMounted(() => {
             display: none!important;
           }
         }
+
+      /* 折叠状态样式 */
+      .collapsed-view {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 16px;
+        cursor: pointer;
+        color: #606266;
+        transition: all 0.3s;
+        
+        &:hover {
+          color: var(--el-color-primary);
+          background-color: var(--el-fill-color-light);
+        }
+
+        .collapsed-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .vertical-text {
+          writing-mode: vertical-rl;
+          letter-spacing: 4px;
+          font-size: 14px;
+          font-weight: 600;
+        }
+      }
+
+      /* 折叠时移除卡片内边距 */
+      &.collapsed-card :deep(.el-card__body) {
+        padding: 0 !important;
+        overflow: hidden;
+      }
 
       /* 网格子项需要可收缩以启用卡片内部滚动 */
       .left-col, .right-col {

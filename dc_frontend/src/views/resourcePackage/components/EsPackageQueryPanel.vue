@@ -6,29 +6,15 @@
         <div class="card-header">
           <span class="card-title">资源中心查询</span>
           <div class="header-actions">
-            <el-button
-              type="primary"
-              size="small"
-              plain
-              :disabled="selectedCount === 0"
-              @click="exportResults"
-            >
-              <el-icon><Download /></el-icon>
+            <el-button type="primary" size="small" @click="openExportDialog('current')" :disabled="!results?.hits?.hits?.length">
+              <el-icon style="margin-right: 4px"><Download /></el-icon>
               导出当前页结果
             </el-button>
-            <el-tooltip :content="exportStatus === 'processing' ? '服务端正在打包生成中' : ''" :disabled="exportStatus !== 'processing'" placement="top">
-              <el-button
-                type="primary"
-                size="small"
-                plain
-                :disabled="selectedCount === 0 || exportStatus === 'processing'"
-                @click="exportAllResults"
-                :loading="exportAllLoading"
-              >
-                <el-icon><Download /></el-icon>
-                导出全部结果
-              </el-button>
-            </el-tooltip>
+            <el-button type="primary" size="small" @click="openExportDialog('all')" :disabled="!results?.hits?.hits?.length">
+              <el-icon style="margin-right: 4px"><Download /></el-icon>
+              导出全部结果
+            </el-button>
+            
             <!-- 导出进度显示 -->
             <div v-if="exportStatus === 'processing' || exportStatus === 'completed' || latestFileAvailable" class="export-progress">
               <el-progress 
@@ -636,6 +622,36 @@
         </div>
       </div>
     </el-card>
+
+    <!-- 导出字段选择弹窗 -->
+    <el-dialog v-model="exportDialogVisible" title="导出选项" width="500px">
+      <div style="margin-bottom: 16px;">
+        <span style="font-weight: bold; margin-right: 8px;">导出范围:</span>
+        <el-tag>{{ exportType === 'current' ? '当前页结果' : '全部查询结果' }}</el-tag>
+      </div>
+      <div style="margin-bottom: 8px; font-weight: bold;">选择导出字段:</div>
+      <el-checkbox
+        v-model="checkAllExportFields"
+        :indeterminate="isIndeterminateExportFields"
+        @change="handleCheckAllExportFieldsChange"
+      >
+        全选
+      </el-checkbox>
+      <div style="margin: 10px 0;"></div>
+      <el-checkbox-group v-model="selectedExportFields" @change="handleCheckedExportFieldsChange" class="export-fields-group">
+        <el-checkbox v-for="field in availableFieldNames" :key="field" :label="field">
+          {{ getFieldDisplayName(field) }}
+        </el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="exportDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="executeExport" :loading="exportLoading">
+            确认导出
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
     <!-- 下载资源包功能已禁用 -->
   </div>
 </template>
@@ -950,6 +966,210 @@ watch(
   },
   { immediate: true }
 );
+
+// 导出弹窗相关状态
+const exportDialogVisible = ref(false);
+const exportType = ref<'current' | 'all'>('current');
+const checkAllExportFields = ref(false);
+const isIndeterminateExportFields = ref(false);
+const selectedExportFields = ref<string[]>([]);
+const exportLoading = ref(false);
+
+const openExportDialog = (type: 'current' | 'all') => {
+  exportType.value = type;
+  exportDialogVisible.value = true;
+  // 默认全选所有字段
+  selectedExportFields.value = [...availableFieldNames.value];
+  checkAllExportFields.value = true;
+  isIndeterminateExportFields.value = false;
+};
+
+const handleCheckAllExportFieldsChange = (val: boolean) => {
+  selectedExportFields.value = val ? [...availableFieldNames.value] : [];
+  isIndeterminateExportFields.value = false;
+};
+
+const handleCheckedExportFieldsChange = (value: string[]) => {
+  const checkedCount = value.length;
+  checkAllExportFields.value = checkedCount === availableFieldNames.value.length;
+  isIndeterminateExportFields.value = checkedCount > 0 && checkedCount < availableFieldNames.value.length;
+};
+
+const executeExport = async () => {
+  if (selectedExportFields.value.length === 0) {
+    ElMessage.warning('请至少选择一个导出字段');
+    return;
+  }
+  
+  exportLoading.value = true;
+  try {
+    await handleExport();
+    exportDialogVisible.value = false;
+  } catch (error) {
+    console.error('导出异常:', error);
+    ElMessage.error('导出失败');
+  } finally {
+    exportLoading.value = false;
+  }
+};
+
+const handleExport = async () => {
+  const columns = selectedExportFields.value;
+  let dataToExport: any[] = [];
+
+  if (exportType.value === 'current') {
+    // 导出当前页：基于当前勾选或当前页所有数据
+    // 优先使用勾选的数据
+    let candidates = viewMode.value === 'list'
+      ? selectedTableRows.value
+      : Array.from(selectedCardIndices.value)
+          .map((i) => records.value?.[i])
+          .filter(Boolean);
+          
+    // 如果没有勾选，则导出当前页所有数据
+    if (!candidates || candidates.length === 0) {
+      candidates = records.value || [];
+    }
+    
+    if (candidates.length === 0) {
+      ElMessage.warning("当前页无数据可导出");
+      return;
+    }
+    dataToExport = candidates;
+  } else {
+    // 导出全部：使用后端异步导出（打包功能）
+    try {
+      await exportAllResults(columns, true);
+    } catch (e) {
+      console.error(e);
+      ElMessage.error("发起导出任务失败");
+    }
+    // 不需要在此处调用 exportToCSV，因为后端会处理文件生成
+    return;
+  }
+
+  if (dataToExport.length === 0) {
+    ElMessage.warning("无数据可导出");
+    return;
+  }
+
+  exportToCSV(dataToExport, columns);
+};
+
+const fetchAllData = async (columns: string[]) => {
+  const allRows: any[] = [];
+  const batchSize = 1000;
+  let searchAfter = null;
+  
+  // 构建基础查询
+  const dsl = buildDSL();
+  const query = dsl.query;
+  
+  // 循环拉取
+  while (true) {
+    const req: any = {
+      datasourceId: props.packageData.datasource_id,
+      index: selectedIndices.value,
+      query: query,
+      size: batchSize,
+      // 仅获取需要的字段，减少传输量
+      _source: columns
+    };
+    
+    // 使用 search_after 进行深度分页
+    if (searchAfter) {
+      req.search_after = searchAfter;
+    } else {
+      // 第一页
+      req.from = 0;
+    }
+    
+    // 强制使用 _shard_doc 排序以确保游标稳定
+    // 如果原查询有排序，附加 _shard_doc；否则直接使用 _shard_doc
+    if (dsl.sort) {
+       req.sort = [...dsl.sort];
+       // 检查是否已有 _shard_doc，没有则追加
+       const hasShardDoc = req.sort.some((s: any) => s._shard_doc);
+       if (!hasShardDoc) {
+         req.sort.push({ _shard_doc: { order: "asc" } });
+       }
+    } else {
+       req.sort = [{ _shard_doc: { order: "asc" } }];
+    }
+
+    const resp = await executeESQuery(req);
+    const data = resp?.data || resp;
+    const hits = data?.hits?.hits || [];
+    
+    if (hits.length === 0) break;
+    
+    allRows.push(...hits.map((h: any) => h._source));
+    
+    // 更新游标
+    const lastHit = hits[hits.length - 1];
+    if (lastHit && lastHit.sort) {
+      searchAfter = lastHit.sort;
+    } else {
+      // 如果没有 sort 字段，无法继续
+      break;
+    }
+    
+    if (hits.length < batchSize) break;
+    
+    // 安全限制：防止浏览器崩溃，限制最大导出 10万条
+    if (allRows.length >= 100000) {
+      ElMessage.warning("导出数据量过大，已截断为前100,000条");
+      break;
+    }
+  }
+  
+  return allRows;
+};
+
+const exportToCSV = (rows: any[], columns: string[]) => {
+  // 构建CSV内容
+  let csvContent = "";
+  
+  // 添加表头
+  const headers = columns.map(field => `"${getFieldDisplayName(field).replace(/"/g, '""')}"`);
+  csvContent += headers.join(",") + "\n";
+  
+  // 添加数据行
+  rows.forEach((row: Record<string, any>) => {
+    const values: string[] = [];
+    columns.forEach((field: string) => {
+      const v = row?.[field];
+      // 使用 formatCell 保持格式一致性，但要注意 formatCell 可能返回 HTML (如 snippet)，这里需要纯文本
+      // 简单起见，直接转字符串，或者剥离 HTML
+      let cellValue = v;
+      if (cellValue === null || cellValue === undefined) {
+        cellValue = "";
+      } else if (typeof cellValue === "object") {
+        cellValue = JSON.stringify(cellValue);
+      } else {
+        cellValue = String(cellValue);
+      }
+      
+      // 处理CSV特殊字符
+      cellValue = cellValue.replace(/"/g, '""');
+      values.push(`"${cellValue}"`);
+    });
+    csvContent += values.join(",") + "\n";
+  });
+
+  // 创建并下载CSV文件
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const fileName = `${props.packageData?.name || "资源包查询"}_${exportType.value === 'all' ? '全部' : '当前页'}_${new Date()
+    .toISOString()
+    .slice(0, 10)}.csv`;
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  
+  ElMessage.success("导出成功");
+};
 
 // 全选/取消全选逻辑与状态
 const isAllSelected = computed(() => {
@@ -2440,13 +2660,15 @@ function formatNumber(num: number | string | undefined): string {
  * 导出全部结果（异步导出）
  * 触发后端异步任务，返回 task_id，并开始轮询任务状态以展示进度。
  */
-const exportAllResults = async () => {
+const exportAllResults = async (columns?: string[], skipConfirm = false) => {
   try {
-    await ElMessageBox.confirm("确定要导出全部查询结果吗？这可能需要一些时间，导出完成后会提供下载链接。", "确认导出", {
-      confirmButtonText: "确定",
-      cancelButtonText: "取消",
-      type: "info"
-    });
+    if (!skipConfirm) {
+      await ElMessageBox.confirm("确定要导出全部查询结果吗？这可能需要一些时间，导出完成后会提供下载链接。", "确认导出", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "info"
+      });
+    }
 
     exportAllLoading.value = true;
     
@@ -2455,7 +2677,7 @@ const exportAllResults = async () => {
     const queryData = {
       index: selectedIndices.value,
       query: dsl.query,
-      _source: dsl._source
+      _source: columns && columns.length > 0 ? columns : dsl._source
     };
 
     // 优先检查是否有与当前查询条件完全匹配的缓存文件（有效期1小时）

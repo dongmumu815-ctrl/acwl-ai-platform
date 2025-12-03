@@ -37,6 +37,8 @@ export interface DataUploadLogsQuery extends PaginationParams {
   end_time?: string
   /** 排除的数据源名称（后端支持则生效） */
   exclude_data_source_name?: string
+  /** 排除的数据平台名称 */
+  exclude_platform_name?: string
 }
 
 export const dataUploadLogsApi = {
@@ -53,8 +55,18 @@ export const dataUploadLogsApi = {
         batch_id: params?.batch_id,
         // 透传时间范围查询参数（如果存在）
         start_time: params?.start_time,
-        end_time: params?.end_time
+        end_time: params?.end_time,
+        // 透传数据平台名称查询参数（如果存在）
+        exclude_platform_name: params?.exclude_platform_name
       }
+    })
+  },
+
+  getBatchDetails(batchId: string, params?: { limit?: number, offset?: number, q?: string }): Promise<ApiResponse<any>> {
+    return request({
+      url: `/data-upload-logs/details/${batchId}`,
+      method: 'get',
+      params
     })
   }
 }

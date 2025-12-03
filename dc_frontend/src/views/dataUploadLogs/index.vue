@@ -194,7 +194,8 @@ async function loadLogs() {
       start_time: searchRange.value?.[0],
       end_time: searchRange.value?.[1],
       // 服务端排除指定数据源，避免前端过滤导致分页不一致
-      exclude_data_source_name: 'cpc_rc_data'
+      exclude_data_source_name: 'cpc_rc_data',
+      exclude_platform_name: 'internal_migration'
     })
 
     const data = (res as any).data ?? res

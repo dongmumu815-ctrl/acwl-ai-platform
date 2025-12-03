@@ -23,7 +23,8 @@ async def _query_doris_logs(
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     batch_id: Optional[str] = None,
-    exclude_data_source_name: Optional[str] = None
+    exclude_data_source_name: Optional[str] = None,
+    exclude_platform_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     查询 Doris 中的日志数据
@@ -66,6 +67,11 @@ async def _query_doris_logs(
     if exclude_data_source_name:
         where_clauses.append("LOWER(data_source_name) <> LOWER(%s)")
         params.append(exclude_data_source_name)
+
+    # 排除指定数据平台名称
+    if exclude_platform_name:
+        where_clauses.append("platform_name <> %s")
+        params.append(exclude_platform_name)
 
     where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
@@ -146,7 +152,8 @@ async def get_data_upload_logs(
     start_time: Optional[str] = Query(None, description="开始时间，格式 YYYY-MM-DD HH:MM:SS"),
     end_time: Optional[str] = Query(None, description="结束时间，格式 YYYY-MM-DD HH:MM:SS"),
     batch_id: Optional[str] = Query(None, description="按批次号过滤"),
-    exclude_data_source_name: Optional[str] = Query(None, description="排除的数据源名称")
+    exclude_data_source_name: Optional[str] = Query(None, description="排除的数据源名称"),
+    exclude_platform_name: Optional[str] = Query(None, description="排除的数据平台名称")
 ):
     try:
         result = await _query_doris_logs(
@@ -157,7 +164,8 @@ async def get_data_upload_logs(
             start_time=start_time,
             end_time=end_time,
             batch_id=batch_id,
-            exclude_data_source_name=exclude_data_source_name
+            exclude_data_source_name=exclude_data_source_name,
+            exclude_platform_name=exclude_platform_name
         )
         return paginated_response(items=result["items"], total=result["total"], page=page, size=size, message="获取数据上传日志成功")
     except Exception as e:
