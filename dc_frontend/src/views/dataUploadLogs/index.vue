@@ -6,29 +6,15 @@
 
       </div>
       <div class="actions">
-        <el-date-picker
-          v-model="searchRange"
-          type="datetimerange"
-          range-separator="至"
-          start-placeholder="开始时间"
-          end-placeholder="结束时间"
-          value-format="YYYY-MM-DD HH:mm:ss"
-          unlink-panels
-          clearable
-          style="width: 380px; margin-right: 12px"
-          @change="handleSearch"
-          @clear="handleSearch"
-        />
-        <el-input
-          v-model="searchBatch"
-          placeholder="按批次号搜索"
-          clearable
-          style="width: 260px; margin-right: 12px"
-          @keyup.enter="handleSearch"
-          @clear="onClearSearch"
-        >
+        <el-date-picker v-model="searchRange" type="datetimerange" range-separator="至" start-placeholder="开始时间"
+          end-placeholder="结束时间" value-format="YYYY-MM-DD HH:mm:ss" unlink-panels clearable
+          style="width: 380px; margin-right: 12px" @change="handleSearch" @clear="handleSearch" />
+        <el-input v-model="searchBatch" placeholder="按批次号搜索" clearable style="width: 260px; margin-right: 12px"
+          @keyup.enter="handleSearch" @clear="onClearSearch">
           <template #prefix>
-            <el-icon><Search /></el-icon>
+            <el-icon>
+              <Search />
+            </el-icon>
           </template>
         </el-input>
         <el-button type="primary" @click="handleSearch" :loading="loading" style="margin-right: 8px">搜索</el-button>
@@ -79,16 +65,9 @@
       </el-table>
 
       <div class="table-footer">
-        <el-pagination
-          background
-          layout="total, sizes, prev, pager, next"
-          :total="pagination.total"
-          :page-sizes="[10, 20, 50, 100]"
-          :page-size="pagination.pageSize"
-          :current-page="pagination.page"
-          @current-change="onPageChange"
-          @size-change="onPageSizeChange"
-        />
+        <el-pagination background layout="total, sizes, prev, pager, next" :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]" :page-size="pagination.pageSize" :current-page="pagination.page"
+          @current-change="onPageChange" @size-change="onPageSizeChange" />
       </div>
 
       <div v-if="logs.length === 0 && !loading" class="empty">
@@ -102,15 +81,12 @@
         <div style="display:flex;align-items:center;gap:12px;">
           <span>批次号：{{ detailBatchId || '-' }}</span>
           <el-tag v-if="detailTableName" type="info">{{ detailTableName }}</el-tag>
-          <el-input
-            v-model="detailSearch"
-            placeholder="搜索全部字段"
-            clearable
-            style="width: 280px;"
-            @keyup.enter="onSearchDetails"
-          >
+          <el-input v-model="detailSearch" placeholder="搜索全部字段" clearable style="width: 280px;"
+            @keyup.enter="onSearchDetails">
             <template #prefix>
-              <el-icon><Search /></el-icon>
+              <el-icon>
+                <Search />
+              </el-icon>
             </template>
           </el-input>
           <el-button type="primary" size="small" @click="onSearchDetails" :loading="detailLoading">查询</el-button>
@@ -118,27 +94,31 @@
         </div>
       </template>
       <div>
-        <el-table :data="filteredDetailItems" v-loading="detailLoading" height="480px" stripe>
+        <el-table :data="filteredDetailItems" v-loading="detailLoading" height="480px" stripe border>
           <el-table-column
             v-for="col in visibleDetailColumns"
             :key="col"
             :prop="col"
             :label="columnLabel(col)"
+            :class-name="colClassName(col)"
             :formatter="getFormatter(col)"
-            show-overflow-tooltip
-          />
+            :show-overflow-tooltip="col !== '变更记录'"
+            draggable
+          >
+            <template v-if="col === '变更记录'" #default="{ row }">
+              <el-tooltip placement="top" popper-class="pre-wrap-tooltip">
+                <template #content>
+                  <div class="tooltip-pre" v-html="formatChangeLogHtml(row[col])"></div>
+                </template>
+                <span class="text-pre-line">{{ formatChangeLogText(row[col]) }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
         </el-table>
         <div class="table-footer">
-          <el-pagination
-            background
-            layout="total, sizes, prev, pager, next"
-            :total="detailTotal"
-            :page-sizes="[50, 100, 200, 500]"
-            :page-size="detailLimit"
-            :current-page="detailPage"
-            @current-change="onDetailPageChange"
-            @size-change="onDetailPageSizeChange"
-          />
+          <el-pagination background layout="total, sizes, prev, pager, next" :total="detailTotal"
+            :page-sizes="[50, 100, 200, 500]" :page-size="detailLimit" :current-page="detailPage"
+            @current-change="onDetailPageChange" @size-change="onDetailPageSizeChange" />
         </div>
       </div>
     </el-drawer>
@@ -149,6 +129,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { dataUploadLogsApi } from '@/api/dataUploadLogs'
+import { request } from '@/utils/request'
 import type { DataUploadLog } from '@/api/dataUploadLogs'
 
 const loading = ref(false)
@@ -236,7 +217,10 @@ function onPageSizeChange(size: number) {
   loadLogs()
 }
 
-onMounted(loadLogs)
+onMounted(async () => {
+  await loadFinalPassMap()
+  await loadLogs()
+})
 
 // 明细抽屉状态与方法
 const drawerVisible = ref(false)
@@ -429,43 +413,65 @@ function columnLabel(key: string): string {
   return columnLabelMap[key] ?? key
 }
 
-// final_pass 值映射
-const finalPassMap: Record<number, string> = {
-  1: '订单通过',
-  2: '重点审读',
-  3: '删除',
-  5: '限阅',
-  6: '全文禁发',
-  7: '需实物审读',
-  16: '撤订',
-  17: '禁止发行',
-  11: '可订',
-  12: '禁订',
-  13: '可作为新增数据库报备',
-  14: '可试作为新增数据库报备',
-  15: '不建议作为新增数据库报备',
-  10: '需样书审读',
-  9: '无需实物审读',
-  4: '不通过',
-  8: '疑似',
-  18: '通过',
-  19: '实物通过',
-  20: '高度疑似',
-  21: '含有违反',
-  22: '含有少量违反',
-  23: '未发现违反',
-  0: '未处理'
+const finalPassMap = ref<Record<number, string>>({})
+
+async function loadFinalPassMap() {
+  try {
+    const resp = await request<Record<string, string>>({
+      url: '/dict-data',
+      method: 'get',
+      params: { dict_type: 'machine_person_review_result' }
+    })
+    const data = (resp as any)?.data ?? resp
+    if (data && typeof data === 'object') {
+      const reversed: Record<number, string> = {}
+      Object.entries(data).forEach(([label, value]) => {
+        const n = Number(value)
+        if (!Number.isNaN(n)) {
+          reversed[n] = String(label)
+        }
+      })
+      if (Object.keys(reversed).length > 0) {
+        finalPassMap.value = reversed
+      }
+    }
+  } catch {}
 }
 
 function formatterFinalPass(_row: any, _column: any, cellValue: any) {
   const n = Number(cellValue)
   if (Number.isNaN(n)) return cellValue
-  return finalPassMap[n] ?? cellValue
+  return finalPassMap.value[n] ?? cellValue
 }
 
 function getFormatter(col: string) {
   if (col === 'final_pass') return formatterFinalPass
+  // const formatter = detailColumns.value.find((c) => c === col)?.label
+  // if (formatter) return formatter
+  if (col === '变更记录') {
+    return (_row: any, _column: any, cellValue: any) => {
+      const text = String(cellValue ?? '')
+      return text
+    }
+  }
   return undefined as any
+}
+
+function formatChangeLogText(value: any): string {
+  const text = String(value ?? '')
+  if (!text) return ''
+  const lines = text.split('\n')
+  const mapped = lines.map((line) => {
+    return line.replace(/([A-Za-z0-9_]+)\s*:/g, (_m, key) => {
+      const label = columnLabelMap[key] ?? key
+      return `${label}:`
+    })
+  })
+  return mapped.join('\n')
+}
+
+function formatChangeLogHtml(value: any): string {
+  return formatChangeLogText(value).replace(/\n/g, '<br/>')
 }
 
 // 停用输入即时匹配：仅在回车或点击查询时从服务端检索
@@ -474,7 +480,7 @@ const filteredDetailItems = computed(() => detailItems.value)
 // 仅显示有数据的列（至少一行非空）
 const visibleDetailColumns = computed(() => {
   const items = filteredDetailItems.value
-  const cols = detailColumns.value
+  const cols = detailColumns.value.filter((c) => c !== 'id')
   if (!items.length) return cols
   return cols.filter((c) => {
     for (const row of items) {
@@ -494,31 +500,46 @@ const visibleDetailColumns = computed(() => {
     return false
   })
 })
+
+function colClassName(col: string): string {
+  if (col === '变更记录') return 'text-pre-line'
+  return ''
+}
 </script>
 
 <style scoped>
 .data-upload-logs {
   padding: 16px;
 }
+
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
+
 .page-header .desc {
   color: var(--el-text-color-secondary);
   font-size: 13px;
 }
+
 .table-card {
   margin-top: 8px;
 }
+
 .table-footer {
   display: flex;
   justify-content: flex-end;
   padding: 12px 0;
 }
+
 .empty {
   padding: 24px 0;
+}
+
+:deep(.text-pre-line .cell) {
+  white-space: nowrap;
+  /* white-space: pre-line; */
 }
 </style>

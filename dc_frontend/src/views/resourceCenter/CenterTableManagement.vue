@@ -678,7 +678,7 @@ const scheduleAutoSave = () => {
 // 数据类型映射到资源字段类型
 const mapDataTypeToFieldType = (dataType: string): string => {
   const type = (dataType || '').toLowerCase()
-  if (type.includes('int') || type.includes('bigint') || type.includes('smallint')) return 'integer'
+  if (type.includes('int') || type.includes('bigint') || type.includes('smallint')) return 'int'
   if (type.includes('decimal') || type.includes('float') || type.includes('double') || type.includes('numeric')) return 'number'
   if (type.includes('bool')) return 'boolean'
   if (type.includes('date') || type.includes('time')) return 'datetime'

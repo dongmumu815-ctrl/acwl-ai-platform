@@ -37,7 +37,8 @@ class ResponseFormatEnum(str, Enum):
 class FieldTypeEnum(str, Enum):
     """字段类型枚举"""
     STRING = "string"
-    INTEGER = "integer"
+    INT = "int"
+    INTEGER = "int"
     FLOAT = "float"
     BOOLEAN = "boolean"
     DATE = "date"
@@ -212,6 +213,13 @@ class ApiFieldBase(BaseModel):
     validation_message: Optional[str] = Field(None, max_length=200, description="验证失败提示")
     sort_order: int = Field(default=0, description="排序顺序")
     description: Optional[str] = Field(None, description="字段描述")
+    
+    @field_validator('field_type', mode='before')
+    @classmethod
+    def normalize_field_type(cls, v):
+        if isinstance(v, str) and v.lower() == 'integer':
+            return 'int'
+        return v
     
     @field_validator('field_label')
     @classmethod

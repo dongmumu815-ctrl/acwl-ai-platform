@@ -6,6 +6,8 @@
 提供从 Doris 数据库读取同步日志表 `logs_data_sync` 的分页查询。
 """
 
+import os
+import json
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Query
 from app.core.config import settings
@@ -216,9 +218,8 @@ async def get_batch_details(
 
         # 2) 构建 doris-read 查询（使用 batch_id 作为 task_id）
         if table_name == "cpc_rc_periodical_articles":
-            # 选取常用字段用于展示与检索
             base_sql = (
-                "SELECT source_system_id, periodical_name, doi, publisher, title, author, final_pass, final_pass_time "
+                "SELECT id, source_system_id, periodical_name, doi, publisher, title, author, final_pass, final_pass_time "
                 "FROM cpc_rc_periodical_articles WHERE task_id = %s"
             )
             count_sql = "SELECT COUNT(*) AS total FROM cpc_rc_periodical_articles WHERE task_id = %s"
@@ -260,6 +261,67 @@ async def get_batch_details(
             return error_response(message="查询 doris-read 失败", error_code="DORIS_QUERY_ERROR", detail=str(detail))
 
         items = res2.get("data") or []
+        if items:
+            record_ids = [str(item.get("id")) for item in items if item.get("id")]
+            for item in items:
+                item["变更记录"] = ""
+            if record_ids:
+                conn_change = await aiomysql.connect(
+                    host=os.getenv("TASK_HOST", "10.20.1.200"),
+                    user=os.getenv("TASK_USER", "root"),
+                    password=os.getenv("TASK_PASSWORD", "2wsx1QAZaczt"),
+                    db=os.getenv("TASK_DATABASE", "cvs2db"),
+                    port=int(os.getenv("TASK_PORT", "3306")),
+                    charset="utf8mb4"
+                )
+                try:
+                    async with conn_change.cursor(aiomysql.DictCursor) as cur:
+                        placeholders = ",".join(["%s"] * len(record_ids))
+                        sql_changes = (
+                            "SELECT record_id, before_values, after_values, changed_at "
+                            "FROM import_change_logs "
+                            "WHERE target_table = %s AND record_id IN (" + placeholders + ") "
+                            "ORDER BY changed_at ASC"
+                        )
+                        await cur.execute(sql_changes, (table_name, *record_ids))
+                        change_rows = await cur.fetchall()
+                        changes_map: Dict[str, List[str]] = {}
+                        for row in change_rows:
+                            rid = str(row.get("record_id"))
+                            if rid not in changes_map:
+                                changes_map[rid] = []
+                            before = row.get("before_values")
+                            after = row.get("after_values")
+                            try:
+                                if isinstance(before, str):
+                                    before = json.loads(before)
+                            except Exception:
+                                pass
+                            try:
+                                if isinstance(after, str):
+                                    after = json.loads(after)
+                            except Exception:
+                                pass
+                            if not isinstance(before, dict):
+                                before = {}
+                            if not isinstance(after, dict):
+                                after = {}
+                            diffs: List[str] = []
+                            all_keys = set(before.keys()) | set(after.keys())
+                            for k in all_keys:
+                                vb = before.get(k)
+                                va = after.get(k)
+                                if str(vb) != str(va):
+                                    diffs.append(f"{k}: {vb} 变更为 {va}")
+                            if diffs:
+                                version = len(changes_map[rid]) + 1
+                                changes_map[rid].append(f"变更记录{version}: {', '.join(diffs)}")
+                        for item in items:
+                            rid = str(item.get("id"))
+                            if rid in changes_map:
+                                item["变更记录"] = "\n".join(changes_map[rid])
+                finally:
+                    conn_change.close()
         total = 0
         if res_count and res_count.get("success"):
             count_rows = res_count.get("data") or []

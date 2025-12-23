@@ -50,7 +50,7 @@ class LinkTaskService:
         """
         try:
             # 使用用户指定的端口 50000
-            self.manager = PoolManager(address=('127.0.0.1', 50000), authkey=b'cepiec2024')
+            self.manager = PoolManager(address=('127.0.0.1', 50001), authkey=b'cepiec2024')
             self.manager.connect()
             self.service = self.manager.DataService()
         except Exception as e:
@@ -72,7 +72,7 @@ class LinkTaskService:
         try:
             query = """
                SELECT
-                c.id,
+                CAST(c.id AS CHAR) AS id,
                 m.link_menu_name,
                 t.`name`,
                 m.db_name,
@@ -98,4 +98,52 @@ class LinkTaskService:
         
         except Exception as e:
             logging.error(f"获取待任务类型失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+
+class SysDictService:
+    def __init__(self):
+        self.manager = None
+        self.service = None
+    
+    def _connect(self) -> None:
+        try:
+            self.manager = PoolManager(address=('127.0.0.1', 50001), authkey=b'cepiec2024')
+            self.manager.connect()
+            self.service = self.manager.DataService()
+        except Exception as e:
+            logging.error(f"数据库连接失败: {e}")
+            raise ConnectionError(f"无法连接到数据服务: {e}")
+    
+    def get_dict_by_type(self, dict_type: str) -> Dict[str, Any]:
+        if not self.service:
+            self._connect()
+        try:
+            safe_type = (dict_type or "").replace("'", "''")
+            query = f"""
+               SELECT dict_label, dict_value
+               FROM sys_dict_data
+               WHERE dict_type = '{safe_type}'
+            """
+            result = self.service.execute_sql('cloud_db', query)
+            if not result['success']:
+                logging.error(f"获取字典失败: {result['error']}")
+                return {'success': False, 'error': result['error']}
+            data = {}
+            rows = result.get('data') or []
+            for row in rows:
+                try:
+                    if isinstance(row, dict):
+                        k = str(row.get('dict_label'))
+                        v = str(row.get('dict_value'))
+                    else:
+                        k = str(row[0])
+                        v = str(row[1])
+                    if k:
+                        data[k] = v
+                except Exception:
+                    continue
+            return {'success': True, 'data': data}
+        except Exception as e:
+            logging.error(f"获取字典失败: {e}")
             return {'success': False, 'error': str(e)}

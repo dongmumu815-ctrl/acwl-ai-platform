@@ -27,7 +27,7 @@ from app.core.multi_db_manager import get_db_session
 from app.models.api_management import Customer, CustomApi, ApiField, DataBatch, ApiUsageLog, DataUpload
 from app.models.resource_type import DataResourceType
 from app.core.config import settings
-from app.services.db_service import LinkTaskService
+from app.services.db_service import LinkTaskService, SysDictService
 import redis
 
 router = APIRouter()
@@ -85,6 +85,20 @@ async def get_link_types(
         if not result['success']:
             raise HTTPException(status_code=500, detail=result.get('error', '获取任务类型失败'))
             
+        return success_response(data=result['data'])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/dict-data", summary="获取系统字典数据")
+async def get_dict_data(
+    dict_type: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    try:
+        service = SysDictService()
+        result = service.get_dict_by_type(dict_type)
+        if not result['success']:
+            raise HTTPException(status_code=500, detail=result.get('error', '获取字典数据失败'))
         return success_response(data=result['data'])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

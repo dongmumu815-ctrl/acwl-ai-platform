@@ -81,7 +81,7 @@ export enum PermissionType {
 // 字段数据类型枚举
 export enum FieldDataType {
   STRING = 'string',
-  INTEGER = 'integer',
+  INTEGER = 'int',
   FLOAT = 'float',
   DOUBLE = 'double',
   DECIMAL = 'decimal',

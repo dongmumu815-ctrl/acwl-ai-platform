@@ -36,7 +36,7 @@ class DataLink:
             ConnectionError: 当连接失败时抛出异常
         """
         try:
-            self.manager = PoolManager(address=('127.0.0.1', 50000), authkey=b'cepiec2024')
+            self.manager = PoolManager(address=('127.0.0.1', 50001), authkey=b'cepiec2024')
             self.manager.connect()
             self.service = self.manager.DataService()
         except Exception as e:

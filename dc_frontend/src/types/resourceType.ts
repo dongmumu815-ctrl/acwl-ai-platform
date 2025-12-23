@@ -1,4 +1,4 @@
-export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'object' | 'array'
+export type FieldType = 'string' | 'int' | 'number' | 'boolean' | 'date' | 'object' | 'array'
 
 export interface ResourceField {
   key: string

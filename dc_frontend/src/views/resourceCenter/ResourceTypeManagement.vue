@@ -331,7 +331,7 @@ const loadCenterTableFields = async () => {
 const mapDataTypeToFieldType = (dataType: string): string => {
   const type = dataType.toLowerCase()
   if (type.includes('int') || type.includes('bigint') || type.includes('smallint')) {
-    return 'integer'
+    return 'int'
   } else if (type.includes('decimal') || type.includes('float') || type.includes('double') || type.includes('numeric')) {
     return 'number'
   } else if (type.includes('bool')) {

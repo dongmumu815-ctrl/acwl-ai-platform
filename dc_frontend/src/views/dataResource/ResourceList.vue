@@ -1550,11 +1550,11 @@ const showApiInfo = (resource: any) => {
     parameters: [
       {
         name: "limit",
-        type: "integer",
+        type: "int",
         description: "返回记录数限制",
         default: "100"
       },
-      { name: "offset", type: "integer", description: "偏移量", default: "0" },
+      { name: "offset", type: "int", description: "偏移量", default: "0" },
       { name: "filter", type: "string", description: "过滤条件", default: "" }
     ],
     examples: {

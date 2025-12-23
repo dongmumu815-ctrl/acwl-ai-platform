@@ -170,11 +170,16 @@
             <el-form-item label="字段类型" prop="field_type">
               <el-select v-model="form.field_type" style="width: 100%">
                 <el-option label="字符串" value="string" />
-                <el-option label="数字" value="number" />
+                <el-option label="整数" value="int" />
+                <el-option label="浮点数" value="float" />
                 <el-option label="布尔值" value="boolean" />
                 <el-option label="日期" value="date" />
-                <el-option label="数组" value="array" />
-                <el-option label="对象" value="object" />
+                <el-option label="日期时间" value="datetime" />
+                <el-option label="文本" value="text" />
+                <el-option label="邮箱" value="email" />
+                <el-option label="URL" value="url" />
+                <el-option label="JSON" value="json" />
+                <el-option label="文件" value="file" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -424,6 +429,7 @@ const loadFields = async (apiId?: number) => {
       // 归一化 is_upload 类型，确保为数字 0/1，避免 '1'/'0' 导致复选框不勾选
       const normalized = items.map((item: any) => ({
         ...item,
+        field_type: typeof item.field_type === 'string' && item.field_type.toLowerCase() === 'integer' ? 'int' : item.field_type,
         is_upload:
           item?.is_upload === undefined || item?.is_upload === null
             ? 0
@@ -537,7 +543,7 @@ const loadResourceTypeFields = async () => {
       const meta = (response.data.metadata || []) as any[]
       centerTableFields.value = meta.map((m: any) => ({
         column_name: m.key,
-        data_type: m.type || 'string',
+        data_type: ((m.type || 'string') as string).toLowerCase() === 'integer' ? 'int' : m.type || 'string',
         column_comment: m.description || '',
         is_nullable: !(m.required === true)
       }))
@@ -570,20 +576,26 @@ const isExistingCenterField = (row: CenterTableField) => {
 // 将资源类型字段的类型映射为 API 字段类型
 const mapDataTypeToApiFieldType = (dataType: string): ApiFieldCreate['field_type'] => {
   const t = (dataType || '').toLowerCase()
-  if (t === 'integer' || t === 'number' || t.includes('int') || t.includes('decimal') || t.includes('float') || t.includes('double') || t.includes('numeric')) {
-    return 'number'
+  if (t === 'int' || t.includes('bigint') || t.includes('smallint') || t.includes('int')) {
+    return 'int'
+  }
+  if (t.includes('decimal') || t.includes('float') || t.includes('double') || t.includes('numeric')) {
+    return 'float'
   }
   if (t === 'boolean' || t.includes('bool')) {
     return 'boolean'
   }
-  if (t === 'date' || t.includes('date') || t.includes('time')) {
+  if (t === 'date') {
     return 'date'
   }
-  if (t === 'array') {
-    return 'array'
+  if (t.includes('timestamp') || t.includes('datetime') || t.includes('time')) {
+    return 'datetime'
   }
-  if (t === 'object') {
-    return 'object'
+  if (t.includes('json')) {
+    return 'json'
+  }
+  if (t.includes('text') || t.includes('char')) {
+    return 'text'
   }
   return 'string'
 }
@@ -611,6 +623,7 @@ const addSelectedFields = async () => {
         field_name: f.column_name,
         field_type: mapDataTypeToApiFieldType(f.data_type),
         is_required: !f.is_nullable,
+        is_upload: 1,
         description: f.column_comment || '',
         sort_order: ++order
       }
@@ -712,6 +725,7 @@ const submitForm = async () => {
         field_name: form.field_name,
         field_type: form.field_type,
         is_required: form.is_required,
+        is_upload: 1,
         default_value: form.default_value,
         description: form.description,
         validation_rules: form.validation_rules,

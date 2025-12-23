@@ -157,6 +157,7 @@
                   filterable
                   :disabled="availableFieldNames.length === 0"
                 >
+                  <el-option label="全部字段" value="_all_fields" />
                   <el-option
                     v-for="f in availableFieldNames"
                     :key="f"
@@ -428,7 +429,15 @@
                                 class="card-title-link"
                                 @click="openRowDetail(row)"
                               >
-                                {{ formatCell(row[getTitleField(row)]) }}
+                                <span
+                                  v-html="
+                                    formatTextWithHighlight(
+                                      formatCell(row[getTitleField(row)]),
+                                      null,
+                                      executedSearchValue
+                                    )
+                                  "
+                                ></span>
                               </el-link>
                             </div>
                             <div class="card-row wide">
@@ -739,7 +748,7 @@ const toggleAdvanced = () => {
 const defaultSearchField = ref<string>("");
 const defaultSearchValue = ref<string>("");
 // 已执行查询的搜索词，用于高亮显示
-const executedSearchValue = ref<string>("");
+const executedSearchValue = ref<string | string[]>("");
 
 const viewMode = ref<"list" | "card">("card");
 const compactMode = ref(true);
@@ -755,12 +764,37 @@ function stripTags(html: string): string {
   if (!html) return "";
   return html.replace(/<[^>]*>/g, "");
 }
-function extractSentence(text: string, keyword: string, maxLen = 200): string {
+function extractSentence(
+  text: string,
+  keyword: string | string[],
+  maxLen = 200
+): string {
   if (!text) return "";
-  if (!keyword) return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
+  if (!keyword)
+    return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
+  if (Array.isArray(keyword) && keyword.length === 0)
+    return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
+
   const lower = text.toLowerCase();
-  const k = keyword.toLowerCase();
-  const idx = lower.indexOf(k);
+  let idx = -1;
+  let kLen = 0;
+
+  if (Array.isArray(keyword)) {
+    // 找到第一个匹配的关键词
+    for (const k of keyword) {
+      if (!k || typeof k !== "string") continue;
+      const i = lower.indexOf(k.toLowerCase());
+      if (i >= 0) {
+        idx = i;
+        kLen = k.length;
+        break; // 找到一个即可
+      }
+    }
+  } else {
+    idx = lower.indexOf(keyword.toLowerCase());
+    kLen = keyword.length;
+  }
+
   if (idx < 0) {
     return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
   }
@@ -791,18 +825,27 @@ function extractSentence(text: string, keyword: string, maxLen = 200): string {
     // 过长时，以关键词为中心截取
     const half = Math.floor(maxLen / 2);
     const s = Math.max(0, idx - half);
-    const e = Math.min(text.length, idx + k.length + half);
-    return (s > 0 ? "…" : "") + text.slice(s, e) + (e < text.length ? "…" : "");
+    const e = Math.min(text.length, idx + kLen + half);
+    return (
+      (s > 0 ? "…" : "") + text.slice(s, e) + (e < text.length ? "…" : "")
+    );
   }
   return sentence;
 }
 
 const records = computed<any[]>(() => {
   const hits = results.value?.hits?.hits || [];
-  const keyword = executedSearchValue.value?.trim() || "";
+  let keyword: string | string[] = "";
+  if (Array.isArray(executedSearchValue.value)) {
+    keyword = executedSearchValue.value;
+  } else {
+    keyword = executedSearchValue.value?.trim() || "";
+  }
+
   const isPagesSearch = Boolean(
     defaultSearchField.value &&
-      (defaultSearchField.value === "pages" || defaultSearchField.value.startsWith("pages"))
+      (defaultSearchField.value === "pages" ||
+        defaultSearchField.value.startsWith("pages"))
   );
   const expanded: any[] = [];
 
@@ -820,12 +863,17 @@ const records = computed<any[]>(() => {
           let pageNum: any = ih?._source?.pages?.pageNumber;
           if (pageNum === undefined || pageNum === null) {
             const pagesArr = Array.isArray(src?.pages) ? src.pages : [];
-            const found = pagesArr.find((p: any) =>
-              typeof p?.content === "string" && p.content.includes(fragPlain)
+            const found = pagesArr.find(
+              (p: any) =>
+                typeof p?.content === "string" && p.content.includes(fragPlain)
             );
             pageNum = found?.pageNumber ?? null;
           }
-          expanded.push({ ...common, pageNumber: pageNum ?? null, snippet: fragPlain });
+          expanded.push({
+            ...common,
+            pageNumber: pageNum ?? null,
+            snippet: fragPlain
+          });
         });
         return;
       }
@@ -834,9 +882,22 @@ const records = computed<any[]>(() => {
       pagesArr.forEach((p: any) => {
         const content: string = String(p?.content ?? "");
         if (!content) return;
-        if (!keyword || content.toLowerCase().includes(keyword.toLowerCase())) {
+        
+        let matched = false;
+        if (!keyword) matched = true;
+        else if (Array.isArray(keyword)) {
+          matched = keyword.length === 0 || keyword.some(k => content.toLowerCase().includes(k.toLowerCase()));
+        } else {
+          matched = content.toLowerCase().includes(keyword.toLowerCase());
+        }
+
+        if (matched) {
           const sent = extractSentence(content, keyword);
-          expanded.push({ ...common, pageNumber: p?.pageNumber ?? null, snippet: sent });
+          expanded.push({
+            ...common,
+            pageNumber: p?.pageNumber ?? null,
+            snippet: sent
+          });
         }
       });
       return;
@@ -1745,9 +1806,71 @@ function buildDSL(): any {
   conditions.forEach((c) => {
     if (!c.field) return;
     let clause: any = {};
-    // pages 字段为嵌套类型，改造为 nested 查询，并附带 inner_hits 高亮
-    const isPagesField = c.field === "pages" || c.field.startsWith("pages");
-    if (isPagesField) {
+
+    if (c.field === "_all_fields") {
+      const nonDateFields = availableFieldNames.value.filter((f) => {
+        const t =
+          fieldMappings.value[f]?.type ||
+          availableFields.value.find((af) => af.name === f)?.type;
+        return t !== "date" && t !== "date_nanos" && t !== "nested";
+      });
+
+      if (nonDateFields.length > 0) {
+        if (c.type === "match" || c.type === "term") {
+          clause = {
+            multi_match: {
+              query: c.value,
+              fields: nonDateFields,
+              type: "best_fields",
+              operator: "and",
+            },
+          };
+        } else if (c.type === "wildcard" || c.type === "prefix") {
+          const shouldClauses = nonDateFields.map((f) => {
+            let fieldName = f;
+            const t =
+              fieldMappings.value[f]?.type ||
+              availableFields.value.find((af) => af.name === f)?.type;
+
+            // 如果是 text 类型，且未指定 .keyword 后缀，则自动追加 .keyword
+            if (t === "text" && !fieldName.endsWith(".keyword")) {
+              fieldName = `${fieldName}.keyword`;
+            }
+
+            if (c.type === "wildcard") {
+              return {
+                wildcard: {
+                  [fieldName]: {
+                    value: `*${c.value}*`,
+                    case_insensitive: true,
+                  },
+                },
+              };
+            } else {
+              // prefix
+              return {
+                prefix: {
+                  [fieldName]: {
+                    value: c.value,
+                    case_insensitive: true,
+                  },
+                },
+              };
+            }
+          });
+
+          clause = {
+            bool: {
+              should: shouldClauses,
+              minimum_should_match: 1,
+            },
+          };
+        }
+      }
+    } else {
+      // pages 字段为嵌套类型，改造为 nested 查询，并附带 inner_hits 高亮
+      const isPagesField = c.field === "pages" || c.field.startsWith("pages");
+      if (isPagesField) {
       const f = "pages.content";
       switch (c.type) {
         case "term":
@@ -1798,18 +1921,22 @@ function buildDSL(): any {
           clause = {
             nested: {
               path: "pages",
-              query: { prefix: { [f]: c.value } },
-              inner_hits: { name: "pages" }
-            }
+              query: {
+                prefix: { [f]: { value: c.value, case_insensitive: true } },
+              },
+              inner_hits: { name: "pages" },
+            },
           };
           break;
         case "wildcard":
           clause = {
             nested: {
               path: "pages",
-              query: { wildcard: { [f]: c.value } },
-              inner_hits: { name: "pages" }
-            }
+              query: {
+                wildcard: { [f]: { value: `*${c.value}*`, case_insensitive: true } },
+              },
+              inner_hits: { name: "pages" },
+            },
           };
           break;
         case "exists":
@@ -1837,16 +1964,56 @@ function buildDSL(): any {
     } else {
     switch (c.type) {
       case "term":
-        clause = { term: { [c.field]: c.value } };
+        {
+          let termField = c.field;
+          // 尝试获取字段类型
+          const fType =
+            fieldMappings.value[c.field]?.type ||
+            availableFields.value.find((af) => af.name === c.field)?.type;
+
+          // 如果是 text 类型，且未指定 .keyword 后缀，则自动追加 .keyword 以支持精确匹配
+          if (fType === "text" && !termField.endsWith(".keyword")) {
+            termField = `${termField}.keyword`;
+          }
+          clause = { term: { [termField]: c.value } };
+        }
         break;
       case "match":
-        clause = { match: { [c.field]: c.value } };
+        clause = { match: { [c.field]: { query: c.value, operator: "and" } } };
         break;
       case "prefix":
-        clause = { prefix: { [c.field]: c.value } };
+        {
+          let prefixField = c.field;
+          const fType =
+            fieldMappings.value[c.field]?.type ||
+            availableFields.value.find((af) => af.name === c.field)?.type;
+
+          if (fType === "text" && !prefixField.endsWith(".keyword")) {
+            prefixField = `${prefixField}.keyword`;
+          }
+          clause = {
+            prefix: {
+              [prefixField]: { value: c.value, case_insensitive: true },
+            },
+          };
+        }
         break;
       case "wildcard":
-        clause = { wildcard: { [c.field]: c.value } };
+        {
+          let wcField = c.field;
+          const fType =
+            fieldMappings.value[c.field]?.type ||
+            availableFields.value.find((af) => af.name === c.field)?.type;
+
+          if (fType === "text" && !wcField.endsWith(".keyword")) {
+            wcField = `${wcField}.keyword`;
+          }
+          clause = {
+            wildcard: {
+              [wcField]: { value: `*${c.value}*`, case_insensitive: true },
+            },
+          };
+        }
         break;
       case "exists":
         clause = { exists: { field: c.field } };
@@ -1857,6 +2024,7 @@ function buildDSL(): any {
         if (c.value?.lte !== undefined) range.lte = c.value.lte;
         clause = { range: { [c.field]: range } };
         break;
+    }
     }
     }
     if (Object.keys(clause).length) {
@@ -1933,7 +2101,28 @@ async function executeQuery() {
 
     loading.value = true;
     // 更新已执行查询的搜索词，用于高亮显示
-    executedSearchValue.value = defaultSearchValue.value;
+    // 优先使用顶部搜索框
+    if (defaultSearchValue.value && defaultSearchValue.value.trim()) {
+      executedSearchValue.value = defaultSearchValue.value.trim();
+    } else {
+      // 否则从高级条件中提取
+      const keywords: string[] = [];
+      conditions.forEach((c) => {
+        if (
+          ["match", "term", "prefix", "wildcard"].includes(c.type) &&
+          c.value
+        ) {
+          if (typeof c.value === "string") {
+            keywords.push(c.value);
+          }
+        }
+        // Multi-match or _all_fields
+        if (c.field === "_all_fields" && typeof c.value === "string") {
+          keywords.push(c.value);
+        }
+      });
+      executedSearchValue.value = keywords;
+    }
     const dsl = buildDSL();
     const req: any = {
       datasourceId: props.packageData.datasource_id,
@@ -2179,13 +2368,25 @@ function shouldTooltip(value: any, limit: number): boolean {
 }
 
 // 高亮搜索关键词的函数
-function highlightText(text: string, keyword: string): string {
+function highlightText(text: string, keyword: string | string[]): string {
   if (!text || !keyword) return text;
+  if (Array.isArray(keyword) && keyword.length === 0) return text;
 
-  // 转义特殊字符，避免正则表达式错误
-  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`(${escapedKeyword})`, "gi");
+  let pattern = "";
+  if (Array.isArray(keyword)) {
+    // 过滤空字符串并转义
+    const escaped = keyword
+      .filter((k) => k && typeof k === "string" && k.trim())
+      .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (escaped.length === 0) return text;
+    // 按长度降序排序，优先匹配长词
+    escaped.sort((a, b) => b.length - a.length);
+    pattern = `(${escaped.join("|")})`;
+  } else {
+    pattern = `(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`;
+  }
 
+  const regex = new RegExp(pattern, "gi");
   return text.replace(regex, '<span class="highlight">$1</span>');
 }
 
@@ -2193,22 +2394,20 @@ function highlightText(text: string, keyword: string): string {
 function formatTextWithHighlight(
   text: string,
   max: number | null,
-  keyword?: string
+  keyword?: string | string[]
 ): string {
   if (!text) return "";
 
   // 先截断文本
-  const truncatedText = (max && text.length > max) ? text.slice(0, max - 1) + "…" : text;
+  const truncatedText =
+    max && text.length > max ? text.slice(0, max - 1) + "…" : text;
 
   // 如果有搜索关键词，则高亮显示
-  if (keyword && keyword.trim()) {
-    console.log(
-      "Highlighting keyword:",
-      keyword.trim(),
-      "in text:",
-      truncatedText.substring(0, 50)
-    );
-    return highlightText(truncatedText, keyword.trim());
+  if (keyword) {
+    if (typeof keyword === "string" && !keyword.trim()) return truncatedText;
+    if (Array.isArray(keyword) && keyword.length === 0) return truncatedText;
+    
+    return highlightText(truncatedText, keyword);
   }
 
   return truncatedText;
