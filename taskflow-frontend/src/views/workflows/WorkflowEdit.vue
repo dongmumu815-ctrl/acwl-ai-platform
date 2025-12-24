@@ -191,7 +191,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, markRaw } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Graph } from '@antv/x6'
-import NodeConfig from '../../components/workflow/configs/NodeConfig.vue'
+import NodeConfig from '@/components/workflow/NodeConfig.vue'
 import { workflowApi } from '@/api/workflow'
 import {
   ArrowLeft, Check, View, ZoomIn, ZoomOut, FullScreen,
