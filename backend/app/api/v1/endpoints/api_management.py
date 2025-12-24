@@ -1567,16 +1567,17 @@ def _generate_markdown_doc(api: CustomApi, api_fields: list = None) -> str:
     
 
     
-    # 添加字段说明（如果API有字段定义）
     if api_fields:
-        doc.append("### 数据字段说明")
-        doc.append("")
-        doc.append("| 字段名 | 类型 | 必填 | 描述 |")
-        doc.append("|--------|------|------|------|")
-        for field in api_fields:
-            required = "是" if field.is_required else "否"
-            doc.append(f"| {field.field_name} | {field.field_type} | {required} | {field.description or '无描述'} |")
-        doc.append("")
+        upload_fields = [f for f in api_fields if getattr(f, "is_upload", 0) == 1 or str(getattr(f, "is_upload", 0)) == "1"]
+        if upload_fields:
+            doc.append("### 数据字段说明")
+            doc.append("")
+            doc.append("| 字段名 | 类型 | 必填 | 描述 |")
+            doc.append("|--------|------|------|------|")
+            for field in upload_fields:
+                required = "是" if field.is_required else "否"
+                doc.append(f"| {field.field_name} | {field.field_type} | {required} | {field.description or '无描述'} |")
+            doc.append("")
     
     doc.append("### 数据签名机制")
     doc.append("")

@@ -21,6 +21,28 @@
       ],
       "is_primary": true,
       "is_active": true
+    },
+    "api_system": {
+      "name": "api_system",
+      "type": "mysql",
+      "host": "10.20.1.200",
+      "port": 3306,
+      "username": "root",
+      "password": "2wsx1QAZaczt",
+      "database": "acwl_api_system",
+      "charset": "utf8mb4",
+      "pool_size": 8,
+      "max_overflow": 15,
+      "pool_timeout": 30,
+      "pool_recycle": 3600,
+      "extra_params": null,
+      "business_tags": [
+        "api",
+        "system",
+        "external"
+      ],
+      "is_primary": false,
+      "is_active": true
     }
   }
 }

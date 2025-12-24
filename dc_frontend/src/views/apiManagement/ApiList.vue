@@ -1468,8 +1468,26 @@ const generateJsonDoc = async (apiItem: CustomApi) => {
  */
 const copyToClipboard = async (content: string, type: string) => {
   try {
-    await navigator.clipboard.writeText(content);
-    ElMessage.success(`${type}内容已复制到剪贴板`);
+    if (navigator.clipboard && (window as any).isSecureContext) {
+      await navigator.clipboard.writeText(content);
+      ElMessage.success(`${type}内容已复制到剪贴板`);
+      return;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = content;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const succeeded = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    if (succeeded) {
+      ElMessage.success(`${type}内容已复制到剪贴板`);
+    } else {
+      throw new Error("execCommand copy failed");
+    }
   } catch (error) {
     console.error("复制失败:", error);
     ElMessage.error("复制失败");

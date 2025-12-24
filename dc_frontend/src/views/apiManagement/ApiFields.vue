@@ -117,16 +117,19 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="is_required" label="是否必填" width="100">
+        <el-table-column prop="is_required" label="是否必填" width="180">
           <template #default="{ row }">
-            <el-tag :type="row.is_required ? 'danger' : 'info'" size="small">
-              {{ row.is_required ? '必填' : '可选' }}
-            </el-tag>
+            <el-switch
+              v-model="row.is_required"
+              active-text="必填"
+              inactive-text="可选"
+              @change="onRequiredChange(row, $event)"
+            />
           </template>
         </el-table-column>
-        <el-table-column prop="default_value" label="默认值" width="120" show-overflow-tooltip />
+        <el-table-column prop="default_value" label="默认值" width="100" show-overflow-tooltip />
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="validation_rules" label="验证规则" width="150" show-overflow-tooltip />
+        <el-table-column prop="validation_rules" label="验证规则" width="120" show-overflow-tooltip />
         <el-table-column prop="sort_order" label="排序" width="80" sortable />
         <el-table-column prop="created_at" label="创建时间" width="150">
           <template #default="{ row }">
@@ -141,7 +144,7 @@
               :true-value="1"
               :false-value="0"
               @change="onUploadChange(row, $event)"
-            >上传</el-checkbox>
+            ></el-checkbox>
           </template>
         </el-table-column>
       </el-table>
@@ -822,26 +825,48 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
 /**
  * 勾选是否上传状态并同步更新到后端
  */
-const onUploadChange = async (field: ApiField, value: number | boolean) => {
-  const apiId = parseInt(route.params.id as string)
-  const newVal = typeof value === 'boolean' ? (value ? 1 : 0) : value
-  const prev = field.is_upload ?? 0
-  try {
-    const resp = await updateApiField(apiId, field.id, { is_upload: newVal })
-    if (resp.success) {
-      ElMessage.success('上传状态已更新')
-      field.is_upload = newVal
-    } else {
-      // 回滚界面状态
+  const onUploadChange = async (field: ApiField, value: number | boolean) => {
+    const apiId = parseInt(route.params.id as string)
+    const newVal = typeof value === 'boolean' ? (value ? 1 : 0) : value
+    const prev = field.is_upload ?? 0
+    try {
+      const resp = await updateApiField(apiId, field.id, { is_upload: newVal })
+      if (resp.success) {
+        ElMessage.success('上传状态已更新')
+        field.is_upload = newVal
+      } else {
+        // 回滚界面状态
+        field.is_upload = prev
+        ElMessage.error(resp.message || '更新上传状态失败')
+      }
+    } catch (e) {
       field.is_upload = prev
-      ElMessage.error(resp.message || '更新上传状态失败')
+      console.error('更新上传状态失败:', e)
+      ElMessage.error('更新上传状态失败')
     }
-  } catch (e) {
-    field.is_upload = prev
-    console.error('更新上传状态失败:', e)
-    ElMessage.error('更新上传状态失败')
   }
-}
+  
+  /**
+   * 切换是否必填并同步更新到后端
+   */
+  const onRequiredChange = async (field: ApiField, value: boolean) => {
+    const apiId = parseInt(route.params.id as string)
+    const prev = !!field.is_required
+    try {
+      const resp = await updateApiField(apiId, field.id, { is_required: value })
+      if (resp.success) {
+        ElMessage.success('必填状态已更新')
+        field.is_required = value
+      } else {
+        field.is_required = prev
+        ElMessage.error(resp.message || '更新必填状态失败')
+      }
+    } catch (e) {
+      field.is_required = prev
+      console.error('更新必填状态失败:', e)
+      ElMessage.error('更新必填状态失败')
+    }
+  }
 </script>
 
 <style scoped lang="scss">
