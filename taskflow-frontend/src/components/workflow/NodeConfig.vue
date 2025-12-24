@@ -58,10 +58,6 @@ import ShellConfig from './configs/ShellConfig.vue'
 import PythonConfig from './configs/PythonConfig.vue'
 import DelayConfig from './configs/DelayConfig.vue'
 import HttpRequestConfig from './configs/HttpRequestConfig.vue'
-import FileProcessConfig from './configs/FileProcessConfig.vue'
-import EmailSendConfig from './configs/EmailSendConfig.vue'
-import FtpTransferConfig from './configs/FtpTransferConfig.vue'
-import DatabaseQueryConfig from './configs/DatabaseQueryConfig.vue'
 
 // Props
 const props = defineProps({
@@ -101,11 +97,7 @@ const getConfigComponent = (type) => {
     'shell': ShellConfig,
     'python': PythonConfig,
     'delay': DelayConfig,
-    'http-request': HttpRequestConfig,
-    'file-process': FileProcessConfig,
-    'email-send': EmailSendConfig,
-    'ftp-transfer': FtpTransferConfig,
-    'database-query': DatabaseQueryConfig
+    'http-request': HttpRequestConfig
   }
   return componentMap[type] || 'div'
 }

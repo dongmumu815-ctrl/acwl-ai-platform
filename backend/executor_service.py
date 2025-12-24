@@ -223,12 +223,73 @@ class ExecutorService:
     async def _check_and_execute_tasks(self):
         """
         检查并执行任务
-        
-        这里应该从任务队列中获取任务并执行
-        目前只是一个占位实现
         """
-        # TODO: 实现任务队列获取和执行逻辑
-        pass
+        # 检查当前并发数是否已满
+        if len(self.running_tasks) >= self.max_concurrent_tasks:
+            return
+
+        try:
+            async for db in get_db():
+                service = ExecutorClusterService(db)
+                
+                # 获取可执行的任务数量
+                slots_available = self.max_concurrent_tasks - len(self.running_tasks)
+                
+                # 从服务获取待执行任务
+                tasks = await service.fetch_pending_tasks(self.node_id, limit=slots_available)
+                
+                for task in tasks:
+                    # 启动任务执行协程
+                    task_id = str(task.id)
+                    self.running_tasks[task_id] = asyncio.create_task(
+                        self._execute_single_task(service, task)
+                    )
+                    
+                break
+                
+        except Exception as e:
+            logger.error(f"获取任务失败: {e}")
+
+    async def _execute_single_task(self, service: ExecutorClusterService, task: Any):
+        """
+        执行单个任务
+        """
+        task_id = str(task.id)
+        logger.info(f"开始处理任务: {task_id}")
+        
+        try:
+            # 1. 更新任务状态为运行中
+            await service.update_task_status(task.id, 'running')
+            
+            # 2. 准备任务信息
+            # 注意：这里需要根据实际的TaskInstance结构适配
+            task_info = {
+                'task_name': getattr(task, 'name', f'task-{task_id}'),
+                'task_type': getattr(task, 'task_type', 'unknown'),
+                'task_content': getattr(task, 'task_content', {}),
+                'task_config': getattr(task, 'task_config', {})
+            }
+            
+            # 3. 执行任务
+            result = await self.task_executor.execute_task(task_info)
+            
+            # 4. 更新任务状态为完成或失败
+            status = 'success' if result['success'] else 'failed'
+            await service.update_task_status(task.id, status, result)
+            
+            logger.info(f"任务 {task_id} 执行完成: {status}")
+            
+        except Exception as e:
+            logger.error(f"任务 {task_id} 执行异常: {e}")
+            try:
+                await service.update_task_status(task.id, 'failed', {'error': str(e)})
+            except:
+                pass
+        finally:
+            # 从运行列表中移除
+            if task_id in self.running_tasks:
+                del self.running_tasks[task_id]
+
     
     async def _health_check_loop(self):
         """
@@ -264,11 +325,12 @@ class ExecutorService:
                 return {'healthy': False, 'reason': f'内存使用率过高: {memory.percent}%'}
             
             # 检查磁盘使用率
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage('c:\\') if os.name == 'nt' else psutil.disk_usage('/')
             if disk.percent > 90:
                 return {'healthy': False, 'reason': f'磁盘使用率过高: {disk.percent}%'}
             
             return {'healthy': True, 'reason': 'OK'}
+
             
         except Exception as e:
             return {'healthy': False, 'reason': f'健康检查异常: {e}'}

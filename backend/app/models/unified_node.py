@@ -25,6 +25,7 @@ class UnifiedNodeType(str, PyEnum):
     # 任务类型
     DATA_SYNC = "data_sync"           # 数据同步
     MODEL_TRAINING = "model_training" # 模型训练
+    SHELL_SCRIPT = "shell-script"     # Shell脚本
     DATA_ANALYSIS = "data_analysis"   # 数据分析
     ETL = "etl"                       # ETL处理
     PYTHON_CODE = "python_code"       # Python代码执行
