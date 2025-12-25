@@ -92,7 +92,7 @@
               </template>
             </el-table-column> -->
             <el-table-column prop="column_default" label="默认值" width="120" show-overflow-tooltip />
-            <el-table-column prop="column_comment" label="字段注释" min-width="300" show-overflow-tooltip />
+            <!-- <el-table-column prop="column_comment" label="字段注释" min-width="300" show-overflow-tooltip /> -->
             <el-table-column label="操作" width="155" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="showEditFieldDialog(row)">
@@ -242,7 +242,13 @@
               <el-table-column prop="data_type" label="数据类型" width="140" />
               <el-table-column prop="column_comment" label="字段说明" show-overflow-tooltip>
                 <template #default="{ row }">
-                  {{ row.column_comment || '-' }}
+                  <el-input
+                    :model-value="getFieldDesc(row.column_name)"
+                    size="small"
+                    placeholder="请输入字段说明"
+                    @update:model-value="val => setFieldDesc(row.column_name, val)"
+                    clearable
+                  />
                 </template>
               </el-table-column>
             </el-table>
@@ -635,6 +641,7 @@ const resourceTypes = ref<ResourceTypeItem[]>([])
 const activeTypeId = ref<string | number | null>(null)
 // 勾选的字段 key（小写）
 const checkedKeys = ref<string[]>([])
+const fieldDescriptions = reactive<Record<string, string>>({})
 // 自动保存状态
 const isAutoSaving = ref(false)
 const saveStatusText = ref('')
@@ -652,6 +659,12 @@ const sortedRightPanelFields = computed(() => {
     return bSel - aSel
   })
 })
+
+const getFieldDesc = (key: string) => fieldDescriptions[String(key).toLowerCase()] || ''
+const setFieldDesc = (key: string, val: string) => {
+  fieldDescriptions[String(key).toLowerCase()] = val || ''
+  if (activeTypeId.value) scheduleAutoSave()
+}
 
 // 勾选状态方法
 const isFieldChecked = (key: string) => checkedKeys.value.includes(String(key).toLowerCase())
@@ -691,10 +704,12 @@ const refreshPreselection = async () => {
   if (!activeTypeId.value) { checkedKeys.value = []; return }
   const current = resourceTypes.value.find(rt => String(rt.id) === String(activeTypeId.value))
   const existingKeys = new Set((current?.metadata || []).map(f => String(f.key).toLowerCase()))
+  const existingDescMap = new Map((current?.metadata || []).map(f => [String(f.key).toLowerCase(), f.description || '']))
   const preset: string[] = []
   rightPanelFields.value.forEach(col => {
     const colKey = String(col.column_name).toLowerCase()
     if (existingKeys.has(colKey)) preset.push(colKey)
+    fieldDescriptions[colKey] = existingDescMap.get(colKey) ?? (col.column_comment || '')
   })
   checkedKeys.value = preset
 }
@@ -731,7 +746,7 @@ const saveResourceTypeFields = async (silent = false) => {
       key: field.column_name,
       type: mapDataTypeToFieldType(field.data_type),
       required: true,
-      description: field.column_comment || ''
+      description: getFieldDesc(field.column_name) || ''
     }))
     const res = await updateResourceType(String(activeTypeId.value), { metadata: newMetadata })
     if (!res.success) throw new Error(res.message)
@@ -1076,6 +1091,7 @@ const submitAddField = async () => {
     addFieldLoading.value = false
   }
 }
+
 
 const handleDataSizeChange = (size: number) => {
   dataTablePagination.pageSize = size
