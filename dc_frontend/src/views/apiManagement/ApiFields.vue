@@ -133,16 +133,6 @@
                   </el-button>
                 </div>
               </div>
-              <div class="list-search">
-                <el-input
-                  v-model="sourceSearch"
-                  placeholder="搜索字段..."
-                  prefix-icon="Search"
-                  clearable
-                  size="small"
-                  @input="handleSourceSearch"
-                />
-              </div>
               <div class="fields-scroll-container">
                 <div
                   v-for="sf in sourceFields"
@@ -155,7 +145,7 @@
                   <div class="field-content">
                     <div class="field-info">
                       <span class="field-name" :title="sf.field_name">
-                        <span v-html="highlightText(sf.field_name, sourceSearch)"></span>
+                        {{ sf.field_name }}
                       </span>
                       <span class="field-type">{{ sf.field_type }}</span>
                     </div>
@@ -210,21 +200,11 @@
                 <h3>表字段 (目标)</h3>
                 <span class="count">{{ targetFields.length }}</span>
               </div>
-              <div class="list-search">
-                <el-input
-                  v-model="targetSearch"
-                  placeholder="搜索字段..."
-                  prefix-icon="Search"
-                  clearable
-                  size="small"
-                  @input="handleTargetSearch"
-                />
-              </div>
               <div class="fields-scroll-container">
                 <div
                   v-for="tf in targetFields"
                   :key="tf.name"
-                  :class="['field-item', mappingLookup[tf.name] ? 'mapped' : selectedTarget===tf.name ? 'active' : '', highlightedField === tf.name ? 'highlighted' : '']"
+                  :class="['field-item', mappingLookup[tf.name] ? 'mapped' : selectedTarget===tf.name ? 'active' : '']"
                   @click="handleTargetClick(tf.name)"
                   :ref="el => setTargetRef(tf.name, el as HTMLElement)"
                   :id="'target-field-' + tf.name"
@@ -1360,6 +1340,18 @@ const saveMapping = async () => {
       const data = resp.data
       const newTemplateId = data.id
       
+      // 更新 mapping_config_id 到 CustomApi
+      if (newTemplateId) {
+         try {
+           console.log('Updating API with mapping_config_id:', newTemplateId)
+           // 移除 Number() 转换，因为 newTemplateId 可能是 UUID 字符串
+           const updateResult = await updateApi(apiId, { mapping_config_id: newTemplateId })
+           console.log('API update result:', updateResult)
+         } catch (err) {
+           console.error('更新API mapping_config_id失败:', err)
+         }
+      }
+      
       // 更新 URL，加上 templateId
       if (!templateId && newTemplateId) {
         router.replace({
@@ -2039,6 +2031,8 @@ const highlightText = (text: string, query: string) => {
   justify-content: space-between;
   align-items: center;
   background: #fff;
+  height: 64px;
+  box-sizing: border-box;
 }
 
 .field-item:hover {
