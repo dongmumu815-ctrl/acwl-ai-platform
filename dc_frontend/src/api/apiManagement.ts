@@ -259,6 +259,23 @@ export const deleteApiField = (apiId: number, fieldId: number): Promise<ApiRespo
 }
 
 /**
+ * 保存API字段映射
+ */
+export const saveApiFieldMapping = (apiId: number, data: {
+  datasource_id: number
+  schema?: string
+  table: string
+  mappings: Record<string, string>
+}): Promise<ApiResponse<{ saved: boolean }>> => {
+  return request({
+    url: `/apis/${apiId}/field-mapping`,
+    method: 'post',
+    data,
+    permission: 'data:api_field:mapping:save'
+  })
+}
+
+/**
  * 批量更新字段顺序
  */
 export const updateFieldsOrder = (apiId: number, fields: Array<{ id: number; field_order: number }>): Promise<ApiResponse<void>> => {

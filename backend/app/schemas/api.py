@@ -140,6 +140,7 @@ class CustomApiUpdate(BaseModel):
     require_authentication: Optional[bool] = Field(None, description="是否需要认证")
     customer_id: Optional[int] = Field(None, description="客户ID（仅管理员可更改）")
     link_read_id: Optional[Union[str, int]] = Field(None, description="链接其他系统的ID")
+    mapping_config_id: Optional[int] = Field(None, description="映射配置ID")
 
 
 class CustomApiResponse(CustomApiBase):

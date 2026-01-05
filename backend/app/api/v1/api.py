@@ -6,13 +6,19 @@ API v1 主路由
 
 from fastapi import APIRouter
 
-from .endpoints import auth, users, models, model_service_configs, deployments, environments, health, servers, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure, roles, permissions, api_management, es_aggregations, user_operation_logs, data_upload_logs
+from .endpoints import auth, users, models, model_service_configs, deployments, environments, health, servers, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure, roles, permissions, api_management, es_aggregations, user_operation_logs, data_upload_logs, templates
 from . import instruction_sets, data_resource, resource_package, resource_type
 
 # 创建API路由器
 api_router = APIRouter()
 
 # 注册各个模块的路由
+api_router.include_router(
+    templates.router,
+    prefix="/templates",
+    tags=["模板管理"]
+)
+
 api_router.include_router(
     health.router,
     prefix="/health",

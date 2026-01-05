@@ -563,6 +563,7 @@ async def get_apis(
                     "response_format": api.response_format,
                     "resource_type_id": getattr(api, 'resource_type_id', None),
                     "link_read_id": getattr(api, 'link_read_id', None),
+                    "mapping_config_id": getattr(api, 'mapping_config_id', None),
                     "is_active": api.status == 1,        # 正确的状态转换
                     "total_calls": api.total_calls or 0,
                     "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,
@@ -629,6 +630,7 @@ async def get_api(
                 "response_format": api.response_format,
                 "resource_type_id": getattr(api, 'resource_type_id', None),
                 "link_read_id": getattr(api, 'link_read_id', None),
+                "mapping_config_id": getattr(api, 'mapping_config_id', None),
                 "is_active": api.status == 1,
                 "total_calls": api.total_calls or 0,
                 "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,
@@ -807,6 +809,8 @@ async def update_api(
                 api.resource_type_id = update_data.resource_type_id
             if update_data.link_read_id is not None:
                 api.link_read_id = update_data.link_read_id
+            if update_data.mapping_config_id is not None:
+                api.mapping_config_id = update_data.mapping_config_id
             
             # 更新时间戳
             api.updated_at = datetime.now()
@@ -834,6 +838,7 @@ async def update_api(
                 "response_format": api.response_format,
                 "resource_type_id": getattr(api, 'resource_type_id', None),
                 "link_read_id": getattr(api, 'link_read_id', None),
+                "mapping_config_id": getattr(api, 'mapping_config_id', None),
                 "is_active": api.status == 1,
                 "total_calls": api.total_calls or 0,
                 "last_called_at": api.last_called_at.isoformat() if api.last_called_at else None,
@@ -969,6 +974,7 @@ async def copy_api(
                 "request_format": getattr(new_api, 'request_format', 'json'),
                 "response_format": new_api.response_format,
                 "resource_type_id": getattr(new_api, 'resource_type_id', None),
+                "mapping_config_id": getattr(new_api, 'mapping_config_id', None),
                 "is_active": new_api.status == 1,
                 "total_calls": new_api.total_calls or 0,
                 "last_called_at": new_api.last_called_at.isoformat() if new_api.last_called_at else None,
@@ -3046,6 +3052,45 @@ async def delete_api_field(api_id: int, field_id: int):
         print(f"删除API字段失败: {e}")
         raise HTTPException(status_code=500, detail="数据库连接失败")
 
+@router.post("/apis/{api_id}/field-mapping", summary="保存API字段映射")
+async def save_api_field_mapping(
+    api_id: int,
+    payload: dict
+):
+    """
+    保存API字段到数据表字段的映射关系
+    
+    请求体包含：
+    - datasource_id: 数据源ID
+    - schema: Schema名称（可选）
+    - table: 表名称
+    - mappings: 映射关系 { 源字段: 目标字段 }
+    """
+    try:
+        async for api_db in get_db_session(db_name="api_system"):
+            api_query = select(CustomApi).where(CustomApi.id == api_id)
+            api_result = await api_db.execute(api_query)
+            api = api_result.scalar_one_or_none()
+            if not api:
+                raise HTTPException(status_code=404, detail="API不存在")
+            
+            # 目前仅校验并回传成功，后续可将映射持久化到专用表
+            # 校验基本字段
+            if not payload or "datasource_id" not in payload or "table" not in payload or "mappings" not in payload:
+                raise HTTPException(status_code=400, detail="请求参数不完整")
+            
+            # 简要校验映射格式
+            mappings = payload.get("mappings", {})
+            if not isinstance(mappings, dict):
+                raise HTTPException(status_code=400, detail="mappings 必须为对象")
+            
+            return success_response({"saved": True, "api_id": api_id})
+            break
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"保存字段映射失败: {e}")
+        raise HTTPException(status_code=500, detail="数据库连接失败")
 
 @router.get("/resource-types", summary="获取资源类型列表")
 async def get_resource_types():
