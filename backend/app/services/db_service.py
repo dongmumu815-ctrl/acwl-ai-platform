@@ -32,6 +32,22 @@ class RouterDBService:
         self.manager.connect()
         self.service = self.manager.DataService()
 
+    def execute_sql(self, db_alias: str, query: str) -> Dict[str, Any]:
+        """执行SQL查询"""
+        try:
+            return self.service.execute_sql(db_alias, query)
+        except Exception as e:
+            logging.error(f"执行SQL失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def execute_batch_sql(self, db_alias: str, query: str, params_list: List[Any]) -> Dict[str, Any]:
+        """批量执行SQL (支持事务提交)"""
+        try:
+            return self.service.execute_batch_sql(db_alias, query, params_list)
+        except Exception as e:
+            logging.error(f"批量执行SQL失败: {e}")
+            return {'success': False, 'error': str(e)}
+
 
 class LinkTaskService:
     """任务链接服务"""

@@ -99,6 +99,7 @@ export interface CustomApiUpdate {
   response_format?: 'json' | 'xml' | 'text'
   resource_type_id?: string
   link_read_id?: string | number
+  mapping_config_id?: number
   is_active?: boolean
 }
 

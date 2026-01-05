@@ -20,7 +20,7 @@ from ....schemas.workflow import (
     WorkflowWithNodes, WorkflowQueryParams, WorkflowListResponse,
     
     # 工作流节点相关
-    WorkflowNodeCreate, WorkflowNodeUpdate, WorkflowNode as WorkflowNodeSchema,
+    WorkflowNodeCreate, WorkflowNodeUpdate, WorkflowNode as WorkflowNodeSchema, NodeType,
     
     # 工作流连接相关
     WorkflowConnectionCreate, WorkflowConnectionUpdate, WorkflowConnection as WorkflowConnectionSchema,

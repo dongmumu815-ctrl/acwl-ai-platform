@@ -479,7 +479,7 @@ class DatasourceService:
         finally:
             if connection:
                 try:
-                    await connection.close()
+                    connection.close()
                 except Exception as e:
                     self.logger.warning(f"关闭MySQL测试连接失败: {str(e)}")
     
@@ -1020,17 +1020,16 @@ class DatasourceService:
                 autocommit=True
             )
             
-            cursor = await connection.cursor()
-            
             # Doris使用类似MySQL的语法
-            await cursor.execute("""
-                SELECT TABLE_NAME, TABLE_TYPE 
-                FROM INFORMATION_SCHEMA.TABLES 
-                WHERE TABLE_SCHEMA = %s
-                ORDER BY TABLE_NAME
-            """, (schema_name,))
-            
-            results = await cursor.fetchall()
+            async with connection.cursor() as cursor:
+                await cursor.execute("""
+                    SELECT TABLE_NAME, TABLE_TYPE 
+                    FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_SCHEMA = %s
+                    ORDER BY TABLE_NAME
+                """, (schema_name,))
+                
+                results = await cursor.fetchall()
             tables = []
             
             for row in results:
@@ -1047,8 +1046,7 @@ class DatasourceService:
                     "type": type_name
                 })
             
-            await cursor.close()
-            await connection.close()
+            connection.close()
             
             return tables
             
@@ -1433,10 +1431,9 @@ class DatasourceService:
             )
             
             try:
-                cursor = await connection.cursor(aiomysql.DictCursor)
-                
                 # 查询表字段信息
-                query = """
+                async with connection.cursor(aiomysql.DictCursor) as cursor:
+                    query = """
                     SELECT 
                         COLUMN_NAME as name,
                         DATA_TYPE as type,
@@ -1449,39 +1446,38 @@ class DatasourceService:
                     FROM INFORMATION_SCHEMA.COLUMNS 
                     WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
                     ORDER BY ORDINAL_POSITION
-                """
-                
-                await cursor.execute(query, (schema_name, table_name))
-                rows = await cursor.fetchall()
-                
-                fields = []
-                for row in rows:
-                    field_info = {
-                        "name": row['name'],
-                        "type": row['type'],
-                        "nullable": row['nullable'] == 'YES',
-                        "comment": row['comment'] or ""
-                    }
+                    """
                     
-                    if row['default_value'] is not None:
-                        field_info['default_value'] = row['default_value']
+                    await cursor.execute(query, (schema_name, table_name))
+                    rows = await cursor.fetchall()
                     
-                    if row['max_length'] is not None:
-                        field_info['max_length'] = row['max_length']
+                    fields = []
+                    for row in rows:
+                        field_info = {
+                            "name": row['name'],
+                            "type": row['type'],
+                            "nullable": row['nullable'] == 'YES',
+                            "comment": row['comment'] or ""
+                        }
+                        
+                        if row['default_value'] is not None:
+                            field_info['default_value'] = row['default_value']
+                        
+                        if row['max_length'] is not None:
+                            field_info['max_length'] = row['max_length']
+                        
+                        if row['precision'] is not None:
+                            field_info['precision'] = row['precision']
+                        
+                        if row['scale'] is not None:
+                            field_info['scale'] = row['scale']
+                        
+                        fields.append(field_info)
                     
-                    if row['precision'] is not None:
-                        field_info['precision'] = row['precision']
-                    
-                    if row['scale'] is not None:
-                        field_info['scale'] = row['scale']
-                    
-                    fields.append(field_info)
-                
-                return fields
+                    return fields
                 
             finally:
-                await cursor.close()
-                await connection.close()
+                connection.close()
                 
         except Exception as e:
             self.logger.error(f"获取MySQL表字段失败: {str(e)}")
@@ -1599,10 +1595,9 @@ class DatasourceService:
             )
             
             try:
-                cursor = await connection.cursor(aiomysql.DictCursor)
-                
                 # 查询表字段信息 - 使用INFORMATION_SCHEMA
-                query = """
+                async with connection.cursor(aiomysql.DictCursor) as cursor:
+                    query = """
                     SELECT 
                         COLUMN_NAME as name,
                         DATA_TYPE as type,
@@ -1616,44 +1611,43 @@ class DatasourceService:
                     FROM INFORMATION_SCHEMA.COLUMNS 
                     WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
                     ORDER BY ORDINAL_POSITION
-                """
-                
-                await cursor.execute(query, (schema_name, table_name))
-                rows = await cursor.fetchall()
-                
-                fields = []
-                for row in rows:
-                    field_info = {
-                        "name": row['name'],
-                        "type": row['type'],
-                        "full_type": row['full_type'] or row['type'],  # 完整类型信息，包含长度等
-                        "nullable": row['nullable'] == 'YES',
-                        "comment": row['comment'] or ""
-                    }
+                    """
                     
-                    # 添加默认值（如果存在）
-                    if row['default_value'] is not None:
-                        field_info['default_value'] = row['default_value']
+                    await cursor.execute(query, (schema_name, table_name))
+                    rows = await cursor.fetchall()
                     
-                    # 添加字符类型的最大长度
-                    if row['max_length'] is not None:
-                        field_info['max_length'] = row['max_length']
+                    fields = []
+                    for row in rows:
+                        field_info = {
+                            "name": row['name'],
+                            "type": row['type'],
+                            "full_type": row['full_type'] or row['type'],  # 完整类型信息，包含长度等
+                            "nullable": row['nullable'] == 'YES',
+                            "comment": row['comment'] or ""
+                        }
+                        
+                        # 添加默认值（如果存在）
+                        if row['default_value'] is not None:
+                            field_info['default_value'] = row['default_value']
+                        
+                        # 添加字符类型的最大长度
+                        if row['max_length'] is not None:
+                            field_info['max_length'] = row['max_length']
+                        
+                        # 添加数值类型的精度
+                        if row['precision'] is not None:
+                            field_info['precision'] = row['precision']
+                        
+                        # 添加数值类型的小数位数
+                        if row['scale'] is not None:
+                            field_info['scale'] = row['scale']
+                        
+                        fields.append(field_info)
                     
-                    # 添加数值类型的精度
-                    if row['precision'] is not None:
-                        field_info['precision'] = row['precision']
-                    
-                    # 添加数值类型的小数位数
-                    if row['scale'] is not None:
-                        field_info['scale'] = row['scale']
-                    
-                    fields.append(field_info)
-                
-                return fields
+                    return fields
                 
             finally:
-                await cursor.close()
-                await connection.close()
+                connection.close()
                 
         except Exception as e:
             self.logger.error(f"获取Doris表字段失败 - Schema: {schema_name}, Table: {table_name}, 错误: {str(e)}")
@@ -1828,7 +1822,7 @@ class DatasourceService:
         finally:
             if connection:
                 try:
-                    await connection.close()
+                    connection.close()
                 except Exception as e:
                     self.logger.warning(f"关闭MySQL连接失败: {str(e)}")
     
@@ -1960,7 +1954,7 @@ class DatasourceService:
         finally:
             if connection:
                 try:
-                    await connection.close()
+                    connection.close()
                 except Exception as e:
                     self.logger.warning(f"关闭Doris连接失败: {str(e)}")
     

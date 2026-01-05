@@ -67,6 +67,7 @@ class CustomApi(Base):
     total_calls = Column(Integer, default=0, comment="总调用次数")
     last_called_at = Column(DateTime, nullable=True, comment="最后调用时间")
     link_read_id = Column(String(50), nullable=True, comment="链接读取ID")  # 实际字段名
+    mapping_config_id = Column(Integer, nullable=True, comment="映射配置ID")
     created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
     

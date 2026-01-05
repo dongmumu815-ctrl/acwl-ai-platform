@@ -282,6 +282,10 @@
                   <el-icon><Setting /></el-icon>
                   字段
                 </el-button>
+                <el-button size="small" type="warning" @click="manageFieldMapping(row)">
+                  <el-icon><Link /></el-icon>
+                  字段映射
+                </el-button>
                 <!-- <el-button size="small" type="success" @click="testApi(row)">
                   <el-icon><VideoPlay /></el-icon>
                   测试
@@ -456,6 +460,10 @@
                         <el-dropdown-item @click="manageFields(api)">
                           <el-icon><Setting /></el-icon>
                           字段
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="manageFieldMapping(api)">
+                          <el-icon><Link /></el-icon>
+                          字段映射
                         </el-dropdown-item>
                         <el-dropdown-item @click="handleDocumentCommand('markdown', api)">
                           <el-icon><Document /></el-icon>
@@ -1240,6 +1248,13 @@ const submitForm = async () => {
  */
 const manageFields = (api: CustomApi) => {
   router.push(`/api-management/apis/${api.id}/fields`);
+};
+
+/**
+ * 管理API字段映射
+ */
+const manageFieldMapping = (api: CustomApi) => {
+  router.push({ path: `/api-management/apis/${api.id}/fields`, query: { mode: 'mapping' } });
 };
 
 const viewLogs = (api: CustomApi) => {

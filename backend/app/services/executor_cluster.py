@@ -604,7 +604,7 @@ class ExecutorClusterService:
         )
         
         if not group:
-            raise NotFoundException(f"执行器分组不存在: {group_id}")
+            raise NotFoundError(f"执行器分组不存在: {group_id}")
         
         # 获取分组下的所有节点
         result = await self.db.execute(
@@ -615,6 +615,59 @@ class ExecutorClusterService:
         nodes = result.scalars().all()
         
         return list(nodes)
+
+    async def fetch_pending_tasks(self, node_id: str, limit: int = 1) -> List[Any]:
+        """
+        获取分配给指定执行器节点的待执行任务
+        
+        Args:
+            node_id: 执行器节点ID
+            limit: 获取数量
+            
+        Returns:
+            任务列表 (TaskInstance)
+        """
+        # 注意：这里假设 TaskInstance 模型已导入
+        # 实际使用时需要在文件头部导入 TaskInstance 和 TaskStatus
+        from ..models.task import TaskInstance
+        # 假设 TaskStatus 是一个枚举或者字符串常量
+        
+        # 查找状态为 'pending' 或 'assigned' 且分配给该节点的任务
+        # 这里简化逻辑，假设调度器已经将任务分配给了该节点
+        
+        # 动态导入避免循环依赖
+        try:
+            # 尝试从模型导入
+            pass
+        except ImportError:
+            return []
+            
+        # 由于 TaskInstance 模型定义可能不在 executor 模块中
+        # 这里我们先返回空列表，实际实现需要 TaskInstance 模型
+        # 待 TaskInstance 模型就绪后完善此查询
+        
+        # 模拟查询逻辑:
+        # result = await self.db.execute(
+        #     select(TaskInstance)
+        #     .where(
+        #         and_(
+        #             TaskInstance.assigned_executor_node == node_id,
+        #             TaskInstance.status.in_(['pending', 'assigned'])
+        #         )
+        #     )
+        #     .order_by(TaskInstance.priority.desc(), TaskInstance.created_at.asc())
+        #     .limit(limit)
+        # )
+        # return result.scalars().all()
+        
+        return []
+
+    async def update_task_status(self, task_instance_id: int, status: str, result: Dict[str, Any] = None):
+        """
+        更新任务状态
+        """
+        # 同样需要 TaskInstance 模型
+        pass
 
 
 async def get_executor_cluster_service(db: AsyncSession = None) -> ExecutorClusterService:

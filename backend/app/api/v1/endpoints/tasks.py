@@ -67,6 +67,7 @@ router = APIRouter()
 # 任务定义管理接口（兼容性接口，推荐使用统一节点接口）
 # ============================================
 
+@router.get("/", response_model=TaskDefinitionListResponse)
 @router.get("/definitions", response_model=TaskDefinitionListResponse)
 async def list_task_definitions(
     params: TaskDefinitionQueryParams = Depends(),
@@ -153,9 +154,8 @@ async def create_task_definition(
 ):
     """创建任务定义"""
     # 检查任务名称是否已存在
-    existing_task = db.query(TaskDefinition).filter(
-        TaskDefinition.task_name == task_data.task_name
-    ).first()
+    result = await db.execute(select(TaskDefinition).where(TaskDefinition.task_name == task_data.task_name))
+    existing_task = result.scalar_one_or_none()
     if existing_task:
         raise ValidationError(f"任务名称 '{task_data.task_name}' 已存在")
     
@@ -165,8 +165,8 @@ async def create_task_definition(
         created_by=current_user.id
     )
     db.add(task_definition)
-    db.commit()
-    db.refresh(task_definition)
+    await db.commit()
+    await db.refresh(task_definition)
     
     return task_definition
 
@@ -178,7 +178,8 @@ async def get_task_definition(
     current_user: User = Depends(get_current_user)
 ):
     """获取任务定义详情"""
-    task_definition = db.query(TaskDefinition).filter(TaskDefinition.id == task_id).first()
+    result = await db.execute(select(TaskDefinition).where(TaskDefinition.id == task_id))
+    task_definition = result.scalar_one_or_none()
     if not task_definition:
         raise NotFoundError(f"任务定义 {task_id} 不存在")
     
@@ -193,7 +194,8 @@ async def update_task_definition(
     current_user: User = Depends(get_current_user)
 ):
     """更新任务定义"""
-    task_definition = db.query(TaskDefinition).filter(TaskDefinition.id == task_id).first()
+    result = await db.execute(select(TaskDefinition).where(TaskDefinition.id == task_id))
+    task_definition = result.scalar_one_or_none()
     if not task_definition:
         raise NotFoundError(f"任务定义 {task_id} 不存在")
     
@@ -206,8 +208,8 @@ async def update_task_definition(
     for field, value in update_data.items():
         setattr(task_definition, field, value)
     
-    db.commit()
-    db.refresh(task_definition)
+    await db.commit()
+    await db.refresh(task_definition)
     
     return task_definition
 
@@ -219,7 +221,8 @@ async def delete_task_definition(
     current_user: User = Depends(get_current_user)
 ):
     """删除任务定义"""
-    task_definition = db.query(TaskDefinition).filter(TaskDefinition.id == task_id).first()
+    result = await db.execute(select(TaskDefinition).where(TaskDefinition.id == task_id))
+    task_definition = result.scalar_one_or_none()
     if not task_definition:
         raise NotFoundError(f"任务定义 {task_id} 不存在")
     
@@ -228,15 +231,16 @@ async def delete_task_definition(
         raise AuthorizationError("没有权限删除此任务定义")
     
     # 检查是否有运行中的实例
-    running_instances = db.query(TaskInstance).filter(
+    result = await db.execute(select(func.count(TaskInstance.id)).where(
         TaskInstance.task_definition_id == task_id,
         TaskInstance.status.in_(['pending', 'running'])
-    ).count()
+    ))
+    running_instances = result.scalar()
     if running_instances > 0:
         raise ValidationError(f"任务有 {running_instances} 个运行中的实例，无法删除")
     
-    db.delete(task_definition)
-    db.commit()
+    await db.delete(task_definition)
+    await db.commit()
 
 
 # ============================================
