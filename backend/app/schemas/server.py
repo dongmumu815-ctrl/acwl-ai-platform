@@ -40,6 +40,8 @@ class ServerBase(BaseModel):
     total_memory: Optional[str] = Field(None, description="总内存", max_length=50)
     total_storage: Optional[str] = Field(None, description="总存储空间", max_length=50)
     total_cpu_cores: Optional[int] = Field(None, description="总CPU核心数")
+    group_id: Optional[int] = Field(None, description="所属分组ID")
+    sort_order: Optional[int] = Field(None, description="排序权重，值越小越靠前")
 
 
 class ServerCreate(ServerBase):
@@ -94,6 +96,8 @@ class ServerUpdate(BaseModel):
     total_memory: Optional[str] = Field(None, description="总内存")
     total_storage: Optional[str] = Field(None, description="总存储空间")
     total_cpu_cores: Optional[int] = Field(None, description="总CPU核心数")
+    group_id: Optional[int] = Field(None, description="所属分组ID")
+    sort_order: Optional[int] = Field(None, description="排序权重，值越小越靠前")
 
     @validator('ip_address')
     def validate_ip_address(cls, v):
@@ -153,6 +157,8 @@ class ServerResponse(ServerBase):
     created_at: datetime
     updated_at: datetime
     gpu_resources: Optional[List[GPUResourceResponse]] = None
+    group_id: Optional[int] = Field(None, description="所属分组ID")
+    group_name: Optional[str] = Field(None, description="所属分组名称")
     
     class Config:
         from_attributes = True
@@ -237,3 +243,14 @@ class DeploymentServerInfo(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class BatchTestConnectionRequest(BaseModel):
+    """批量测试连接请求模型"""
+    ids: List[int] = Field(..., description="服务器ID列表")
+
+
+class BatchUpdatePasswordRequest(BaseModel):
+    """批量更新密码请求模型"""
+    ids: List[int] = Field(..., description="服务器ID列表")
+    password: str = Field(..., description="新SSH密码")

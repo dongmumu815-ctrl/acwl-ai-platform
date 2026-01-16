@@ -22,29 +22,30 @@ if TYPE_CHECKING:
 
 class UnifiedNodeType(str, PyEnum):
     """统一节点类型枚举"""
-    # 任务类型
-    DATA_SYNC = "data_sync"           # 数据同步
-    MODEL_TRAINING = "model_training" # 模型训练
-    SHELL_SCRIPT = "shell-script"     # Shell脚本
-    DATA_ANALYSIS = "data_analysis"   # 数据分析
-    ETL = "etl"                       # ETL处理
+    # 核心脚本执行
     PYTHON_CODE = "python_code"       # Python代码执行
     SQL_QUERY = "sql_query"           # SQL查询执行
-    CONDITION = "condition"           # 条件判断
-    DATA_TRANSFORM = "data_transform" # 数据转换
-    API_CALL = "api_call"             # API调用
-    FILE_OPERATION = "file_operation" # 文件操作
-    EMAIL_SEND = "email_send"         # 邮件发送
-    CUSTOM = "custom"                 # 自定义
+    SHELL_SCRIPT = "shell_script"     # Shell脚本
     
-    # 工作流节点类型
+    # AI 能力
+    LLM_PROCESS = "llm_process"       # LLM处理(总结/报告/建议)
+    
+    # 常用工具
+    API_CALL = "api_call"             # API调用
+    EMAIL_SEND = "email_send"         # 邮件发送
+    FILE_OPERATION = "file_operation" # 文件操作
+    
+    # 流程控制
+    CONDITION = "condition"           # 条件判断
+    LOOP = "loop"                     # 循环节点
     START = "start"                   # 开始节点
     END = "end"                       # 结束节点
-    LOOP = "loop"                     # 循环节点
-    PARALLEL = "parallel"             # 并行节点
-    MERGE = "merge"                   # 合并节点
     DELAY = "delay"                   # 延时节点
     SUBPROCESS = "subprocess"         # 子流程
+    
+    # 兼容/其他（暂时保留但不推荐使用）
+    DATA_TRANSFORM = "data_transform" # 数据转换
+    CUSTOM = "custom"                 # 自定义
 
 
 class NodePriority(str, PyEnum):

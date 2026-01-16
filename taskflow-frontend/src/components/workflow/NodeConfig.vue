@@ -40,6 +40,7 @@
     <component 
       :is="getConfigComponent(nodeType)"
       v-model="localConfig"
+      :node-type="nodeType"
       @change="handleChange"
     />
   </div>
@@ -58,6 +59,12 @@ import ShellConfig from './configs/ShellConfig.vue'
 import PythonConfig from './configs/PythonConfig.vue'
 import DelayConfig from './configs/DelayConfig.vue'
 import HttpRequestConfig from './configs/HttpRequestConfig.vue'
+import SqlExecuteConfig from './configs/SqlExecuteConfig.vue'
+import LlmChatConfig from './configs/LlmChatConfig.vue'
+import EmailSendConfig from './configs/EmailSendConfig.vue'
+import FileProcessConfig from './configs/FileProcessConfig.vue'
+import FtpTransferConfig from './configs/FtpTransferConfig.vue'
+import AiAgentConfig from './configs/AiAgentConfig.vue'
 
 // Props
 const props = defineProps({
@@ -87,16 +94,29 @@ watch(() => props.modelValue, (newValue) => {
  */
 const getConfigComponent = (type) => {
   const componentMap = {
-    'data-input': DataInputConfig,
-    'data-filter': DataFilterConfig,
-    'data-transform': DataTransformConfig,
-    'data-output': DataOutputConfig,
-    'data-join': DataJoinConfig,
+    // 脚本执行
+    'sql_query': SqlExecuteConfig,
+    'python_code': PythonConfig,
+    'shell_script': ShellConfig,
+    
+    // AI 辅助
+    'llm_process': LlmChatConfig,
+    
+    // 流程控制
     'condition': ConditionConfig,
     'loop': LoopConfig,
-    'shell': ShellConfig,
-    'python': PythonConfig,
     'delay': DelayConfig,
+    
+    // 工具
+    'api_call': HttpRequestConfig,
+    'email_send': EmailSendConfig,
+    'file_operation': FileProcessConfig,
+    
+    // 兼容旧类型（如果有遗留数据）
+    'sql-execute': SqlExecuteConfig,
+    'python': PythonConfig,
+    'shell': ShellConfig,
+    'llm-chat': LlmChatConfig,
     'http-request': HttpRequestConfig
   }
   return componentMap[type] || 'div'

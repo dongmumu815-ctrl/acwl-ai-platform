@@ -11,6 +11,8 @@ from typing import List, Optional
 
 from app.core.database import Base, TimestampMixin
 
+if False:
+    from .server_group import ServerGroup
 
 class ServerType(str, Enum):
     """服务器类型枚举"""
@@ -105,12 +107,29 @@ class Server(Base, TimestampMixin):
         Integer,
         comment="总CPU核心数"
     )
+
+    group_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("acwl_server_groups.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="所属分组ID"
+    )
     
     # 关系
+    group: Mapped[Optional["ServerGroup"]] = relationship("ServerGroup", back_populates="servers")
+
+    sort_order: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        comment="排序权重，值越小越靠前"
+    )
+    
     gpu_resources: Mapped[List["GPUResource"]] = relationship(
         "GPUResource",
         back_populates="server",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     
     deployments: Mapped[List["Deployment"]] = relationship(

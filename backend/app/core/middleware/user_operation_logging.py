@@ -612,17 +612,27 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
             return False
         return status_code >= 400
 
-    async def _get_table_columns_cached(self, db, table_name: str) -> Set[str]:
-        """获取指定表的列集合，使用内存缓存避免每次请求都访问 INFORMATION_SCHEMA"""
+    async def _get_table_columns_cached(self, table_name: str) -> Set[str]:
+        """获取指定表的列集合，优先使用预定义缓存"""
         cached = _TABLE_COLUMNS_CACHE.get(table_name)
         if cached is not None:
             return cached
-        res = await db.execute(text(
-            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t"
-        ), {"t": table_name})
-        cols = {row[0] for row in res.fetchall()}
-        _TABLE_COLUMNS_CACHE[table_name] = cols
-        return cols
+        
+        # 只有在未命中的情况下才查询数据库（通常不会发生，除非有新表）
+        try:
+            # 使用独立的 session 查询表结构，避免复用外部 session 带来的问题
+            async with get_db_context() as db:
+                res = await db.execute(text(
+                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t"
+                ), {"t": table_name})
+                cols = {row[0] for row in res.fetchall()}
+                if cols:
+                    _TABLE_COLUMNS_CACHE[table_name] = cols
+                    return cols
+        except Exception as e:
+            logger.warning(f"获取表 {table_name} 结构失败: {e}")
+        
+        return set()
 
     async def dispatch(self, request: Request, call_next):
         """
@@ -785,145 +795,163 @@ class UserOperationLoggingMiddleware(BaseHTTPMiddleware):
 
         # 将日志写入数据库
         try:
-            async with get_db_context() as db:
-                # 动态检测主表可用列（带缓存），构造兼容的 INSERT
-                main_cols = await self._get_table_columns_cached(db, 'user_operation_logs')
+            # 使用 BackgroundTask 确保日志写入在响应返回后执行
+            from starlette.background import BackgroundTask
+            
+            async def _write_log_task():
+                try:
+                    async with get_db_context() as db:
+                        # 动态检测主表可用列（带缓存），构造兼容的 INSERT
+                        main_cols = await self._get_table_columns_cached('user_operation_logs')
 
-                insert_cols = []
-                value_exprs = []
-                params = {
-                    'request_id': request_id,
-                    'user_id': user_id,
-                    'username': username,
-                    'method': method,
-                    'path': path,
-                    'url': full_url,
-                    'action_type': action_type,
-                    'status_code': int(status_code) if status_code is not None else None,
-                    'result_status': result_status,
-                    'ip_address': ip_address,
-                    'duration_ms': duration_ms,
-                    'module': module,
-                    'response_status': int(status_code) if status_code is not None else None,
-                    'server_host': server_host,
-                    'user_agent': user_agent,
-                    'referer': referer,
-                    'request_size': request_size,
-                    'response_size': response_size,
-                    'session_id': session_id,
-                    'trace_id': trace_id,
-                }
+                        insert_cols = []
+                        value_exprs = []
+                        params = {
+                            'request_id': request_id,
+                            'user_id': user_id,
+                            'username': username,
+                            'method': method,
+                            'path': path,
+                            'url': full_url,
+                            'action_type': action_type,
+                            'status_code': int(status_code) if status_code is not None else None,
+                            'result_status': result_status,
+                            'ip_address': ip_address,
+                            'duration_ms': duration_ms,
+                            'module': module,
+                            'response_status': int(status_code) if status_code is not None else None,
+                            'server_host': server_host,
+                            'user_agent': user_agent,
+                            'referer': referer,
+                            'request_size': request_size,
+                            'response_size': response_size,
+                            'session_id': session_id,
+                            'trace_id': trace_id,
+                        }
 
-                def add(col, expr= None, param_name=None):
-                    if col in main_cols:
-                        insert_cols.append(col)
-                        if expr is not None:
-                            value_exprs.append(expr)
+                        def add(col, expr= None, param_name=None):
+                            if col in main_cols:
+                                insert_cols.append(col)
+                                if expr is not None:
+                                    value_exprs.append(expr)
+                                else:
+                                    pn = param_name or col
+                                    value_exprs.append(f":{pn}")
+
+                        add('request_id')
+                        add('user_id')
+                        add('username')
+                        add('method')
+                        add('path')
+                        add('url')
+                        add('action_type')
+                        add('status_code')
+                        add('result_status')
+                        add('ip_address')
+                        add('duration_ms')
+                        add('module')
+                        add('response_status')
+                        add('server_host')
+                        add('user_agent')
+                        add('referer')
+                        add('request_size')
+                        add('response_size')
+                        add('session_id')
+                        add('trace_id')
+                        # created_at 用数据库时间
+                        add('created_at', expr='CURRENT_TIMESTAMP')
+
+                        if insert_cols:
+                            insert_main_sql = text(
+                                f"INSERT INTO user_operation_logs ({', '.join(insert_cols)}) VALUES ({', '.join(value_exprs)})"
+                            )
+                            await db.execute(insert_main_sql, params)
+
+                            # 获取刚插入ID（MySQL）
+                            result = await db.execute(text("SELECT LAST_INSERT_ID()"))
+                            log_id_row = result.fetchone()
+                            log_id = log_id_row[0] if log_id_row else None
                         else:
-                            pn = param_name or col
-                            value_exprs.append(f":{pn}")
+                            log_id = None
 
-                add('request_id')
-                add('user_id')
-                add('username')
-                add('method')
-                add('path')
-                add('url')
-                add('action_type')
-                add('status_code')
-                add('result_status')
-                add('ip_address')
-                add('duration_ms')
-                add('module')
-                add('response_status')
-                add('server_host')
-                add('user_agent')
-                add('referer')
-                add('request_size')
-                add('response_size')
-                add('session_id')
-                add('trace_id')
-                # created_at 用数据库时间
-                add('created_at', expr='CURRENT_TIMESTAMP')
+                        # 动态检测详情表可用列（带缓存），构造兼容的 INSERT
+                        detail_cols = await self._get_table_columns_cached('user_operation_log_details')
 
-                if insert_cols:
-                    insert_main_sql = text(
-                        f"INSERT INTO user_operation_logs ({', '.join(insert_cols)}) VALUES ({', '.join(value_exprs)})"
-                    )
-                    await db.execute(insert_main_sql, params)
+                        # 兼容旧库可能存在的必填字段 field_name
+                        def _guess_field_name():
+                            try:
+                                if request_body:
+                                    jb = json.loads(request_body)
+                                    if isinstance(jb, dict) and jb:
+                                        return next(iter(jb.keys()))
+                                    if isinstance(jb, list) and jb and isinstance(jb[0], dict) and jb[0]:
+                                        return next(iter(jb[0].keys()))
+                            except Exception:
+                                pass
+                            if query_params:
+                                for k in query_params.keys():
+                                    if k:
+                                        return k
+                            try:
+                                seg = path.strip('/').split('/')[-1]
+                                if seg:
+                                    return seg
+                            except Exception:
+                                pass
+                            return 'unknown'
+                        field_name = _guess_field_name()
 
-                    # 获取刚插入ID（MySQL）
-                    result = await db.execute(text("SELECT LAST_INSERT_ID()"))
-                    log_id_row = result.fetchone()
-                    log_id = log_id_row[0] if log_id_row else None
-                else:
-                    log_id = None
+                        d_insert_cols = []
+                        d_value_exprs = []
+                        d_params = {
+                            'log_id': log_id,
+                            'request_headers': json.dumps(headers, ensure_ascii=False),
+                            'query_params': json.dumps(query_params, ensure_ascii=False),
+                            'request_body': request_body,
+                            'response_body': response_text,
+                            'error_message': error_message,
+                            'stack_trace': stack_trace,
+                            'field_name': field_name,
+                        }
 
-                # 动态检测详情表可用列（带缓存），构造兼容的 INSERT
-                detail_cols = await self._get_table_columns_cached(db, 'user_operation_log_details')
+                        def d_add(col, expr=None, param_name=None):
+                            if col in detail_cols:
+                                d_insert_cols.append(col)
+                                if expr is not None:
+                                    d_value_exprs.append(expr)
+                                else:
+                                    pn = param_name or col
+                                    d_value_exprs.append(f":{pn}")
 
-                # 兼容旧库可能存在的必填字段 field_name
-                def _guess_field_name():
-                    try:
-                        if request_body:
-                            jb = json.loads(request_body)
-                            if isinstance(jb, dict) and jb:
-                                return next(iter(jb.keys()))
-                            if isinstance(jb, list) and jb and isinstance(jb[0], dict) and jb[0]:
-                                return next(iter(jb[0].keys()))
-                    except Exception:
-                        pass
-                    if query_params:
-                        for k in query_params.keys():
-                            if k:
-                                return k
-                    try:
-                        seg = path.strip('/').split('/')[-1]
-                        if seg:
-                            return seg
-                    except Exception:
-                        pass
-                    return 'unknown'
-                field_name = _guess_field_name()
+                        d_add('log_id')
+                        d_add('request_headers')
+                        d_add('query_params')
+                        d_add('request_body')
+                        d_add('response_body')
+                        d_add('error_message')
+                        d_add('stack_trace')
+                        d_add('field_name')
+                        d_add('created_at', expr='CURRENT_TIMESTAMP')
 
-                d_insert_cols = []
-                d_value_exprs = []
-                d_params = {
-                    'log_id': log_id,
-                    'request_headers': json.dumps(headers, ensure_ascii=False),
-                    'query_params': json.dumps(query_params, ensure_ascii=False),
-                    'request_body': request_body,
-                    'response_body': response_text,
-                    'error_message': error_message,
-                    'stack_trace': stack_trace,
-                    'field_name': field_name,
-                }
+                        if d_insert_cols:
+                            insert_detail_sql = text(
+                                f"INSERT INTO user_operation_log_details ({', '.join(d_insert_cols)}) VALUES ({', '.join(d_value_exprs)})"
+                            )
+                            await db.execute(insert_detail_sql, d_params)
+                except Exception as ex:
+                    logger.error(f"后台异步写入用户操作日志任务失败: {ex}")
+            
+            # 将日志写入任务挂载到 response.background，确保响应先返回，日志后写入
+            if response.background:
+                old_task = response.background
+                async def combined_task():
+                    await old_task()
+                    await _write_log_task()
+                response.background = BackgroundTask(combined_task)
+            else:
+                response.background = BackgroundTask(_write_log_task)
 
-                def d_add(col, expr=None, param_name=None):
-                    if col in detail_cols:
-                        d_insert_cols.append(col)
-                        if expr is not None:
-                            d_value_exprs.append(expr)
-                        else:
-                            pn = param_name or col
-                            d_value_exprs.append(f":{pn}")
-
-                d_add('log_id')
-                d_add('request_headers')
-                d_add('query_params')
-                d_add('request_body')
-                d_add('response_body')
-                d_add('error_message')
-                d_add('stack_trace')
-                d_add('field_name')
-                d_add('created_at', expr='CURRENT_TIMESTAMP')
-
-                if d_insert_cols:
-                    insert_detail_sql = text(
-                        f"INSERT INTO user_operation_log_details ({', '.join(d_insert_cols)}) VALUES ({', '.join(d_value_exprs)})"
-                    )
-                    await db.execute(insert_detail_sql, d_params)
         except Exception as e:
             # 写库失败不影响业务流，记录到应用日志
-            logger.error(f"写入用户操作日志失败: {e}")
+            logger.error(f"准备写入用户操作日志失败: {e}")
         return response

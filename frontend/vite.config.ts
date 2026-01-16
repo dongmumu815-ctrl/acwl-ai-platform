@@ -64,7 +64,8 @@ export default defineConfig({
         target: 'http://127.0.0.1:8082',
         // target: 'http://192.168.95.11:8082',
         // target: 'http://10.20.1.201:8082',
-        changeOrigin: true
+        changeOrigin: true,
+        ws: true
       }
     } : undefined
   },

@@ -74,6 +74,7 @@ declare module 'vue' {
     RobotIcon: typeof import('./src/components/RobotIcon.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    WebTerminal: typeof import('./src/components/WebTerminal.vue')['default']
   }
   export interface ComponentCustomProperties {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

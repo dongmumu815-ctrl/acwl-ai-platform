@@ -11,21 +11,89 @@ from passlib.context import CryptContext
 from cryptography.fernet import Fernet
 import base64
 import hashlib
+import logging
 
 from .config import settings
 
+# 尝试修复 bcrypt >= 4.0.0 与 passlib 的兼容性问题
+try:
+    import bcrypt
+    if not hasattr(bcrypt, '__about__'):
+        class Version:
+            def __init__(self, version):
+                self.__version__ = version
+        
+        bcrypt.__about__ = Version(bcrypt.__version__)
+except (ImportError, AttributeError):
+    pass
+
 # 密码加密上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger(__name__)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码"""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        # 优先使用原生 bcrypt 库，解决 passlib 与新版 bcrypt 不兼容的问题
+        import bcrypt
+        
+        # 确保输入是字节串
+        if isinstance(plain_password, str):
+            plain_password_bytes = plain_password.encode('utf-8')
+        else:
+            plain_password_bytes = plain_password
+            
+        if isinstance(hashed_password, str):
+            hashed_password_bytes = hashed_password.encode('utf-8')
+        else:
+            hashed_password_bytes = hashed_password
+            
+        # 检查是否是 bcrypt 哈希
+        if hashed_password_bytes.startswith(b'$2a$') or hashed_password_bytes.startswith(b'$2b$') or hashed_password_bytes.startswith(b'$2y$'):
+             return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
+        
+        # 如果不是 bcrypt 格式，尝试使用 passlib（兼容旧数据或其他格式）
+        return pwd_context.verify(plain_password, hashed_password)
+        
+    except Exception as e:
+        logger.warning(f"Native bcrypt verification failed, falling back to passlib: {e}")
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except ValueError as ve:
+            # 再次捕获 passlib 的误报
+            if "password cannot be longer than 72 bytes" in str(ve):
+                logger.warning(f"Passlib verification failed due to length limit bug: {str(ve)}")
+                return False
+            raise ve
 
 
 def get_password_hash(password: str) -> str:
     """获取密码哈希值"""
-    return pwd_context.hash(password)
+    try:
+        # 优先使用原生 bcrypt 库
+        import bcrypt
+        
+        if isinstance(password, str):
+            password_bytes = password.encode('utf-8')
+        else:
+            password_bytes = password
+            
+        # 检查长度（bcrypt 原生限制）
+        if len(password_bytes) > 72:
+            raise ValueError("密码长度不能超过72字节")
+            
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password_bytes, salt)
+        return hashed.decode('utf-8')
+        
+    except Exception as e:
+        logger.warning(f"Native bcrypt hashing failed, falling back to passlib: {e}")
+        # 检查密码长度，防止 bcrypt 报错
+        if len(password.encode('utf-8')) > 72:
+            raise ValueError("密码长度不能超过72字节")
+            
+        return pwd_context.hash(password)
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:

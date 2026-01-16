@@ -29,6 +29,8 @@ export interface ServerForm {
   total_storage: string
   /** CPU核心数 */
   total_cpu_cores: number | null
+  /** 排序权重 */
+  sort_order: number
 }
 
 /**
@@ -105,6 +107,9 @@ export function getServers(params?: {
   search?: string
   server_type?: string
   status?: string
+  group_id?: number
+  sort_by?: string
+  sort_order?: string
 }): Promise<ApiResponse<PaginatedResponse<ServerResponse>>> {
   return request.get('/servers/', params)
 }
@@ -160,4 +165,32 @@ export function scanServerGpus(id: number): Promise<ApiResponse<any[]>> {
  */
 export function getServerStats(): Promise<ApiResponse<{ total: number; online: number; offline: number; total_gpus: number }>> {
   return request.get('/servers/stats')
+}
+
+/**
+ * 批量测试服务器连接
+ * @param ids 服务器ID列表
+ * @returns Promise<ApiResponse<any>>
+ */
+export function batchTestConnection(ids: number[]): Promise<ApiResponse<any>> {
+  return request.post('/servers/batch/test-connection', { ids })
+}
+
+/**
+ * 批量更新SSH密码
+ * @param ids 服务器ID列表
+ * @param password 新密码
+ * @returns Promise<ApiResponse<any>>
+ */
+export function batchUpdatePassword(ids: number[], password: string): Promise<ApiResponse<any>> {
+  return request.post('/servers/batch/update-password', { ids, password })
+}
+
+/**
+ * 重启服务器
+ * @param id 服务器ID
+ * @returns Promise<ApiResponse<any>>
+ */
+export function restartServer(id: number): Promise<ApiResponse<any>> {
+  return request.post(`/servers/${id}/restart`)
 }

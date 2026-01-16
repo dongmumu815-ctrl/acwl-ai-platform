@@ -21,8 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.core.database import get_db
 from app.services.executor_cluster import ExecutorClusterService
-from app.schemas.executor import ExecutorNodeCreate, ExecutorNodeHeartbeat, ExecutorGroupCreate, ExecutorStatus
-from app.core.logger import logger
+from app.sore.logger import logger
 
 
 class ExecutorService:
@@ -37,7 +36,7 @@ class ExecutorService:
         self.node_id = config.get('node_id') or str(uuid.uuid4())
         self.node_name = config.get('node_name') or f'executor-{self.node_id[:8]}'
         self.group_id = config.get('group_id', 'default')
-        self.host_ip = config.get('host_ip', '10.20.1.200')
+        self.host_ip = config.get('host_ip') or self._get_local_ip()
         self.port = config.get('port', 8001)
         self.max_concurrent_tasks = config.get('max_concurrent_tasks', 5)
         
@@ -45,11 +44,29 @@ class ExecutorService:
         self.heartbeat_interval = 30  # 心跳间隔（秒）
         self.running_tasks = {}  # 正在运行的任务
         
+        # 初始化任务执行器
+        self.task_executor = TaskExecutionExecutor()
+        
         # 设置日志
         self._setup_logging()
         
         # 注册信号处理
-        signal.signal(signal.SIGINT, self._signal_handler)
+    
+    def _get_local_ip(self) -> str:
+        """
+        获取本机IP地址
+        """
+        try:
+            # 创建一个UDP socket连接到外网地址（不会实际发送数据）
+            # 这里使用Google DNS作为目标，仅为了选择正确的网络接口
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return '127.0.0.1'
+    signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
     
     def _setup_logging(self):
@@ -262,10 +279,21 @@ class ExecutorService:
             await service.update_task_status(task.id, 'running')
             
             # 2. 准备任务信息
+            original_type = getattr(task, 'task_type', 'unknown')
+            
+            # 类型映射：前端类型 -> 执行器类型
+            type_mapping = {
+                'python': 'python_code',
+                'shell': 'shell_script',
+                'sql-execute': 'sql_query',
+                'database-query': 'sql_query'
+            }
+            task_type = type_mapping.get(original_type, original_type)
+            
             # 注意：这里需要根据实际的TaskInstance结构适配
             task_info = {
                 'task_name': getattr(task, 'name', f'task-{task_id}'),
-                'task_type': getattr(task, 'task_type', 'unknown'),
+                'task_type': task_type,
                 'task_content': getattr(task, 'task_content', {}),
                 'task_config': getattr(task, 'task_config', {})
             }

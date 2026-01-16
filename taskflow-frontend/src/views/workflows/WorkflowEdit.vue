@@ -221,10 +221,10 @@ let graph = null
  * 节点分类定义
  */
 const nodeCategories = ref([
-  { key: 'data', name: '数据处理' },
-  { key: 'ai', name: 'AI智能' },
+  { key: 'script', name: '脚本执行' },
+  { key: 'ai', name: 'AI 辅助' },
   { key: 'control', name: '流程控制' },
-  { key: 'tools', name: '工具类' }
+  { key: 'tools', name: '常用工具' }
 ])
 
 /**
@@ -238,7 +238,7 @@ const nodeTypes = ref([
     description: '工作流开始节点',
     category: 'control',
     color: '#52c41a',
-    hidden: true // 标记为隐藏，不在节点库中显示
+    hidden: true
   },
   {
     type: 'end',
@@ -246,52 +246,41 @@ const nodeTypes = ref([
     description: '工作流结束节点',
     category: 'control',
     color: '#f5222d',
-    hidden: true // 标记为隐藏，不在节点库中显示
+    hidden: true
   },
-  // 数据处理类
+  
+  // 脚本执行类
   {
-    type: 'sql-execute',
+    type: 'sql_query',
     name: 'SQL执行',
     description: '执行SQL查询和数据操作',
-    category: 'data',
+    category: 'script',
     color: '#1890ff'
   },
-  // AI智能类
   {
-    type: 'llm-chat',
-    name: '大语言模型',
-    description: '调用大语言模型进行对话和文本生成',
+    type: 'python_code',
+    name: 'Python脚本',
+    description: '执行Python代码',
+    category: 'script',
+    color: '#3776ab'
+  },
+  {
+    type: 'shell_script',
+    name: 'Shell脚本',
+    description: '执行Shell命令或脚本',
+    category: 'script',
+    color: '#13c2c2'
+  },
+
+  // AI 辅助类
+  {
+    type: 'llm_process',
+    name: 'LLM处理',
+    description: '调用大语言模型生成总结或报告',
     category: 'ai',
     color: '#722ed1'
   },
-  {
-    type: 'ai-agent',
-    name: 'AI智能体',
-    description: '执行复杂的AI任务和决策',
-    category: 'ai',
-    color: '#eb2f96'
-  },
-  {
-    type: 'text-analysis',
-    name: '文本分析',
-    description: '文本情感分析、关键词提取等',
-    category: 'ai',
-    color: '#52c41a'
-  },
-  {
-    type: 'image-recognition',
-    name: '图像识别',
-    description: '图像分类、物体检测等AI视觉任务',
-    category: 'ai',
-    color: '#faad14'
-  },
-  {
-    type: 'speech-processing',
-    name: '语音处理',
-    description: '语音识别、语音合成等处理',
-    category: 'ai',
-    color: '#13c2c2'
-  },
+
   // 流程控制类
   {
     type: 'condition',
@@ -308,61 +297,34 @@ const nodeTypes = ref([
     color: '#eb2f96'
   },
   {
-    type: 'shell',
-    name: 'Shell脚本',
-    description: '执行Shell命令或脚本',
-    category: 'control',
-    color: '#13c2c2'
-  },
-  {
-    type: 'python',
-    name: 'Python脚本',
-    description: '执行Python代码',
-    category: 'control',
-    color: '#3776ab'
-  },
-  {
     type: 'delay',
     name: '延时等待',
     description: '等待指定时间后继续',
     category: 'control',
     color: '#fa8c16'
   },
+
   // 工具类
   {
-    type: 'http-request',
-    name: 'HTTP请求',
+    type: 'api_call',
+    name: 'API调用',
     description: '发送HTTP/HTTPS请求',
     category: 'tools',
     color: '#52c41a'
   },
   {
-    type: 'file-process',
-    name: '文件处理',
-    description: '文件读写和处理操作',
-    category: 'tools',
-    color: '#faad14'
-  },
-  {
-    type: 'email-send',
+    type: 'email_send',
     name: '邮件发送',
     description: '发送电子邮件通知',
     category: 'tools',
     color: '#1890ff'
   },
   {
-    type: 'ftp-transfer',
-    name: 'FTP传输',
-    description: '文件FTP上传下载',
+    type: 'file_operation',
+    name: '文件操作',
+    description: '文件读写和处理操作',
     category: 'tools',
-    color: '#722ed1'
-  },
-  {
-    type: 'database-query',
-    name: '数据库查询',
-    description: '执行SQL查询语句',
-    category: 'tools',
-    color: '#f5222d'
+    color: '#faad14'
   }
 ])
 

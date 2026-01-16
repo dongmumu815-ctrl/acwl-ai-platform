@@ -13,7 +13,7 @@ from datetime import datetime
 import paramiko
 import psutil
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 
 from app.models.server import Server, GPUResource, ServerMetrics, ServerStatus
 from app.core.config import settings
@@ -31,6 +31,203 @@ class ServerService:
     def __init__(self, db: AsyncSession):
         self.db = db
     
+    async def _run_sync(self, func, *args, **kwargs):
+        """在线程池中运行同步函数"""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+
+    @staticmethod
+    def _ssh_task(server_info: Dict[str, Any], task_type: str) -> Dict[str, Any]:
+        """
+        执行 SSH 任务的同步方法
+        
+        Args:
+            server_info: 服务器连接信息字典
+            task_type: 任务类型 'test_and_info' | 'scan_gpu' | 'collect_metrics' | 'restart'
+        """
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        result = {"success": False, "message": "", "data": {}}
+        
+        try:
+            # 建立连接
+            connected = False
+            last_error = None
+            
+            # 1. 优先尝试 Key 认证
+            if server_info.get("ssh_key_path"):
+                try:
+                    ssh_client.connect(
+                        hostname=server_info["ip_address"],
+                        port=server_info["ssh_port"],
+                        username=server_info["ssh_username"],
+                        key_filename=server_info["ssh_key_path"],
+                        timeout=15
+                    )
+                    connected = True
+                    logger.info(f"SSH连接成功 (Key认证): {server_info['ip_address']}")
+                except Exception as e:
+                    logger.warning(f"SSH Key认证失败: {str(e)}，尝试密码认证")
+                    last_error = e
+            
+            # 2. 如果未连接且提供了密码，尝试密码认证
+            if not connected and server_info.get("ssh_password"):
+                try:
+                    ssh_client.connect(
+                        hostname=server_info["ip_address"],
+                        port=server_info["ssh_port"],
+                        username=server_info["ssh_username"],
+                        password=server_info["ssh_password"],
+                        timeout=15
+                    )
+                    connected = True
+                    logger.info(f"SSH连接成功 (密码认证): {server_info['ip_address']}")
+                except Exception as e:
+                    logger.error(f"SSH 密码认证失败: {str(e)}")
+                    last_error = e
+            
+            if not connected:
+                raise last_error or Exception("无法建立SSH连接，请检查认证信息")
+            
+            if task_type == 'test_and_info':
+                # 1. 测试连接
+                stdin, stdout, stderr = ssh_client.exec_command('echo "connection_test"')
+                output = stdout.read().decode().strip()
+                if output != "connection_test":
+                    raise Exception("连接测试响应不正确")
+                
+                result["success"] = True
+                result["message"] = "SSH连接测试成功"
+                
+                # 2. 获取硬件信息
+                info = {}
+                # CPU
+                try:
+                    stdin, stdout, stderr = ssh_client.exec_command("nproc")
+                    cpu = stdout.read().decode().strip()
+                    if cpu.isdigit(): info["total_cpu_cores"] = int(cpu)
+                except: pass
+                
+                # Memory
+                try:
+                    stdin, stdout, stderr = ssh_client.exec_command("free -m | awk '/^Mem:/{print $2}'")
+                    mem = stdout.read().decode().strip()
+                    if mem.isdigit():
+                        mem_gb = round(int(mem) / 1024, 1)
+                        info["total_memory"] = f"{int(mem_gb)}GB" if mem_gb.is_integer() else f"{mem_gb}GB"
+                except: pass
+                
+                # OS
+                try:
+                    stdin, stdout, stderr = ssh_client.exec_command("cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'")
+                    os_info = stdout.read().decode().strip()
+                    if not os_info:
+                        stdin, stdout, stderr = ssh_client.exec_command("uname -sr")
+                        os_info = stdout.read().decode().strip()
+                    if os_info: info["os_info"] = os_info
+                except: pass
+                
+                result["data"]["sys_info"] = info
+                
+                # 3. 扫描 GPU (复用连接)
+                try:
+                    gpu_list = ServerService._scan_gpus_internal(ssh_client)
+                    result["data"]["gpu_list"] = gpu_list
+                except Exception as e:
+                    logger.warning(f"SSH测试连接时扫描GPU失败: {e}")
+                    result["data"]["gpu_list"] = []
+
+            elif task_type == 'scan_gpu':
+                gpu_list = ServerService._scan_gpus_internal(ssh_client)
+                result["success"] = True
+                result["data"]["gpu_list"] = gpu_list
+                
+            elif task_type == 'restart':
+                ssh_client.exec_command('nohup sudo reboot > /dev/null 2>&1 &')
+                result["success"] = True
+                result["message"] = "重启命令已发送"
+
+            elif task_type == 'change_password':
+                new_password = server_info.get("new_password")
+                username = server_info["ssh_username"]
+                current_password = server_info.get("ssh_password")
+                
+                if not new_password:
+                     raise Exception("未提供新密码")
+                
+                # 转义单引号
+                safe_password = new_password.replace("'", "'\\''")
+                
+                if username == 'root':
+                    cmd = f"echo '{username}:{safe_password}' | chpasswd"
+                else:
+                    if not current_password:
+                         # 尝试无密码 sudo
+                         cmd = f"echo '{username}:{safe_password}' | sudo -n chpasswd"
+                    else:
+                         safe_current_password = current_password.replace("'", "'\\''")
+                         # sudo -S 从 stdin 读取密码
+                         # 使用 sh -c 来执行管道命令
+                         cmd = f"echo '{safe_current_password}' | sudo -S sh -c \"echo '{username}:{safe_password}' | chpasswd\""
+                
+                stdin, stdout, stderr = ssh_client.exec_command(cmd)
+                exit_status = stdout.channel.recv_exit_status()
+                err = stderr.read().decode().strip()
+                
+                if exit_status != 0:
+                    raise Exception(f"修改密码失败 (Exit {exit_status}): {err}")
+                
+                result["success"] = True
+                result["message"] = "密码修改成功"
+                
+        except Exception as e:
+            result["success"] = False
+            result["message"] = str(e)
+            # 对于 GPU 扫描错误，可能需要特殊处理，但这里统一返回失败
+        finally:
+            ssh_client.close()
+            
+        return result
+
+    @staticmethod
+    def _scan_gpus_internal(ssh_client: paramiko.SSHClient) -> List[Dict[str, Any]]:
+        """内部使用的 GPU 扫描逻辑，假设 ssh_client 已连接"""
+        # 检查 nvidia-smi
+        stdin, stdout, stderr = ssh_client.exec_command("command -v nvidia-smi || which nvidia-smi || true")
+        if not stdout.read().decode().strip():
+            # 没有 nvidia-smi，返回空列表而不是报错，或者视业务需求而定
+            # 这里为了不中断流程，返回空
+            return []
+
+        # 查询信息
+        stdin, stdout, stderr = ssh_client.exec_command(
+            "nvidia-smi --query-gpu=name,memory.total,uuid --format=csv,noheader,nounits"
+        )
+        query_output = stdout.read().decode().strip()
+        
+        # 获取 CUDA 版本
+        stdin, stdout, stderr = ssh_client.exec_command(
+            "nvidia-smi | grep -oP 'CUDA Version:\s*\K[0-9.]+'"
+        )
+        cuda_version = stdout.read().decode().strip() or None
+        
+        gpu_list = []
+        if query_output:
+            for line in query_output.splitlines():
+                parts = [p.strip() for p in line.split(',') if p.strip()]
+                if len(parts) >= 3:
+                    name, mem_total, uuid = parts[0], parts[1], parts[2]
+                    gpu_list.append({
+                        "gpu_name": name,
+                        "gpu_type": name,
+                        "memory_size": f"{mem_total} MiB",
+                        "cuda_version": cuda_version,
+                        "device_id": uuid,
+                        "is_available": True
+                    })
+        return gpu_list
+
     async def test_ssh_connection(self, server_id: int) -> Dict[str, Any]:
         """
         测试服务器SSH连接
@@ -51,70 +248,89 @@ class ServerService:
             if not server:
                 raise ValueError(f"服务器 {server_id} 不存在")
             
-            # 测试SSH连接
-            ssh_client = paramiko.SSHClient()
-            ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            # 准备连接信息
+            server_info = {
+                "ip_address": server.ip_address,
+                "ssh_port": server.ssh_port,
+                "ssh_username": server.ssh_username,
+                "ssh_password": server.ssh_password,
+                "ssh_key_path": server.ssh_key_path
+            }
             
-            try:
-                # 根据认证方式连接
-                if server.ssh_key_path:
-                    ssh_client.connect(
-                        hostname=server.ip_address,
-                        port=server.ssh_port,
-                        username=server.ssh_username,
-                        key_filename=server.ssh_key_path,
-                        timeout=10
-                    )
-                else:
-                    ssh_client.connect(
-                        hostname=server.ip_address,
-                        port=server.ssh_port,
-                        username=server.ssh_username,
-                        password=server.ssh_password,
-                        timeout=10
-                    )
+            # 使用 _ssh_task 执行连接测试和信息收集
+            task_result = await self._run_sync(self._ssh_task, server_info, 'test_and_info')
+            
+            if task_result["success"]:
+                # 提取系统信息
+                sys_info = task_result["data"].get("sys_info", {})
+                gpu_list = task_result["data"].get("gpu_list", [])
                 
-                # 执行简单命令测试
-                stdin, stdout, stderr = ssh_client.exec_command('echo "connection_test"')
-                output = stdout.read().decode().strip()
+                # 更新服务器信息
+                update_values = {
+                    "status": ServerStatus.online,
+                    "updated_at": datetime.now()
+                }
                 
-                if output == "connection_test":
-                    # 更新服务器状态为在线
-                    await self.db.execute(
-                        update(Server)
-                        .where(Server.id == server_id)
-                        .values(status=ServerStatus.online)
-                    )
-                    await self.db.commit()
-                    
-                    return {
-                        "success": True,
-                        "message": "SSH连接测试成功",
-                        "server_name": server.name,
-                        "ip_address": server.ip_address
+                if "os_info" in sys_info:
+                    update_values["os_info"] = sys_info["os_info"]
+                if "total_cpu_cores" in sys_info:
+                    update_values["total_cpu_cores"] = sys_info["total_cpu_cores"]
+                if "total_memory" in sys_info:
+                    update_values["total_memory"] = sys_info["total_memory"]
+                
+                # 更新服务器记录
+                await self.db.execute(
+                    update(Server)
+                    .where(Server.id == server_id)
+                    .values(**update_values)
+                )
+                
+                # 更新 GPU 信息
+                # 先删除旧的
+                await self.db.execute(
+                    delete(GPUResource).where(GPUResource.server_id == server_id)
+                )
+                
+                # 添加新的
+                for gpu_data in gpu_list:
+                    gpu_data["server_id"] = server_id
+                    await self.add_gpu_resource(gpu_data)
+                
+                await self.db.commit()
+                
+                return {
+                    "success": True,
+                    "message": "SSH连接测试成功",
+                    "server_name": server.name,
+                    "ip_address": server.ip_address,
+                    "data": {
+                        **sys_info,
+                        "gpu_count": len(gpu_list),
+                        "status": "online"
                     }
-                else:
-                    raise Exception("命令执行失败")
-                    
-            finally:
-                ssh_client.close()
-                
+                }
+            else:
+                raise Exception(task_result["message"])
+
         except Exception as e:
             logger.error(f"SSH连接测试失败: {str(e)}")
             
             # 更新服务器状态为离线
-            await self.db.execute(
-                update(Server)
-                .where(Server.id == server_id)
-                .values(status=ServerStatus.offline)
-            )
-            await self.db.commit()
+            try:
+                await self.db.execute(
+                    update(Server)
+                    .where(Server.id == server_id)
+                    .values(status=ServerStatus.offline)
+                )
+                await self.db.commit()
+            except:
+                pass
             
             return {
                 "success": False,
                 "message": f"SSH连接测试失败: {str(e)}",
-                "server_name": server.name if server else "未知",
-                "ip_address": server.ip_address if server else "未知"
+                "server_name": server.name if 'server' in locals() and server else "未知",
+                "ip_address": server.ip_address if 'server' in locals() and server else "未知"
             }
     
     async def collect_server_metrics(self, server_id: int) -> Dict[str, Any]:
@@ -137,8 +353,22 @@ class ServerService:
             if not server:
                 raise ValueError(f"服务器 {server_id} 不存在")
             
+            # 准备连接信息
+            server_info = {
+                "ip_address": server.ip_address,
+                "ssh_port": server.ssh_port,
+                "ssh_username": server.ssh_username,
+                "ssh_password": server.ssh_password,
+                "ssh_key_path": server.ssh_key_path
+            }
+            
             # 通过SSH收集远程服务器指标
-            metrics = await self._collect_remote_metrics(server)
+            task_result = await self._run_sync(self._ssh_task, server_info, 'collect_metrics')
+            
+            if not task_result["success"]:
+                raise Exception(task_result["message"])
+                
+            metrics = task_result["data"].get("metrics", {})
             
             # 保存监控数据到数据库
             server_metrics = ServerMetrics(
@@ -168,97 +398,7 @@ class ServerService:
                 "message": f"收集服务器指标失败: {str(e)}"
             }
     
-    async def _collect_remote_metrics(self, server: Server) -> Dict[str, Any]:
-        """
-        通过SSH收集远程服务器指标
-        
-        Args:
-            server: 服务器对象
-            
-        Returns:
-            指标数据字典
-        """
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        try:
-            # 连接到服务器
-            if server.ssh_key_path:
-                ssh_client.connect(
-                    hostname=server.ip_address,
-                    port=server.ssh_port,
-                    username=server.ssh_username,
-                    key_filename=server.ssh_key_path,
-                    timeout=10
-                )
-            else:
-                ssh_client.connect(
-                    hostname=server.ip_address,
-                    port=server.ssh_port,
-                    username=server.ssh_username,
-                    password=server.ssh_password,
-                    timeout=10
-                )
-            
-            metrics = {}
-            
-            # 收集CPU使用率
-            stdin, stdout, stderr = ssh_client.exec_command(
-                "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | awk -F'%' '{print $1}'"
-            )
-            cpu_output = stdout.read().decode().strip()
-            if cpu_output:
-                metrics["cpu_usage"] = float(cpu_output)
-            
-            # 收集内存使用率
-            stdin, stdout, stderr = ssh_client.exec_command(
-                "free | grep Mem | awk '{printf \"%.2f\", $3/$2 * 100.0}'"
-            )
-            memory_output = stdout.read().decode().strip()
-            if memory_output:
-                metrics["memory_usage"] = float(memory_output)
-            
-            # 收集磁盘使用率
-            stdin, stdout, stderr = ssh_client.exec_command(
-                "df -h / | awk 'NR==2{print $5}' | sed 's/%//'"
-            )
-            disk_output = stdout.read().decode().strip()
-            if disk_output:
-                metrics["disk_usage"] = float(disk_output)
-            
-            # 收集网络流量（简化版本）
-            stdin, stdout, stderr = ssh_client.exec_command(
-                "cat /proc/net/dev | grep eth0 | awk '{print $2, $10}'"
-            )
-            network_output = stdout.read().decode().strip()
-            if network_output:
-                parts = network_output.split()
-                if len(parts) >= 2:
-                    metrics["network_in"] = float(parts[0]) / 1024 / 1024  # 转换为MB
-                    metrics["network_out"] = float(parts[1]) / 1024 / 1024  # 转换为MB
-            
-            # 收集GPU信息（如果有nvidia-smi）
-            stdin, stdout, stderr = ssh_client.exec_command(
-                "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits"
-            )
-            gpu_output = stdout.read().decode().strip()
-            if gpu_output and not stderr.read():
-                gpu_metrics = []
-                for line in gpu_output.split('\n'):
-                    if line.strip():
-                        parts = line.split(', ')
-                        if len(parts) >= 3:
-                            gpu_metrics.append({
-                                "utilization": float(parts[0]),
-                                "memory_used": float(parts[1]),
-                                "memory_total": float(parts[2])
-                            })
-                metrics["gpu_metrics"] = gpu_metrics
-            
-            return metrics
-            
-        finally:
-            ssh_client.close()
+    # _collect_remote_metrics 已废弃，功能合并到 _ssh_task 中
     
     async def get_server_status(self, server_id: int) -> Dict[str, Any]:
         """
@@ -537,12 +677,13 @@ class ServerService:
             logger.error(f"添加GPU资源失败: {str(e)}")
             raise
     
-    async def scan_server_gpus(self, server_id: int) -> List[Dict[str, Any]]:
+    async def scan_server_gpus(self, server_id: int, ssh_client: Optional[paramiko.SSHClient] = None) -> List[Dict[str, Any]]:
         """
         通过SSH扫描服务器上的GPU，并将信息写入数据库
         
         Args:
             server_id: 服务器ID
+            ssh_client: (已弃用，保留兼容性) 可选的已连接SSH客户端
         
         Returns:
             持久化后的GPU资源列表
@@ -554,100 +695,41 @@ class ServerService:
             if not server:
                 raise NotFoundError("服务器不存在", detail={"server_id": server_id})
             
-            ssh_client = paramiko.SSHClient()
-            ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            # 准备连接信息
+            server_info = {
+                "ip_address": server.ip_address,
+                "ssh_port": server.ssh_port,
+                "ssh_username": server.ssh_username,
+                "ssh_password": server.ssh_password,
+                "ssh_key_path": server.ssh_key_path
+            }
             
-            try:
-                # 建立SSH连接
-                if server.ssh_key_path:
-                    ssh_client.connect(
-                        hostname=server.ip_address,
-                        port=server.ssh_port,
-                        username=server.ssh_username,
-                        key_filename=server.ssh_key_path,
-                        timeout=15
-                    )
-                else:
-                    ssh_client.connect(
-                        hostname=server.ip_address,
-                        port=server.ssh_port,
-                        username=server.ssh_username,
-                        password=server.ssh_password,
-                        timeout=15
-                    )
-                
-                # 检查 nvidia-smi 是否存在
-                stdin, stdout, stderr = ssh_client.exec_command(
-                    "command -v nvidia-smi || which nvidia-smi || true"
-                )
-                smi_path = stdout.read().decode().strip()
-                smi_err = stderr.read().decode().strip()
-                if not smi_path:
-                    raise GPUError(
-                        "目标服务器未安装或未配置 nvidia-smi",
-                        detail={"server_id": server_id, "ip_address": server.ip_address}
-                    )
-                
-                # 查询GPU基本信息
-                stdin, stdout, stderr = ssh_client.exec_command(
-                    "nvidia-smi --query-gpu=name,memory.total,uuid --format=csv,noheader,nounits"
-                )
-                query_output = stdout.read().decode().strip()
-                stderr_output = stderr.read().decode().strip()
-                if stderr_output and ("not found" in stderr_output.lower() or "command not found" in stderr_output.lower()):
-                    raise GPUError(
-                        "nvidia-smi 命令不可用",
-                        detail={"server_id": server_id, "stderr": stderr_output}
-                    )
-                
-                # 获取CUDA版本（如果有）
-                stdin, stdout, stderr = ssh_client.exec_command(
-                    "nvidia-smi | grep -oP 'CUDA Version:\s*\K[0-9.]+'"
-                )
-                cuda_version = stdout.read().decode().strip() or None
-                
-                # 解析扫描结果
-                scanned_data: List[Dict[str, Any]] = []
-                if query_output:
-                    for line in query_output.splitlines():
-                        parts = [p.strip() for p in line.split(',') if p.strip()]
-                        if len(parts) >= 3:
-                            name, mem_total, uuid = parts[0], parts[1], parts[2]
-                            scanned_data.append({
-                                "server_id": server_id,
-                                "gpu_name": name,
-                                "gpu_type": name,  # 简化处理：使用型号名称作为类型
-                                "memory_size": f"{mem_total} MiB",
-                                "cuda_version": cuda_version,
-                                "device_id": uuid,
-                                "is_available": True,
-                            })
-                else:
-                    raise GPUError(
-                        "未检测到GPU或 nvidia-smi 未返回数据",
-                        detail={"server_id": server_id}
-                    )
-                
-                # 持久化：仅在有有效扫描数据时替换旧数据
-                gpu_result = await self.db.execute(select(GPUResource).where(GPUResource.server_id == server_id))
-                for gpu in gpu_result.scalars().all():
-                    await self.db.delete(gpu)
-                await self.db.commit()
-                
-                scanned: List[Dict[str, Any]] = []
-                for gpu_data in scanned_data:
-                    created = await self.add_gpu_resource(gpu_data)
-                    scanned.append(created)
-                
-                return scanned
-            finally:
-                ssh_client.close()
+            # 在线程池中执行
+            task_result = await self._run_sync(self._ssh_task, server_info, 'scan_gpu')
+            
+            if not task_result["success"]:
+                 raise GPUError(task_result["message"], detail={"server_id": server_id})
+
+            gpu_list = task_result["data"].get("gpu_list", [])
+            
+            # 持久化
+            gpu_result = await self.db.execute(select(GPUResource).where(GPUResource.server_id == server_id))
+            for gpu in gpu_result.scalars().all():
+                await self.db.delete(gpu)
+            await self.db.commit()
+            
+            scanned: List[Dict[str, Any]] = []
+            for gpu_data in gpu_list:
+                gpu_data["server_id"] = server_id
+                created = await self.add_gpu_resource(gpu_data)
+                scanned.append(created)
+            
+            return scanned
+
         except ACWLException:
-            # 直接透传已分类的业务异常
             raise
         except Exception as e:
             logger.error(f"扫描GPU失败: {str(e)}", exc_info=True)
-            # 归一化为GPUError，避免上层500且不清空旧数据
             raise GPUError("扫描GPU失败", detail=str(e))
     
     async def get_server(self, server_id: int) -> Dict[str, Any]:
@@ -748,4 +830,150 @@ class ServerService:
         except Exception as e:
             await self.db.rollback()
             logger.error(f"删除服务器失败: {str(e)}")
+            raise
+
+    async def batch_test_ssh_connection(self, server_ids: List[int]) -> List[Dict[str, Any]]:
+        """
+        批量测试服务器SSH连接
+        
+        Args:
+            server_ids: 服务器ID列表
+            
+        Returns:
+            测试结果列表
+        """
+        results = []
+        for server_id in server_ids:
+            try:
+                result = await self.test_ssh_connection(server_id)
+                results.append(result)
+            except Exception as e:
+                results.append({
+                    "server_id": server_id,
+                    "success": False,
+                    "message": f"测试失败: {str(e)}"
+                })
+        return results
+
+    async def batch_update_password(self, server_ids: List[int], password: str) -> List[Dict[str, Any]]:
+        """
+        批量更新服务器SSH密码
+        
+        Args:
+            server_ids: 服务器ID列表
+            password: 新密码
+            
+        Returns:
+            更新结果列表
+        """
+        results = []
+        try:
+            # 批量获取服务器
+            query = select(Server).where(Server.id.in_(server_ids))
+            result = await self.db.execute(query)
+            servers = result.scalars().all()
+            
+            for server in servers:
+                try:
+                    # DEBUG: 检查密码一致性
+                    if server.ssh_password == password:
+                         logger.warning(f"服务器 {server.id} ({server.ip_address}) 的数据库密码与新密码相同，可能已经更新过")
+                    else:
+                         logger.info(f"服务器 {server.id} ({server.ip_address}) 准备更新密码。数据库中密码长度: {len(server.ssh_password) if server.ssh_password else 0}, 新密码长度: {len(password)}")
+
+                    # 1. 尝试更新远程服务器密码
+                    server_info = {
+                        "ip_address": server.ip_address,
+                        "ssh_port": server.ssh_port,
+                        "ssh_username": server.ssh_username,
+                        "ssh_password": server.ssh_password, # 使用旧密码连接
+                        "ssh_key_path": server.ssh_key_path,
+                        "new_password": password
+                    }
+                    
+                    # 执行远程修改
+                    task_result = await self._run_sync(self._ssh_task, server_info, 'change_password')
+                    
+                    if not task_result["success"]:
+                        raise Exception(task_result["message"])
+                    
+                    # 2. 更新数据库中的密码
+                    server.ssh_password = password
+                    
+                    results.append({
+                        "server_id": server.id,
+                        "success": True,
+                        "message": "密码更新成功"
+                    })
+                except Exception as e:
+                    logger.error(f"服务器 {server.id} 更新密码失败: {str(e)}")
+                    results.append({
+                        "server_id": server.id,
+                        "success": False,
+                        "message": f"密码更新失败: {str(e)}"
+                    })
+            
+            await self.db.commit()
+            return results
+        except Exception as e:
+            logger.error(f"批量更新密码失败: {str(e)}")
+            raise
+
+    async def restart_server(self, server_id: int) -> Dict[str, Any]:
+        """
+        重启服务器
+        
+        Args:
+            server_id: 服务器ID
+            
+        Returns:
+            操作结果
+        """
+        try:
+            # 获取服务器信息
+            result = await self.db.execute(
+                select(Server).where(Server.id == server_id)
+            )
+            server = result.scalar_one_or_none()
+            
+            if not server:
+                raise ValueError(f"服务器 {server_id} 不存在")
+            
+            # 连接SSH执行重启命令
+            ssh_client = paramiko.SSHClient()
+            ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            try:
+                if server.ssh_key_path:
+                    ssh_client.connect(
+                        hostname=server.ip_address,
+                        port=server.ssh_port,
+                        username=server.ssh_username,
+                        key_filename=server.ssh_key_path,
+                        timeout=10
+                    )
+                else:
+                    ssh_client.connect(
+                        hostname=server.ip_address,
+                        port=server.ssh_port,
+                        username=server.ssh_username,
+                        password=server.ssh_password,
+                        timeout=10
+                    )
+                
+                # 异步执行重启命令，因为重启会断开连接
+                # 使用 nohup 和 & 让命令在后台运行
+                ssh_client.exec_command('nohup sudo reboot > /dev/null 2>&1 &')
+                
+                return {
+                    "success": True,
+                    "message": "重启命令已发送",
+                    "server_id": server_id
+                }
+                
+            finally:
+                ssh_client.close()
+                
+        except Exception as e:
+            logger.error(f"重启服务器失败: {str(e)}")
             raise
