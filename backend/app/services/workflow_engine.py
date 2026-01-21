@@ -8,6 +8,7 @@
 
 import asyncio
 import logging
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ from app.models.workflow import (
     WorkflowNodeInstance, InstanceStatus, NodeType, ConnectionType
 )
 from app.models.unified_node import UnifiedNode, UnifiedNodeType
-from app.models.task import TaskDefinition
+from app.models.task import TaskDefinition, TaskType, TaskInstance, TaskStatus
 from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ class WorkflowEngine:
                 .where(WorkflowInstance.id == instance_id)
                 .values(
                     status=InstanceStatus.RUNNING,
-                    started_at=datetime.now(),
+                    actual_start_time=datetime.now(),
                     updated_at=datetime.now()
                 )
             )
@@ -95,7 +96,7 @@ class WorkflowEngine:
                     .values(
                         status=InstanceStatus.FAILED,
                         error_message=str(e),
-                        finished_at=datetime.now(),
+                        actual_end_time=datetime.now(),
                         updated_at=datetime.now()
                     )
                 )
@@ -124,13 +125,25 @@ class WorkflowEngine:
         
         # 为每个节点创建实例
         for node in nodes:
+            # 检查是否已存在
+            existing_instance = await db.execute(
+                select(WorkflowNodeInstance)
+                .filter(
+                    WorkflowNodeInstance.workflow_instance_id == workflow_instance.id,
+                    WorkflowNodeInstance.node_id == node.id
+                )
+            )
+            if existing_instance.scalar_one_or_none():
+                continue
+
             node_instance = WorkflowNodeInstance(
+                instance_id=uuid.uuid4().hex,
                 workflow_instance_id=workflow_instance.id,
                 node_id=node.id,
                 node_name=node.name,
                 node_type=node.node_type.value,  # 从枚举值获取字符串
                 status=InstanceStatus.PENDING,
-                input_data=node.config or {},
+                input_data=node.node_config or {},
                 scheduled_time=datetime.now(),
                 created_at=datetime.now(),
                 updated_at=datetime.now()
@@ -153,7 +166,19 @@ class WorkflowEngine:
             start_nodes = await self._find_start_nodes(workflow_instance.workflow_id, db)
             
             if not start_nodes:
-                raise Exception("未找到开始节点")
+                logger.info(f"工作流 {workflow_instance.workflow_id} 未找到开始节点，视为执行成功（空跑）")
+                await db.execute(
+                    update(WorkflowInstance)
+                    .where(WorkflowInstance.id == workflow_instance.id)
+                    .values(
+                        status=InstanceStatus.SUCCESS,
+                        actual_end_time=datetime.now(),
+                        updated_at=datetime.now(),
+                        error_message="未找到开始节点，跳过执行"
+                    )
+                )
+                await db.commit()
+                return
             
             # 执行开始节点
             for start_node in start_nodes:
@@ -171,7 +196,7 @@ class WorkflowEngine:
                 .values(
                     status=InstanceStatus.FAILED,
                     error_message=str(e),
-                    finished_at=datetime.now(),
+                    actual_end_time=datetime.now(),
                     updated_at=datetime.now()
                 )
             )
@@ -213,7 +238,7 @@ class WorkflowEngine:
                 .filter(
                     WorkflowNodeInstance.workflow_instance_id == workflow_instance_id,
                     WorkflowNodeInstance.node_id == node_id
-                )
+                ).limit(1)
             )
             node_instance = result.scalar_one_or_none()
             
@@ -227,20 +252,31 @@ class WorkflowEngine:
                 .where(WorkflowNodeInstance.id == node_instance.id)
                 .values(
                     status=InstanceStatus.RUNNING,
-                    started_at=datetime.now(),
+                    actual_start_time=datetime.now(),
                     updated_at=datetime.now()
                 )
             )
             await db.commit()
             
             # 根据节点类型执行不同的逻辑
-            if node_instance.node_type == NodeType.START:
+            try:
+                # 尝试将字符串转换为统一节点枚举 (优先使用 UnifiedNodeType)
+                node_type_enum = UnifiedNodeType(node_instance.node_type)
+            except ValueError:
+                node_type_enum = None
+                logger.warning(f"未知节点类型: {node_instance.node_type}")
+
+            if node_type_enum == UnifiedNodeType.START:
                 # 开始节点直接标记为完成
                 await self._complete_node(node_instance.id, {"message": "工作流开始"}, db)
-            elif node_instance.node_type == NodeType.END:
+            elif node_type_enum == UnifiedNodeType.END:
                 # 结束节点直接标记为完成
                 await self._complete_node(node_instance.id, {"message": "工作流结束"}, db)
-            elif node_instance.node_type == NodeType.TASK:
+            elif node_type_enum in [
+                UnifiedNodeType.PYTHON_CODE, UnifiedNodeType.SQL_QUERY, UnifiedNodeType.CUSTOM, 
+                UnifiedNodeType.DATA_TRANSFORM, UnifiedNodeType.API_CALL, UnifiedNodeType.FILE_OPERATION, 
+                UnifiedNodeType.EMAIL_SEND, UnifiedNodeType.SHELL_SCRIPT, UnifiedNodeType.LLM_PROCESS
+            ]:
                 # 任务节点需要实际执行
                 await self._execute_task_node(node_instance, db)
             else:
@@ -263,16 +299,84 @@ class WorkflowEngine:
             node_instance: 节点实例
             db: 数据库会话
         """
-        # 这里应该根据任务类型执行具体的任务
-        # 目前简化处理，直接标记为完成
-        output_data = {
-            "message": f"任务节点 {node_instance.node_name} 执行完成",
-            "execution_time": datetime.now().isoformat(),
-            "node_type": node_instance.node_type.value if node_instance.node_type else "unknown"
-        }
-        
-        await self._complete_node(node_instance.id, output_data, db)
-    
+        try:
+            # 1. 创建 TaskInstance
+            task_instance_id = f"task-{node_instance.id}-{uuid.uuid4().hex[:8]}"
+            
+            # 确定任务类型
+            # node_instance.node_type 是字符串
+            task_type = TaskType.CUSTOM
+            if node_instance.node_type == UnifiedNodeType.PYTHON_CODE:
+                task_type = TaskType.DATA_ANALYSIS # 暂时映射
+            elif node_instance.node_type == UnifiedNodeType.SQL_QUERY:
+                task_type = TaskType.DATA_SYNC
+            elif node_instance.node_type == UnifiedNodeType.SHELL_SCRIPT:
+                task_type = TaskType.CUSTOM
+            elif node_instance.node_type == UnifiedNodeType.LLM_PROCESS:
+                task_type = TaskType.MODEL_INFERENCE
+                
+            # 从节点配置中获取执行器分组，默认为 'default'
+            executor_group = node_instance.input_data.get('executor_group', 'default')
+            
+            logger.info(f"准备执行任务节点 {node_instance.node_name} (ID: {node_instance.id})")
+            logger.info(f"任务类型: {task_type}, 执行器组: {executor_group}")
+            logger.info(f"节点配置: {node_instance.input_data}")
+
+            # 获取默认任务定义
+            stmt = select(TaskDefinition).where(TaskDefinition.name == "System Default Task").limit(1)
+            result = await db.execute(stmt)
+            default_task_def = result.scalar_one_or_none()
+            
+            if not default_task_def:
+                # 创建默认任务定义
+                default_task_def = TaskDefinition(
+                    name="System Default Task",
+                    task_type=TaskType.CUSTOM,
+                    executor_group="default",
+                    created_by=5, # Admin
+                    is_active=True
+                )
+                db.add(default_task_def)
+                await db.flush()
+                
+            task_instance = TaskInstance(
+                instance_id=task_instance_id,
+                task_definition_id=default_task_def.id,
+                status=TaskStatus.PENDING,
+                executor_group=executor_group, 
+                scheduled_time=datetime.now(),
+                # task_definition=None, # Removed to avoid SQLAlchemy issues
+                # 将节点类型和配置存入 runtime_config，以便 Executor 使用
+                runtime_config={
+                    "task_type": node_instance.node_type, # 明确传递 task_type
+                    "node_type": node_instance.node_type,
+                    "config": node_instance.input_data
+                },
+                created_by_scheduler='workflow-engine'
+            )
+            
+            db.add(task_instance)
+            await db.flush()
+            
+            # 2. 更新 WorkflowNodeInstance 关联 TaskInstance
+            node_instance.task_instance_id = task_instance.id
+            node_instance.status = InstanceStatus.RUNNING
+            db.add(node_instance)
+            await db.commit()
+            
+            logger.info(f"节点 {node_instance.node_name} 已创建任务实例 {task_instance.instance_id}，等待执行")
+            
+            # 注意：这里不调用 _complete_node，也不调用 _execute_next_nodes
+            # 流程在此暂停，直到 Scheduler 的 _result_processor_loop 检测到 Task 完成
+            
+        except Exception as e:
+            logger.error(f"创建任务实例失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # 使用 node_instance.node_id (定义ID) 而不是 node_instance.id (实例ID)
+            await self._fail_node(node_instance.workflow_instance_id, node_instance.node_id, str(e), db)
+
+
     async def _complete_node(self, node_instance_id: int, output_data: Dict[str, Any], db: AsyncSession):
         """
         标记节点为完成
@@ -286,9 +390,9 @@ class WorkflowEngine:
             update(WorkflowNodeInstance)
             .where(WorkflowNodeInstance.id == node_instance_id)
             .values(
-                status=InstanceStatus.COMPLETED,
+                status=InstanceStatus.SUCCESS,
                 output_data=output_data,
-                finished_at=datetime.now(),
+                actual_end_time=datetime.now(),
                 updated_at=datetime.now()
             )
         )
@@ -310,7 +414,7 @@ class WorkflowEngine:
             .filter(
                 WorkflowNodeInstance.workflow_instance_id == workflow_instance_id,
                 WorkflowNodeInstance.node_id == node_id
-            )
+            ).limit(1)
         )
         node_instance = result.scalar_one_or_none()
         
@@ -321,7 +425,7 @@ class WorkflowEngine:
                 .values(
                     status=InstanceStatus.FAILED,
                     error_message=error_message,
-                    finished_at=datetime.now(),
+                    actual_end_time=datetime.now(),
                     updated_at=datetime.now()
                 )
             )
@@ -371,7 +475,7 @@ class WorkflowEngine:
         failed_count = 0
         
         for node_instance in node_instances:
-            if node_instance.status == InstanceStatus.COMPLETED:
+            if node_instance.status == InstanceStatus.SUCCESS:
                 completed_count += 1
             elif node_instance.status == InstanceStatus.FAILED:
                 failed_count += 1
@@ -385,7 +489,7 @@ class WorkflowEngine:
             error_message = f"工作流执行失败，{failed_count} 个节点失败"
         elif completed_count == total_count:
             # 所有节点完成，工作流成功
-            final_status = InstanceStatus.COMPLETED
+            final_status = InstanceStatus.SUCCESS
             error_message = None
         else:
             # 还有节点在执行中，不更新状态
@@ -398,7 +502,7 @@ class WorkflowEngine:
             .values(
                 status=final_status,
                 error_message=error_message,
-                finished_at=datetime.now(),
+                actual_end_time=datetime.now(),
                 updated_at=datetime.now()
             )
         )

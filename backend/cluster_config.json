@@ -1,71 +1,61 @@
 {
-  "database": {
-        "host": "10.20.1.200",
-    "port": 3306,
-    "user": "root",
-    "password": "password",
-    "database": "acwl_ai_data"
-  },
-  "redis": {
-    "host": "localhost",
-    "port": 6379,
-    "password": null,
-    "db": 0
-  },
-  "scheduler": {
-    "default_instances": 3,
-    "max_instances": 5,
-    "heartbeat_interval": 30,
-    "leader_election_timeout": 60,
-    "base_port": 8001,
-    "health_check_interval": 10,
-    "log_level": "INFO"
-  },
-  "executor": {
-    "default_instances": 3,
-    "max_instances": 10,
-    "heartbeat_interval": 30,
-    "task_poll_interval": 5,
-    "base_port": 8101,
-    "health_check_interval": 10,
-    "log_level": "INFO",
-    "groups": {
-      "default": {
-        "max_concurrent_tasks": 5,
-        "task_timeout": 300,
-        "retry_count": 3
-      },
-      "data_processing": {
-        "max_concurrent_tasks": 3,
-        "task_timeout": 600,
-        "retry_count": 2
-      },
-      "ml_training": {
-        "max_concurrent_tasks": 1,
-        "task_timeout": 3600,
-        "retry_count": 1
-      }
+  "schedulers": [
+    {
+      "node_id": "scheduler-001",
+      "node_name": "主调度器-1",
+      "host_ip": "127.0.0.1",
+      "port": 6789,
+      "log_level": "INFO"
+    },
+    {
+      "node_id": "scheduler-002",
+      "node_name": "主调度器-2",
+      "host_ip": "127.0.0.1",
+      "port": 6790,
+      "log_level": "INFO"
+    },
+    {
+      "node_id": "scheduler-003",
+      "node_name": "主调度器-3",
+      "host_ip": "127.0.0.1",
+      "port": 6791,
+      "log_level": "INFO"
     }
-  },
-  "monitoring": {
+  ],
+  "executors": [
+    {
+      "node_id": "executor-001",
+      "node_name": "执行器-1",
+      "group_id": "default",
+      "host_ip": "127.0.0.1",
+      "port": 9876,
+      "max_concurrent_tasks": 5,
+      "log_level": "INFO"
+    },
+    {
+      "node_id": "executor-002",
+      "node_name": "执行器-2",
+      "group_id": "default",
+      "host_ip": "127.0.0.1",
+      "port": 9877,
+      "max_concurrent_tasks": 5,
+      "log_level": "INFO"
+    },
+    {
+      "node_id": "executor-003",
+      "node_name": "执行器-3",
+      "group_id": "default",
+      "host_ip": "127.0.0.1",
+      "port": 9878,
+      "max_concurrent_tasks": 5,
+      "log_level": "INFO"
+    }
+  ],
+  "monitor": {
     "enabled": true,
-    "metrics_port": 9090,
-    "log_retention_days": 7,
-    "alert_webhook": null
-  },
-  "security": {
-    "api_key_required": false,
-    "allowed_hosts": [
-      "localhost",
-      "127.0.0.1"
-    ],
-    "ssl_enabled": false
-  },
-  "deployment": {
-    "environment": "development",
-    "cluster_name": "acwl-ai-cluster",
-    "node_prefix": "node",
-    "auto_restart": true,
-    "graceful_shutdown_timeout": 30
+    "heartbeat_timeout": 300,
+    "cleanup_interval": 600,
+    "offline_retention": 3600,
+    "log_level": "INFO"
   }
 }

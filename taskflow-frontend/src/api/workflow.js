@@ -60,7 +60,7 @@ export const workflowApi = {
    * @param {string} executionId 执行ID
    */
   stopWorkflowExecution(id, executionId) {
-    return api.post(`/workflows/${id}/executions/${executionId}/stop`)
+    return api.post(`/workflows/instances/${executionId}/cancel`)
   },
   
   /**
@@ -71,23 +71,34 @@ export const workflowApi = {
   getWorkflowExecutions(id, params = {}) {
     return api.get(`/workflows/${id}/executions`, params)
   },
+
+  /**
+   * 获取所有工作流执行实例
+   * @param {object} params 查询参数
+   */
+  getAllWorkflowExecutions(params = {}) {
+    return api.get('/workflows/instances', params)
+  },
   
   /**
    * 获取工作流执行详情
    * @param {number} id 工作流ID
    * @param {string} executionId 执行ID
+   * @param {object} config 请求配置
    */
-  getWorkflowExecutionDetail(id, executionId) {
-    return api.get(`/workflows/${id}/executions/${executionId}`)
+  getWorkflowExecutionDetail(id, executionId, config = {}) {
+    return api.get(`/workflows/instances/${executionId}`, {}, config)
   },
   
   /**
    * 获取工作流执行日志
    * @param {number} id 工作流ID
    * @param {string} executionId 执行ID
+   * @param {object} params 查询参数
+   * @param {object} config 请求配置
    */
-  getWorkflowExecutionLogs(id, executionId) {
-    return api.get(`/workflows/${id}/executions/${executionId}/logs`)
+  getWorkflowExecutionLogs(id, executionId, params = {}, config = {}) {
+    return api.get(`/workflows/instances/${executionId}/logs`, params, config)
   },
   
   /**
@@ -98,7 +109,77 @@ export const workflowApi = {
   cloneWorkflow(id, data = {}) {
     return api.post(`/workflows/${id}/clone`, data)
   },
-  
+
+  /**
+   * 获取工作流调度列表
+   * @param {number} workflowId 工作流ID
+   */
+  getWorkflowSchedules(workflowId) {
+    return api.get(`/workflows/${workflowId}/schedules`)
+  },
+
+  /**
+   * 创建工作流调度
+   * @param {number} workflowId 工作流ID
+   * @param {object} data 调度数据
+   */
+  createWorkflowSchedule(workflowId, data) {
+    return api.post(`/workflows/${workflowId}/schedules`, data)
+  },
+
+  /**
+   * 更新工作流调度
+   * @param {number} workflowId 工作流ID
+   * @param {number} scheduleId 调度ID
+   * @param {object} data 调度数据
+   */
+  updateWorkflowSchedule(workflowId, scheduleId, data) {
+    return api.put(`/workflows/${workflowId}/schedules/${scheduleId}`, data)
+  },
+
+  /**
+   * 删除工作流调度
+   * @param {number} workflowId 工作流ID
+   * @param {number} scheduleId 调度ID
+   */
+  deleteWorkflowSchedule(workflowId, scheduleId) {
+    return api.delete(`/workflows/${workflowId}/schedules/${scheduleId}`)
+  },
+
+  // 监控相关 API
+  getSystemStats(params = {}) {
+    return api.get('/monitoring/stats', params)
+  },
+
+  getResourceUsage(params = {}) {
+    return api.get('/monitoring/resources', params)
+  },
+
+  getActiveWorkflows(params = {}) {
+    return api.get('/monitoring/active-workflows', params)
+  },
+
+  getSystemAlerts(params = {}) {
+    return api.get('/monitoring/alerts', params)
+  },
+
+  getExecutionTrend(params = {}) {
+    return api.get('/monitoring/trend', params)
+  },
+
+  getStatusDistribution(params = {}) {
+    return api.get('/monitoring/distribution', params)
+  },
+
+  getSystemLogs(params = {}) {
+    // 暂时使用空接口或 mock
+    return Promise.resolve({ items: [] })
+  },
+
+  getClusterNodes() {
+    return api.get('/monitoring/nodes')
+  },
+
   /**
    * 导出工作流
    * @param {number} id 工作流ID
@@ -180,12 +261,29 @@ export const taskApi = {
   },
   
   /**
-   * 获取任务执行历史
+   * 获取任务执行历史 (特定任务)
    * @param {number} id 任务ID
    * @param {object} params 查询参数
    */
   getTaskExecutions(id, params = {}) {
     return api.get(`/tasks/${id}/executions`, params)
+  },
+
+  /**
+   * 获取所有任务实例列表 (全局)
+   * @param {object} params 查询参数
+   */
+  getAllTaskInstances(params = {}) {
+    return api.get('/tasks/instances', params)
+  },
+
+  /**
+   * 获取任务实例日志文件
+   * @param {number} instanceId 实例ID
+   * @param {object} params 查询参数 (start, length)
+   */
+  getTaskInstanceLogFile(instanceId, params = {}) {
+    return api.get(`/tasks/instances/${instanceId}/logs/file`, params)
   },
   
   /**

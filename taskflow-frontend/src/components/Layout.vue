@@ -31,17 +31,10 @@
             <el-icon><Operation /></el-icon>
             <span>工作流管理</span>
           </template>
-          <el-menu-item index="/workflows">工作流列表</el-menu-item>
+          <el-menu-item index="/workflows">工作流定义</el-menu-item>
           <el-menu-item index="/workflows/create">创建工作流</el-menu-item>
-        </el-sub-menu>
-        
-        <el-sub-menu index="/tasks">
-          <template #title>
-            <el-icon><List /></el-icon>
-            <span>任务管理</span>
-          </template>
-          <el-menu-item index="/tasks">任务列表</el-menu-item>
-          <el-menu-item index="/tasks/create">创建任务</el-menu-item>
+          <el-menu-item index="/workflows/instances">工作流实例</el-menu-item>
+          <el-menu-item index="/tasks/instances">任务节点实例</el-menu-item>
         </el-sub-menu>
         
         <el-sub-menu index="/projects">
@@ -383,6 +376,11 @@ onUnmounted(() => {
 .sidebar-menu {
   border-right: none;
   background: #001529;
+}
+
+/* 修复二级菜单背景色问题 */
+.sidebar-menu :deep(.el-sub-menu .el-menu) {
+  background-color: #000c17;
 }
 
 .sidebar-menu :deep(.el-menu-item),

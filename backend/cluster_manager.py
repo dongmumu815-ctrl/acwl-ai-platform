@@ -48,21 +48,7 @@ class ClusterManager:
                     "node_id": "scheduler-001",
                     "node_name": "主调度器-1",
                     "host_ip": "127.0.0.1",
-                    "port": 8002,
-                    "log_level": "INFO"
-                },
-                {
-                    "node_id": "scheduler-002",
-                    "node_name": "主调度器-2",
-                    "host_ip": "127.0.0.1",
-                    "port": 8003,
-                    "log_level": "INFO"
-                },
-                {
-                    "node_id": "scheduler-003",
-                    "node_name": "主调度器-3",
-                    "host_ip": "127.0.0.1",
-                    "port": 8004,
+                    "port": 6789,
                     "log_level": "INFO"
                 }
             ],
@@ -72,26 +58,8 @@ class ClusterManager:
                     "node_name": "执行器-1",
                     "group_id": "default",
                     "host_ip": "127.0.0.1",
-                    "port": 8011,
+                    "port": 9876,
                     "max_concurrent_tasks": 5,
-                    "log_level": "INFO"
-                },
-                {
-                    "node_id": "executor-002",
-                    "node_name": "执行器-2",
-                    "group_id": "default",
-                    "host_ip": "127.0.0.1",
-                    "port": 8012,
-                    "max_concurrent_tasks": 5,
-                    "log_level": "INFO"
-                },
-                {
-                    "node_id": "executor-003",
-                    "node_name": "执行器-3",
-                    "group_id": "high-performance",
-                    "host_ip": "127.0.0.1",
-                    "port": 8013,
-                    "max_concurrent_tasks": 10,
                     "log_level": "INFO"
                 }
             ],
@@ -199,10 +167,14 @@ class ClusterManager:
         ]
         
         try:
+            # 确保日志目录存在
+            os.makedirs('logs', exist_ok=True)
+            log_file = open(f"logs/scheduler-{config['node_id']}.log", 'w', encoding='utf-8')
+            
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=log_file,
+                stderr=log_file,
                 text=True
             )
             
@@ -210,10 +182,11 @@ class ClusterManager:
                 'process': process,
                 'type': 'scheduler',
                 'config': config,
-                'start_time': time.time()
+                'start_time': time.time(),
+                'log_file': log_file
             }
             
-            print(f"✓ 调度器启动成功: {config['node_name']} (PID: {process.pid})")
+            print(f"✓ 调度器启动成功: {config['node_name']} (PID: {process.pid}), 日志: logs/scheduler-{config['node_id']}.log")
             
         except Exception as e:
             print(f"✗ 调度器启动失败: {config['node_name']} - {e}")
@@ -235,10 +208,14 @@ class ClusterManager:
         ]
         
         try:
+            # 确保日志目录存在
+            os.makedirs('logs', exist_ok=True)
+            log_file = open(f"logs/executor-{config['node_id']}.log", 'w', encoding='utf-8')
+            
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=log_file,
+                stderr=log_file,
                 text=True
             )
             
@@ -246,10 +223,11 @@ class ClusterManager:
                 'process': process,
                 'type': 'executor',
                 'config': config,
-                'start_time': time.time()
+                'start_time': time.time(),
+                'log_file': log_file
             }
             
-            print(f"✓ 执行器启动成功: {config['node_name']} (PID: {process.pid})")
+            print(f"✓ 执行器启动成功: {config['node_name']} (PID: {process.pid}), 日志: logs/executor-{config['node_id']}.log")
             
         except Exception as e:
             print(f"✗ 执行器启动失败: {config['node_name']} - {e}")
@@ -446,6 +424,8 @@ def main():
                 manager.start_schedulers()
                 time.sleep(5)
                 manager.start_executors()
+                time.sleep(2)
+                manager.start_monitor()
         
         elif args.command == 'stop':
             if args.type == 'schedulers':

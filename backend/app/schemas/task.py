@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
@@ -83,13 +83,21 @@ class ScheduleType(str, Enum):
 
 class TaskDefinitionBase(BaseModel):
     """任务定义基础Schema"""
-    task_name: str = Field(..., description="任务名称")
-    task_display_name: Optional[str] = Field(None, description="任务显示名称")
-    task_description: Optional[str] = Field(None, description="任务描述")
+    task_name: str = Field(..., description="任务名称", alias="name")
+    task_display_name: Optional[str] = Field(None, description="任务显示名称", alias="display_name")
+    task_description: Optional[str] = Field(None, description="任务描述", alias="description")
     task_type: TaskType = Field(..., description="任务类型")
-    task_category: Optional[str] = Field(None, description="任务分类")
-    task_version: str = Field("1.0.0", description="任务版本")
-    task_status: TaskStatus = Field(TaskStatus.DRAFT, description="任务状态")
+    task_category: Optional[str] = Field(None, description="任务分类", alias="category")
+    task_version: str = Field("1.0.0", description="任务版本", alias="version")
+    
+    @field_validator('task_version', mode='before')
+    @classmethod
+    def validate_version(cls, v):
+        if v is None:
+            return "1.0.0"
+        return str(v)
+
+    task_status: TaskStatus = Field(TaskStatus.DRAFT, description="任务状态", alias="status")
     priority: TaskPriority = Field(TaskPriority.NORMAL, description="优先级")
     
     # 关联信息
@@ -114,7 +122,10 @@ class TaskDefinitionBase(BaseModel):
     
     # 扩展信息
     tags: Optional[List[str]] = Field(None, description="标签")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
+    # metadata字段会导致与SQLAlchemy的metadata属性冲突，且数据库中无此字段，故移除
+    # metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="元数据")
+    
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
 class TaskDefinitionCreate(TaskDefinitionBase):
     """创建任务定义Schema"""
@@ -307,6 +318,13 @@ class TaskInstanceBase(BaseModel):
     priority: TaskPriority = Field(TaskPriority.NORMAL, description="优先级")
     status: InstanceStatus = Field(InstanceStatus.PENDING, description="状态")
     
+    @field_validator('task_version', mode='before')
+    @classmethod
+    def validate_version(cls, v):
+        if v is None:
+            return "1.0.0"
+        return str(v)
+    
     # 输入输出
     input_data: Optional[Dict[str, Any]] = Field(None, description="输入数据")
     output_data: Optional[Dict[str, Any]] = Field(None, description="输出数据")
@@ -325,7 +343,7 @@ class TaskInstanceBase(BaseModel):
     triggered_by_user: Optional[int] = Field(None, description="触发用户ID")
     
     # 扩展信息
-    metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
+    task_metadata: Optional[Dict[str, Any]] = Field(None, description="元数据", serialization_alias="metadata")
 
 class TaskInstanceCreate(TaskInstanceBase):
     """创建任务实例Schema"""
@@ -374,9 +392,9 @@ class TaskExecutionBase(BaseModel):
     memory_usage: Optional[float] = Field(None, description="内存使用量")
     
     # 扩展信息
-    metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
+    task_metadata: Optional[Dict[str, Any]] = Field(None, description="元数据", serialization_alias="metadata")
 
-class TaskExecutionUpdate(BaseModel):
+class TaskExecutionUpdate(TaskExecutionBase):
     """更新任务执行Schema"""
     status: Optional[ExecutionStatus] = None
     end_time: Optional[datetime] = None
@@ -576,6 +594,14 @@ class TaskExecutionListResponse(BaseListResponse):
 class TaskLogListResponse(BaseListResponse):
     """任务日志列表响应"""
     items: List[TaskLog] = Field(..., description="任务日志列表")
+
+class TaskLogFileResponse(BaseModel):
+    """任务日志文件响应"""
+    content: str = Field(..., description="日志内容")
+    size: int = Field(..., description="文件总大小")
+    offset: int = Field(..., description="当前读取偏移量")
+    length: int = Field(..., description="读取长度")
+    has_more: bool = Field(..., description="是否还有更多内容")
 
 # ============================================
 # 操作相关Schema

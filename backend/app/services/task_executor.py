@@ -9,6 +9,7 @@
 import asyncio
 import logging
 import os
+import sys
 import subprocess
 import tempfile
 import json
@@ -27,8 +28,18 @@ class TaskExecutionExecutor:
     负责具体任务的执行逻辑
     """
     
-    def __init__(self, work_dir: str = None):
+    def __init__(self, work_dir: str = None, log_dir: str = None):
         self.work_dir = work_dir or tempfile.gettempdir()
+        # 默认日志目录
+        self.log_dir = log_dir or os.path.join(os.getcwd(), 'logs', 'tasks')
+        if not os.path.exists(self.log_dir):
+            try:
+                os.makedirs(self.log_dir, exist_ok=True)
+            except Exception as e:
+                logger.warning(f"无法创建日志目录 {self.log_dir}: {e}")
+                # 回退到临时目录
+                self.log_dir = os.path.join(tempfile.gettempdir(), 'acwl_logs')
+                os.makedirs(self.log_dir, exist_ok=True)
         
     async def execute_task(self, task_info: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -43,8 +54,20 @@ class TaskExecutionExecutor:
         task_type = task_info.get('task_type')
         task_content = task_info.get('task_content', {})
         task_config = task_info.get('task_config', {})
+        instance_id = task_info.get('instance_id')
         
         logger.info(f"开始执行任务: {task_info.get('task_name')} (类型: {task_type})")
+        
+        # 确定日志文件路径
+        if instance_id:
+            # 确保文件名安全
+            safe_id = "".join([c for c in instance_id if c.isalnum() or c in ('-', '_')])
+            log_file = os.path.join(self.log_dir, f"{safe_id}.log")
+        else:
+            log_file = os.path.join(self.log_dir, f"task_{datetime.now().strftime('%Y%m%d%H%M%S')}_{os.getpid()}.log")
+            
+        # 将日志路径放入配置中传递给执行方法
+        task_config['log_file'] = log_file
         
         start_time = datetime.utcnow()
         result = {
@@ -54,7 +77,8 @@ class TaskExecutionExecutor:
             'exit_code': -1,
             'start_time': start_time,
             'end_time': None,
-            'duration_ms': 0
+            'duration_ms': 0,
+            'log_path': log_file
         }
         
         try:
@@ -91,34 +115,80 @@ class TaskExecutionExecutor:
         """
         script_content = content.get('script_content')
         if not script_content:
+            # 尝试从 code 字段获取
+            script_content = content.get('code')
+            
+        if not script_content:
             return {'success': False, 'error': '未提供Python脚本内容', 'exit_code': 1}
+            
+        # 准备工作目录
+        cwd = config.get('cwd', self.work_dir)
+        if not os.path.exists(cwd):
+            os.makedirs(cwd, exist_ok=True)
+            
+        # 准备环境变量
+        env = os.environ.copy()
+        custom_env = config.get('environment_variables', {})
+        if custom_env:
+            for k, v in custom_env.items():
+                env[str(k)] = str(v)
             
         # 创建临时文件
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, dir=self.work_dir) as f:
             f.write(script_content)
             script_path = f.name
             
+        log_file = config.get('log_file')
+            
         try:
             # 执行脚本
-            python_path = config.get('python_path', 'python3')
+            python_path = config.get('python_path', sys.executable)
             args = config.get('args', [])
             
             cmd = [python_path, script_path] + args
             
+            # 打开日志文件
+            log_f = None
+            if log_file:
+                try:
+                    log_f = open(log_file, 'w', encoding='utf-8')
+                except Exception as e:
+                    logger.error(f"无法打开日志文件 {log_file}: {e}")
+            
+            # 如果无法打开日志文件，使用PIPE
+            stdout_dest = log_f if log_f else asyncio.subprocess.PIPE
+            stderr_dest = asyncio.subprocess.STDOUT if log_f else asyncio.subprocess.PIPE
+            
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=self.work_dir
+                stdout=stdout_dest,
+                stderr=stderr_dest,
+                cwd=cwd,
+                env=env
             )
             
-            stdout, stderr = await proc.communicate()
+            if log_f:
+                await proc.wait()
+                log_f.close()
+                stdout = b''
+                stderr = b''
+                
+                # 读取部分日志作为输出返回
+                try:
+                    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                        # 读取前10KB
+                        stdout = f.read(10000).encode('utf-8')
+                except Exception:
+                    pass
+            else:
+                stdout, stderr = await proc.communicate()
             
             return {
                 'success': proc.returncode == 0,
-                'output': stdout.decode(),
-                'error': stderr.decode(),
-                'exit_code': proc.returncode
+                'output': stdout.decode('utf-8', errors='ignore') if stdout else '',
+                'error': stderr.decode('utf-8', errors='ignore') if stderr else '',
+                'exit_code': proc.returncode,
+                'log_path': log_file
             }
             
         finally:
@@ -135,7 +205,23 @@ class TaskExecutionExecutor:
         """
         script_content = content.get('script_content')
         if not script_content:
+             # 尝试从 code 字段获取
+            script_content = content.get('code')
+            
+        if not script_content:
             return {'success': False, 'error': '未提供Shell脚本内容', 'exit_code': 1}
+            
+        # 准备工作目录
+        cwd = config.get('cwd', self.work_dir)
+        if not os.path.exists(cwd):
+            os.makedirs(cwd, exist_ok=True)
+            
+        # 准备环境变量
+        env = os.environ.copy()
+        custom_env = config.get('environment_variables', {})
+        if custom_env:
+            for k, v in custom_env.items():
+                env[str(k)] = str(v)
             
         # 根据操作系统选择后缀
         suffix = '.bat' if os.name == 'nt' else '.sh'
@@ -145,6 +231,8 @@ class TaskExecutionExecutor:
             f.write(script_content)
             script_path = f.name
             
+        log_file = config.get('log_file')
+            
         try:
             # 赋予执行权限 (Linux/Mac)
             if os.name != 'nt':
@@ -153,20 +241,48 @@ class TaskExecutionExecutor:
             # 执行脚本
             cmd = [script_path]
             
+            # 打开日志文件
+            log_f = None
+            if log_file:
+                try:
+                    log_f = open(log_file, 'w', encoding='utf-8')
+                except Exception as e:
+                    logger.error(f"无法打开日志文件 {log_file}: {e}")
+            
+            # 如果无法打开日志文件，使用PIPE
+            stdout_dest = log_f if log_f else asyncio.subprocess.PIPE
+            stderr_dest = asyncio.subprocess.STDOUT if log_f else asyncio.subprocess.PIPE
+            
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=self.work_dir
+                stdout=stdout_dest,
+                stderr=stderr_dest,
+                cwd=cwd,
+                env=env
             )
             
-            stdout, stderr = await proc.communicate()
+            if log_f:
+                await proc.wait()
+                log_f.close()
+                stdout = b''
+                stderr = b''
+                
+                # 读取部分日志作为输出返回
+                try:
+                    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                        # 读取前10KB
+                        stdout = f.read(10000).encode('utf-8')
+                except Exception:
+                    pass
+            else:
+                stdout, stderr = await proc.communicate()
             
             return {
                 'success': proc.returncode == 0,
-                'output': stdout.decode(),
-                'error': stderr.decode(),
-                'exit_code': proc.returncode
+                'output': stdout.decode('utf-8', errors='ignore') if stdout else '',
+                'error': stderr.decode('utf-8', errors='ignore') if stderr else '',
+                'exit_code': proc.returncode,
+                'log_path': log_file
             }
             
         finally:

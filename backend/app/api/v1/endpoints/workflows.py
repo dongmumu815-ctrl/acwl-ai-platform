@@ -1,17 +1,19 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, or_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime
 
-from ....core.database import get_db
+from ....core.database import get_db, AsyncSessionLocal
 from ....models.workflow import (
     Workflow, WorkflowNode, WorkflowConnection, WorkflowInstance, 
-    WorkflowNodeInstance, WorkflowSchedule
+    WorkflowNodeInstance, WorkflowSchedule, InstanceStatus
 )
-from ....models.unified_node import UnifiedNode, UnifiedNodeInstance
+from ....models.executor import ExecutorNode, ExecutorStatus
+from ....models.scheduler import SchedulerNode, SchedulerStatus
+from ....models.unified_node import UnifiedNode, UnifiedNodeInstance, UnifiedNodeType
 from ....models.task import TaskDefinition
 from ....models.project import Project
 from ....schemas.workflow import (
@@ -170,6 +172,388 @@ async def create_workflow(
     return workflow
 
 
+# ============================================
+# 工作流统计接口
+# ============================================
+
+@router.get("/execution-status", response_model=WorkflowExecutionStatusListResponse)
+async def get_workflow_execution_status(
+    workflow_id: Optional[int] = Query(None, description="工作流ID"),
+    status: Optional[str] = Query(None, description="实例状态"),
+    limit: int = Query(50, ge=1, le=100, description="返回数量限制"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取工作流执行状态"""
+    # 构建查询条件
+    query = select(
+        WorkflowInstance.id.label('workflow_instance_id'),
+        WorkflowInstance.instance_id,
+        Workflow.name.label('workflow_name'),
+        Workflow.name.label('workflow_display_name'),  # 使用 name 字段作为 display_name
+        WorkflowInstance.status.label('workflow_status'),
+        WorkflowInstance.priority,
+        WorkflowInstance.scheduled_time,
+        WorkflowInstance.actual_start_time,
+        WorkflowInstance.actual_end_time,
+        WorkflowInstance.duration_seconds,
+        WorkflowInstance.retry_count,
+        WorkflowInstance.triggered_by,
+        func.coalesce(User.username, 'system').label('triggered_by_username'),
+        func.count(WorkflowNodeInstance.id).label('total_nodes'),
+        func.sum(func.case((WorkflowNodeInstance.status == 'success', 1), else_=0)).label('completed_nodes'),
+        func.sum(func.case((WorkflowNodeInstance.status == 'failed', 1), else_=0)).label('failed_nodes')
+    ).select_from(
+        WorkflowInstance.__table__.join(
+            Workflow.__table__, WorkflowInstance.workflow_id == Workflow.id
+        ).outerjoin(
+            User.__table__, WorkflowInstance.triggered_by_user == User.id
+        ).outerjoin(
+            WorkflowNodeInstance.__table__, WorkflowInstance.id == WorkflowNodeInstance.workflow_instance_id
+        )
+    ).group_by(
+        WorkflowInstance.id
+    )
+    
+    # 添加过滤条件
+    if workflow_id:
+        query = query.where(WorkflowInstance.workflow_id == workflow_id)
+    if status:
+        query = query.where(WorkflowInstance.status == status)
+    
+    # 排序和限制
+    query = query.order_by(WorkflowInstance.scheduled_time.desc()).limit(limit)
+    
+    result = await db.execute(query)
+    rows = result.fetchall()
+    
+    # 转换为Schema对象
+    execution_statuses = [
+        WorkflowExecutionStatus(
+            workflow_instance_id=row.workflow_instance_id,
+            instance_id=row.instance_id,
+            workflow_name=row.workflow_name,
+            workflow_display_name=row.workflow_name,
+            workflow_status=row.workflow_status,
+            priority=row.priority,
+            scheduled_time=row.scheduled_time,
+            actual_start_time=row.actual_start_time,
+            actual_end_time=row.actual_end_time,
+            duration_seconds=row.duration_seconds,
+            retry_count=row.retry_count,
+            triggered_by=row.triggered_by,
+            triggered_by_username=row.triggered_by_username,
+            total_nodes=row.total_nodes or 0,
+            completed_nodes=row.completed_nodes or 0,
+            failed_nodes=row.failed_nodes or 0,
+            running_nodes=row[16] or 0
+        )
+        for row in rows
+    ]
+    
+    return WorkflowExecutionStatusListResponse(
+        items=execution_statuses,
+        total=len(execution_statuses),
+        page=1,
+        size=limit,
+        pages=1
+    )
+
+
+@router.get("/node-stats", response_model=NodeExecutionStatsListResponse)
+async def get_node_execution_stats(
+    workflow_id: Optional[int] = Query(None, description="工作流ID"),
+    node_type: Optional[str] = Query(None, description="节点类型"),
+    limit: int = Query(50, ge=1, le=100, description="返回数量限制"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取节点执行统计"""
+    # 使用视图查询节点统计
+    query = db.execute(
+        """
+        SELECT * FROM v_node_execution_stats
+        WHERE 1=1
+        {workflow_filter}
+        {type_filter}
+        ORDER BY total_executions DESC
+        LIMIT {limit}
+        """.format(
+            workflow_filter=f"AND node_id IN (SELECT id FROM acwl_workflow_nodes WHERE workflow_id = {workflow_id})" if workflow_id else "",
+            type_filter=f"AND node_type = '{node_type}'" if node_type else "",
+            limit=limit
+        )
+    )
+    
+    results = query.fetchall()
+    
+    # 转换为Schema对象
+    node_stats = [
+        NodeExecutionStats(
+            node_id=row[0],
+            node_name=row[1],
+            node_type=row[2],
+            workflow_name=row[3],
+            total_executions=row[4] or 0,
+            success_count=row[5] or 0,
+            failure_count=row[6] or 0,
+            avg_duration_seconds=row[7],
+            max_duration_seconds=row[8],
+            min_duration_seconds=row[9]
+        )
+        for row in results
+    ]
+    
+    return NodeExecutionStatsListResponse(
+        items=node_stats,
+        total=len(node_stats),
+        page=1,
+        size=limit,
+        pages=1
+    )
+
+
+# ============================================
+# 工作流实例接口
+# ============================================
+
+@router.get("/instances", response_model=WorkflowInstanceListResponse)
+async def list_workflow_instances(
+    params: WorkflowInstanceQueryParams = Depends(),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取工作流实例列表"""
+    # 构建查询
+    query = select(WorkflowInstance)
+    
+    # 应用过滤条件
+    if params.workflow_id:
+        query = query.where(WorkflowInstance.workflow_id == params.workflow_id)
+    if params.status:
+        query = query.where(WorkflowInstance.status == params.status)
+    if params.priority:
+        query = query.where(WorkflowInstance.priority == params.priority)
+    if params.triggered_by:
+        query = query.where(WorkflowInstance.triggered_by == params.triggered_by)
+    if params.triggered_by_user:
+        query = query.where(WorkflowInstance.triggered_by_user == params.triggered_by_user)
+    if params.scheduled_start:
+        query = query.where(WorkflowInstance.scheduled_time >= params.scheduled_start)
+    if params.scheduled_end:
+        query = query.where(WorkflowInstance.scheduled_time <= params.scheduled_end)
+    
+    # 获取总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total = await db.scalar(count_query) or 0
+
+    # 应用排序
+    if params.sort_by:
+        if hasattr(WorkflowInstance, params.sort_by):
+            order_column = getattr(WorkflowInstance, params.sort_by)
+            if params.sort_order == "desc":
+                query = query.order_by(order_column.desc())
+            else:
+                query = query.order_by(order_column.asc())
+    else:
+        query = query.order_by(WorkflowInstance.created_at.desc())
+    
+    # 应用分页
+    query = query.offset(params.skip).limit(params.limit)
+    
+    # 执行查询
+    result = await db.execute(query)
+    instances = result.scalars().all()
+    
+    return WorkflowInstanceListResponse(
+        items=instances,
+        total=total,
+        page=params.page,
+        size=params.size,
+        pages=(total + params.size - 1) // params.size
+    )
+
+
+@router.get("/instances/{instance_id}", response_model=WorkflowInstanceWithNodes)
+async def get_workflow_instance(
+    instance_id: str,
+    include_nodes: bool = Query(True, description="是否包含节点实例信息"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取工作流实例详情"""
+    # 使用异步查询获取工作流实例
+    # 支持通过 instance_id (str) 查询
+    result = await db.execute(select(WorkflowInstance).filter(WorkflowInstance.instance_id == instance_id))
+    instance = result.scalar_one_or_none()
+    
+    if not instance:
+        # 尝试通过 ID (int) 查询，以兼容旧接口
+        if instance_id.isdigit():
+            result = await db.execute(select(WorkflowInstance).filter(WorkflowInstance.id == int(instance_id)))
+            instance = result.scalar_one_or_none()
+            
+    if not instance:
+        raise NotFoundError(f"工作流实例 {instance_id} 不存在")
+    
+    if include_nodes:
+        # 获取节点实例信息
+        node_result = await db.execute(select(WorkflowNodeInstance).filter(
+            WorkflowNodeInstance.workflow_instance_id == instance.id
+        ))
+        node_instances = node_result.scalars().all()
+        
+        return WorkflowInstanceWithNodes(
+            **instance.__dict__,
+            node_instances=node_instances
+        )
+    
+    return WorkflowInstanceWithNodes(**instance.__dict__)
+
+
+@router.post("/instances/{instance_id}/cancel", response_model=WorkflowInstanceSchema)
+async def cancel_workflow_instance(
+    instance_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """取消工作流实例"""
+    # 支持通过 instance_id (str) 查询
+    result = await db.execute(select(WorkflowInstance).filter(WorkflowInstance.instance_id == instance_id))
+    instance = result.scalar_one_or_none()
+    
+    if not instance:
+        # 尝试通过 ID (int) 查询
+        if instance_id.isdigit():
+            result = await db.execute(select(WorkflowInstance).filter(WorkflowInstance.id == int(instance_id)))
+            instance = result.scalar_one_or_none()
+            
+    if not instance:
+        raise NotFoundError(f"工作流实例 {instance_id} 不存在")
+    
+    # 检查权限
+    if instance.triggered_by_user != current_user.id and not current_user.is_admin:
+        raise AuthorizationError("没有权限取消此工作流实例")
+    
+    # 检查状态
+    if instance.status not in [InstanceStatus.PENDING, InstanceStatus.RUNNING]:
+        raise ValidationError(f"工作流实例状态为 {instance.status}，无法取消")
+    
+    # 更新状态
+    instance.status = InstanceStatus.CANCELLED
+    instance.actual_end_time = datetime.now()
+    if not instance.error_message:
+        instance.error_message = f"由用户 {current_user.username} 手动取消"
+    
+    await db.commit()
+    await db.refresh(instance)
+    
+    # TODO: 这里应该通知执行引擎取消执行
+    
+    return instance
+
+
+@router.get("/instances/{instance_id}/logs")
+async def get_workflow_instance_logs(
+    instance_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取工作流实例日志"""
+    # 查询实例
+    result = await db.execute(select(WorkflowInstance).filter(WorkflowInstance.instance_id == instance_id))
+    instance = result.scalar_one_or_none()
+    
+    if not instance:
+        if instance_id.isdigit():
+            result = await db.execute(select(WorkflowInstance).filter(WorkflowInstance.id == int(instance_id)))
+            instance = result.scalar_one_or_none()
+            
+    if not instance:
+        raise NotFoundError(f"工作流实例 {instance_id} 不存在")
+        
+    # 获取节点实例信息
+    node_result = await db.execute(select(WorkflowNodeInstance).filter(
+        WorkflowNodeInstance.workflow_instance_id == instance.id
+    ))
+    node_instances = node_result.scalars().all()
+    
+    # 构建日志列表
+    logs = []
+    
+    # 实例启动日志
+    logs.append({
+        "timestamp": instance.created_at.isoformat(),
+        "level": "INFO",
+        "message": f"工作流实例 {instance.instance_name} 创建成功",
+        "node_name": "System"
+    })
+    
+    if instance.actual_start_time:
+        logs.append({
+            "timestamp": instance.actual_start_time.isoformat(),
+            "level": "INFO",
+            "message": f"工作流实例开始执行",
+            "node_name": "System"
+        })
+        
+    # 节点执行日志
+    # 按开始时间排序
+    sorted_nodes = sorted(node_instances, key=lambda x: x.actual_start_time or datetime.max)
+    
+    for node in sorted_nodes:
+        if node.actual_start_time:
+            logs.append({
+                "timestamp": node.actual_start_time.isoformat(),
+                "level": "INFO",
+                "message": f"节点 {node.node_name} ({node.node_type}) 开始执行",
+                "node_name": node.node_name
+            })
+            
+        if node.status == InstanceStatus.FAILED and node.error_message:
+            logs.append({
+                "timestamp": (node.actual_end_time or datetime.now()).isoformat(),
+                "level": "ERROR",
+                "message": f"节点 {node.node_name} 执行失败: {node.error_message}",
+                "node_name": node.node_name
+            })
+        elif node.status == InstanceStatus.SUCCESS:
+            logs.append({
+                "timestamp": (node.actual_end_time or datetime.now()).isoformat(),
+                "level": "INFO",
+                "message": f"节点 {node.node_name} 执行成功",
+                "node_name": node.node_name
+            })
+            
+    # 实例结束日志
+    if instance.status == InstanceStatus.FAILED:
+        logs.append({
+            "timestamp": (instance.actual_end_time or datetime.now()).isoformat(),
+            "level": "ERROR",
+            "message": f"工作流实例执行失败: {instance.error_message or '未知错误'}",
+            "node_name": "System"
+        })
+    elif instance.status == InstanceStatus.SUCCESS:
+        logs.append({
+            "timestamp": (instance.actual_end_time or datetime.now()).isoformat(),
+            "level": "INFO",
+            "message": "工作流实例执行完成",
+            "node_name": "System"
+        })
+    elif instance.status == InstanceStatus.CANCELLED:
+        logs.append({
+            "timestamp": (instance.actual_end_time or datetime.now()).isoformat(),
+            "level": "WARNING",
+            "message": f"工作流实例已取消: {instance.error_message or '用户取消'}",
+            "node_name": "System"
+        })
+        
+    # 按时间排序
+    logs.sort(key=lambda x: x['timestamp'])
+    
+    return {"logs": logs}
+
+
 @router.get("/{workflow_id}", response_model=WorkflowWithNodes)
 async def get_workflow(
     workflow_id: int,
@@ -182,7 +566,7 @@ async def get_workflow(
     result = await db.execute(stmt)
     workflow = result.scalar_one_or_none()
     if not workflow:
-        raise NotFoundException(f"工作流 {workflow_id} 不存在")
+        raise NotFoundError(f"工作流 {workflow_id} 不存在")
     
     if include_nodes:
         # 获取统一节点和连接信息
@@ -268,11 +652,11 @@ async def update_workflow(
     result = await db.execute(stmt)
     workflow = result.scalar_one_or_none()
     if not workflow:
-        raise NotFoundException(f"工作流 {workflow_id} 不存在")
+        raise NotFoundError(f"工作流 {workflow_id} 不存在")
     
     # 检查权限（只有创建者或管理员可以修改）
     if workflow.created_by != current_user.id and not current_user.is_admin:
-        raise ForbiddenException("没有权限修改此工作流")
+        raise AuthorizationError("没有权限修改此工作流")
     
     # 更新工作流基本信息
     update_data = workflow_data.model_dump(exclude_unset=True, exclude={'nodes', 'connections'})
@@ -293,40 +677,57 @@ async def update_workflow(
             # 从前端数据中提取节点信息
             if node_data.get('shape') == 'workflow-node':
                 # 获取节点类型并转换为 UnifiedNodeType 枚举值
-                node_type_str = node_data.get('data', {}).get('nodeType', 'custom')
+                # 优先获取 type，其次 nodeType
+                data_obj = node_data.get('data', {})
+                node_type_str = data_obj.get('type') or data_obj.get('nodeType', 'custom')
+                
                 # 将节点类型映射到 UnifiedNodeType
                 node_type_mapping = {
-                    'start': 'START',
-                    'end': 'END',
-                    'python_code': 'PYTHON_CODE',
-                    'sql_query': 'SQL_QUERY',
-                    'condition': 'CONDITION',
-                    'loop': 'LOOP',
-                    'parallel': 'PARALLEL',
-                    'merge': 'MERGE',
-                    'data_transform': 'DATA_TRANSFORM',
-                    'api_call': 'API_CALL',
-                    'file_operation': 'FILE_OPERATION',
-                    'email_send': 'EMAIL_SEND',
-                    'delay': 'DELAY',
-                    'subprocess': 'SUBPROCESS',
-                    'custom': 'CUSTOM'
+                    'start': UnifiedNodeType.START,
+                    'end': UnifiedNodeType.END,
+                    'python_code': UnifiedNodeType.PYTHON_CODE,
+                    'sql_query': UnifiedNodeType.SQL_QUERY,
+                    'condition': UnifiedNodeType.CONDITION,
+                    'loop': UnifiedNodeType.LOOP,
+                    'parallel': UnifiedNodeType.PARALLEL,
+                    'merge': UnifiedNodeType.MERGE,
+                    'data_transform': UnifiedNodeType.DATA_TRANSFORM,
+                    'api_call': UnifiedNodeType.API_CALL,
+                    'file_operation': UnifiedNodeType.FILE_OPERATION,
+                    'email_send': UnifiedNodeType.EMAIL_SEND,
+                    'delay': UnifiedNodeType.DELAY,
+                    'subprocess': UnifiedNodeType.SUBPROCESS,
+                    'custom': UnifiedNodeType.CUSTOM,
+                    'shell_script': UnifiedNodeType.SHELL_SCRIPT,
+                    'llm_process': UnifiedNodeType.LLM_PROCESS
                 }
-                node_type = node_type_mapping.get(node_type_str.lower(), 'CUSTOM')
+                node_type = node_type_mapping.get(node_type_str.lower(), UnifiedNodeType.CUSTOM)
                 
                 # 创建统一节点
                 # 获取节点配置和名称
                 node_data_obj = node_data.get('data', {})
-                node_config = node_data_obj.get('node_config', {})
+                # node_config = node_data_obj.get('node_config', {}) # 这种写法可能导致获取不到配置，因为前端传来的可能是 config
+                # 兼容前端数据结构，尝试从 config 或 node_config 获取
+                node_config = node_data_obj.get('node_config') or node_data_obj.get('config') or {}
+                
                 node_name = node_data_obj.get('name', '')
                 node_type_from_config = node_config.get('type', '')
                 
                 # 优先使用node_config中的type，其次使用node_data中的type
+                # 但如果明确是 Start/End 节点，且 node_config 中的类型是 custom/unknown，则保留原类型
                 if node_type_from_config:
-                    node_type = node_type_from_config.upper().replace('-', '_')
+                    # 尝试映射 config_type
+                    mapped_config_type = node_type_mapping.get(node_type_from_config.lower())
+                    
+                    if mapped_config_type:
+                        # 如果当前判定为 start/end，但 config 里说是 custom，则忽略 config
+                        if node_type in [UnifiedNodeType.START, UnifiedNodeType.END] and mapped_config_type == UnifiedNodeType.CUSTOM:
+                            pass
+                        else:
+                            node_type = mapped_config_type
                 
                 # 确保节点配置中包含正确的脚本内容
-                if node_type == 'SHELL_SCRIPT' and 'config' in node_config:
+                if node_type == UnifiedNodeType.SHELL_SCRIPT and 'config' in node_config:
                     # 确保脚本内容被正确保存
                     if 'script' not in node_config['config'] and 'script' in node_data_obj.get('config', {}):
                         if not node_config.get('config'):
@@ -334,13 +735,13 @@ async def update_workflow(
                         node_config['config']['script'] = node_data_obj['config']['script']
                 
                 # 同样处理Python代码和SQL查询
-                if node_type == 'PYTHON_CODE' and 'config' in node_config:
+                if node_type == UnifiedNodeType.PYTHON_CODE and 'config' in node_config:
                     if 'code' not in node_config['config'] and 'code' in node_data_obj.get('config', {}):
                         if not node_config.get('config'):
                             node_config['config'] = {}
                         node_config['config']['code'] = node_data_obj['config']['code']
                 
-                if node_type == 'SQL_QUERY' and 'config' in node_config:
+                if node_type == UnifiedNodeType.SQL_QUERY and 'config' in node_config:
                     if 'sql' not in node_config['config'] and 'sql' in node_data_obj.get('config', {}):
                         if not node_config.get('config'):
                             node_config['config'] = {}
@@ -437,11 +838,11 @@ async def delete_workflow(
     result = await db.execute(stmt)
     workflow = result.scalar_one_or_none()
     if not workflow:
-        raise NotFoundException(f"工作流 {workflow_id} 不存在")
+        raise NotFoundError(f"工作流 {workflow_id} 不存在")
     
     # 检查权限
     if workflow.created_by != current_user.id and not current_user.is_admin:
-        raise ForbiddenException("没有权限删除此工作流")
+        raise AuthorizationError("没有权限删除此工作流")
     
     # 检查是否有运行中的实例
     count_stmt = select(func.count(WorkflowInstance.id)).where(
@@ -477,7 +878,7 @@ async def list_workflow_nodes(
     workflow_result = await db.execute(workflow_stmt)
     workflow = workflow_result.scalar_one_or_none()
     if not workflow:
-        raise NotFoundException(f"工作流 {workflow_id} 不存在")
+        raise NotFoundError(f"工作流 {workflow_id} 不存在")
     
     # 从 TaskDefinition 表获取工作流相关的任务定义
     tasks_stmt = select(TaskDefinition).where(
@@ -884,10 +1285,24 @@ async def delete_workflow_connection(
 # 工作流执行接口
 # ============================================
 
+async def run_workflow_background(instance_id: int):
+    """后台运行工作流"""
+    from ....services.workflow_engine import workflow_engine
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # 使用独立的数据库会话
+    async with AsyncSessionLocal() as session:
+        try:
+            await workflow_engine.start_instance(instance_id, session)
+        except Exception as e:
+            logger.error(f"Background workflow execution failed: {e}")
+
 @router.post("/{workflow_id}/execute", response_model=WorkflowInstanceSchema, status_code=status.HTTP_201_CREATED)
 async def execute_workflow(
     workflow_id: int,
     execute_request: WorkflowExecuteRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -902,6 +1317,42 @@ async def execute_workflow(
     workflow = result.scalar_one_or_none()
     if not workflow:
         raise HTTPException(status_code=404, detail=f"工作流 {workflow_id} 不存在或未激活")
+    
+    # 检查是否有可用的调度器节点
+    scheduler_stmt = select(SchedulerNode).where(
+        or_(
+            SchedulerNode.status == 'online',
+            SchedulerNode.status == 'running',
+            SchedulerNode.status == 'standby',
+            SchedulerNode.status == 'active',  # 兼容旧状态
+            SchedulerNode.status == 'ONLINE',
+            SchedulerNode.status == 'RUNNING',
+            SchedulerNode.status == 'STANDBY',
+            SchedulerNode.status == 'ACTIVE'
+        )
+    ).limit(1)
+    scheduler_result = await db.execute(scheduler_stmt)
+    if not scheduler_result.scalar_one_or_none():
+         raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
+            detail="调度器服务未启动或不可用，无法执行工作流。"
+        )
+
+    # 检查是否有可用的执行器节点
+    executor_stmt = select(ExecutorNode).where(
+        or_(
+            ExecutorNode.status == 'online',
+            ExecutorNode.status == 'busy',
+            ExecutorNode.status == 'ONLINE',
+            ExecutorNode.status == 'BUSY'
+        )
+    ).limit(1)
+    executor_result = await db.execute(executor_stmt)
+    if not executor_result.scalar_one_or_none():
+         raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
+            detail="没有可用的执行器节点，无法执行任务。"
+        )
     
     # 生成实例ID
     import uuid
@@ -925,259 +1376,134 @@ async def execute_workflow(
     await db.refresh(workflow_instance)
     
     # 触发工作流执行引擎
-    from ....services.workflow_engine import workflow_engine
-    
-    # 异步启动工作流实例
-    asyncio.create_task(workflow_engine.start_instance(workflow_instance.id, db))
+    # 使用 BackgroundTasks 确保在响应返回后执行，并且使用独立的数据库会话
+    background_tasks.add_task(run_workflow_background, workflow_instance.id)
     
     return workflow_instance
 
 
-@router.get("/instances", response_model=WorkflowInstanceListResponse)
-async def list_workflow_instances(
-    params: WorkflowInstanceQueryParams = Depends(),
+
+
+
+# ============================================
+# 工作流调度管理接口
+# ============================================
+
+@router.get("/{workflow_id}/schedules", response_model=List[WorkflowScheduleSchema])
+async def list_workflow_schedules(
+    workflow_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """获取工作流实例列表"""
-    query = db.query(WorkflowInstance)
-    
-    # 应用过滤条件
-    if params.workflow_id:
-        query = query.filter(WorkflowInstance.workflow_id == params.workflow_id)
-    if params.status:
-        query = query.filter(WorkflowInstance.status == params.status)
-    if params.priority:
-        query = query.filter(WorkflowInstance.priority == params.priority)
-    if params.triggered_by:
-        query = query.filter(WorkflowInstance.triggered_by == params.triggered_by)
-    if params.triggered_by_user:
-        query = query.filter(WorkflowInstance.triggered_by_user == params.triggered_by_user)
-    if params.scheduled_start:
-        query = query.filter(WorkflowInstance.scheduled_time >= params.scheduled_start)
-    if params.scheduled_end:
-        query = query.filter(WorkflowInstance.scheduled_time <= params.scheduled_end)
-    
-    # 应用排序
-    if params.sort_by:
-        if hasattr(WorkflowInstance, params.sort_by):
-            order_column = getattr(WorkflowInstance, params.sort_by)
-            if params.sort_order == "desc":
-                query = query.order_by(order_column.desc())
-            else:
-                query = query.order_by(order_column.asc())
-    else:
-        query = query.order_by(WorkflowInstance.created_at.desc())
-    
-    # 应用分页
-    total = query.count()
-    instances = query.offset(params.skip).limit(params.limit).all()
-    
-    return WorkflowInstanceListResponse(
-        items=instances,
-        total=total,
-        page=params.page,
-        size=params.size,
-        pages=(total + params.size - 1) // params.size
+    """获取工作流调度列表"""
+    schedules_stmt = select(WorkflowSchedule).where(
+        WorkflowSchedule.workflow_id == workflow_id
     )
+    schedules_result = await db.execute(schedules_stmt)
+    schedules = schedules_result.scalars().all()
+    return schedules
 
 
-@router.get("/instances/{instance_id}", response_model=WorkflowInstanceWithNodes)
-async def get_workflow_instance(
-    instance_id: int,
-    include_nodes: bool = Query(True, description="是否包含节点实例信息"),
+@router.post("/{workflow_id}/schedules", response_model=WorkflowScheduleSchema, status_code=status.HTTP_201_CREATED)
+async def create_workflow_schedule(
+    workflow_id: int,
+    schedule_data: WorkflowScheduleCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """获取工作流实例详情"""
-    # 使用异步查询获取工作流实例
-    result = await db.execute(select(WorkflowInstance).filter(WorkflowInstance.id == instance_id))
-    instance = result.scalar_one_or_none()
-    if not instance:
-        raise NotFoundException(f"工作流实例 {instance_id} 不存在")
-    
-    if include_nodes:
-        # 获取节点实例信息
-        node_result = await db.execute(select(WorkflowNodeInstance).filter(
-            WorkflowNodeInstance.workflow_instance_id == instance_id
-        ))
-        node_instances = node_result.scalars().all()
-        
-        return WorkflowInstanceWithNodes(
-            **instance.__dict__,
-            node_instances=node_instances
-        )
-    
-    return WorkflowInstanceWithNodes(**instance.__dict__)
-
-
-@router.post("/instances/{instance_id}/cancel", response_model=WorkflowInstanceSchema)
-async def cancel_workflow_instance(
-    instance_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """取消工作流实例"""
-    instance = db.query(WorkflowInstance).filter(WorkflowInstance.id == instance_id).first()
-    if not instance:
-        raise NotFoundException(f"工作流实例 {instance_id} 不存在")
+    """创建工作流调度"""
+    # 检查工作流是否存在
+    workflow_stmt = select(Workflow).where(Workflow.id == workflow_id)
+    workflow_result = await db.execute(workflow_stmt)
+    workflow = workflow_result.scalar_one_or_none()
+    if not workflow:
+        raise NotFoundError(f"工作流 {workflow_id} 不存在")
     
     # 检查权限
-    if instance.triggered_by_user != current_user.id and not current_user.is_admin:
-        raise ForbiddenException("没有权限取消此工作流实例")
+    if workflow.created_by != current_user.id and not current_user.is_admin:
+        raise AuthorizationError("没有权限修改此工作流")
     
-    # 检查状态
-    if instance.status not in ['pending', 'running']:
-        raise ValidationError(f"工作流实例状态为 {instance.status}，无法取消")
+    # 创建调度
+    schedule_dict = schedule_data.model_dump()
+    schedule_dict['workflow_id'] = workflow_id
     
-    # 更新状态
-    instance.status = 'cancelled'
-    instance.actual_end_time = datetime.now()
+    schedule = WorkflowSchedule(
+        **schedule_dict,
+        created_by=current_user.id
+    )
+    db.add(schedule)
+    await db.commit()
+    await db.refresh(schedule)
     
-    db.commit()
-    db.refresh(instance)
+    return schedule
+
+
+@router.put("/{workflow_id}/schedules/{schedule_id}", response_model=WorkflowScheduleSchema)
+async def update_workflow_schedule(
+    workflow_id: int,
+    schedule_id: int,
+    schedule_data: WorkflowScheduleUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """更新工作流调度"""
+    schedule_stmt = select(WorkflowSchedule).where(
+        WorkflowSchedule.id == schedule_id,
+        WorkflowSchedule.workflow_id == workflow_id
+    )
+    schedule_result = await db.execute(schedule_stmt)
+    schedule = schedule_result.scalar_one_or_none()
+    if not schedule:
+        raise NotFoundError(f"调度 {schedule_id} 不存在")
     
-    # TODO: 这里应该通知执行引擎取消执行
+    # 检查权限
+    workflow_stmt = select(Workflow).where(Workflow.id == workflow_id)
+    workflow_result = await db.execute(workflow_stmt)
+    workflow = workflow_result.scalar_one_or_none()
+    if workflow.created_by != current_user.id and not current_user.is_admin:
+        raise AuthorizationError("没有权限修改此工作流")
     
-    return instance
+    # 更新调度
+    update_data = schedule_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(schedule, key, value)
+    
+    schedule.updated_at = datetime.now()
+    await db.commit()
+    await db.refresh(schedule)
+    
+    return schedule
+
+
+@router.delete("/{workflow_id}/schedules/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workflow_schedule(
+    workflow_id: int,
+    schedule_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """删除工作流调度"""
+    schedule_stmt = select(WorkflowSchedule).where(
+        WorkflowSchedule.id == schedule_id,
+        WorkflowSchedule.workflow_id == workflow_id
+    )
+    schedule_result = await db.execute(schedule_stmt)
+    schedule = schedule_result.scalar_one_or_none()
+    if not schedule:
+        raise NotFoundError(f"调度 {schedule_id} 不存在")
+    
+    # 检查权限
+    workflow_stmt = select(Workflow).where(Workflow.id == workflow_id)
+    workflow_result = await db.execute(workflow_stmt)
+    workflow = workflow_result.scalar_one_or_none()
+    if workflow.created_by != current_user.id and not current_user.is_admin:
+        raise AuthorizationError("没有权限修改此工作流")
+    
+    await db.delete(schedule)
+    await db.commit()
 
 
 # ============================================
 # 工作流统计接口
 # ============================================
 
-@router.get("/execution-status", response_model=WorkflowExecutionStatusListResponse)
-async def get_workflow_execution_status(
-    workflow_id: Optional[int] = Query(None, description="工作流ID"),
-    status: Optional[str] = Query(None, description="实例状态"),
-    limit: int = Query(50, ge=1, le=100, description="返回数量限制"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """获取工作流执行状态"""
-    # 构建查询条件
-    query = select(
-        WorkflowInstance.id.label('workflow_instance_id'),
-        WorkflowInstance.instance_id,
-        Workflow.name.label('workflow_name'),
-        Workflow.name.label('workflow_display_name'),  # 使用 name 字段作为 display_name
-        WorkflowInstance.status.label('workflow_status'),
-        WorkflowInstance.priority,
-        WorkflowInstance.scheduled_time,
-        WorkflowInstance.actual_start_time,
-        WorkflowInstance.actual_end_time,
-        WorkflowInstance.duration_seconds,
-        WorkflowInstance.retry_count,
-        WorkflowInstance.triggered_by,
-        func.coalesce(User.username, 'system').label('triggered_by_username'),
-        func.count(WorkflowNodeInstance.id).label('total_nodes'),
-        func.sum(func.case((WorkflowNodeInstance.status == 'success', 1), else_=0)).label('completed_nodes'),
-        func.sum(func.case((WorkflowNodeInstance.status == 'failed', 1), else_=0)).label('failed_nodes')
-    ).select_from(
-        WorkflowInstance.__table__.join(
-            Workflow.__table__, WorkflowInstance.workflow_id == Workflow.id
-        ).outerjoin(
-            User.__table__, WorkflowInstance.triggered_by_user == User.id
-        ).outerjoin(
-            WorkflowNodeInstance.__table__, WorkflowInstance.id == WorkflowNodeInstance.workflow_instance_id
-        )
-    ).group_by(
-        WorkflowInstance.id
-    )
-    
-    # 添加过滤条件
-    if workflow_id:
-        query = query.where(WorkflowInstance.workflow_id == workflow_id)
-    if status:
-        query = query.where(WorkflowInstance.status == status)
-    
-    # 排序和限制
-    query = query.order_by(WorkflowInstance.scheduled_time.desc()).limit(limit)
-    
-    result = await db.execute(query)
-    rows = result.fetchall()
-    
-    # 转换为Schema对象
-    execution_statuses = [
-        WorkflowExecutionStatus(
-            workflow_instance_id=row.workflow_instance_id,
-            instance_id=row.instance_id,
-            workflow_name=row.workflow_name,
-            workflow_display_name=row.workflow_name,
-            workflow_status=row.workflow_status,
-            priority=row.priority,
-            scheduled_time=row.scheduled_time,
-            actual_start_time=row.actual_start_time,
-            actual_end_time=row.actual_end_time,
-            duration_seconds=row.duration_seconds,
-            retry_count=row.retry_count,
-            triggered_by=row.triggered_by,
-            triggered_by_username=row.triggered_by_username,
-            total_nodes=row.total_nodes or 0,
-            completed_nodes=row.completed_nodes or 0,
-            failed_nodes=row.failed_nodes or 0,
-            running_nodes=row[16] or 0
-        )
-        for row in results
-    ]
-    
-    return WorkflowExecutionStatusListResponse(
-        items=execution_statuses,
-        total=len(execution_statuses),
-        page=1,
-        size=limit,
-        pages=1
-    )
-
-
-@router.get("/node-stats", response_model=NodeExecutionStatsListResponse)
-async def get_node_execution_stats(
-    workflow_id: Optional[int] = Query(None, description="工作流ID"),
-    node_type: Optional[str] = Query(None, description="节点类型"),
-    limit: int = Query(50, ge=1, le=100, description="返回数量限制"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """获取节点执行统计"""
-    # 使用视图查询节点统计
-    query = db.execute(
-        """
-        SELECT * FROM v_node_execution_stats
-        WHERE 1=1
-        {workflow_filter}
-        {type_filter}
-        ORDER BY total_executions DESC
-        LIMIT {limit}
-        """.format(
-            workflow_filter=f"AND node_id IN (SELECT id FROM acwl_workflow_nodes WHERE workflow_id = {workflow_id})" if workflow_id else "",
-            type_filter=f"AND node_type = '{node_type}'" if node_type else "",
-            limit=limit
-        )
-    )
-    
-    results = query.fetchall()
-    
-    # 转换为Schema对象
-    node_stats = [
-        NodeExecutionStats(
-            node_id=row[0],
-            node_name=row[1],
-            node_type=row[2],
-            workflow_name=row[3],
-            total_executions=row[4] or 0,
-            success_count=row[5] or 0,
-            failure_count=row[6] or 0,
-            avg_duration_seconds=row[7],
-            max_duration_seconds=row[8],
-            min_duration_seconds=row[9]
-        )
-        for row in results
-    ]
-    
-    return NodeExecutionStatsListResponse(
-        items=node_stats,
-        total=len(node_stats),
-        page=1,
-        size=limit,
-        pages=1
-    )

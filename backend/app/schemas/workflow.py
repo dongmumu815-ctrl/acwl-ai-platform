@@ -151,7 +151,7 @@ class WorkflowUpdate(BaseModel):
 class WorkflowInDB(WorkflowBase):
     """数据库中的工作流Schema"""
     id: int
-    created_by: int
+    created_by: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     
@@ -401,7 +401,7 @@ class WorkflowScheduleBase(BaseModel):
 
 class WorkflowScheduleCreate(WorkflowScheduleBase):
     """创建工作流调度Schema"""
-    workflow_id: int = Field(..., description="工作流定义ID")
+    workflow_id: Optional[int] = Field(None, description="工作流定义ID")
 
 
 class WorkflowScheduleUpdate(BaseModel):

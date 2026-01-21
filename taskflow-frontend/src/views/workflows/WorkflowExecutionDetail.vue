@@ -52,6 +52,14 @@
             </el-descriptions>
           </el-card>
 
+          <!-- 工作流图 -->
+          <el-card class="graph-card">
+            <template #header>
+              <span>执行可视化</span>
+            </template>
+            <div id="execution-canvas" class="canvas"></div>
+          </el-card>
+
           <!-- 任务执行详情 -->
           <el-card class="tasks-card">
             <template #header>
@@ -177,12 +185,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close, Refresh, Download, VideoPlay, CircleCheck, CircleClose, Loading } from '@element-plus/icons-vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { formatTime } from '@/utils'
+import { Graph } from '@antv/x6'
 
 const route = useRoute()
 const router = useRouter()
@@ -193,6 +202,7 @@ const execution = ref(null)
 const taskExecutions = ref([])
 const logs = ref([])
 const executionId = route.params.executionId
+const workflowId = route.params.id
 
 // 对话框相关
 const dataDialogVisible = ref(false)
@@ -208,16 +218,143 @@ let logTimer = null
 /**
  * 获取执行详情
  */
-const fetchExecutionDetail = async () => {
+const fetchExecutionDetail = async (showLoading = true) => {
   try {
-    loading.value = true
-    execution.value = await workflowStore.getExecutionDetail(executionId)
-    taskExecutions.value = await workflowStore.getTaskExecutions(executionId)
+    if (showLoading) {
+      loading.value = true
+    }
+    const config = showLoading ? {} : { loading: false }
+    execution.value = await workflowStore.getWorkflowExecutionDetail(workflowId, executionId, config)
+    taskExecutions.value = await workflowStore.getTaskExecutions(workflowId, executionId, config)
+    
+    // 加载工作流图数据
+    const workflow = await workflowStore.getWorkflowDetail(workflowId)
+    if (workflow && workflow.graph_data) {
+      nextTick(() => {
+        initGraph(workflow.graph_data)
+        updateNodeStatus()
+      })
+    }
   } catch (error) {
     ElMessage.error('获取执行详情失败')
   } finally {
-    loading.value = false
+    if (showLoading) {
+      loading.value = false
+    }
   }
+}
+
+/**
+ * 初始化图
+ */
+const initGraph = (graphData) => {
+  const container = document.getElementById('execution-canvas')
+  if (!container) return
+  
+  if (graph) {
+    graph.dispose()
+  }
+
+  graph = new Graph({
+    container: container,
+    width: container.clientWidth,
+    height: 300,
+    grid: true,
+    panning: { enabled: true, eventTypes: ['leftMouseDown', 'mouseWheel'] },
+    mousewheel: { enabled: true, modifiers: 'ctrl', factor: 1.1, maxScale: 3, minScale: 0.3 },
+    interacting: false,
+    connecting: { 
+      router: 'manhattan', 
+      connector: { name: 'rounded', args: { radius: 8 } },
+      anchor: 'center',
+      connectionPoint: 'boundary'
+    }
+  })
+  
+  registerCustomNodes()
+  
+  if (graphData) {
+    try {
+      graph.fromJSON(JSON.parse(graphData))
+      graph.zoomToFit({ padding: 20 })
+    } catch (e) {
+      console.error('Failed to parse graph data', e)
+    }
+  }
+}
+
+/**
+ * 注册自定义节点
+ */
+const registerCustomNodes = () => {
+  try {
+    Graph.unregisterNode('workflow-node')
+  } catch (e) {
+    // ignore
+  }
+  
+  Graph.registerNode('workflow-node', {
+    inherit: 'rect',
+    width: 180,
+    height: 56,
+    attrs: {
+      body: {
+        strokeWidth: 2,
+        stroke: '#d9d9d9',
+        fill: '#ffffff',
+        rx: 8,
+        ry: 8,
+      },
+      text: {
+        fontSize: 13,
+        fill: '#262626',
+        fontWeight: 500,
+        textAnchor: 'middle',
+        textVerticalAnchor: 'middle',
+        textWrap: {
+          width: 160,
+          height: 40,
+          ellipsis: true
+        }
+      }
+    }
+  })
+}
+
+/**
+ * 更新节点状态
+ */
+const updateNodeStatus = () => {
+  if (!graph || !taskExecutions.value) return
+  
+  const statusColors = {
+    'success': '#52c41a',
+    'failed': '#f5222d',
+    'running': '#1890ff',
+    'pending': '#d9d9d9',
+    'cancelled': '#d9d9d9'
+  }
+
+  taskExecutions.value.forEach(task => {
+    // 尝试通过任务名称匹配节点
+    const nodes = graph.getNodes()
+    const node = nodes.find(n => n.getData()?.name === task.task_name)
+    
+    if (node) {
+      const color = statusColors[task.status] || '#d9d9d9'
+      node.attr('body/stroke', color)
+      
+      // 如果是运行中或失败，加粗边框
+      if (['running', 'failed'].includes(task.status)) {
+        node.attr('body/strokeWidth', 3)
+      } else {
+        node.attr('body/strokeWidth', 2)
+      }
+      
+      // 可以考虑修改背景色变浅
+      node.attr('body/fill', color + '10') // 10% 透明度
+    }
+  })
 }
 
 /**
@@ -225,7 +362,7 @@ const fetchExecutionDetail = async () => {
  */
 const fetchLogs = async () => {
   try {
-    const result = await workflowStore.getExecutionLogs(executionId, { limit: 100 })
+    const result = await workflowStore.getExecutionLogs(workflowId, executionId, { limit: 100 })
     logs.value = result.logs || []
   } catch (error) {
     console.error('获取日志失败:', error)
@@ -284,7 +421,7 @@ const retryExecution = async () => {
  */
 const downloadLogs = async () => {
   try {
-    const result = await workflowStore.getExecutionLogs(executionId, { format: 'file' })
+    const result = await workflowStore.getExecutionLogs(workflowId, executionId, { format: 'file' })
     // 创建下载链接
     const blob = new Blob([result.content], { type: 'text/plain' })
     const url = window.URL.createObjectURL(blob)
@@ -461,13 +598,21 @@ const getDuration = (startTime, endTime) => {
 }
 
 /**
+ * 监听执行状态更新图表
+ */
+const handlePollingUpdate = async () => {
+  await fetchExecutionDetail(false)
+  updateNodeStatus()
+}
+
+/**
  * 启动日志轮询
  */
 const startLogPolling = () => {
   if (execution.value?.status === 'running') {
     logTimer = setInterval(() => {
       fetchLogs()
-      fetchExecutionDetail()
+      handlePollingUpdate()
     }, 5000)
   }
 }

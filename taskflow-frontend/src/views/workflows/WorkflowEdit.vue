@@ -19,6 +19,9 @@
           <el-icon><View /></el-icon>
           预览
         </el-button>
+        <el-button @click="showShortcuts = true" size="small" circle>
+          <el-icon><QuestionFilled /></el-icon>
+        </el-button>
       </div>
     </div>
 
@@ -124,6 +127,16 @@
           <el-divider direction="vertical" />
           
           <div class="toolbar-group">
+            <el-button 
+              @click="handleDeleteSelected" 
+              :disabled="!hasSelection" 
+              size="small" 
+              type="danger" 
+              plain
+            >
+              <el-icon><Remove /></el-icon>
+              删除
+            </el-button>
             <el-button @click="handleClearAll" size="small" type="danger">
               <el-icon><Delete /></el-icon>
               清空
@@ -131,34 +144,30 @@
           </div>
         </div>
         <div
-          id="workflow-canvas"
-          class="canvas"
-          @drop="handleDrop"
-          @dragover="handleDragOver"
-        ></div>
-      </div>
-
+        id="workflow-canvas"
+        class="canvas"
+        @drop="handleDrop"
+        @dragover="handleDragOver"
+      ></div>
     </div>
 
-    <!-- 右侧属性面板 - 抽屉式模态窗口 -->
-    <el-drawer
-      v-model="showPropertyPanel"
-      title="节点属性"
-      direction="rtl"
-      size="400px"
-      :before-close="handleClosePropertyPanel"
-    >
-      <template #header>
-        <div class="drawer-header">
-          <h3>节点属性</h3>
-          <span class="node-type-badge" v-if="selectedNode">
+    <!-- 右侧属性面板 - 固定面板 -->
+    <div class="property-panel" v-if="showPropertyPanel">
+      <div class="panel-header">
+        <h3>节点属性</h3>
+        <el-button @click="handleClosePropertyPanel" size="small" text>
+          <el-icon><Close /></el-icon>
+        </el-button>
+      </div>
+      
+      <div class="panel-content" v-if="selectedNode">
+        <div class="node-type-info">
+          <span class="node-type-badge">
             {{ getNodeTypeName(selectedNode.type) }}
           </span>
         </div>
-      </template>
-      
-      <div class="drawer-content" v-if="selectedNode">
-        <el-form :model="selectedNode" label-width="80px" size="small">
+
+        <el-form :model="selectedNode" label-width="80px" size="small" class="property-form">
           <el-form-item label="节点名称">
             <el-input v-model="selectedNode.name" @change="updateNodeProperty" />
           </el-form-item>
@@ -170,9 +179,8 @@
               @change="updateNodeProperty"
             />
           </el-form-item>
-          <el-form-item label="节点类型">
-            <el-tag>{{ getNodeTypeName(selectedNode.type) }}</el-tag>
-          </el-form-item>
+          
+          <el-divider content-position="left">参数配置</el-divider>
           
           <!-- 动态配置项 -->
           <NodeConfig 
@@ -180,14 +188,129 @@
             :node-type="selectedNode.type"
             @change="updateNodeProperty"
           />
+
+          <el-divider />
+          
+          <div class="panel-footer">
+            <el-button type="danger" plain size="small" @click="handleDeleteFromPanel" class="delete-btn">
+              <el-icon><Delete /></el-icon> 删除节点
+            </el-button>
+          </div>
         </el-form>
       </div>
-    </el-drawer>
+    </div>
+
   </div>
+
+    <!-- 快捷键说明弹窗 -->
+    <el-dialog
+      v-model="showShortcuts"
+      title="快捷键说明"
+      width="400px"
+      align-center
+    >
+      <div class="shortcut-list">
+        <div class="shortcut-item">
+          <span class="key-label">Ctrl + Z</span>
+          <span class="action-label">撤销</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key-label">Ctrl + Y</span>
+          <span class="action-label">重做</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key-label">Ctrl + C</span>
+          <span class="action-label">复制节点</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key-label">Ctrl + V</span>
+          <span class="action-label">粘贴节点</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key-label">Delete / Backspace</span>
+          <span class="action-label">删除选中</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key-label">Ctrl + A</span>
+          <span class="action-label">全选</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key-label">Ctrl + 鼠标滚轮</span>
+          <span class="action-label">缩放画布</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key-label">空格 + 鼠标拖拽</span>
+          <span class="action-label">移动画布</span>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 调度配置弹窗 -->
+    <el-dialog
+      v-model="showScheduleDialog"
+      title="定时调度配置"
+      width="500px"
+      align-center
+    >
+      <el-form :model="scheduleConfig" label-width="100px">
+        <el-form-item label="启用调度">
+          <el-switch v-model="scheduleConfig.enabled" />
+        </el-form-item>
+        
+        <template v-if="scheduleConfig.enabled">
+          <el-form-item label="调度类型">
+            <el-select v-model="scheduleConfig.type" placeholder="选择调度类型">
+              <el-option label="Cron表达式" value="cron" />
+              <el-option label="固定间隔" value="interval" />
+              <el-option label="仅一次" value="once" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="Cron表达式" v-if="scheduleConfig.type === 'cron'">
+            <el-input v-model="scheduleConfig.cron_expression" placeholder="例如: 0 0 * * * (每天午夜)" />
+            <div class="form-tip">分 时 日 月 周</div>
+          </el-form-item>
+
+          <el-form-item label="间隔(秒)" v-if="scheduleConfig.type === 'interval'">
+            <el-input-number v-model="scheduleConfig.interval_seconds" :min="1" />
+          </el-form-item>
+
+          <el-form-item label="执行时间" v-if="scheduleConfig.type === 'once'">
+             <el-date-picker
+                v-model="scheduleConfig.start_time"
+                type="datetime"
+                placeholder="选择执行时间"
+                value-format="YYYY-MM-DD HH:mm:ss"
+              />
+          </el-form-item>
+
+           <el-form-item label="生效时间段" v-if="scheduleConfig.type !== 'once'">
+              <el-date-picker
+                v-model="scheduleConfig.date_range"
+                type="datetimerange"
+                range-separator="至"
+                start-placeholder="开始时间"
+                end-placeholder="结束时间"
+                value-format="YYYY-MM-DD HH:mm:ss"
+              />
+          </el-form-item>
+        </template>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showScheduleDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleSaveSchedule">确认</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+  </div>
+
+  <!-- 已移除 el-drawer -->
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, markRaw, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Graph } from '@antv/x6'
@@ -197,7 +320,7 @@ import {
   ArrowLeft, Check, View, ZoomIn, ZoomOut, FullScreen,
   RefreshLeft, RefreshRight, Delete, ArrowRight, Close,
   DataBoard, Setting, Share, DocumentCopy, Upload,
-  Download, Picture, Refresh
+  Download, Picture, Refresh, Remove, QuestionFilled, Timer
 } from '@element-plus/icons-vue'
 
 // 路由相关
@@ -209,6 +332,7 @@ const workflowName = ref('新建工作流')
 const saveLoading = ref(false)
 const showNodePanel = ref(true)
 const showPropertyPanel = ref(false)
+const showShortcuts = ref(false)
 const activeCategory = ref('data')
 const selectedNode = ref(null)
 const canUndo = ref(false)
@@ -336,6 +460,22 @@ const filteredNodeTypes = computed(() => {
 })
 
 /**
+ * 监听面板状态变化，调整画布大小
+ */
+watch([showNodePanel, showPropertyPanel], () => {
+  if (!graph) return
+  
+  // 等待DOM更新
+  nextTick(() => {
+    const container = document.getElementById('workflow-canvas')
+    if (container) {
+      graph.resize(container.clientWidth, container.clientHeight)
+      graph.zoomToFit({ padding: 20, maxScale: 1 }) // 可选：调整大小后自动适应
+    }
+  })
+})
+
+/**
  * 初始化X6图编辑器
  */
 const initGraph = () => {
@@ -377,21 +517,13 @@ const initGraph = () => {
       router: {
         name: 'manhattan',
         args: {
-          padding: 1
+          padding: 20,
         }
       },
       connector: {
         name: 'rounded',
         args: {
           radius: 8,
-          offset: 20
-        }
-      },
-      router: {
-        name: 'manhattan',
-        args: {
-          padding: 20,
-          step: 20
         }
       },
       anchor: 'center',
@@ -421,16 +553,12 @@ const initGraph = () => {
             name: 'rounded',
             args: {
               radius: 8,
-              offset: 15
             }
           },
           router: {
             name: 'manhattan',
             args: {
-              padding: 25,
-              step: 20,
-              endDirections: ['top', 'bottom', 'left', 'right'],
-              startDirections: ['top', 'bottom', 'left', 'right']
+              padding: 20,
             }
           },
           zIndex: 0
@@ -628,7 +756,11 @@ const bindGraphEvents = () => {
 
   // 边选择事件
   graph.on('edge:click', ({ edge }) => {
+    // 确保选中
+    graph.resetSelection(edge)
     selectedNode.value = null
+    showPropertyPanel.value = false
+    hasSelection.value = true
   })
 
   // 节点移动事件
@@ -676,10 +808,7 @@ const bindKeyboardShortcuts = () => {
 
   // 删除 Delete/Backspace
   graph.bindKey(['del', 'backspace'], () => {
-    const cells = graph.getSelectedCells()
-    if (cells.length) {
-      graph.removeCells(cells)
-    }
+    handleDeleteSelected()
     return false
   })
 
@@ -858,7 +987,29 @@ const handleDragStart = (event, nodeType) => {
   event.dataTransfer.effectAllowed = 'copy'
   
   // 添加拖拽样式
-  event.target.style.opacity = '0.5'
+  const target = event.target
+  target.style.opacity = '0.5'
+  
+  // 创建自定义拖拽图像
+  const dragImage = target.cloneNode(true)
+  dragImage.style.position = 'absolute'
+  dragImage.style.top = '-9999px'
+  dragImage.style.left = '-9999px'
+  dragImage.style.width = '180px' // 与节点宽度一致
+  dragImage.style.background = '#fff'
+  dragImage.style.border = '2px solid #1890ff'
+  dragImage.style.borderRadius = '8px'
+  dragImage.style.padding = '12px'
+  dragImage.style.zIndex = '1000'
+  dragImage.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+  
+  document.body.appendChild(dragImage)
+  event.dataTransfer.setDragImage(dragImage, 90, 28) // 居中抓取
+  
+  // 拖拽结束后移除临时元素
+  setTimeout(() => {
+    document.body.removeChild(dragImage)
+  }, 0)
 }
 
 /**
@@ -926,6 +1077,37 @@ const handleZoomIn = () => {
       graph.redo()
     }
   }
+
+  const handleDeleteSelected = () => {
+    if (graph) {
+      const cells = graph.getSelectedCells()
+      if (cells.length > 0) {
+        graph.removeCells(cells)
+        hasSelection.value = false
+        // 如果删除了当前选中的节点，关闭属性面板
+        if (selectedNode.value) {
+          const selectedNodeId = selectedNode.value.id
+          if (cells.some(cell => cell.id === selectedNodeId)) {
+            selectedNode.value = null
+            showPropertyPanel.value = false
+          }
+        }
+      }
+    }
+  }
+  
+  const handleDeleteFromPanel = () => {
+    if (selectedNode.value && graph) {
+      const cell = graph.getCellById(selectedNode.value.id)
+      if (cell) {
+        graph.removeCell(cell)
+        selectedNode.value = null
+        showPropertyPanel.value = false
+        hasSelection.value = graph.getSelectedCells().length > 0
+      }
+    }
+  }
+
 const handleClearAll = () => {
   ElMessageBox.confirm(
     '确定要清空画布吗？此操作不可撤销。',
@@ -1209,6 +1391,23 @@ const handleSave = async () => {
       connections: graphData.cells.filter(cell => cell.shape === 'edge')
     }
 
+    // 尝试生成缩略图（如果有DataURI支持）
+    try {
+      graph.toPNG((dataUri) => {
+        // 这里可以将 dataUri 发送到后端，或者作为预览图保存
+        // workflowData.thumbnail = dataUri
+        console.log('Thumbnail generated')
+      }, {
+        width: 300,
+        height: 200,
+        preserveDimensions: true,
+        backgroundColor: '#ffffff',
+        padding: 20
+      })
+    } catch (e) {
+      console.warn('Failed to generate thumbnail', e)
+    }
+
     // 获取工作流ID，判断是创建还是更新
     const workflowId = route.params.id
     let response
@@ -1266,6 +1465,19 @@ const loadWorkflowData = async (workflowId) => {
         }
       }, 200)
     }
+
+    // 加载调度配置
+    if (workflow && workflow.schedules && workflow.schedules.length > 0) {
+      const schedule = workflow.schedules[0] // 暂时只支持一个调度
+      scheduleConfig.value = {
+        enabled: schedule.is_enabled,
+        type: schedule.schedule_type,
+        cron_expression: schedule.cron_expression,
+        interval_seconds: schedule.interval_seconds,
+        start_time: schedule.start_time,
+        date_range: [schedule.start_time, schedule.end_time]
+      }
+    }
     
     console.log('工作流数据加载成功:', workflow)
   } catch (error) {
@@ -1276,11 +1488,26 @@ const loadWorkflowData = async (workflowId) => {
 }
 
 /**
+ * 窗口大小调整处理
+ */
+const handleWindowResize = () => {
+  if (graph) {
+    const container = document.getElementById('workflow-canvas')
+    if (container) {
+      graph.resize(container.clientWidth, container.clientHeight)
+    }
+  }
+}
+
+/**
  * 生命周期
  */
 onMounted(async () => {
   // 获取工作流ID
   const workflowId = route.params.id
+  
+  // 窗口大小变化监听
+  window.addEventListener('resize', handleWindowResize)
   
   // 初始化图编辑器
   setTimeout(() => {
@@ -1294,6 +1521,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  // 移除窗口监听
+  window.removeEventListener('resize', handleWindowResize)
+  
   // 清理注册的自定义节点
   try {
     Graph.unregisterNode('workflow-node')
@@ -1479,8 +1709,60 @@ onUnmounted(() => {
   min-height: 400px;
 }
 
-/* 抽屉式属性面板样式 */
-.drawer-header {
+/* 右侧属性面板 */
+.property-panel {
+  width: 320px;
+  background: #fff;
+  border-left: 1px solid #e8e8e8;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.05);
+  z-index: 10;
+}
+
+.property-panel .panel-header {
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.property-panel .panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.property-panel .panel-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.node-type-info {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.property-form {
+  margin-top: 10px;
+}
+
+.panel-footer {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.delete-btn {
+  width: 100%;
+}
+
+  /* 抽屉式属性面板样式 (已废弃，保留部分样式参考) */
+  .drawer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1552,5 +1834,44 @@ onUnmounted(() => {
     width: 90% !important;
     max-width: 350px;
   }
+}
+
+/* 快捷键列表样式 */
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.key-label {
+  font-family: monospace;
+  background: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #dcdfe6;
+  font-size: 12px;
+  color: #606266;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+}
+
+.action-label {
+  font-size: 14px;
+  color: #303133;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.2;
+  margin-top: 4px;
 }
 </style>

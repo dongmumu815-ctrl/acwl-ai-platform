@@ -64,6 +64,23 @@ request.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response
       
+      // 优先使用后端返回的详细错误信息 (FastAPI通常使用 detail 字段)
+      let apiMessage = data?.message
+      if (data?.detail) {
+        if (typeof data.detail === 'string') {
+          apiMessage = data.detail
+        } else if (Array.isArray(data.detail)) {
+          // 处理 Pydantic 验证错误
+          apiMessage = data.detail.map(e => `${e.loc ? e.loc.join('.') + ': ' : ''}${e.msg}`).join('; ')
+        } else {
+          try {
+            apiMessage = JSON.stringify(data.detail)
+          } catch (e) {
+            apiMessage = String(data.detail)
+          }
+        }
+      }
+      
       switch (status) {
         case 401:
           message = '未授权，请重新登录'
@@ -75,22 +92,28 @@ request.interceptors.response.use(
           }
           break
         case 403:
-          message = '拒绝访问'
+          message = apiMessage || '拒绝访问'
           break
         case 404:
-          message = '请求地址不存在'
+          message = apiMessage || '请求地址不存在'
           break
         case 500:
-          message = '服务器内部错误'
+          message = apiMessage || '服务器内部错误'
+          break
+        case 503:
+          message = apiMessage || '服务暂时不可用'
           break
         default:
-          message = data?.message || `请求失败 (${status})`
+          message = apiMessage || `请求失败 (${status})`
       }
     } else if (error.code === 'ECONNABORTED') {
       message = '请求超时'
     } else {
       message = '网络错误'
     }
+    
+    // 更新错误对象的 message 属性，以便下游捕获时使用
+    error.message = message
     
     ElMessage.error(message)
     return Promise.reject(error)

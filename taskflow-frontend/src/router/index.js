@@ -40,6 +40,15 @@ const routes = [
            requiresAuth: true
          }
        },
+       {
+         path: 'workflows/instances',
+         name: 'WorkflowInstanceList',
+         component: () => import('@/views/workflows/WorkflowInstanceList.vue'),
+         meta: {
+           title: '工作流实例',
+           requiresAuth: true
+         }
+       },
         {
           path: 'workflows/:id',
           name: 'WorkflowDetail',
@@ -73,6 +82,15 @@ const routes = [
           component: () => import('@/views/workflows/WorkflowExecutionDetail.vue'),
           meta: {
             title: '执行详情',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'tasks/instances',
+          name: 'TaskInstanceList',
+          component: () => import('@/views/tasks/TaskInstanceList.vue'),
+          meta: {
+            title: '任务实例',
             requiresAuth: true
           }
         },

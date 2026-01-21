@@ -12,7 +12,11 @@ import logging
 import os
 import signal
 import sys
+import socket
 import uuid
+import uvicorn
+import threading
+from fastapi import FastAPI
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -21,7 +25,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.core.database import get_db
 from app.services.executor_cluster import ExecutorClusterService
-from app.sore.logger import logger
+from app.services.task_executor import TaskExecutionExecutor
+from app.core.logger import logger
+from app.models.executor import ExecutorStatus
+from app.schemas.executor import ExecutorNodeCreate, ExecutorNodeHeartbeat, ExecutorGroupCreate
 
 
 class ExecutorService:
@@ -51,6 +58,8 @@ class ExecutorService:
         self._setup_logging()
         
         # 注册信号处理
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
     
     def _get_local_ip(self) -> str:
         """
@@ -66,8 +75,6 @@ class ExecutorService:
             return ip
         except Exception:
             return '127.0.0.1'
-    signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
     
     def _setup_logging(self):
         """
@@ -94,12 +101,43 @@ class ExecutorService:
         """
         logger.info(f"接收到信号 {signum}，准备关闭执行器服务...")
         self.is_running = False
-    
+
+    def _start_api_server(self):
+        """
+        启动API服务
+        """
+        app = FastAPI(title=f"Executor Service - {self.node_name}")
+        
+        @app.get("/health")
+        async def health_check():
+            return self._check_node_health()
+            
+        @app.get("/status")
+        async def status():
+            return {
+                "node_id": self.node_id,
+                "node_name": self.node_name,
+                "status": "online" if self.is_running else "offline",
+                "running_tasks": len(self.running_tasks),
+                "max_concurrent_tasks": self.max_concurrent_tasks,
+                "resource_usage": self._get_resource_info()
+            }
+
+        def run_server():
+            uvicorn.run(app, host="0.0.0.0", port=self.port, log_level="error")
+            
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+        logger.info(f"API服务已启动，监听端口: {self.port}")
+
     async def start(self):
         """
         启动执行器服务
         """
         logger.info(f"启动执行器服务: {self.node_name} (ID: {self.node_id})")
+        
+        # 启动API服务
+        self._start_api_server()
         
         try:
             # 注册执行器节点
@@ -131,27 +169,75 @@ class ExecutorService:
                 # 获取或创建默认执行器分组
                 group_id = await self._get_or_create_default_group(service)
                 
-                node_data = ExecutorNodeCreate(
-                    node_id=self.node_id,
-                    node_name=self.node_name,
-                    group_id=group_id,
-                    host_ip=self.host_ip,
-                    port=self.port,
-                    status=ExecutorStatus.ONLINE,
-                    max_concurrent_tasks=self.max_concurrent_tasks,
-                    current_load=0,
-                    capabilities=self._get_node_capabilities(),
-                    resource_info=self._get_resource_info(),
-                    tags=[],
-                    node_metadata={}
-                )
-                
-                node = await service.register_executor_node(node_data)
-                logger.info(f"执行器节点注册成功: {node.node_name}")
-                break
-                
+                # 1. 检查并清理相同IP和端口的旧节点（解决幽灵节点问题）
+                try:
+                    from app.models.executor import ExecutorNode, ExecutorStatus
+                    from sqlalchemy import select
+                    
+                    stmt = select(ExecutorNode).where(
+                        ExecutorNode.host_ip == self.host_ip,
+                        ExecutorNode.port == self.port
+                    )
+                    result = await db.execute(stmt)
+                    existing_nodes = result.scalars().all()
+                    
+                    for node in existing_nodes:
+                        if node.node_id != self.node_id:
+                            logger.info(f"发现冲突的旧执行器节点 (IP: {self.host_ip}, Port: {self.port}), 标记为离线: {node.node_name} ({node.node_id})")
+                            node.status = ExecutorStatus.OFFLINE.value
+                            node.updated_at = datetime.utcnow()
+                    await db.commit()
+                except Exception as e:
+                    logger.warning(f"清理旧执行器节点时出错: {e}")
+
+                # 2. 检查节点是否已存在
+                try:
+                    from sqlalchemy import select
+                    from app.models.executor import ExecutorNode, ExecutorStatus
+                    from app.schemas.executor import ExecutorNodeCreate
+                    
+                    stmt = select(ExecutorNode).where(ExecutorNode.node_name == self.node_name)
+                    existing_node = await db.scalar(stmt)
+                    
+                    if existing_node:
+                        logger.info(f"发现已存在的执行器节点: {self.node_name} (ID: {existing_node.node_id})")
+                        self.node_id = existing_node.node_id
+                        # 尝试注销旧节点
+                        try:
+                            await service.unregister_executor_node(self.node_id)
+                            logger.info(f"已注销旧节点实例: {self.node_id}")
+                        except Exception as e:
+                            logger.warning(f"注销旧节点失败 (可能不存在): {e}")
+                            
+                except Exception as e:
+                    logger.warning(f"检查已存在节点时出错: {e}")
+
+                try:
+                    node_data = ExecutorNodeCreate(
+                        node_id=self.node_id,
+                        node_name=self.node_name,
+                        group_id=group_id,
+                        host_ip=self.host_ip,
+                        port=self.port,
+                        status=ExecutorStatus.ONLINE,
+                        max_concurrent_tasks=self.max_concurrent_tasks,
+                        current_load=0,
+                        capabilities=self._get_node_capabilities(),
+                        resource_info=self._get_resource_info(),
+                        tags=[],
+                        node_metadata={}
+                    )
+                    
+                    node = await service.register_executor_node(node_data)
+                    logger.info(f"执行器节点注册成功: {node.node_name}")
+                    break
+                    
+                except Exception as e:
+                    logger.error(f"执行器节点注册失败: {e}")
+                    raise
+                    
         except Exception as e:
-            logger.error(f"执行器节点注册失败: {e}")
+            logger.error(f"注册节点过程中发生未捕获异常: {e}")
             raise
     
     async def _get_or_create_default_group(self, service: ExecutorClusterService) -> int:
@@ -279,23 +365,126 @@ class ExecutorService:
             await service.update_task_status(task.id, 'running')
             
             # 2. 准备任务信息
-            original_type = getattr(task, 'task_type', 'unknown')
+            # 优先从 runtime_config 获取配置，如果没有则从 task_definition 获取
+            runtime_config = getattr(task, 'runtime_config', {}) or {}
+            task_def = getattr(task, 'task_definition', None)
+            
+            # 获取任务类型
+            original_type = 'unknown'
+            if runtime_config and runtime_config.get('task_type'):
+                original_type = runtime_config.get('task_type')
+            elif task_def:
+                # 处理 Enum 类型
+                original_type = task_def.task_type.value if hasattr(task_def.task_type, 'value') else str(task_def.task_type)
+            
+            logger.info(f"DEBUG: 任务 {task_id} 原始类型: {original_type}")
+            logger.info(f"DEBUG: runtime_config keys: {list(runtime_config.keys()) if runtime_config else 'None'}")
+            if runtime_config and 'config' in runtime_config:
+                logger.info(f"DEBUG: runtime_config['config']: {runtime_config['config']}")
             
             # 类型映射：前端类型 -> 执行器类型
             type_mapping = {
                 'python': 'python_code',
                 'shell': 'shell_script',
                 'sql-execute': 'sql_query',
-                'database-query': 'sql_query'
+                'database-query': 'sql_query',
+                'data_sync': 'data_sync',
+                'model_train': 'model_train',
+                'PYTHON_CODE': 'python_code', # 支持大写枚举值
+                'SHELL_SCRIPT': 'shell_script',
+                'SQL_QUERY': 'sql_query',
+                # 'custom': 'python_code'  # 移除 custom 映射
             }
             task_type = type_mapping.get(original_type, original_type)
+            # 如果映射后仍然是大写（例如 original_type 是 PYTHON_CODE 但不在 mapping 中），尝试转小写
+            if task_type.upper() == task_type:
+                 task_type = task_type.lower()
             
-            # 注意：这里需要根据实际的TaskInstance结构适配
+            # 获取任务名称
+            task_name = f'task-{task_id}'
+            if task_def and task_def.name:
+                task_name = task_def.name
+            
+            # 获取任务内容和配置
+            task_content = {}
+            task_config = {}
+            env_vars = {}
+            
+            if runtime_config:
+                task_content = runtime_config.get('task_content', {})
+                # 兼容旧格式或不同字段名
+                if not task_content and 'code' in runtime_config:
+                    task_content = {'code': runtime_config['code']}
+                
+                # 如果从标准字段没找到，尝试从 config 结构中查找 (针对 WorkflowEngine 传来的数据结构)
+                if not task_content and 'config' in runtime_config:
+                    node_cfg = runtime_config['config']
+                    if isinstance(node_cfg, dict):
+                        # 尝试直接从 config 对象获取 (情况1: config = {"code": "..."})
+                        if 'code' in node_cfg:
+                            task_content['code'] = node_cfg['code']
+                        if 'script' in node_cfg:
+                            task_content['script_content'] = node_cfg['script']
+                        if 'sql' in node_cfg:
+                            task_content['sql'] = node_cfg['sql']
+                            
+                        # 如果没有找到，尝试获取内部的 config 对象 (情况2: config = {"config": {"code": "..."}})
+                        if not task_content:
+                            inner_cfg = node_cfg.get('config')
+                            if isinstance(inner_cfg, dict):
+                                # Python 任务
+                                if 'code' in inner_cfg:
+                                    task_content['code'] = inner_cfg['code']
+                                # Shell 任务
+                                if 'script' in inner_cfg:
+                                    task_content['script_content'] = inner_cfg['script']
+                                # SQL 任务
+                                if 'sql' in inner_cfg:
+                                    task_content['sql'] = inner_cfg['sql']
+
+                task_config = runtime_config.get('task_config', {})
+                # 如果 runtime_config 本身包含配置项，也合并进去
+                for k, v in runtime_config.items():
+                    if k not in ['task_type', 'task_content', 'task_config', 'code', 'environment_variables']:
+                        task_config[k] = v
+                
+                # 获取环境变量
+                env_vars = runtime_config.get('environment_variables', {})
+            
+            # 如果 runtime_config 中没有内容，尝试从 task_definition 获取
+            if not task_content and task_def:
+                if task_def.script_content:
+                    task_content = {'code': task_def.script_content}
+                elif task_def.command_template:
+                    task_content = {'command': task_def.command_template}
+                elif task_def.task_config:
+                    # 某些任务类型可能将内容放在 task_config 中
+                    pass
+            
+            # 如果 runtime_config 中没有配置，尝试从 task_definition 获取合并
+            if task_def and task_def.task_config:
+                # runtime_config 优先级更高，所以只补充缺失的
+                def_config = task_def.task_config or {}
+                for k, v in def_config.items():
+                    if k not in task_config:
+                        task_config[k] = v
+            
+            # 合并环境变量
+            if task_def and task_def.environment_variables:
+                for k, v in task_def.environment_variables.items():
+                    if k not in env_vars:
+                        env_vars[k] = v
+
+            # 将环境变量放入 task_config，以便传递给 TaskExecutor
+            if env_vars:
+                task_config['environment_variables'] = env_vars
+
             task_info = {
-                'task_name': getattr(task, 'name', f'task-{task_id}'),
+                'task_name': task_name,
                 'task_type': task_type,
-                'task_content': getattr(task, 'task_content', {}),
-                'task_config': getattr(task, 'task_config', {})
+                'task_content': task_content,
+                'task_config': task_config,
+                'instance_id': task.instance_id
             }
             
             # 3. 执行任务
@@ -426,7 +615,7 @@ def parse_args():
     parser.add_argument('--node-name', help='节点名称')
     parser.add_argument('--group-id', default='default', help='执行器分组ID')
     parser.add_argument('--host-ip', default='10.20.1.200', help='主机IP地址')
-    parser.add_argument('--port', type=int, default=8001, help='端口号')
+    parser.add_argument('--port', type=int, default=9876, help='端口号')
     parser.add_argument('--max-concurrent-tasks', type=int, default=5, help='最大并发任务数')
     parser.add_argument('--log-level', default='INFO', help='日志级别')
     parser.add_argument('--log-file', help='日志文件路径')

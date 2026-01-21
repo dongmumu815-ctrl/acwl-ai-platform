@@ -26,6 +26,126 @@
     </div>
 
     <div class="monitoring-content" v-loading="loading">
+      <!-- 集群节点状态 -->
+      <el-row :gutter="20" class="cluster-section" style="margin-bottom: 20px;">
+        <el-col :span="6">
+          <el-card class="cluster-card" style="height: 100%">
+            <template #header>
+              <div class="card-header">
+                <span style="display: flex; align-items: center; gap: 8px;">
+                  <el-icon><Platform /></el-icon> 主服务
+                  <el-tag v-if="clusterNodes.main_service" type="success" size="small" style="margin-left: 10px">
+                    {{ clusterNodes.main_service.status }}
+                  </el-tag>
+                </span>
+              </div>
+            </template>
+            <div v-if="clusterNodes.main_service" class="main-service-info">
+              <div class="info-item">
+                <span class="label">版本:</span>
+                <span class="value">{{ clusterNodes.main_service.version }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">地址:</span>
+                <span class="value">{{ clusterNodes.main_service.host_ip }}:{{ clusterNodes.main_service.port }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">CPU:</span>
+                <el-progress :percentage="Math.round(clusterNodes.main_service.resource_usage?.cpu_percent || 0)" :width="40" type="circle" :stroke-width="4" :show-text="false" />
+                <span class="value" style="margin-left: 8px">{{ clusterNodes.main_service.resource_usage?.cpu_percent || 0 }}%</span>
+              </div>
+              <div class="info-item">
+                <span class="label">内存:</span>
+                <el-progress :percentage="Math.round(clusterNodes.main_service.resource_usage?.memory_percent || 0)" :width="40" type="circle" :stroke-width="4" :show-text="false" status="success" />
+                <span class="value" style="margin-left: 8px">{{ clusterNodes.main_service.resource_usage?.memory_percent || 0 }}%</span>
+              </div>
+            </div>
+            <el-empty v-else description="暂无数据" :image-size="60" />
+          </el-card>
+        </el-col>
+        <el-col :span="9">
+          <el-card class="cluster-card">
+            <template #header>
+              <div class="card-header">
+                <span style="display: flex; align-items: center; gap: 8px;">
+                  <el-icon><Monitor /></el-icon> 执行器节点
+                  <el-tag type="success" size="small" style="margin-left: 10px">
+                    在线: {{ clusterNodes.online_executors }}/{{ clusterNodes.total_executors }}
+                  </el-tag>
+                </span>
+              </div>
+            </template>
+            <el-table :data="clusterNodes.executors" style="width: 100%" height="200" size="small">
+              <el-table-column prop="node_name" label="节点名称" />
+              <el-table-column prop="host_ip" label="地址" width="160">
+                <template #default="{ row }">
+                  {{ row.host_ip }}:{{ row.port }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="80">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'online' ? 'success' : 'danger'" size="small">
+                    {{ row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="资源使用" width="140">
+                <template #default="{ row }">
+                  <div style="font-size: 11px; line-height: 1.2;">
+                    <div>CPU: {{ Math.round(row.resource_usage?.cpu_percent || 0) }}%</div>
+                    <div>Mem: {{ Math.round(row.resource_usage?.memory_percent || 0) }}%</div>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="current_load" label="负载" width="60" />
+            </el-table>
+          </el-card>
+        </el-col>
+        <el-col :span="9">
+          <el-card class="cluster-card">
+            <template #header>
+              <div class="card-header">
+                <span style="display: flex; align-items: center; gap: 8px;">
+                  <el-icon><Connection /></el-icon> 调度器节点
+                  <el-tag type="success" size="small" style="margin-left: 10px">
+                    在线: {{ clusterNodes.online_schedulers }}/{{ clusterNodes.total_schedulers }}
+                  </el-tag>
+                </span>
+              </div>
+            </template>
+            <el-table :data="clusterNodes.schedulers" style="width: 100%" height="200" size="small">
+              <el-table-column prop="node_name" label="节点名称" />
+              <el-table-column prop="host_ip" label="地址" width="160">
+                <template #default="{ row }">
+                  {{ row.host_ip }}:{{ row.port }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="80">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'online' ? 'success' : 'danger'" size="small">
+                    {{ row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="资源使用" width="140">
+                <template #default="{ row }">
+                  <div style="font-size: 11px; line-height: 1.2;">
+                    <div>CPU: {{ Math.round(row.resource_usage?.cpu_percent || 0) }}%</div>
+                    <div>Mem: {{ Math.round(row.resource_usage?.memory_percent || 0) }}%</div>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="is_leader" label="角色" width="80">
+                <template #default="{ row }">
+                  <el-tag v-if="row.is_leader" type="warning" size="small">Ldr</el-tag>
+                  <el-tag v-else type="info" size="small">Flr</el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </el-col>
+      </el-row>
+
       <!-- 系统概览 -->
       <el-row :gutter="20" class="overview-section">
         <el-col :span="6">
@@ -279,7 +399,10 @@ import {
   VideoPlay,
   Clock,
   SuccessFilled,
-  Warning
+  Warning,
+  Monitor,
+  Connection,
+  Platform
 } from '@element-plus/icons-vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { useProjectStore } from '@/stores/project'
@@ -299,6 +422,15 @@ const autoRefreshLogs = ref(true)
 
 const projects = ref([])
 const systemStats = ref({})
+const clusterNodes = ref({
+  main_service: null,
+  executors: [],
+  schedulers: [],
+  total_executors: 0,
+  total_schedulers: 0,
+  online_executors: 0,
+  online_schedulers: 0
+})
 const activeWorkflows = ref([])
 const logs = ref([])
 const alerts = ref([])
@@ -322,13 +454,25 @@ const fetchMonitoringData = async () => {
     
     // 获取系统统计
     systemStats.value = await workflowStore.getSystemStats({
-      project_id: selectedProject.value,
+      project_id: selectedProject.value || undefined,
       time_range: timeRange.value
     })
+
+    // 获取集群节点信息
+    const nodesResult = await workflowStore.getClusterNodes()
+    clusterNodes.value = nodesResult || {
+      main_service: null,
+      executors: [],
+      schedulers: [],
+      total_executors: 0,
+      total_schedulers: 0,
+      online_executors: 0,
+      online_schedulers: 0
+    }
     
     // 获取活跃工作流
     const workflowResult = await workflowStore.getActiveWorkflows({
-      project_id: selectedProject.value,
+      project_id: selectedProject.value || undefined,
       page: 1,
       size: 10
     })
@@ -336,7 +480,7 @@ const fetchMonitoringData = async () => {
     
     // 获取系统警告
     alerts.value = await workflowStore.getSystemAlerts({
-      project_id: selectedProject.value
+      project_id: selectedProject.value || undefined
     })
     
     // 更新图表
@@ -356,7 +500,7 @@ const fetchMonitoringData = async () => {
  */
 const fetchProjects = async () => {
   try {
-    const result = await projectStore.getProjects({ page: 1, size: 100 })
+    const result = await projectStore.getProjectList({ page: 1, size: 100 })
     projects.value = result.items || []
   } catch (error) {
     console.error('获取项目列表失败:', error)
@@ -369,7 +513,7 @@ const fetchProjects = async () => {
 const fetchLogs = async () => {
   try {
     const result = await workflowStore.getSystemLogs({
-      project_id: selectedProject.value,
+      project_id: selectedProject.value || undefined,
       page: 1,
       size: 50
     })
@@ -400,7 +544,7 @@ const updateExecutionChart = async () => {
   
   try {
     const data = await workflowStore.getExecutionTrend({
-      project_id: selectedProject.value,
+      project_id: selectedProject.value || undefined,
       time_range: timeRange.value,
       type: executionChartType.value
     })
@@ -471,7 +615,7 @@ const updateStatusChart = async () => {
   
   try {
     const data = await workflowStore.getStatusDistribution({
-      project_id: selectedProject.value,
+      project_id: selectedProject.value || undefined,
       time_range: timeRange.value
     })
     
@@ -869,7 +1013,8 @@ onUnmounted(() => {
 .chart-card,
 .table-card,
 .log-card,
-.alert-card {
+.alert-card,
+.cluster-card {
   margin-bottom: 20px;
 }
 
@@ -950,5 +1095,29 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--el-text-color-placeholder);
   margin-left: 12px;
+}
+
+.main-service-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 10px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+}
+
+.info-item .label {
+  width: 50px;
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+}
+
+.info-item .value {
+  color: var(--el-text-color-primary);
+  font-weight: 500;
+  font-size: 14px;
 }
 </style>

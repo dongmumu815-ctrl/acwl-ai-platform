@@ -21,12 +21,13 @@ class SchedulerRole(enum.Enum):
 
 class SchedulerStatus(enum.Enum):
     """调度器状态枚举"""
-    ACTIVE = "active"
+    ONLINE = "online"
     STANDBY = "standby"
     OFFLINE = "offline"
     ERROR = "error"
     MAINTENANCE = "maintenance"
     STARTING = "starting"
+    ACTIVE = "active"
 
 
 class SchedulerNode(Base):

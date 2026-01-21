@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from ..core.database import get_db
 from ..models.executor import ExecutorGroup, ExecutorNode, ExecutorStatus, GroupType, LoadBalanceStrategy
+from ..models.task import TaskInstance, TaskStatus
 from ..schemas.executor import (
     ExecutorGroupCreate,
     ExecutorGroupUpdate,
@@ -616,7 +617,7 @@ class ExecutorClusterService:
         
         return list(nodes)
 
-    async def fetch_pending_tasks(self, node_id: str, limit: int = 1) -> List[Any]:
+    async def fetch_pending_tasks(self, node_id: str, limit: int = 1) -> List[TaskInstance]:
         """
         获取分配给指定执行器节点的待执行任务
         
@@ -627,47 +628,107 @@ class ExecutorClusterService:
         Returns:
             任务列表 (TaskInstance)
         """
-        # 注意：这里假设 TaskInstance 模型已导入
-        # 实际使用时需要在文件头部导入 TaskInstance 和 TaskStatus
-        from ..models.task import TaskInstance
-        # 假设 TaskStatus 是一个枚举或者字符串常量
-        
-        # 查找状态为 'pending' 或 'assigned' 且分配给该节点的任务
-        # 这里简化逻辑，假设调度器已经将任务分配给了该节点
-        
-        # 动态导入避免循环依赖
-        try:
-            # 尝试从模型导入
-            pass
-        except ImportError:
+        # 1. 获取节点信息，包括其所属的分组名称
+        node = await self.get_executor_node(node_id)
+        if not node or not node.group:
+            logger.warning(f"节点 {node_id} 不存在或未分配分组")
             return []
             
-        # 由于 TaskInstance 模型定义可能不在 executor 模块中
-        # 这里我们先返回空列表，实际实现需要 TaskInstance 模型
-        # 待 TaskInstance 模型就绪后完善此查询
+        group_name = node.group.group_name
         
-        # 模拟查询逻辑:
-        # result = await self.db.execute(
-        #     select(TaskInstance)
-        #     .where(
-        #         and_(
-        #             TaskInstance.assigned_executor_node == node_id,
-        #             TaskInstance.status.in_(['pending', 'assigned'])
-        #         )
-        #     )
-        #     .order_by(TaskInstance.priority.desc(), TaskInstance.created_at.asc())
-        #     .limit(limit)
-        # )
-        # return result.scalars().all()
+        # 2. 查找待执行的任务
+        # 条件：
+        # - 状态为 PENDING
+        # - 执行器分组匹配 (executor_group == group_name)
+        # - 未被分配给其他节点 (assigned_executor_node 为空 或 等于当前节点ID)
         
-        return []
+        stmt = select(TaskInstance).options(
+            selectinload(TaskInstance.task_definition)
+        ).where(
+            and_(
+                TaskInstance.status == TaskStatus.PENDING,
+                TaskInstance.executor_group == group_name,
+                or_(
+                    TaskInstance.assigned_executor_node.is_(None),
+                    TaskInstance.assigned_executor_node == node_id
+                )
+            )
+        ).order_by(
+            TaskInstance.priority.desc(),
+            TaskInstance.scheduled_time.asc()
+        ).limit(limit)
+        
+        result = await self.db.execute(stmt)
+        tasks = result.scalars().all()
+        
+        # 3. 锁定这些任务（简单乐观锁：更新 assigned_executor_node）
+        # 注意：这里可能存在并发竞争，更严谨的做法是使用 SELECT ... FOR UPDATE 或 atomic update
+        # 但考虑到 SQLAlchemy Async 的限制和简单性，我们这里直接返回，
+        # 在 execute_single_task 中会将状态改为 RUNNING，那时会再次确认
+        
+        return list(tasks)
 
     async def update_task_status(self, task_instance_id: int, status: str, result: Dict[str, Any] = None):
         """
         更新任务状态
         """
-        # 同样需要 TaskInstance 模型
-        pass
+        stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+        task = await self.db.scalar(stmt)
+        
+        if not task:
+            logger.warning(f"任务实例 {task_instance_id} 不存在")
+            return
+            
+        # 更新状态
+        old_status = task.status
+        # 将字符串状态转换为枚举
+        try:
+            new_status = TaskStatus(status)
+        except ValueError:
+            logger.warning(f"无效的任务状态: {status}")
+            return
+
+        task.status = new_status
+        
+        now = datetime.utcnow()
+        
+        # 根据状态更新时间字段
+        if new_status == TaskStatus.RUNNING:
+            if not task.actual_start_time:
+                task.actual_start_time = now
+        elif new_status in [TaskStatus.SUCCESS, TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.TIMEOUT]:
+            task.actual_end_time = now
+            if task.actual_start_time:
+                task.duration_seconds = int((now - task.actual_start_time).total_seconds())
+        
+        # 更新结果数据
+        if result:
+            # 序列化 datetime 对象
+            serialized_result = {}
+            for k, v in result.items():
+                if isinstance(v, datetime):
+                    serialized_result[k] = v.isoformat()
+                else:
+                    serialized_result[k] = v
+            result = serialized_result
+
+            if task.result_data:
+                # 合并结果而不是覆盖，如果有必要
+                # 这里简单起见直接更新/覆盖
+                current_result = dict(task.result_data)
+                current_result.update(result)
+                task.result_data = current_result
+            else:
+                task.result_data = result
+                
+            # 如果有错误信息
+            if 'error' in result:
+                task.error_message = str(result['error'])
+        
+        await self.db.commit()
+        await self.db.refresh(task)
+        
+        logger.info(f"任务 {task_instance_id} 状态更新: {old_status} -> {new_status}")
 
 
 async def get_executor_cluster_service(db: AsyncSession = None) -> ExecutorClusterService:
