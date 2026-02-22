@@ -79,8 +79,8 @@
             @command="handleBatchAction"
             style="margin-left: 12px"
           >
-            <el-button type="warning">
-              批量操作
+            <el-button type="warning" :loading="batchActionLoading">
+              批量操作 ({{ selectedServers.length }})
               <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </el-button>
             <template #dropdown>
@@ -92,6 +92,18 @@
                 <el-dropdown-item command="password">
                   <el-icon><Key /></el-icon>
                   批量修改密码
+                </el-dropdown-item>
+                <el-dropdown-item command="script">
+                  <el-icon><Cpu /></el-icon>
+                  批量执行脚本
+                </el-dropdown-item>
+                <el-dropdown-item command="restart" divided>
+                  <el-icon><VideoPlay /></el-icon>
+                  批量重启
+                </el-dropdown-item>
+                <el-dropdown-item command="delete" type="danger">
+                  <el-icon><Delete /></el-icon>
+                  批量删除
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -252,8 +264,17 @@
               v-for="server in servers"
               :key="server.id"
               class="server-card"
+              :class="{ 'is-selected': isSelected(server) }"
               @click="viewServerDetail(server)"
             >
+            <!-- 多选 Checkbox -->
+            <div class="server-select-checkbox" @click.stop>
+              <el-checkbox 
+                :model-value="isSelected(server)"
+                @change="(val) => toggleSelection(server, val)"
+              />
+            </div>
+            
             <div class="server-header">
               <div class="server-info">
                 <div class="server-name">{{ server.name }}</div>
@@ -305,6 +326,9 @@
 
             <!-- 实时监控预览 -->
             <div class="server-monitor-preview" v-if="server.status === 'online'">
+              <div class="monitor-status-indicator" :class="{ connected: server.monitor_connected }" :title="server.monitor_connected ? '监控已连接' : '监控未连接'">
+                <div class="status-dot"></div>
+              </div>
               <div class="monitor-item">
                 <div class="monitor-label">
                   <span>CPU</span>
@@ -320,7 +344,10 @@
               <div class="monitor-item">
                 <div class="monitor-label">
                   <span>内存</span>
-                  <span>{{ server.monitor?.memory_usage || 0 }}%</span>
+                  <span>
+                    {{ (server.monitor?.memory_used_kb !== undefined && server.monitor?.memory_used_kb !== null) ? formatSize(server.monitor.memory_used_kb) : '?' }} / {{ (server.monitor?.memory_total_kb !== undefined && server.monitor?.memory_total_kb !== null && server.monitor?.memory_total_kb > 0) ? formatSize(server.monitor.memory_total_kb) : (server.total_memory || '?') }}
+                    ({{ server.monitor?.memory_usage || 0 }}%)
+                  </span>
                 </div>
                 <el-progress 
                   :percentage="server.monitor?.memory_usage || 0" 
@@ -329,10 +356,48 @@
                   :color="getUsageColor(server.monitor?.memory_usage)"
                 />
               </div>
+              
+              <!-- 磁盘监控 (支持多磁盘) -->
+              <template v-if="server.monitor?.disk_details && server.monitor.disk_details.length > 0">
+                <div class="monitor-item" v-for="(disk, idx) in server.monitor.disk_details" :key="idx">
+                  <div class="monitor-label">
+                    <span>磁盘 ({{ disk.mount_point }})</span>
+                    <span>
+                      {{ formatSize(disk.used_kb) }} / {{ formatSize(disk.total_kb) }}
+                      ({{ disk.usage }}%)
+                    </span>
+                  </div>
+                  <el-progress 
+                    :percentage="disk.usage || 0" 
+                    :show-text="false" 
+                    :stroke-width="4"
+                    :color="getUsageColor(disk.usage)"
+                  />
+                </div>
+              </template>
+              <div class="monitor-item" v-else>
+                <div class="monitor-label">
+                  <span>磁盘</span>
+                  <span>
+                     <template v-if="server.total_storage">? / {{ server.total_storage }} ({{ server.monitor?.disk_usage || 0 }}%)</template>
+                     <template v-else>{{ server.monitor?.disk_usage || 0 }}%</template>
+                  </span>
+                </div>
+                <el-progress 
+                  :percentage="server.monitor?.disk_usage || 0" 
+                  :show-text="false" 
+                  :stroke-width="4"
+                  :color="getUsageColor(server.monitor?.disk_usage)"
+                />
+              </div>
+
               <div class="monitor-item" v-if="server.monitor?.gpu_count > 0">
                 <div class="monitor-label">
                   <span>GPU</span>
-                  <span>{{ server.monitor?.gpu_usage || 0 }}%</span>
+                  <span>
+                    {{ server.monitor?.gpu_memory_used ? formatSize(server.monitor.gpu_memory_used * 1024) : '?' }} / {{ server.monitor?.gpu_memory_total ? formatSize(server.monitor.gpu_memory_total * 1024) : '?' }}
+                    ({{ server.monitor?.gpu_usage || 0 }}%)
+                  </span>
                 </div>
                 <el-progress 
                   :percentage="server.monitor?.gpu_usage || 0" 
@@ -691,6 +756,108 @@
       </div>
     </el-dialog>
 
+    <!-- 批量执行脚本对话框 -->
+    <el-dialog
+      v-model="scriptDialogVisible"
+      title="批量执行脚本"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="script-dialog-content">
+        <el-alert
+          title="警告：此操作将在选定的服务器上以 root 权限(或 sudo)执行脚本，请谨慎操作。"
+          type="warning"
+          show-icon
+          style="margin-bottom: 20px"
+        />
+        
+        <el-form label-position="top">
+          <el-form-item label="脚本模板">
+            <el-select 
+              v-model="selectedScriptTemplate" 
+              placeholder="选择预设模板" 
+              style="width: 100%"
+              @change="handleTemplateChange"
+            >
+              <el-option label="自定义脚本" value="custom" />
+              <el-option label="Docker 安装 (Ubuntu 22.04)" value="docker_ubuntu" />
+              <el-option label="NVIDIA Driver 自动安装 (Ubuntu)" value="nvidia_driver" />
+              <el-option label="系统更新 (apt update & upgrade)" value="apt_update" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="脚本内容">
+            <el-input
+              v-model="scriptContent"
+              type="textarea"
+              :rows="10"
+              font-family="monospace"
+              placeholder="#!/bin/bash"
+            />
+          </el-form-item>
+
+          <el-form-item label="执行模式">
+             <el-radio-group v-model="executionMode">
+                <el-radio value="batch">批量执行 ({{ selectedServers.length }} 台)</el-radio>
+                <el-radio value="single">单台验证</el-radio>
+             </el-radio-group>
+          </el-form-item>
+
+          <el-form-item v-if="executionMode === 'single'" label="选择验证服务器">
+            <el-select v-model="verificationServerId" placeholder="请选择一台服务器进行验证" style="width: 100%">
+               <el-option 
+                 v-for="server in selectedServers" 
+                 :key="server.id" 
+                 :label="server.name + ' (' + server.ip_address + ')'" 
+                 :value="server.id" 
+               />
+            </el-select>
+          </el-form-item>
+        </el-form>
+
+        <!-- 执行结果展示 -->
+        <div v-if="executionResults" class="execution-results">
+           <el-divider content-position="left">执行结果</el-divider>
+           <el-collapse>
+              <el-collapse-item 
+                v-for="(res, serverId) in executionResults" 
+                :key="serverId" 
+                :name="serverId"
+              >
+                <template #title>
+                  <div class="result-header">
+                    <span class="server-name">{{ res.server_name }} ({{ res.ip_address }})</span>
+                    <el-tag :type="getStatusType(res.status)" size="small" style="margin-left: 10px">
+                      {{ getStatusLabel(res.status) }}
+                      <el-icon v-if="res.status === 'running'" class="is-loading"><Loading /></el-icon>
+                    </el-tag>
+                  </div>
+                </template>
+                <div class="result-content">
+                   <div v-if="res.error_message" class="result-message error">{{ res.error_message }}</div>
+                   <div v-if="res.stdout">
+                     <strong>Output:</strong>
+                     <pre class="log-output">{{ res.stdout }}</pre>
+                   </div>
+                   <div v-if="res.stderr" style="color: red">
+                     <strong>Error:</strong>
+                     <pre class="log-output">{{ res.stderr }}</pre>
+                   </div>
+                </div>
+              </el-collapse-item>
+           </el-collapse>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="scriptDialogVisible = false">关闭</el-button>
+          <el-button type="primary" @click="handleExecuteScript" :loading="scriptExecuting">
+            {{ executionMode === 'single' ? '开始验证' : '开始批量执行' }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <!-- 批量修改密码对话框 -->
     <el-dialog
       v-model="batchPasswordDialogVisible"
@@ -846,10 +1013,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElTable } from 'element-plus'
-import { getServers, createServer, updateServer, deleteServer, getServerStats, getServerGpuResources, scanServerGpus, testServerConnection, batchTestConnection, batchUpdatePassword, restartServer } from '@/api/servers'
+import { getServers, createServer, updateServer, deleteServer, getServerStats, getServerGpuResources, scanServerGpus, testServerConnection, batchTestConnection, batchUpdatePassword, batchRestartServers, 
+  batchDeleteServers, 
+  restartServer,
+  batchExecuteScript,
+  getScriptExecutionStatus
+} from '@/api/servers'
 import { getServerGroups, createServerGroup, updateServerGroup, deleteServerGroup } from '@/api/server-groups'
 import WebTerminal from '@/components/WebTerminal.vue'
 import { getToken } from '@/utils/auth'
@@ -881,7 +1053,9 @@ import {
   ScaleToOriginal,
   Folder,
   FolderAdd,
-  Sort
+  Sort,
+  Cpu,
+  Loading
 } from '@element-plus/icons-vue'
 
 // 路由实例
@@ -889,10 +1063,10 @@ const router = useRouter()
 
 // 响应式数据
 const selectedServers = ref<any[]>([])
+const batchActionLoading = ref(false)
 const batchPasswordDialogVisible = ref(false)
 const batchPassword = ref('')
 const batchSubmitting = ref(false)
-
 // 终端相关数据
 const terminalDrawerVisible = ref(false)
 const isTerminalFullscreen = ref(false)
@@ -1194,6 +1368,14 @@ const getUsageColor = (usage: number = 0) => {
   return '#67c23a'
 }
 
+const formatSize = (kb: number) => {
+  if (!kb) return '0 B'
+  if (kb < 1024) return kb + ' KB'
+  if (kb < 1024 * 1024) return (kb / 1024).toFixed(1) + ' MB'
+  if (kb < 1024 * 1024 * 1024) return (kb / (1024 * 1024)).toFixed(1) + ' GB'
+  return (kb / (1024 * 1024 * 1024)).toFixed(1) + ' TB'
+}
+
 // 建立监控 WebSocket 连接
 const connectMonitor = (server: any) => {
   if (monitorSockets.has(server.id)) return
@@ -1206,22 +1388,58 @@ const connectMonitor = (server: any) => {
   try {
     const socket = new WebSocket(wsUrl)
     
+    socket.onopen = () => {
+      // Find current server to update status
+      const currentServer = servers.value.find(s => s.id === server.id)
+      if (currentServer) {
+        currentServer.monitor_connected = true
+      }
+    }
+
     socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data)
         if (msg.type === 'monitor_data' && msg.data) {
-          if (!server.monitor) {
-            server.monitor = {
-              cpu_usage: 0,
-              memory_usage: 0,
-              gpu_usage: 0,
-              gpu_count: 0
-            }
+          // Find the current server object in the reactive array
+          // This ensures that even if servers.value is replaced (e.g. by auto-refresh),
+          // we update the currently displayed object.
+          const currentServer = servers.value.find(s => s.id === server.id)
+          
+          if (currentServer) {
+             if (!currentServer.monitor) {
+                currentServer.monitor = {
+                  cpu_usage: 0,
+                  memory_usage: 0,
+                  disk_usage: 0,
+                  gpu_usage: 0,
+                  gpu_count: 0,
+                  gpu_memory_used: 0,
+                  gpu_memory_total: 0,
+                  disk_details: []
+                }
+             }
+             currentServer.monitor.cpu_usage = msg.data.cpu_usage
+             currentServer.monitor.memory_usage = msg.data.memory_usage
+             currentServer.monitor.memory_total_kb = msg.data.memory_total_kb
+             currentServer.monitor.memory_used_kb = msg.data.memory_used_kb
+             currentServer.monitor.disk_usage = msg.data.disk_usage
+             currentServer.monitor.gpu_usage = msg.data.gpu_usage
+             currentServer.monitor.gpu_count = msg.data.gpu_count
+             currentServer.monitor.gpu_memory_used = msg.data.gpu_memory_used
+             currentServer.monitor.gpu_memory_total = msg.data.gpu_memory_total
+             currentServer.monitor.disk_details = msg.data.disk_details
+             
+             // Update static info if provided (auto-synced from backend)
+             if (msg.data.total_memory) {
+               currentServer.total_memory = msg.data.total_memory
+             }
+             if (msg.data.total_storage) {
+               currentServer.total_storage = msg.data.total_storage
+             }
+             
+             // Ensure connected status is true (in case onopen didn't catch the right object ref)
+             currentServer.monitor_connected = true
           }
-          server.monitor.cpu_usage = msg.data.cpu_usage
-          server.monitor.memory_usage = msg.data.memory_usage
-          server.monitor.gpu_usage = msg.data.gpu_usage
-          server.monitor.gpu_count = msg.data.gpu_count
         }
       } catch (e) {
         console.warn('解析监控数据失败:', e)
@@ -1230,16 +1448,43 @@ const connectMonitor = (server: any) => {
     
     socket.onerror = (error) => {
       console.warn(`监控连接错误 (Server ${server.id}):`, error)
+      const currentServer = servers.value.find(s => s.id === server.id)
+      if (currentServer) {
+        currentServer.monitor_connected = false
+      }
     }
     
     socket.onclose = () => {
+      // Check if this was an intentional close (stopped by user/component unmount)
+      // If stopMonitoring() was called, the socket is already removed from the map.
+      const wasMonitoring = monitorSockets.has(server.id)
       monitorSockets.delete(server.id)
-      // 可以在这里添加重连逻辑
+      
+      const currentServer = servers.value.find(s => s.id === server.id)
+      if (currentServer) {
+        currentServer.monitor_connected = false
+      }
+
+      // Only reconnect if it was in the map (meaning accidental close)
+      if (wasMonitoring) {
+        console.log(`监控连接意外断开 (Server ${server.id})，5秒后尝试重连...`)
+        setTimeout(() => {
+          // Check if server is still in the list and online before reconnecting
+          const s = servers.value.find(item => item.id === server.id)
+          if (s && s.status === 'online') {
+            connectMonitor(s)
+          }
+        }, 5000)
+      }
     }
     
     monitorSockets.set(server.id, socket)
   } catch (e) {
     console.error(`创建监控连接失败 (Server ${server.id}):`, e)
+    const currentServer = servers.value.find(s => s.id === server.id)
+    if (currentServer) {
+      currentServer.monitor_connected = false
+    }
   }
 }
 
@@ -1254,34 +1499,436 @@ const startMonitoring = () => {
 
 // 停止所有监控连接
 const stopMonitoring = () => {
-  monitorSockets.forEach(socket => {
+  const sockets = new Map(monitorSockets)
+  monitorSockets.clear() // Clear first to prevent reconnect logic in onclose
+  sockets.forEach(socket => {
     socket.close()
   })
-  monitorSockets.clear()
 }
 
 // 方法
+const isSelected = (server: any) => {
+  return selectedServers.value.some(s => s.id === server.id)
+}
+
+const toggleSelection = (server: any, checked: boolean) => {
+  if (checked) {
+    if (!isSelected(server)) {
+      selectedServers.value.push(server)
+    }
+  } else {
+    selectedServers.value = selectedServers.value.filter(s => s.id !== server.id)
+  }
+}
+
 const handleSelectionChange = (val: any[]) => {
   selectedServers.value = val
 }
 
+// 批量脚本执行相关
+const scriptDialogVisible = ref(false)
+const selectedScriptTemplate = ref('custom')
+const scriptContent = ref('')
+const executionMode = ref('batch')
+const verificationServerId = ref<number | null>(null)
+const scriptExecuting = ref(false)
+const executionResults = ref<any>(null)
+
+const TEMPLATES = {
+  docker_ubuntu: `#!/bin/bash
+
+# install-docker-cn.sh
+# 在 Ubuntu 上安装 Docker 并配置国内镜像加速（适用于 20.04 / 22.04 / 24.04）
+# Updated by Trae
+
+# 设置日志文件
+LOG_FILE="/var/log/acwl_docker_install.log"
+# 确保日志文件可写（如果脚本以 sudo 运行）
+touch "$LOG_FILE" || LOG_FILE="/tmp/acwl_docker_install.log"
+echo "🔍 日志将记录到: $LOG_FILE"
+
+# 将 stdout 和 stderr 同时输出到控制台和日志文件
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+set -e  # 遇错即停
+
+echo "🚀 开始执行 Docker 安装/配置脚本..."
+date "+%Y-%m-%d %H:%M:%S"
+
+SKIP_INSTALL=false
+
+# 0. 检查 Docker 是否已安装
+if command -v docker &> /dev/null; then
+    echo "✅ 检测到 Docker 已安装，版本: $(docker --version)"
+    
+    # 检查服务状态
+    if systemctl is-active --quiet docker; then
+        echo "✅ Docker 服务运行正常。"
+        echo "⏩ 将跳过基础安装步骤，仅更新镜像源配置以确保加速生效。"
+        SKIP_INSTALL=true
+    else
+        echo "⚠️  Docker 服务未运行，将执行完整安装流程以尝试修复..."
+    fi
+else
+    echo "⚪ Docker 未安装，准备开始安装..."
+fi
+
+if [ "$SKIP_INSTALL" = "false" ]; then
+    # 1. 更新系统并安装依赖
+    echo "🔧 正在更新系统并安装必要依赖..."
+    sudo apt-get update
+    sudo apt-get install -y ca-certificates curl gnupg lsb-release
+
+    # 2. 添加 Docker 清华镜像 GPG 密钥
+    echo "🔑 正在添加 Docker GPG 密钥（清华源）..."
+    sudo install -m 0755 -d /etc/apt/keyrings
+    # 如果文件存在先删除，避免交互式确认
+    if [ -f /etc/apt/keyrings/docker.gpg ]; then
+        sudo rm /etc/apt/keyrings/docker.gpg
+    fi
+    curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+    # 3. 添加清华 Docker APT 源
+    echo "📥 正在添加 Docker 清华软件源..."
+    UBUNTU_CODENAME=$(lsb_release -cs)
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu $UBUNTU_CODENAME stable" \\
+      | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    # 4. 安装 Docker 引擎及相关组件
+    echo "📦 正在安装 Docker Engine 和插件..."
+    sudo apt-get update
+    # 使用非交互模式安装，避免因配置文件冲突或服务重启确认导致卡死
+    export DEBIAN_FRONTEND=noninteractive
+    sudo -E apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+fi
+
+# 5. 配置国内镜像加速器 (始终执行，确保配置最新)
+echo "🌐 正在配置 Docker 国内镜像加速器..."
+sudo mkdir -p /etc/docker
+
+# 备份原有配置
+if [ -f /etc/docker/daemon.json ]; then
+    BACKUP_FILE="/etc/docker/daemon.json.bak.$(date +%s)"
+    echo "📄 备份现有配置到 $BACKUP_FILE"
+    sudo cp /etc/docker/daemon.json "$BACKUP_FILE"
+fi
+
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+  "registry-mirrors": [
+    "https://docker.1panel.live",
+    "https://docker.1ms.run",
+    "https://hub.rat.dev",
+    "https://dockerproxy.net",
+    "https://proxy.vvvv.ee",
+    "https://docker.m.daocloud.io",
+    "https://registry.cyou",
+    "https://hub.rat.dev",
+    "https://hub-mirror.c.163.com"
+  ],
+  "runtimes": {
+    "nvidia": {
+      "args": [],
+      "path": "nvidia-container-runtime"
+    }
+  }
+}
+EOF
+
+# 6. 重启 Docker 服务
+echo "🔄 正在重启 Docker 服务..."
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+sudo systemctl enable docker
+
+# 7. 将当前用户加入 docker 组（避免每次用 sudo）
+REAL_USER=\${SUDO_USER:-$(whoami)}
+if [ "$REAL_USER" = "root" ]; then
+    echo "⚠️  当前似乎是直接以 root 运行，跳过用户组配置。"
+else
+    # 检查用户是否已在 docker 组
+    if groups "$REAL_USER" | grep &>/dev/null '\\bdocker\\b'; then
+        echo "✅ 用户 $REAL_USER 已在 docker 组中。"
+    else
+        echo "👥 正在将用户 $REAL_USER 加入 docker 用户组..."
+        sudo usermod -aG docker "$REAL_USER"
+    fi
+fi
+
+# 8. 提示用户重新登录或刷新组权限
+echo ""
+echo "✅ Docker 部署/配置完成！"
+echo ""
+if [ "$SKIP_INSTALL" = "false" ]; then
+    echo "💡 提示：如果是首次安装，请执行 'newgrp docker' 或重新登录以生效组权限。"
+fi
+echo "🧪 验证安装："
+echo "   docker run --rm hello-world"
+echo ""
+
+echo "✅ 脚本执行完毕"
+date "+%Y-%m-%d %H:%M:%S"
+`,
+  nvidia_driver: `#!/bin/bash
+# Auto install NVIDIA drivers on Ubuntu
+# 注意：安装后可能需要重启
+set -e
+
+echo "Updating apt..."
+sudo apt-get update
+sudo apt-get install -y ubuntu-drivers-common
+
+echo "Auto installing drivers..."
+sudo ubuntu-drivers autoinstall
+
+echo "Done. Please restart the server."
+`,
+  apt_update: `#!/bin/bash
+set -e
+sudo apt-get update
+sudo apt-get upgrade -y
+echo "System updated."
+`
+}
+
+const handleTemplateChange = (val: string) => {
+  if (val === 'custom') {
+    scriptContent.value = ''
+  } else {
+    scriptContent.value = TEMPLATES[val as keyof typeof TEMPLATES] || ''
+  }
+}
+
+const scriptTaskId = ref<number | null>(null)
+let pollTimer: any = null
+
+const getStatusType = (status: string) => {
+  const map: Record<string, string> = {
+    'pending': 'info',
+    'running': 'primary',
+    'completed': 'success',
+    'success': 'success',
+    'failed': 'danger',
+    'timeout': 'warning',
+    'partial_failed': 'warning'
+  }
+  return map[status] || 'info'
+}
+
+const getStatusLabel = (status: string) => {
+  const map: Record<string, string> = {
+    'pending': '等待中',
+    'running': '执行中',
+    'completed': '已完成',
+    'success': '成功',
+    'failed': '失败',
+    'timeout': '超时',
+    'partial_failed': '部分失败'
+  }
+  return map[status] || status
+}
+
+const pollExecutionStatus = async (taskId: number) => {
+  try {
+    const res = await getScriptExecutionStatus(taskId)
+    const record = res.data || res
+    
+    // 转换后端详情列表为前端 map 结构
+    const results: Record<number, any> = {}
+    if (record.details) {
+      record.details.forEach((detail: any) => {
+        results[detail.server_id] = {
+          server_name: detail.server_name,
+          ip_address: detail.server_ip, // 注意后端字段可能不同，这里假设后端返回 server_ip
+          status: detail.status,
+          stdout: detail.stdout,
+          stderr: detail.stderr,
+          error_message: detail.error_message
+        }
+      })
+    }
+    executionResults.value = results
+
+    // 检查是否所有任务都已结束
+    const isFinished = ['completed', 'failed', 'partial_failed'].includes(record.status)
+    
+    if (isFinished) {
+      if (pollTimer) {
+        clearInterval(pollTimer)
+        pollTimer = null
+      }
+      scriptExecuting.value = false
+      if (record.status === 'completed') {
+        ElMessage.success('脚本批量执行完成')
+      } else if (record.status === 'partial_failed') {
+        ElMessage.warning('脚本执行完成，但有部分服务器失败')
+      } else {
+        ElMessage.error('脚本执行失败')
+      }
+    }
+  } catch (error) {
+    console.error('获取执行状态失败:', error)
+    // 不中断轮询，可能是网络波动
+  }
+}
+
+const handleExecuteScript = async () => {
+  if (!scriptContent.value.trim()) {
+    ElMessage.warning('请输入脚本内容')
+    return
+  }
+
+  let targetIds: number[] = []
+  if (executionMode.value === 'single') {
+    if (!verificationServerId.value) {
+      ElMessage.warning('请选择验证服务器')
+      return
+    }
+    targetIds = [verificationServerId.value]
+  } else {
+    targetIds = selectedServers.value.map(s => s.id)
+  }
+
+  if (targetIds.length === 0) return
+
+  scriptExecuting.value = true
+  executionResults.value = null
+  
+  try {
+    const res = await batchExecuteScript(targetIds, scriptContent.value)
+    const taskId = res.task_id || (res.data as any)?.task_id
+    
+    if (taskId) {
+      scriptTaskId.value = taskId
+      ElMessage.success('脚本任务已提交，正在执行...')
+      
+      // 立即轮询一次
+      await pollExecutionStatus(taskId)
+      
+      // 启动轮询
+      if (pollTimer) clearInterval(pollTimer)
+      pollTimer = setInterval(() => {
+        pollExecutionStatus(taskId)
+      }, 2000) // 每2秒轮询一次
+    } else {
+      throw new Error('未获取到任务ID')
+    }
+  } catch (error: any) {
+    console.error(error)
+    ElMessage.error(error.message || '脚本执行出错')
+    scriptExecuting.value = false
+  }
+}
+
+// 监听对话框关闭，清除轮询
+watch(() => scriptDialogVisible.value, (val) => {
+  if (!val && pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+})
+
+// 批量操作处理
 const handleBatchAction = async (command: string) => {
   if (selectedServers.value.length === 0) return
+  if (batchActionLoading.value) return
   
   const ids = selectedServers.value.map(s => s.id)
+  const serverNames = selectedServers.value.map(s => s.name).join(', ')
   
   if (command === 'test') {
     try {
+      batchActionLoading.value = true
       ElMessage.info('开始批量测试连接...')
+      // 幂等性设计：前端防止重复提交，API层面假设支持幂等
       await batchTestConnection(ids)
       ElMessage.success('批量测试请求已发送，请稍后刷新查看状态')
       loadServers()
     } catch (error: any) {
       ElMessage.error(error.message || '批量测试失败')
+    } finally {
+      batchActionLoading.value = false
     }
   } else if (command === 'password') {
     batchPassword.value = ''
     batchPasswordDialogVisible.value = true
+  } else if (command === 'script') {
+    scriptDialogVisible.value = true
+    scriptContent.value = ''
+    selectedScriptTemplate.value = 'custom'
+    executionMode.value = 'batch'
+    executionResults.value = null
+  } else if (command === 'restart') {
+    try {
+      await ElMessageBox.confirm(
+        `确定要重启以下 ${ids.length} 台服务器吗？\n${serverNames}`,
+        '批量重启确认',
+        {
+          confirmButtonText: '确定重启',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      )
+      
+      batchActionLoading.value = true
+      ElMessage.info('正在发起批量重启请求...')
+      
+      const res = await batchRestartServers(ids)
+      const results = res.results || []
+      const failed = results.filter((r: any) => !r.success)
+      
+      if (failed.length === 0) {
+        ElMessage.success('所有服务器重启指令已发送')
+      } else if (failed.length === ids.length) {
+        ElMessage.error('所有服务器重启失败')
+      } else {
+        ElMessage.warning(`操作完成，但在 ${failed.length} 台服务器上失败`)
+      }
+      
+      loadServers()
+    } catch (error: any) {
+      if (error !== 'cancel') {
+        ElMessage.error(error.message || '批量重启失败')
+      }
+    } finally {
+      batchActionLoading.value = false
+    }
+  } else if (command === 'delete') {
+    try {
+      await ElMessageBox.confirm(
+        `确定要删除以下 ${ids.length} 台服务器吗？此操作不可恢复！\n${serverNames}`,
+        '批量删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'error'
+        }
+      )
+      
+      batchActionLoading.value = true
+      
+      const res = await batchDeleteServers(ids)
+      const results = res.results || []
+      const failed = results.filter((r: any) => !r.success)
+      
+      if (failed.length === 0) {
+        ElMessage.success('批量删除操作完成')
+      } else if (failed.length === ids.length) {
+        ElMessage.error('所有服务器删除失败')
+      } else {
+        ElMessage.warning(`操作完成，但在 ${failed.length} 台服务器上失败`)
+      }
+      
+      selectedServers.value = [] // 清空选中
+      loadServers()
+    } catch (error: any) {
+      if (error !== 'cancel') {
+        ElMessage.error(error.message || '批量删除失败')
+      }
+    } finally {
+      batchActionLoading.value = false
+    }
   }
 }
 
@@ -1331,6 +1978,7 @@ const handleAutoRefreshChange = (val: boolean) => {
   }
 }
 
+
 // 新增：独立统计数据获取方法，保证与列表查询解耦
 const fetchStats = async () => {
   try {
@@ -1371,7 +2019,7 @@ const loadServers = async (opts?: { fetchStats?: boolean, fetchGroups?: boolean 
     
     console.log('列表查询参数:', params)
 
-    const response = await getServers(params)
+    const response: any = await getServers(params)
     console.log('服务器列表数据:', response)
 
     // 适配多种可能的API响应结构
@@ -1390,7 +2038,7 @@ const loadServers = async (opts?: { fetchStats?: boolean, fetchGroups?: boolean 
     servers.value = serverList || []
 
     // 启动监控 (暂时禁用以减少资源消耗，列表页不需要建立大量SSH连接)
-    // startMonitoring()
+    startMonitoring()
 
     // 如果有分页信息，使用分页总数
     pagination.total = response.data?.total || response.total || serverList?.length || 0
@@ -1702,6 +2350,33 @@ const handleCurrentChange = (page: number) => {
 </script>
 
 <style scoped>
+.log-output {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  padding: 10px;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  margin: 5px 0;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-right: 10px;
+}
+
+.script-dialog-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
 .servers-page {
   padding: 20px;
 }
@@ -1941,14 +2616,33 @@ const handleCurrentChange = (page: number) => {
   transition: all 0.3s ease;
 }
 
-.stat-card:hover {
+.server-card {
+  position: relative; /* 为 checkbox 定位 */
+  cursor: pointer;
+  background: white;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.server-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.stat-icon {
-  width: 48px;
-  height: 48px;
+.server-card.is-selected {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.server-select-checkbox {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: auto;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -2045,6 +2739,7 @@ const handleCurrentChange = (page: number) => {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 16px;
+  padding-left: 48px;
 }
 
 .server-name {
@@ -2123,11 +2818,37 @@ const handleCurrentChange = (page: number) => {
 
 /* 监控预览样式 */
 .server-monitor-preview {
+  position: relative;
   margin-bottom: 16px;
   padding: 12px;
   background-color: #f9fafb;
   border-radius: 8px;
   border: 1px solid #f3f4f6;
+}
+
+.monitor-status-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  cursor: help;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #d1d5db;
+  transition: all 0.3s ease;
+}
+
+.monitor-status-indicator.connected .status-dot {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
 }
 
 .monitor-item {

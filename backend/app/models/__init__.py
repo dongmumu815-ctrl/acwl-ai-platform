@@ -13,6 +13,7 @@ from .model import Model, ModelType
 from .model_service_config import ModelServiceConfig
 from .deployment import Deployment, DeploymentGPU, DeploymentTemplate, DeploymentType, DeploymentStatus
 from .server import Server, GPUResource, ServerMetrics
+from .script_execution import ScriptExecutionRecord, ScriptExecutionDetail, ScriptExecutionStatus, ScriptDetailStatus
 from .dataset import Dataset, DatasetType, DatasetStatus
 from .datasource import (
     Datasource, DatasourceTestLog, DatasourceUsageStats, 
@@ -90,9 +91,19 @@ __all__ = [
     "Server",
     "GPUResource",
     "ServerMetrics",
+    "ScriptExecutionRecord",
+    "ScriptExecutionDetail",
+    "ScriptExecutionStatus",
+    "ScriptDetailStatus",
     "Dataset",
     "DatasetType",
     "DatasetStatus",
+    "HarborConfig",
+    "AppTemplate",
+    "AppInstance",
+    "AppDeployment",
+    "AppType",
+    "AppStatus",
     "Datasource",
     "DatasourceTestLog",
     "DatasourceUsageStats",

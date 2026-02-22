@@ -134,7 +134,7 @@ class ExecutorClusterService:
             is_active=group_data.is_active,
             resource_profile=group_data.config or {},
             task_types=group_data.tags or [],
-            created_by=1  # 临时设置为1，实际应该从认证上下文获取
+            created_by=None  # 系统自动创建，无特定创建者
         )
         
         self.db.add(group)
@@ -251,7 +251,11 @@ class ExecutorClusterService:
         
         # 应用过滤条件
         if params.group_id:
-            query = query.where(ExecutorNode.group_id == params.group_id)
+            # 兼容旧逻辑，查询 primary_group 或 groups 中包含该 group_id 的节点
+            # 这里简化为查询 primary_group_id，或者需要 join acwl_executor_node_groups
+            # 为支持多分组查询，我们应该 join 关联表
+            query = query.join(ExecutorNode.groups).where(ExecutorGroup.id == params.group_id)
+        
         if params.node_name:
             query = query.where(ExecutorNode.node_name.ilike(f"%{params.node_name}%"))
         # 注意：ExecutorNodeQueryParams 没有 host 属性，这里注释掉
@@ -260,6 +264,9 @@ class ExecutorClusterService:
         if params.status:
             query = query.where(ExecutorNode.status == params.status)
         
+        # 去重，因为 join 可能会产生重复
+        query = query.distinct()
+
         # 获取总数
         count_query = select(func.count()).select_from(query.subquery())
         total = await self.db.scalar(count_query)
@@ -281,7 +288,10 @@ class ExecutorClusterService:
             query = query.offset(offset).limit(params.size)
         
         # 加载关联的分组信息
-        query = query.options(selectinload(ExecutorNode.group))
+        query = query.options(
+            selectinload(ExecutorNode.primary_group),
+            selectinload(ExecutorNode.groups)
+        )
         
         result = await self.db.execute(query)
         nodes = result.scalars().all()
@@ -305,13 +315,29 @@ class ExecutorClusterService:
             ConflictException: 节点已存在
             NotFoundException: 分组不存在
         """
-        # 检查分组是否存在
+        # 验证并获取分组
+        groups = []
+        if node_data.group_ids:
+            result = await self.db.execute(
+                select(ExecutorGroup).where(ExecutorGroup.id.in_(node_data.group_ids))
+            )
+            groups = result.scalars().all()
+            if len(groups) != len(set(node_data.group_ids)):
+                found_ids = {g.id for g in groups}
+                missing_ids = set(node_data.group_ids) - found_ids
+                raise NotFoundError(f"部分执行器分组不存在: {missing_ids}")
+        
+        # 验证主分组
         if node_data.group_id:
-            group = await self.db.scalar(
+            primary_group = await self.db.scalar(
                 select(ExecutorGroup).where(ExecutorGroup.id == node_data.group_id)
             )
-            if not group:
-                raise NotFoundError(f"执行器分组不存在: {node_data.group_id}")
+            if not primary_group:
+                raise NotFoundError(f"主执行器分组不存在: {node_data.group_id}")
+            
+            # 如果主分组不在 groups 列表中，添加进去（可选逻辑，视需求而定，这里保持一致性）
+            if not any(g.id == primary_group.id for g in groups):
+                groups.append(primary_group)
         
         # 检查节点是否已存在
         existing_node = await self.db.scalar(
@@ -325,7 +351,18 @@ class ExecutorClusterService:
         )
         
         if existing_node:
-            raise ConflictError(f"执行器节点已存在: {node_data.node_name}")
+            # 如果节点已存在，更新其分组信息并返回
+            # 这可以视为一种自动恢复/更新机制
+            logger.info(f"节点 {node_data.node_name} 已存在，更新其注册信息")
+            existing_node.groups = groups
+            if node_data.group_id:
+                existing_node.group_id = node_data.group_id
+            existing_node.status = ExecutorStatus.ONLINE
+            existing_node.last_heartbeat = datetime.utcnow()
+            await self.db.commit()
+            await self.db.refresh(existing_node)
+            return existing_node
+            # 或者抛出异常: raise ConflictError(f"执行器节点已存在: {node_data.node_name}")
         
         # 创建新节点
         node = ExecutorNode(
@@ -344,6 +381,9 @@ class ExecutorClusterService:
             node_metadata=node_data.node_metadata or {},
             last_heartbeat=datetime.utcnow()
         )
+        
+        # 设置多对多关系
+        node.groups = groups
         
         self.db.add(node)
         await self.db.commit()
@@ -369,7 +409,10 @@ class ExecutorClusterService:
         node = await self.db.scalar(
             select(ExecutorNode)
             .where(ExecutorNode.node_id == node_id)
-            .options(selectinload(ExecutorNode.group))
+            .options(
+                selectinload(ExecutorNode.primary_group),
+                selectinload(ExecutorNode.groups)
+            )
         )
         
         if not node:
@@ -399,6 +442,17 @@ class ExecutorClusterService:
         
         # 更新字段
         update_data = node_data.model_dump(exclude_unset=True)
+        
+        # 处理多对多关系更新
+        if 'group_ids' in update_data:
+            group_ids = update_data.pop('group_ids')
+            if group_ids is not None:
+                result = await self.db.execute(
+                    select(ExecutorGroup).where(ExecutorGroup.id.in_(group_ids))
+                )
+                groups = result.scalars().all()
+                node.groups = groups
+        
         for field, value in update_data.items():
             if hasattr(node, field):
                 setattr(node, field, value)
@@ -629,17 +683,34 @@ class ExecutorClusterService:
             任务列表 (TaskInstance)
         """
         # 1. 获取节点信息，包括其所属的分组名称
-        node = await self.get_executor_node(node_id)
-        if not node or not node.group:
-            logger.warning(f"节点 {node_id} 不存在或未分配分组")
+        # 加载所有分组
+        node = await self.db.scalar(
+            select(ExecutorNode)
+            .where(ExecutorNode.node_id == node_id)
+            .options(selectinload(ExecutorNode.groups), selectinload(ExecutorNode.primary_group))
+        )
+        
+        if not node:
+            logger.warning(f"节点 {node_id} 不存在")
             return []
             
-        group_name = node.group.group_name
+        # 获取所有关联分组的名称
+        group_names = []
+        if node.groups:
+            group_names.extend([g.group_name for g in node.groups])
+        
+        # 兼容旧的主分组字段
+        if node.primary_group and node.primary_group.group_name not in group_names:
+            group_names.append(node.primary_group.group_name)
+            
+        if not group_names:
+            logger.warning(f"节点 {node_id} 未分配任何分组")
+            return []
         
         # 2. 查找待执行的任务
         # 条件：
         # - 状态为 PENDING
-        # - 执行器分组匹配 (executor_group == group_name)
+        # - 执行器分组匹配 (executor_group IN group_names)
         # - 未被分配给其他节点 (assigned_executor_node 为空 或 等于当前节点ID)
         
         stmt = select(TaskInstance).options(
@@ -647,7 +718,7 @@ class ExecutorClusterService:
         ).where(
             and_(
                 TaskInstance.status == TaskStatus.PENDING,
-                TaskInstance.executor_group == group_name,
+                TaskInstance.executor_group.in_(group_names),
                 or_(
                     TaskInstance.assigned_executor_node.is_(None),
                     TaskInstance.assigned_executor_node == node_id

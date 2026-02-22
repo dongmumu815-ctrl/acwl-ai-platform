@@ -5,7 +5,7 @@
       <div class="sidebar-header">
         <div class="logo" @click="$router.push('/dashboard')">
           <img src="/logo.png" alt="Logo" class="logo-icon" :style="{ width: '32px', height: '32px' }" />
-          <span v-show="!appStore.sidebarCollapsed" class="logo-text">AI中台</span>
+          <span v-show="!appStore.sidebarCollapsed" class="logo-text">AI数据中台</span>
         </div>
       </div>
       

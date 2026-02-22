@@ -297,10 +297,49 @@ class TaskExecutionExecutor:
         """
         执行SQL查询任务 (通过DB服务)
         """
-        # 这里只是模拟SQL执行，实际应该调用数据服务的API
-        # 由于executor_service.py主要关注执行逻辑，这里可以预留接口
-        return {
-            'success': False,
-            'error': 'SQL任务执行需要在Worker中集成数据服务客户端',
-            'exit_code': 1
-        }
+        sql = content.get('sql')
+        if not sql:
+            # 尝试从 code 字段获取
+            sql = content.get('code')
+            
+        if not sql:
+            return {'success': False, 'error': '未提供SQL内容', 'exit_code': 1}
+            
+        db_alias = config.get('db_alias', 'default')
+        # 如果 config 中没有 db_alias，尝试从 content 获取
+        if not db_alias or db_alias == 'default':
+            db_alias = content.get('db_alias', 'default')
+
+        try:
+            # 延迟导入以避免循环依赖
+            from app.services.db_service import RouterDBService
+            
+            # 实例化数据库服务
+            # 注意：这里每次执行都会创建一个新的连接，对于高并发场景可能需要优化
+            # 但考虑到这是一个独立进程/任务，且 Manager 连接是轻量级的，暂时可行
+            db_service = RouterDBService()
+            
+            # 在线程池中执行，避免阻塞事件循环
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, 
+                lambda: db_service.execute_sql(db_alias, sql)
+            )
+            
+            if not result.get('success'):
+                return {
+                    'success': False, 
+                    'error': result.get('error', 'Unknown error'), 
+                    'exit_code': 1
+                }
+                
+            return {
+                'success': True,
+                'output': json.dumps(result.get('data'), ensure_ascii=False, indent=2),
+                'error': '',
+                'exit_code': 0
+            }
+            
+        except Exception as e:
+            logger.error(f"SQL执行失败: {e}")
+            return {'success': False, 'error': str(e), 'exit_code': 1}

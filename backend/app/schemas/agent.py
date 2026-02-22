@@ -318,3 +318,27 @@ class AgentConfigValidationResponse(BaseModel):
     is_valid: bool = Field(..., description="配置是否有效")
     errors: List[str] = Field(..., description="错误信息列表")
     warnings: List[str] = Field(..., description="警告信息列表")
+
+
+class AgentToolGenerateRequest(BaseModel):
+    """Agent工具生成请求Schema"""
+    requirements: str = Field(..., description="工具需求描述")
+    model_service_config_id: Optional[int] = Field(None, description="使用的模型服务配置ID")
+
+
+class AgentToolGenerateResponse(BaseModel):
+    """Agent工具生成响应Schema"""
+    code_structure: Dict[str, str] = Field(..., description="生成的文件结构")
+    raw_response: str = Field(..., description="原始响应")
+
+
+class AgentToolExecuteRequest(BaseModel):
+    """Agent工具执行请求Schema"""
+    prompt: str = Field(..., description="指令")
+    skill_names: List[str] = Field(..., description="启用的技能名称")
+    model_service_config_id: Optional[int] = Field(None, description="使用的模型服务配置ID")
+
+
+class AgentToolExecuteResponse(BaseModel):
+    """Agent工具执行响应Schema"""
+    result: str = Field(..., description="执行结果")

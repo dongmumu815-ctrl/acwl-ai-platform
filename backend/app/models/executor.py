@@ -4,7 +4,7 @@
 执行器节点模型
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Enum, Boolean, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Enum, Boolean, Float, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -40,6 +40,16 @@ class LoadBalanceStrategy(enum.Enum):
     RANDOM = "RANDOM"
 
 
+# 执行器节点与分组的多对多关联表
+executor_node_groups = Table(
+    "acwl_executor_node_groups",
+    Base.metadata,
+    Column("node_id", Integer, ForeignKey("acwl_executor_nodes.id", ondelete="CASCADE"), primary_key=True),
+    Column("group_id", Integer, ForeignKey("acwl_executor_groups.id", ondelete="CASCADE"), primary_key=True),
+    Column("created_at", DateTime, default=datetime.utcnow)
+)
+
+
 class ExecutorGroup(Base):
     """执行器分组模型"""
     __tablename__ = "acwl_executor_groups"
@@ -59,7 +69,8 @@ class ExecutorGroup(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
 
     # 关系
-    executors = relationship("ExecutorNode", back_populates="group")
+    # executors = relationship("ExecutorNode", back_populates="group") # 旧的一对多关系，保留以兼容，但在多对多模式下可能不再主要使用
+    executors = relationship("ExecutorNode", secondary=executor_node_groups, back_populates="groups")
     creator = relationship("User", back_populates="created_executor_groups")
 
     def __repr__(self):
@@ -73,7 +84,8 @@ class ExecutorNode(Base):
     id = Column(Integer, primary_key=True, index=True, comment="执行器ID，自增主键")
     node_id = Column(String(100), unique=True, nullable=False, index=True, comment="执行器节点唯一标识")
     node_name = Column(String(100), nullable=False, comment="节点名称")
-    group_id = Column(Integer, ForeignKey("acwl_executor_groups.id"), nullable=False, comment="所属分组ID")
+    # group_id 保留为可选，作为主分组或兼容旧逻辑
+    group_id = Column(Integer, ForeignKey("acwl_executor_groups.id"), nullable=True, comment="所属主分组ID")
     host_ip = Column(String(45), nullable=False, comment="主机IP地址")
     port = Column(Integer, nullable=False, comment="服务端口")
     status = Column(Enum(ExecutorStatus), default=ExecutorStatus.OFFLINE, nullable=False, comment="节点状态")
@@ -93,7 +105,15 @@ class ExecutorNode(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
 
     # 关系
-    group = relationship("ExecutorGroup", back_populates="executors")
+    # group = relationship("ExecutorGroup", back_populates="executors") # 旧的一对多关系
+    # 使用 viewonly=True 避免与多对多关系冲突，或者只保留多对多
+    # 为了兼容，我们可以保留 group 属性指向 group_id，但不再是主要的关联方式
+    # 在 SQLAlchemy 中，如果有两个 relationship 指向同一个模型，需要明确区分
+    # 这里我们将 group 设为只读引用主分组
+    primary_group = relationship("ExecutorGroup", foreign_keys=[group_id])
+    
+    groups = relationship("ExecutorGroup", secondary=executor_node_groups, back_populates="executors")
+    
     task_instances = relationship(
         "TaskInstance",
         foreign_keys="[TaskInstance.assigned_executor_node]",

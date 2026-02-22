@@ -458,7 +458,8 @@ const PLATFORM_MODULE_MAP: Record<'AI中台' | '数据中台', string[]> = {
   ],
   数据中台: [
     // 数据中台路由中涉及的功能模块（以 data 前缀聚合）
-    'data'
+    'data',
+    'governance'
   ]
 }
 

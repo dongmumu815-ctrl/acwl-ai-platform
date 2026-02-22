@@ -46,7 +46,14 @@
           <el-menu-item index="/projects/create">创建项目</el-menu-item>
         </el-sub-menu>
         
-
+        <el-sub-menu index="/resources">
+          <template #title>
+            <el-icon><Connection /></el-icon>
+            <span>资源管理</span>
+          </template>
+          <el-menu-item index="/resources/executor-groups">执行器分组</el-menu-item>
+          <el-menu-item index="/resources/environments">环境管理</el-menu-item>
+        </el-sub-menu>
         
         <el-menu-item index="/monitoring">
           <el-icon><Monitor /></el-icon>
@@ -204,7 +211,9 @@ import {
   List,
   Folder,
   Monitor,
-  Avatar
+  Avatar,
+  Connection,
+  Cpu
 } from '@element-plus/icons-vue'
 
 /**

@@ -59,22 +59,22 @@ class UserMixin:
 
 
 # 创建异步数据库引擎
-# engine = create_async_engine(
-#     settings.database_url.replace("mysql+pymysql", "mysql+aiomysql"),
-#     echo=settings.DEBUG,
-#     pool_size=20,
-#     max_overflow=30,
-#     pool_pre_ping=True,
-#     pool_recycle=3600,
-# )
-
-# 使用 NullPool 禁用连接池，避免 aiomysql 在 Windows 下的并发问题
 engine = create_async_engine(
     settings.database_url.replace("mysql+pymysql", "mysql+aiomysql"),
-    echo=False, # 禁用 SQL 日志以减少干扰
-    poolclass=NullPool,
-    # pool_pre_ping=True, # NullPool 不需要 pre_ping
+    echo=False,
+    pool_size=20,
+    max_overflow=30,
+    pool_pre_ping=True,
+    pool_recycle=3600,
 )
+
+# 使用 NullPool 禁用连接池，避免 aiomysql 在 Windows 下的并发问题
+# engine = create_async_engine(
+#     settings.database_url.replace("mysql+pymysql", "mysql+aiomysql"),
+#     echo=False, # 禁用 SQL 日志以减少干扰
+#     poolclass=NullPool,
+#     # pool_pre_ping=True, # NullPool 不需要 pre_ping
+# )
 
 # 创建同步数据库引擎（用于兼容现有代码）
 sync_engine = create_engine(

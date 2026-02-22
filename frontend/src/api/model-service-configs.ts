@@ -23,6 +23,16 @@ export const modelServiceConfigApi = {
   },
 
   /**
+   * 获取可用于Agent的模型服务列表
+   */
+  getAvailableConfigs() {
+    return request({
+      url: '/model-service-configs/available-for-agents',
+      method: 'get'
+    })
+  },
+
+  /**
    * 获取配置详情
    * @param id 配置ID
    */

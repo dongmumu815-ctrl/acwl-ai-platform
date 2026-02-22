@@ -166,6 +166,35 @@ const routes = [
             requiresAuth: true
           }
         },
+        
+        {
+          path: 'resources',
+          redirect: '/resources/executor-groups',
+          meta: {
+            title: '资源管理',
+            requiresAuth: true
+          },
+          children: [
+            {
+              path: 'executor-groups',
+              name: 'ExecutorGroupList',
+              component: () => import('@/views/resources/ExecutorGroupList.vue'),
+              meta: {
+                title: '执行器分组',
+                requiresAuth: true
+              }
+            },
+            {
+              path: 'environments',
+              name: 'EnvironmentList',
+              component: () => import('@/views/resources/EnvironmentList.vue'),
+              meta: {
+                title: '环境管理',
+                requiresAuth: true
+              }
+            }
+          ]
+        },
 
         {
           path: 'monitoring',

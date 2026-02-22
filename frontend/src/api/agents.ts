@@ -6,6 +6,10 @@ import type {
   AgentResponse,
   AgentListResponse,
   AgentTool,
+  AgentToolCreate,
+  AgentToolUpdate,
+  AgentToolGenerateRequest,
+  AgentToolGenerateResponse,
   AgentChat,
   AgentChatResponse,
   AgentStats,
@@ -85,13 +89,103 @@ export function deleteAgent(id: number) {
 
 /**
  * 获取智能体工具列表
- * @param id 智能体ID
+ * @param params 查询参数
  * @returns 工具列表
  */
-export function getAgentTools(id: number) {
-  return request<AgentTool[]>({
-    url: `/agents/${id}/tools`,
+export function getAgentTools(params?: {
+  page?: number
+  size?: number
+  search?: string
+  tool_type?: string
+  is_enabled?: boolean
+}) {
+  return request<{
+    items: AgentTool[]
+    total: number
+    page: number
+    size: number
+    pages: number
+  }>({
+    url: '/agents/tools/',
+    method: 'get',
+    params
+  })
+}
+
+/**
+ * 获取单个工具详情
+ * @param id 工具ID
+ */
+export function getAgentTool(id: number) {
+  return request<AgentTool>({
+    url: `/agents/tools/${id}`,
     method: 'get'
+  })
+}
+
+/**
+ * 创建工具
+ * @param data 工具数据
+ */
+export function createAgentTool(data: AgentToolCreate) {
+  return request<AgentTool>({
+    url: '/agents/tools/',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 更新工具
+ * @param id 工具ID
+ * @param data 更新数据
+ */
+export function updateAgentTool(id: number, data: AgentToolUpdate) {
+  return request<AgentTool>({
+    url: `/agents/tools/${id}`,
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 删除工具
+ * @param id 工具ID
+ */
+export function deleteAgentTool(id: number) {
+  return request<void>({
+    url: `/agents/tools/${id}`,
+    method: 'delete'
+  })
+}
+/**
+ * 生成工具代码
+ * @param data 生成请求
+ * @returns 生成结果
+ */
+export function generateAgentToolCode(data: AgentToolGenerateRequest) {
+  return request<AgentToolGenerateResponse>({
+    url: '/agents/tools/generate',
+    method: 'post',
+    data,
+    timeout: 120000 // 2分钟超时，生成代码可能较慢
+  })
+}
+
+/**
+ * 执行工具任务
+ * @param data 执行请求
+ * @returns 执行结果
+ */
+export function executeAgentToolTask(data: {
+  prompt: string
+  skill_names: string[]
+  model_service_config_id?: number
+}) {
+  return request<{ result: string }>({
+    url: '/agents/tools/execute',
+    method: 'post',
+    data
   })
 }
 
