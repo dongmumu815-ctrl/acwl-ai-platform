@@ -9,6 +9,9 @@ import logging
 import json
 import os
 import shutil
+import subprocess
+import shlex
+import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -18,7 +21,7 @@ from app.services.skill_adapter import SkillAdapter
 # 尝试导入 modelscope-agent，如果未安装则提供优雅降级
 try:
     from modelscope_agent.agents import RolePlay
-    from modelscope_agent.tools import BaseTool, register_tool
+    from modelscope_agent.tools import BaseTool, register_tool, TOOL_REGISTRY
     MS_AGENT_AVAILABLE = True
     
     # --- Monkey Patch for Ollama LLM Bug ---
@@ -43,21 +46,28 @@ try:
                 return response
             except AttributeError:
                 # Handle generator response
-                for chunk in response:
-                    # Safe dict access for chunk
-                    if isinstance(chunk, dict):
-                        prompt_tokens = chunk.get('prompt_eval_count')
-                        if prompt_tokens is None: prompt_tokens = 0
-                        
-                        completion_tokens = chunk.get('eval_count')
-                        if completion_tokens is None: completion_tokens = 0
-                        
-                        self.last_call_usage_info = {
-                            'prompt_tokens': prompt_tokens,
-                            'completion_tokens': completion_tokens,
-                            'total_tokens': prompt_tokens + completion_tokens
-                        }
-                    yield chunk
+                try:
+                    for chunk in response:
+                        # Safe dict access for chunk
+                        if isinstance(chunk, dict):
+                            prompt_tokens = chunk.get('prompt_eval_count')
+                            if prompt_tokens is None: prompt_tokens = 0
+                            
+                            completion_tokens = chunk.get('eval_count')
+                            if completion_tokens is None: completion_tokens = 0
+                            
+                            self.last_call_usage_info = {
+                                'prompt_tokens': prompt_tokens,
+                                'completion_tokens': completion_tokens,
+                                'total_tokens': prompt_tokens + completion_tokens
+                            }
+                        yield chunk
+                except Exception as e:
+                    # Catch stream errors (like 502 Bad Gateway) to prevent crash
+                    import logging
+                    logging.getLogger(__name__).warning(f"Stream error in OllamaLLM patch: {e}")
+                    # Optionally yield a final error chunk or just stop
+                    return
 
         # Apply patch
         OllamaLLM.stat_last_call_token_info_stream = safe_stat_last_call_token_info_stream
@@ -136,24 +146,147 @@ class AgentSkillService:
                 "agent_skill_generator": AgentSkillGeneratorTool()
             }
             
+            # 定义一个通用的资源工具类
+            class ResourceSkillTool(BaseTool):
+                def __init__(self, name: str, description: str, path: str):
+                    self.name = name
+                    self.path = path
+                    self.parameters = []
+                    self.description = description
+                    
+                    # Check for scripts
+                    self.scripts_path = Path(path) / "scripts"
+                    self.available_scripts = []
+                    
+                    if self.scripts_path.exists() and self.scripts_path.is_dir():
+                        for script_file in self.scripts_path.iterdir():
+                             if script_file.suffix in ['.py', '.sh', '.js', '.bat', '.ps1']:
+                                 self.available_scripts.append(script_file.name)
+                    
+                    if self.available_scripts:
+                        script_list = ", ".join(self.available_scripts)
+                        self.description += f"\n\nAvailable executable scripts: {script_list}. To run a script, use the 'run_script' parameter."
+                        
+                        self.parameters.append({
+                            'name': 'run_script',
+                            'type': 'string',
+                            'description': 'The name of the script to run (must be one of the available scripts)',
+                            'required': False
+                        })
+                        self.parameters.append({
+                            'name': 'args',
+                            'type': 'string',
+                            'description': 'Arguments for the script (as a space-separated string or JSON list)',
+                            'required': False
+                        })
+                        
+                    super().__init__()
+
+                def call(self, params: str, **kwargs) -> str:
+                    try:
+                        params_dict = json.loads(params) if isinstance(params, str) else params
+                    except json.JSONDecodeError:
+                        params_dict = {}
+                    
+                    run_script = params_dict.get('run_script')
+                    if run_script:
+                        if run_script not in self.available_scripts:
+                            return f"Error: Script '{run_script}' not found. Available: {self.available_scripts}"
+                        
+                        script_path = self.scripts_path / run_script
+                        args = params_dict.get('args', '')
+                        
+                        # Prepare command
+                        cmd = []
+                        
+                        # Determine interpreter
+                        if script_path.suffix == '.py':
+                            cmd = [sys.executable, str(script_path)]
+                        elif script_path.suffix == '.sh':
+                            cmd = ['bash', str(script_path)]
+                        elif script_path.suffix == '.ps1':
+                            cmd = ['powershell', '-File', str(script_path)]
+                        else:
+                             # Try direct execution
+                             cmd = [str(script_path)]
+                        
+                        # Add arguments
+                        if args:
+                            if isinstance(args, list):
+                                cmd.extend([str(a) for a in args])
+                            else:
+                                try:
+                                    cmd.extend(shlex.split(args))
+                                except:
+                                    cmd.append(args) # Fallback
+                        
+                        try:
+                            # Execute
+                            # Default CWD to the parent of the skill directory (e.g., skills root)
+                            cwd = Path(self.path).parent
+                            if not cwd.exists():
+                                cwd = Path(self.path)
+
+                            logger.info(f"Executing script: {cmd} in {cwd}")
+                            result = subprocess.run(
+                                cmd, 
+                                capture_output=True, 
+                                text=True, 
+                                check=False,
+                                cwd=str(cwd)
+                            )
+                            return f"Script execution result:\nStdout:\n{result.stdout}\nStderr:\n{result.stderr}\nExit Code: {result.returncode}"
+                        except Exception as e:
+                            return f"Error executing script: {e}"
+
+                    return f"Skill resources for {self.name} are available at {self.path}. Please read SKILL.md for instructions."
+
             # 将 SkillAdapter 加载的技能也注册为 ResourceSkillTool (如果尚未存在)
             for skill in self.skill_adapter.list_skills():
                 name = skill.get("name") or skill.get("id")
                 if name and name not in self.available_skills:
-                    # 创建一个简单的资源工具，指向技能目录
-                    desc = skill.get("description", "")
                     path = skill.get("path", "")
+                    # 读取代码文件以确定是否有可执行逻辑
+                    code_files = self._read_skill_files(path)
                     
-                    # 简单闭包类
-                    # class FileSkillTool(BaseTool):
-                    #     description = desc
-                    #     name = name
-                    #     parameters = []
-                    #     def call(self, params: str, **kwargs) -> str:
-                    #         return f"Skill resources available at {path}"
-                            
-                    # self.available_skills[name] = FileSkillTool() # 暂时不注册为可执行工具，避免污染 context，除非明确启用
-                    pass
+                    # 尝试动态加载（如果是有效的 Python 工具包）
+                    # 只有当代码中明确包含了 modelscope-agent 的工具定义时才尝试加载为 Tool
+                    # 否则，我们将其视为资源包 (ResourceSkillTool)
+                    
+                    is_executable = False
+                    try:
+                        files_map = json.loads(code_files)
+                        # 检查 scripts 目录下是否有 .py 文件，且内容包含 register_tool
+                        for fname, content in files_map.items():
+                            if fname.endswith(".py") and "register_tool" in content:
+                                # 这是一个可执行的 Skill
+                                # 我们尝试加载它
+                                # 注意：这需要复杂的动态加载逻辑（处理依赖等），这里做简化处理：
+                                # 暂时不自动加载复杂的 Python 脚本，除非它们是单文件的
+                                # 对于 skill-creator，它主要是文档和辅助脚本，我们将其作为 ResourceSkillTool 加载
+                                # 但为了响应用户需求，我们检查是否有名为 'scripts/init_skill.py' 的文件，如果有，我们可以尝试暴露它
+                                pass
+                    except:
+                        pass
+
+                    # 默认作为 ResourceSkillTool 加载，这样 Agent 可以看到它
+                    # 并能读取其描述 (SKILL.md)
+                    desc = skill.get("description", "")
+                    # 读取 SKILL.md 内容作为详细描述
+                    skill_md_path = Path(path) / "SKILL.md"
+                    if skill_md_path.exists():
+                         try:
+                             desc = skill_md_path.read_text(encoding="utf-8")[:2000] + "..."
+                         except:
+                             pass
+
+                    self.available_skills[name] = ResourceSkillTool(name, desc, path)
+                    
+                    # 注册到 modelscope-agent 的全局注册表，以便 RolePlay 能够通过名称找到并使用该工具实例
+                    # 注意：我们将实例作为 'class' 的值存入，这会触发 RolePlay 中的 TypeError 异常捕获逻辑，
+                    # 从而直接使用该实例，而不是尝试实例化它。这是动态工具注册的关键 Hack。
+                    TOOL_REGISTRY[name] = {'class': self.available_skills[name]}
+
 
             logger.info(f"Loaded {len(self.available_skills)} agent skills via modelscope-agent")
         except Exception as e:
@@ -252,6 +385,10 @@ class AgentSkillService:
                 update_needed = False
                 if db_tool.is_builtin != is_builtin:
                     db_tool.is_builtin = is_builtin
+                    update_needed = True
+                
+                if db_tool.tool_type != tool_type:
+                    db_tool.tool_type = tool_type
                     update_needed = True
                     
                 if is_builtin:
@@ -398,13 +535,16 @@ class AgentSkillService:
         获取指定的工具实例列表
         
         Args:
-            skill_names: 需要启用的技能名称列表，如果为 None 则返回所有
+            skill_names: 需要启用的技能名称列表。如果为 None，则返回所有可用技能；如果为空列表 []，则返回空。
         """
         if not MS_AGENT_AVAILABLE:
             return []
 
-        if not skill_names:
+        if skill_names is None:
             return list(self.available_skills.values())
+        
+        if len(skill_names) == 0:
+            return []
 
         tools = []
         for name in skill_names:
@@ -480,7 +620,9 @@ class AgentSkillService:
             if not hasattr(agent_logger, 'debug'):
                 agent_logger.debug = agent_logger.info
             
-            response = bot.run(prompt)
+            # 使用 asyncio.to_thread 在后台线程中运行阻塞的 bot.run，防止阻塞 FastAPI 主事件循环
+            import asyncio
+            response = await asyncio.to_thread(bot.run, prompt)
             
             # 处理生成器返回
             final_result = ""

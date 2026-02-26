@@ -43,7 +43,7 @@ class SkillAdapter:
                             skill_data.update({
                                 "id": skill_id,
                                 "is_builtin": is_builtin,
-                                "tool_type": "custom",
+                                "tool_type": "system" if is_builtin else "custom",
                                 "path": str(item.absolute())
                             })
                             

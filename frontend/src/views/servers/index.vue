@@ -1399,6 +1399,20 @@ const connectMonitor = (server: any) => {
     socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data)
+        
+        if (msg.type === 'error') {
+          console.error(`Server ${server.id} monitoring error:`, msg.message)
+          // If server reports error (e.g. SSH failed), stop retrying
+          monitorSockets.delete(server.id)
+          const currentServer = servers.value.find(s => s.id === server.id)
+          if (currentServer) {
+            currentServer.monitor_connected = false
+            // Optional: You could add a field to show error state in UI
+            // currentServer.monitor_error = msg.message 
+          }
+          return
+        }
+
         if (msg.type === 'monitor_data' && msg.data) {
           // Find the current server object in the reactive array
           // This ensures that even if servers.value is replaced (e.g. by auto-refresh),

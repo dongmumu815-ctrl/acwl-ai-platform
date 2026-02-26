@@ -615,52 +615,101 @@ async def generate_agent_tool_code(
 
         # 2. 调用 AgentSkillService
         # 使用 execute_skill_task，只启用 agent_skill_generator
-        # 构造一个Prompt来调用工具
         
-        # 注意：execute_skill_task 主要是为了运行 ReAct/RolePlay Loop
-        # 我们想要的是让 Agent 使用 agent_skill_generator 工具
-        
+        # 尝试读取 skill-creator 的指南以增强 Prompt
+        skill_guide = ""
+        try:
+            # 假设 skill-creator 位于 system skills 目录下
+            from pathlib import Path
+            system_skills_path = Path(agent_skill_service.skill_adapter.system_skills_path)
+            skill_creator_md = system_skills_path / "skill-creator" / "SKILL.md"
+            
+            if skill_creator_md.exists():
+                skill_guide = skill_creator_md.read_text(encoding="utf-8")
+                # 截取一部分关键原则，避免 Prompt 过长
+                # 这里我们提取 "Core Principles" 和 "Anatomy of a Skill" 部分
+                # 或者简单地作为参考附录
+        except Exception as e:
+            logger.warning(f"Failed to load skill-creator guide: {e}")
+
+        # 构造 Prompt
         prompt = f"""
-You are an expert in ModelScope Agent development.
-I need to generate a Python implementation for a new Agent Skill compatible with `modelscope-agent`.
+You are an expert in ModelScope Agent development and Skill creation.
+I need to generate a new Agent Skill based on the following requirements.
 
 Requirements: {request.requirements}
 
+"""
+
+        prompt_with_guide = prompt
+        if skill_guide:
+            prompt_with_guide += f"""
+Reference Guide (Best Practices for Skill Creation):
+---
+{skill_guide[:2000]}... (truncated)
+---
+
+Based on the guide above, please generate a high-quality skill structure.
+The skill MUST include a `SKILL.md` file following the guide's format.
+"""
+
+        prompt_with_guide += f"""
 Please follow these strict rules:
-1. DO NOT use LangChain or any other framework. Use `modelscope-agent` SDK.
-2. The code MUST define a class inheriting from `BaseTool` and decorated with `@register_tool`.
-3. The output MUST be a valid JSON object where keys are filenames (e.g., "plugin.py", "requirements.txt") and values are the file content.
-4. DO NOT repeat the tool call. Call `agent_skill_generator` ONCE to signal intent, then immediately output the JSON.
-5. Provide ONLY the JSON object in your final answer, wrapped in ```json ... ```.
+1. DO NOT use LangChain or any other framework. Use `modelscope-agent` SDK for Python scripts.
+2. The output MUST be a valid JSON object where keys are filenames (e.g., "SKILL.md", "scripts/plugin.py") and values are the file content.
+3. Provide ONLY the JSON object in your final answer, wrapped in ```json ... ```.
 
-Expected Code Template:
-```python
-from modelscope_agent.tools import BaseTool, register_tool
+Structure the skill as:
+- `SKILL.md`: Metadata and instructions (Required)
+- `scripts/`: Directory for Python scripts (if needed)
+- `references/`: Directory for documentation (if needed)
 
-@register_tool('tool_name')
-class MyTool(BaseTool):
-    description = 'tool description'
-    name = 'tool_name'
-    parameters = [{{
-        'name': 'arg1',
-        'type': 'string',
-        'description': 'description',
-        'required': True
-    }}]
+Example Output JSON Structure:
+{{
+  "SKILL.md": "---\\nname: my-skill\\ndescription: ...\\n---\\n\\n# My Skill\\n...",
+  "scripts/my_tool.py": "from modelscope_agent.tools import BaseTool, register_tool\\n\\n@register_tool('my_tool')\\nclass MyTool(BaseTool):\\n..."
+}}
 
-    def call(self, params: str, **kwargs) -> str:
-        # Implementation
-        return "result"
-```
-
-Now, use `agent_skill_generator` ONCE, then generate the JSON.
+Now, generate the JSON.
 """
         
+        # 首次尝试：带指南
         raw_result = await agent_skill_service.execute_skill_task(
-            prompt=prompt,
+            prompt=prompt_with_guide,
             model_config=model_config,
-            enabled_skills=["agent_skill_generator"]
+            enabled_skills=[] # 不使用任何工具，强制直接生成
         )
+
+        # 检查是否失败 (502, timeout, etc causing "Execution failed")
+        if "Execution failed" in raw_result or "status code: 502" in raw_result:
+            logger.warning("Generation with skill guide failed, retrying without guide...")
+            
+            # 降级重试：不带指南
+            simple_prompt = prompt + f"""
+Please follow these strict rules:
+1. DO NOT use LangChain or any other framework. Use `modelscope-agent` SDK for Python scripts.
+2. The output MUST be a valid JSON object where keys are filenames (e.g., "SKILL.md", "scripts/plugin.py") and values are the file content.
+3. Provide ONLY the JSON object in your final answer, wrapped in ```json ... ```.
+
+Structure the skill as:
+- `SKILL.md`: Metadata and instructions (Required)
+- `scripts/`: Directory for Python scripts (if needed)
+- `references/`: Directory for documentation (if needed)
+
+Example Output JSON Structure:
+{{
+  "SKILL.md": "---\\nname: my-skill\\ndescription: ...\\n---\\n\\n# My Skill\\n...",
+  "scripts/my_tool.py": "from modelscope_agent.tools import BaseTool, register_tool\\n\\n@register_tool('my_tool')\\nclass MyTool(BaseTool):\\n..."
+}}
+
+Now, generate the JSON.
+"""
+            raw_result = await agent_skill_service.execute_skill_task(
+                prompt=simple_prompt,
+                model_config=model_config,
+                enabled_skills=[]
+            )
+
         
         # 3. 解析结果
         # 结果可能包含自然语言，也可能直接是JSON。
@@ -670,23 +719,45 @@ Now, use `agent_skill_generator` ONCE, then generate the JSON.
         
         code_structure = {}
         
-        # 尝试提取 ```json ... ```
+        # 尝试提取 ```json ... ``` (最常见)
         json_match = re.search(r"```json\s*(.*?)\s*```", raw_result, re.DOTALL)
         if json_match:
             try:
                 code_structure = json.loads(json_match.group(1))
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to parse JSON block: {e}")
         
+        # 尝试提取 ``` ... ``` (没有语言标识)
+        if not code_structure:
+             json_match = re.search(r"```\s*(\{.*?\})\s*```", raw_result, re.DOTALL)
+             if json_match:
+                try:
+                    code_structure = json.loads(json_match.group(1))
+                except Exception as e:
+                    logger.warning(f"Failed to parse generic code block as JSON: {e}")
+
         # 如果没有找到代码块，尝试直接解析（如果整个返回就是JSON）
         if not code_structure:
             try:
-                code_structure = json.loads(raw_result)
+                # 尝试清理前后空白
+                cleaned_result = raw_result.strip()
+                code_structure = json.loads(cleaned_result)
             except:
                 pass
+
+        # 尝试更宽泛的正则提取 (寻找最外层的 { ... })
+        if not code_structure:
+            try:
+                # 寻找第一个 { 和最后一个 }
+                start = raw_result.find('{')
+                end = raw_result.rfind('}')
+                if start != -1 and end != -1:
+                    json_str = raw_result[start:end+1]
+                    code_structure = json.loads(json_str)
+            except Exception as e:
+                logger.warning(f"Failed to extract JSON using broad search: {e}")
             
         # 如果还是空的，可能在 tool output 里，或者 Agent 没有正确返回 JSON。
-        # 这是一个简化实现，实际可能需要更强的解析逻辑
         
         return AgentToolGenerateResponse(
             code_structure=code_structure,
