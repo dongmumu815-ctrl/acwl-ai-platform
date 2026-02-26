@@ -123,5 +123,6 @@ class ModelServiceConfig(Base):
             "description": self.description,
             "provider": self.provider,
             "provider_display_name": self.provider_display_name,
-            "model_name": self.model_name
+            "model_name": self.model_name,
+            "is_default": self.is_default
         }

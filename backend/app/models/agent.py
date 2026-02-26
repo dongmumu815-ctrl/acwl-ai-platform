@@ -414,6 +414,8 @@ class AgentMessage(Base):
         return f"<AgentMessage(id={self.id}, conversation_id={self.conversation_id}, role='{self.role}')>"
 
 
+from sqlalchemy.dialects.mysql import LONGTEXT
+
 class AgentTool(Base):
     """Agent工具模型"""
     __tablename__ = "acwl_agent_tools"
@@ -461,6 +463,12 @@ class AgentTool(Base):
         JSON,
         nullable=True,
         comment="默认配置"
+    )
+    
+    code: Mapped[Optional[str]] = mapped_column(
+        LONGTEXT,
+        nullable=True,
+        comment="工具实现代码"
     )
     
     is_enabled: Mapped[bool] = mapped_column(

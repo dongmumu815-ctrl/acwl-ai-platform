@@ -2,6 +2,7 @@
  * 服务器管理相关的API接口
  */
 import { request } from '@/utils/request'
+import type { PaginatedResponse } from '@/types/common'
 
 /**
  * 服务器表单数据接口
@@ -66,16 +67,7 @@ export interface ApiResponse<T = any> {
 /**
  * 分页响应接口
  */
-export interface PaginatedResponse<T = any> {
-  /** 数据列表 */
-  data: T[]
-  /** 总数量 */
-  total: number
-  /** 当前页 */
-  page: number
-  /** 每页大小 */
-  size: number
-}
+
 
 /**
  * 创建服务器
@@ -193,4 +185,41 @@ export function batchUpdatePassword(ids: number[], password: string): Promise<Ap
  */
 export function restartServer(id: number): Promise<ApiResponse<any>> {
   return request.post(`/servers/${id}/restart`)
+}
+
+/**
+ * 批量重启服务器
+ * @param ids 服务器ID列表
+ * @returns Promise<ApiResponse<any>>
+ */
+export function batchRestartServers(ids: number[]): Promise<ApiResponse<any>> {
+  return request.post('/servers/batch/restart', { ids })
+}
+
+/**
+ * 批量删除服务器
+ * @param ids 服务器ID列表
+ * @returns Promise<ApiResponse<any>>
+ */
+export function batchDeleteServers(ids: number[]): Promise<ApiResponse<any>> {
+  return request.post('/servers/batch/delete', { ids })
+}
+
+/**
+ * 批量执行脚本
+ * @param ids 服务器ID列表
+ * @param script 脚本内容
+ * @returns Promise<ApiResponse<{ task_id: number; message: string }>>
+ */
+export function batchExecuteScript(ids: number[], script: string): Promise<ApiResponse<{ task_id: number; message: string }>> {
+  return request.post('/servers/batch/execute-script', { ids, script })
+}
+
+/**
+ * 获取脚本执行任务状态
+ * @param taskId 任务ID
+ * @returns Promise<ApiResponse<any>>
+ */
+export function getScriptExecutionStatus(taskId: number): Promise<ApiResponse<any>> {
+  return request.get(`/servers/batch/execute-script/${taskId}`)
 }

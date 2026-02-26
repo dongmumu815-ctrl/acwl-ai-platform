@@ -393,7 +393,8 @@ const PLATFORM_MODULE_MAP: Record<'AI中台' | '数据中台', string[]> = {
     'project'
   ],
   数据中台: [
-    'data'
+    'data',
+    'governance'
   ]
 }
 

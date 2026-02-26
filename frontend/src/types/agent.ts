@@ -100,11 +100,54 @@ export interface Agent extends AgentBase {
 export interface AgentTool {
   id: number
   name: string
+  display_name: string
   description?: string
   tool_type: ToolType
-  config?: Record<string, any>
+  config_schema?: Record<string, any>
+  default_config?: Record<string, any>
+  code?: string
   is_enabled: boolean
+  is_builtin: boolean
   created_at: string
+  updated_at: string
+}
+
+export interface AgentToolCreate {
+  name: string
+  display_name: string
+  description?: string
+  tool_type: ToolType
+  config_schema?: Record<string, any>
+  default_config?: Record<string, any>
+  code?: string
+  is_enabled?: boolean
+  is_builtin?: boolean
+}
+
+export interface AgentToolUpdate {
+  display_name?: string
+  description?: string
+  tool_type?: ToolType
+  config_schema?: Record<string, any>
+  default_config?: Record<string, any>
+  code?: string
+  is_enabled?: boolean
+}
+
+/**
+ * 代码生成请求
+ */
+export interface AgentToolGenerateRequest {
+  requirements: string
+  model_service_config_id?: number
+}
+
+/**
+ * 代码生成响应
+ */
+export interface AgentToolGenerateResponse {
+  code_structure: Record<string, string>
+  raw_response: string
 }
 
 /**

@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -606,6 +606,133 @@ authRoutes.push({
         requiresAuth: true,
         // 页面访问权限：数据上传日志查看
         permission: 'data:logs:data_upload:view',
+        strictPermission: true
+      }
+    }
+  ]
+})
+
+// 添加数据治理模块路由
+authRoutes.push({
+  path: '/governance',
+  component: Layout,
+  redirect: '/governance/dashboard',
+  meta: {
+    title: '数据治理',
+    icon: 'Files',
+    requiresAuth: true,
+    // 分组访问权限：数据治理查看
+    permission: 'data:governance:view',
+    strictPermission: true
+  },
+  children: [
+    {
+      path: 'dashboard',
+      name: 'GovernanceDashboard',
+      component: () => import('@/views/governance/dashboard/index.vue'),
+      meta: {
+        title: '治理概览',
+        icon: 'DataAnalysis',
+        requiresAuth: true,
+        permission: 'data:governance:dashboard:view',
+        strictPermission: true
+      }
+    },
+    {
+      path: 'metadata',
+      name: 'MetadataManagement',
+      component: RouterView,
+      redirect: '/governance/metadata/catalog',
+      meta: {
+        title: '元数据管理',
+        icon: 'Collection',
+        requiresAuth: true,
+        permission: 'data:governance:metadata:view',
+        strictPermission: true
+      },
+      children: [
+        {
+          path: 'catalog',
+          name: 'DataCatalog',
+          component: () => import('@/views/governance/metadata/catalog/index.vue'),
+          meta: {
+            title: '数据地图',
+            requiresAuth: true,
+            permission: 'data:governance:metadata:catalog:view',
+            strictPermission: true
+          }
+        },
+        {
+          path: 'lineage',
+          name: 'DataLineage',
+          component: () => import('@/views/governance/metadata/lineage/index.vue'),
+          meta: {
+            title: '全链路血缘',
+            requiresAuth: true,
+            permission: 'data:governance:metadata:lineage:view',
+            strictPermission: true
+          }
+        }
+      ]
+    },
+    {
+      path: 'quality',
+      name: 'QualityManagement',
+      component: RouterView,
+      redirect: '/governance/quality/rules',
+      meta: {
+        title: '数据质量',
+        icon: 'CircleCheck',
+        requiresAuth: true,
+        permission: 'data:governance:quality:view',
+        strictPermission: true
+      },
+      children: [
+        {
+          path: 'rules',
+          name: 'QualityRules',
+          component: () => import('@/views/governance/quality/rules/index.vue'),
+          meta: {
+            title: '规则库',
+            requiresAuth: true,
+            permission: 'data:governance:quality:rules:view',
+            strictPermission: true
+          }
+        },
+        {
+          path: 'tasks',
+          name: 'QualityTasks',
+          component: () => import('@/views/governance/quality/tasks/index.vue'),
+          meta: {
+            title: '质检任务',
+            requiresAuth: true,
+            permission: 'data:governance:quality:tasks:view',
+            strictPermission: true
+          }
+        }
+      ]
+    },
+    {
+      path: 'standard',
+      name: 'DataStandard',
+      component: () => import('@/views/governance/standard/index.vue'),
+      meta: {
+        title: '数据标准',
+        icon: 'Notebook',
+        requiresAuth: true,
+        permission: 'data:governance:standard:view',
+        strictPermission: true
+      }
+    },
+    {
+      path: 'security',
+      name: 'DataSecurity',
+      component: () => import('@/views/governance/security/index.vue'),
+      meta: {
+        title: '数据安全',
+        icon: 'Lock',
+        requiresAuth: true,
+        permission: 'data:governance:security:view',
         strictPermission: true
       }
     }

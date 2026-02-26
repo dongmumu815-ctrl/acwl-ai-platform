@@ -6,7 +6,7 @@ API v1 主路由
 
 from fastapi import APIRouter
 
-from .endpoints import auth, users, models, model_service_configs, deployments, environments, health, servers, server_groups, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure, roles, permissions, api_management, es_aggregations, user_operation_logs, data_upload_logs, templates, ws_ssh, ws_monitor, monitoring
+from .endpoints import auth, users, models, model_service_configs, deployments, environments, health, servers, server_groups, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure, roles, permissions, api_management, es_aggregations, user_operation_logs, data_upload_logs, templates, ws_ssh, ws_monitor, monitoring, applications
 from . import instruction_sets, data_resource, resource_package, resource_type
 
 # 创建API路由器
@@ -215,6 +215,14 @@ api_router.include_router(
     user_operation_logs.router,
     prefix="/user-operation-logs",
     tags=["日志管理"]
+)
+
+# Governance router removed
+
+api_router.include_router(
+    applications.router,
+    prefix="/applications",
+    tags=["应用管理"]
 )
 
 # 新增：数据上传日志（Doris）

@@ -122,6 +122,7 @@ class ModelServiceConfigForAgent(BaseModel):
     provider: str = Field(..., description="服务提供商")
     provider_display_name: str = Field(..., description="提供商显示名称")
     model_name: str = Field(..., description="模型名称")
+    is_default: bool = Field(False, description="是否为默认配置")
 
 
 class ModelServiceConfigStats(BaseModel):

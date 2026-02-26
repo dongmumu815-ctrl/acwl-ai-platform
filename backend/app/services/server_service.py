@@ -7,6 +7,8 @@
 
 import asyncio
 import logging
+import base64
+import json
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
@@ -16,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 
 from app.models.server import Server, GPUResource, ServerMetrics, ServerStatus
+from app.models.script_execution import ScriptExecutionRecord, ScriptExecutionDetail, ScriptExecutionStatus, ScriptDetailStatus
 from app.core.config import settings
 from app.core.exceptions import GPUError, NotFoundError, ACWLException
 
@@ -111,11 +114,36 @@ class ServerService:
                 
                 # Memory
                 try:
-                    stdin, stdout, stderr = ssh_client.exec_command("free -m | awk '/^Mem:/{print $2}'")
-                    mem = stdout.read().decode().strip()
-                    if mem.isdigit():
-                        mem_gb = round(int(mem) / 1024, 1)
-                        info["total_memory"] = f"{int(mem_gb)}GB" if mem_gb.is_integer() else f"{mem_gb}GB"
+                    # 使用 /proc/meminfo 获取更准确的内存大小 (KB)
+                    stdin, stdout, stderr = ssh_client.exec_command("grep MemTotal /proc/meminfo | awk '{print $2}'")
+                    mem_kb = stdout.read().decode().strip()
+                    if mem_kb and mem_kb.isdigit():
+                        mem_kb_val = int(mem_kb)
+                        if mem_kb_val >= 1024 * 1024:
+                            mem_gb = round(mem_kb_val / 1024 / 1024, 1)
+                            info["total_memory"] = f"{int(mem_gb)}GB" if mem_gb.is_integer() else f"{mem_gb}GB"
+                        else:
+                            info["total_memory"] = f"{round(mem_kb_val / 1024, 1)}MB"
+                except: pass
+
+                # Disk (Total Storage)
+                try:
+                    # 获取所有物理磁盘的总大小 (KB)
+                    # 排除 tmpfs, devtmpfs, overlay, iso9660, none, udev 等伪文件系统
+                    cmd = "df -P -k | grep -vE '^Filesystem|tmpfs|devtmpfs|overlay|iso9660|none|udev' | awk '{sum += $2} END {print sum}'"
+                    stdin, stdout, stderr = ssh_client.exec_command(cmd)
+                    disk_kb = stdout.read().decode().strip()
+                    if disk_kb and disk_kb.isdigit():
+                        disk_kb_val = int(disk_kb)
+                        if disk_kb_val >= 1024 * 1024:
+                            disk_tb = round(disk_kb_val / 1024 / 1024 / 1024, 2)
+                            if disk_tb >= 1.0:
+                                info["total_storage"] = f"{int(disk_tb)}TB" if disk_tb.is_integer() else f"{disk_tb}TB"
+                            else:
+                                disk_gb = round(disk_kb_val / 1024 / 1024, 1)
+                                info["total_storage"] = f"{int(disk_gb)}GB" if disk_gb.is_integer() else f"{disk_gb}GB"
+                        else:
+                            info["total_storage"] = f"{round(disk_kb_val / 1024, 1)}MB"
                 except: pass
                 
                 # OS
@@ -143,8 +171,102 @@ class ServerService:
                 result["success"] = True
                 result["data"]["gpu_list"] = gpu_list
                 
+            elif task_type == 'collect_metrics':
+                # 收集监控指标
+                metrics = {}
+                
+                # CPU使用率 (100 - idle)
+                try:
+                    # 使用 top 批处理模式
+                    cmd = "top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'"
+                    stdin, stdout, stderr = ssh_client.exec_command(cmd)
+                    cpu = stdout.read().decode().strip()
+                    if cpu:
+                        metrics["cpu_usage"] = round(float(cpu), 1)
+                    else:
+                        metrics["cpu_usage"] = 0
+                except:
+                    metrics["cpu_usage"] = 0
+                    
+                # 内存使用率 (使用 /proc/meminfo 更准确)
+                try:
+                    cmd = "awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{if(t>0) printf \"%.1f\", (t-a)/t*100; else print 0}' /proc/meminfo"
+                    stdin, stdout, stderr = ssh_client.exec_command(cmd)
+                    mem = stdout.read().decode().strip()
+                    if mem:
+                        metrics["memory_usage"] = round(float(mem), 1)
+                    else:
+                        metrics["memory_usage"] = 0
+                except:
+                    metrics["memory_usage"] = 0
+                    
+                # 磁盘使用率 (最大使用率)
+                try:
+                    # 优先获取所有物理磁盘(排除伪文件系统)的最大使用率
+                    cmd = "df -h | grep -vE '^Filesystem|tmpfs|devtmpfs|overlay|iso9660|none|udev' | awk '{print $5}' | sed 's/%//' | sort -nr | head -n1"
+                    stdin, stdout, stderr = ssh_client.exec_command(cmd)
+                    disk_max = stdout.read().decode().strip()
+                    
+                    if disk_max and disk_max.isdigit():
+                         metrics["disk_usage"] = round(float(disk_max), 1)
+                    else:
+                        metrics["disk_usage"] = 0
+                except:
+                    metrics["disk_usage"] = 0
+                    
+                # GPU 监控 (利用率和显存)
+                try:
+                    cmd = "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits"
+                    stdin, stdout, stderr = ssh_client.exec_command(cmd)
+                    gpu_stats = stdout.read().decode().strip()
+                    
+                    if gpu_stats:
+                        # 计算平均利用率和总显存使用
+                        total_util = 0
+                        total_mem_used = 0
+                        total_mem_total = 0
+                        count = 0
+                        
+                        for line in gpu_stats.splitlines():
+                            parts = [p.strip() for p in line.split(',')]
+                            if len(parts) >= 3:
+                                try:
+                                    total_util += float(parts[0])
+                                    total_mem_used += int(parts[1])
+                                    total_mem_total += int(parts[2])
+                                    count += 1
+                                except: pass
+                        
+                        if count > 0:
+                            metrics["gpu_metrics"] = {
+                                "usage": round(total_util / count, 1),
+                                "memory_used": total_mem_used,
+                                "memory_total": total_mem_total,
+                                "count": count
+                            }
+                        else:
+                            metrics["gpu_metrics"] = None
+                    else:
+                        metrics["gpu_metrics"] = None
+                except:
+                    metrics["gpu_metrics"] = None
+                
+                result["success"] = True
+                result["data"]["metrics"] = metrics
+
             elif task_type == 'restart':
-                ssh_client.exec_command('nohup sudo reboot > /dev/null 2>&1 &')
+                ssh_username = server_info.get("ssh_username")
+                ssh_password = server_info.get("ssh_password")
+                
+                if ssh_username == 'root':
+                    cmd = 'nohup reboot > /dev/null 2>&1 &'
+                elif ssh_password:
+                    safe_password = ssh_password.replace("'", "'\\''")
+                    cmd = f"nohup sh -c \"echo '{safe_password}' | sudo -S -p '' reboot\" > /dev/null 2>&1 &"
+                else:
+                    cmd = 'nohup sudo -n reboot > /dev/null 2>&1 &'
+                    
+                ssh_client.exec_command(cmd)
                 result["success"] = True
                 result["message"] = "重启命令已发送"
 
@@ -181,6 +303,63 @@ class ServerService:
                 result["success"] = True
                 result["message"] = "密码修改成功"
                 
+            elif task_type == 'execute_script':
+                script = server_info.get("script")
+                if not script:
+                    raise Exception("未提供脚本内容")
+                
+                # 使用 base64 编码脚本，避免特殊字符问题
+                encoded_script = base64.b64encode(script.encode('utf-8')).decode('utf-8')
+                
+                # 在远程创建并执行脚本
+                # 1. 解码并写入临时文件
+                # 2. 赋予执行权限
+                # 3. 执行
+                # 4. 删除临时文件
+                # 注意：这里使用 sudo 执行，需要确保用户有 sudo 权限
+                script_path = f"/tmp/script_{int(datetime.now().timestamp())}.sh"
+                
+                # 构造执行命令，根据用户类型和密码决定是否使用 sudo
+                ssh_username = server_info.get("ssh_username")
+                ssh_password = server_info.get("ssh_password")
+                
+                if ssh_username == 'root':
+                    exec_cmd = script_path
+                elif ssh_password:
+                    # 转义密码中的单引号
+                    safe_password = ssh_password.replace("'", "'\\''")
+                    # -S 从 stdin 读取密码，-p '' 隐藏提示符
+                    exec_cmd = f"echo '{safe_password}' | sudo -S -p '' {script_path}"
+                else:
+                    # 无密码尝试无交互 sudo
+                    exec_cmd = f"sudo -n {script_path}"
+                
+                cmd = f"echo '{encoded_script}' | base64 -d > {script_path} && " \
+                      f"chmod +x {script_path} && " \
+                      f"{exec_cmd}; " \
+                      f"ret=$?; rm -f {script_path}; exit $ret"
+                
+                # 实时获取输出
+                # get_pty=True 合并了 stdout 和 stderr，且更像交互式执行
+                stdin, stdout, stderr = ssh_client.exec_command(cmd, get_pty=True)
+                
+                # 读取输出
+                output = stdout.read().decode('utf-8', errors='replace')
+                # get_pty=True 时 stderr 通常为空
+                error = stderr.read().decode('utf-8', errors='replace')
+                exit_status = stdout.channel.recv_exit_status()
+                
+                result["data"]["output"] = output
+                result["data"]["error"] = error
+                result["data"]["exit_code"] = exit_status
+                
+                if exit_status == 0:
+                    result["success"] = True
+                    result["message"] = "脚本执行成功"
+                else:
+                    result["success"] = False
+                    result["message"] = f"脚本执行失败 (Exit {exit_status})"
+
         except Exception as e:
             result["success"] = False
             result["message"] = str(e)
@@ -208,7 +387,7 @@ class ServerService:
         
         # 获取 CUDA 版本
         stdin, stdout, stderr = ssh_client.exec_command(
-            "nvidia-smi | grep -oP 'CUDA Version:\s*\K[0-9.]+'"
+            r"nvidia-smi | grep -oP 'CUDA Version:\s*\K[0-9.]+'"
         )
         cuda_version = stdout.read().decode().strip() or None
         
@@ -260,10 +439,19 @@ class ServerService:
             # 使用 _ssh_task 执行连接测试和信息收集
             task_result = await self._run_sync(self._ssh_task, server_info, 'test_and_info')
             
+            # 同时收集一次监控指标
+            try:
+                metrics_result = await self._run_sync(self._ssh_task, server_info, 'collect_metrics')
+                if metrics_result["success"]:
+                    task_result["data"]["metrics"] = metrics_result["data"]["metrics"]
+            except Exception as e:
+                logger.warning(f"测试连接时收集监控指标失败: {e}")
+
             if task_result["success"]:
                 # 提取系统信息
                 sys_info = task_result["data"].get("sys_info", {})
                 gpu_list = task_result["data"].get("gpu_list", [])
+                metrics = task_result["data"].get("metrics", {})
                 
                 # 更新服务器信息
                 update_values = {
@@ -277,6 +465,8 @@ class ServerService:
                     update_values["total_cpu_cores"] = sys_info["total_cpu_cores"]
                 if "total_memory" in sys_info:
                     update_values["total_memory"] = sys_info["total_memory"]
+                if "total_storage" in sys_info:
+                    update_values["total_storage"] = sys_info["total_storage"]
                 
                 # 更新服务器记录
                 await self.db.execute(
@@ -306,7 +496,8 @@ class ServerService:
                     "data": {
                         **sys_info,
                         "gpu_count": len(gpu_list),
-                        "status": "online"
+                        "status": "online",
+                        "monitor": metrics  # 添加监控数据
                     }
                 }
             else:
@@ -371,6 +562,13 @@ class ServerService:
             metrics = task_result["data"].get("metrics", {})
             
             # 保存监控数据到数据库
+            # 序列化 GPU 监控数据
+            gpu_metrics_json = None
+            if metrics.get("gpu_metrics"):
+                try:
+                    gpu_metrics_json = json.dumps(metrics.get("gpu_metrics"))
+                except: pass
+
             server_metrics = ServerMetrics(
                 server_id=server_id,
                 cpu_usage=metrics.get("cpu_usage"),
@@ -378,7 +576,7 @@ class ServerService:
                 disk_usage=metrics.get("disk_usage"),
                 network_in=metrics.get("network_in"),
                 network_out=metrics.get("network_out"),
-                gpu_metrics=metrics.get("gpu_metrics"),
+                gpu_metrics=gpu_metrics_json,
                 timestamp=datetime.now()
             )
             
@@ -977,3 +1175,303 @@ class ServerService:
         except Exception as e:
             logger.error(f"重启服务器失败: {str(e)}")
             raise
+
+    async def batch_restart_servers(self, server_ids: List[int]) -> List[Dict[str, Any]]:
+        """
+        批量重启服务器
+        
+        Args:
+            server_ids: 服务器ID列表
+            
+        Returns:
+            操作结果列表
+        """
+        async def safe_restart(sid):
+            try:
+                # 复用单个重启逻辑
+                return await self.restart_server(sid)
+            except Exception as e:
+                return {
+                    "server_id": sid,
+                    "success": False,
+                    "message": f"重启失败: {str(e)}"
+                }
+
+        tasks = [safe_restart(sid) for sid in server_ids]
+        results = await asyncio.gather(*tasks)
+        return list(results)
+
+    async def batch_delete_servers(self, server_ids: List[int]) -> List[Dict[str, Any]]:
+        """
+        批量删除服务器
+        
+        Args:
+            server_ids: 服务器ID列表
+            
+        Returns:
+            操作结果列表
+        """
+        results = []
+        for server_id in server_ids:
+            try:
+                # 复用单个删除逻辑
+                await self.delete_server(server_id)
+                results.append({
+                    "server_id": server_id,
+                    "success": True,
+                    "message": "删除成功"
+                })
+            except Exception as e:
+                # 捕获 ValidationError 等异常
+                results.append({
+                    "server_id": server_id,
+                    "success": False,
+                    "message": str(e)
+                })
+        return results
+
+    async def create_script_execution_task(self, server_ids: List[int], script: str, title: str, user_id: int) -> int:
+        """
+        创建脚本执行任务记录
+        
+        Args:
+            server_ids: 服务器ID列表
+            script: 脚本内容
+            title: 任务标题
+            user_id: 执行用户ID
+            
+        Returns:
+            task_id: 任务记录ID
+        """
+        try:
+            # 1. 创建主记录
+            record = ScriptExecutionRecord(
+                title=title,
+                script_content=script,
+                executor_id=user_id,
+                status=ScriptExecutionStatus.pending,
+                total_servers=len(server_ids),
+                success_count=0,
+                fail_count=0
+            )
+            self.db.add(record)
+            await self.db.flush() # 获取 record.id
+            
+            # 2. 获取服务器信息并创建详情记录
+            query = select(Server).where(Server.id.in_(server_ids))
+            result = await self.db.execute(query)
+            servers = result.scalars().all()
+            
+            details = []
+            for server in servers:
+                detail = ScriptExecutionDetail(
+                    record_id=record.id,
+                    server_id=server.id,
+                    server_name=server.name,
+                    server_ip=server.ip_address,
+                    status=ScriptDetailStatus.pending
+                )
+                self.db.add(detail)
+                details.append(detail)
+                
+            await self.db.commit()
+            return record.id
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"创建脚本执行任务失败: {str(e)}")
+            raise
+
+    async def execute_script_background(self, record_id: int):
+        """
+        后台执行脚本任务
+        注意：此方法需要在独立的 DB Session 中运行，因为它通常在 BackgroundTask 中调用
+        
+        Args:
+            record_id: 任务记录ID
+        """
+        try:
+            # 重新查询记录和关联详情（确保 session 有效）
+            record_query = select(ScriptExecutionRecord).where(ScriptExecutionRecord.id == record_id)
+            result = await self.db.execute(record_query)
+            record = result.scalar_one_or_none()
+            
+            if not record:
+                logger.error(f"脚本执行任务 {record_id} 不存在")
+                return
+
+            # 获取所有详情记录
+            details_query = select(ScriptExecutionDetail).where(ScriptExecutionDetail.record_id == record_id)
+            result = await self.db.execute(details_query)
+            details = result.scalars().all()
+            
+            # 更新主状态为运行中
+            record.status = ScriptExecutionStatus.running
+            await self.db.commit()
+            
+            # 准备并发任务
+            tasks = []
+            server_map = {} # server_id -> detail
+            
+            # 获取服务器连接信息
+            server_ids = [d.server_id for d in details]
+            server_query = select(Server).where(Server.id.in_(server_ids))
+            result = await self.db.execute(server_query)
+            servers = {s.id: s for s in result.scalars().all()}
+            
+            for detail in details:
+                server = servers.get(detail.server_id)
+                if not server:
+                    detail.status = ScriptDetailStatus.failed
+                    detail.error_message = "服务器不存在或已删除"
+                    detail.end_time = datetime.now()
+                    continue
+                    
+                server_map[detail.server_id] = detail
+                
+                # 更新详情状态为运行中
+                detail.status = ScriptDetailStatus.running
+                detail.start_time = datetime.now()
+                
+                server_info = {
+                    "ip_address": server.ip_address,
+                    "ssh_port": server.ssh_port,
+                    "ssh_username": server.ssh_username,
+                    "ssh_password": server.ssh_password,
+                    "ssh_key_path": server.ssh_key_path,
+                    "script": record.script_content
+                }
+                
+                # 包装任务以携带 detail 信息
+                tasks.append(self._run_script_for_server(server_info, detail.id))
+
+            await self.db.commit() # 提交状态更新
+            
+            # 并发执行
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # 统计结果
+            success_count = 0
+            fail_count = 0
+            
+            # 重新获取最新的 details (因为 _run_script_for_server 是在独立事务或上下文中，这里直接更新状态)
+            # 注意：由于 _run_script_for_server 内部逻辑未完全实现持久化更新（它只是返回结果），
+            # 我们需要在这里处理结果并更新数据库。
+            # 为了避免长时间持有主事务，建议 _run_script_for_server 返回数据，在这里统一更新。
+            
+            # 修正：为了实时性，_run_script_for_server 内部不应操作 DB（避免并发 session 问题），
+            # 而是返回结果，由本函数统一更新。
+            
+            for res in results:
+                if isinstance(res, Exception):
+                    logger.error(f"任务执行异常: {res}")
+                    continue
+                    
+                detail_id = res["detail_id"]
+                # 查找对应的 detail 对象 (需要重新从 session 获取或者直接更新)
+                # 这里为了简单，直接使用 update 语句
+                
+                update_values = {
+                    "end_time": datetime.now(),
+                    "stdout": res.get("data", {}).get("output"),
+                    "stderr": res.get("data", {}).get("error"),
+                    "exit_code": res.get("data", {}).get("exit_code"),
+                }
+                
+                if res["success"]:
+                    update_values["status"] = ScriptDetailStatus.success
+                    success_count += 1
+                else:
+                    update_values["status"] = ScriptDetailStatus.failed
+                    update_values["error_message"] = res["message"]
+                    fail_count += 1
+                
+                await self.db.execute(
+                    update(ScriptExecutionDetail)
+                    .where(ScriptExecutionDetail.id == detail_id)
+                    .values(**update_values)
+                )
+
+            # 更新主记录状态
+            record.success_count = success_count
+            record.fail_count = fail_count
+            
+            if fail_count == 0:
+                record.status = ScriptExecutionStatus.completed
+            elif success_count == 0:
+                record.status = ScriptExecutionStatus.failed
+            else:
+                record.status = ScriptExecutionStatus.partial_failed
+                
+            await self.db.commit()
+            
+        except Exception as e:
+            logger.error(f"后台执行脚本任务失败: {str(e)}", exc_info=True)
+            # 尝试更新状态为失败
+            try:
+                await self.db.execute(
+                    update(ScriptExecutionRecord)
+                    .where(ScriptExecutionRecord.id == record_id)
+                    .values(status=ScriptExecutionStatus.failed)
+                )
+                await self.db.commit()
+            except:
+                pass
+
+    async def _run_script_for_server(self, server_info: Dict[str, Any], detail_id: int) -> Dict[str, Any]:
+        """辅助方法：执行单个服务器脚本并返回结果"""
+        try:
+            # 复用现有的 _ssh_task 逻辑
+            # 注意：_ssh_task 是同步的，需要用 _run_sync 包装
+            result = await self._run_sync(self._ssh_task, server_info, 'execute_script')
+            result["detail_id"] = detail_id
+            return result
+        except Exception as e:
+            return {
+                "detail_id": detail_id,
+                "success": False,
+                "message": str(e),
+                "data": {}
+            }
+
+    async def get_execution_record(self, record_id: int) -> Dict[str, Any]:
+        """获取执行记录详情"""
+        query = select(ScriptExecutionRecord).where(ScriptExecutionRecord.id == record_id)
+        result = await self.db.execute(query)
+        record = result.scalar_one_or_none()
+        
+        if not record:
+            raise NotFoundError("执行记录不存在")
+            
+        # 获取详情列表
+        details_query = select(ScriptExecutionDetail).where(ScriptExecutionDetail.record_id == record_id)
+        result = await self.db.execute(details_query)
+        details = result.scalars().all()
+        
+        return {
+            "id": record.id,
+            "title": record.title,
+            "script_content": record.script_content,
+            "status": record.status,
+            "created_at": record.created_at,
+            "total_servers": record.total_servers,
+            "success_count": record.success_count,
+            "fail_count": record.fail_count,
+            "details": [
+                {
+                    "id": d.id,
+                    "server_id": d.server_id,
+                    "server_name": d.server_name,
+                    "server_ip": d.server_ip,
+                    "status": d.status,
+                    "exit_code": d.exit_code,
+                    "stdout": d.stdout,
+                    "stderr": d.stderr,
+                    "error_message": d.error_message,
+                    "start_time": d.start_time,
+                    "end_time": d.end_time
+                }
+                for d in details
+            ]
+        }

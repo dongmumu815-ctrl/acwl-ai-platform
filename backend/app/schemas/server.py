@@ -250,6 +250,22 @@ class BatchTestConnectionRequest(BaseModel):
     ids: List[int] = Field(..., description="服务器ID列表")
 
 
+class BatchRestartRequest(BaseModel):
+    """批量重启请求模型"""
+    ids: List[int] = Field(..., description="服务器ID列表")
+
+
+class BatchDeleteRequest(BaseModel):
+    """批量删除服务器请求模型"""
+    ids: List[int] = Field(..., description="服务器ID列表")
+
+
+class BatchExecuteScriptRequest(BaseModel):
+    """批量执行脚本请求模型"""
+    ids: List[int] = Field(..., description="服务器ID列表")
+    script: str = Field(..., description="脚本内容")
+
+
 class BatchUpdatePasswordRequest(BaseModel):
     """批量更新密码请求模型"""
     ids: List[int] = Field(..., description="服务器ID列表")

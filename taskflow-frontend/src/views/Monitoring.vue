@@ -25,7 +25,7 @@
       </div>
     </div>
 
-    <div class="monitoring-content" v-loading="loading">
+    <div class="monitoring-content" v-loading="pageLoading">
       <!-- 集群节点状态 -->
       <el-row :gutter="20" class="cluster-section" style="margin-bottom: 20px;">
         <el-col :span="6">
@@ -414,6 +414,7 @@ const workflowStore = useWorkflowStore()
 const projectStore = useProjectStore()
 
 const loading = ref(false)
+const pageLoading = ref(false)
 const selectedProject = ref('')
 const timeRange = ref('24h')
 const executionChartType = ref('count')
@@ -448,9 +449,15 @@ let logTimer = null
 /**
  * 获取监控数据
  */
-const fetchMonitoringData = async () => {
+const fetchMonitoringData = async (showLoading = true) => {
   try {
-    loading.value = true
+    if (showLoading) {
+      loading.value = true
+      // 如果没有数据（初次加载），显示页面遮罩 loading
+      if (Object.keys(systemStats.value).length === 0) {
+        pageLoading.value = true
+      }
+    }
     
     // 获取系统统计
     systemStats.value = await workflowStore.getSystemStats({
@@ -488,10 +495,15 @@ const fetchMonitoringData = async () => {
     updateCharts()
     
   } catch (error) {
-    ElMessage.error('获取监控数据失败')
+    if (showLoading) {
+      ElMessage.error('获取监控数据失败')
+    }
     console.error('获取监控数据失败:', error)
   } finally {
-    loading.value = false
+    if (showLoading) {
+      loading.value = false
+      pageLoading.value = false
+    }
   }
 }
 
@@ -626,27 +638,52 @@ const updateStatusChart = async () => {
       },
       legend: {
         orient: 'vertical',
-        left: 'left'
+        left: '5%',
+        top: 'middle',
+        itemGap: 20,
+        textStyle: {
+          fontSize: 14
+        },
+        selectedMode: true // 显式开启图例选择模式
       },
       series: [
         {
           name: '执行状态',
           type: 'pie',
-          radius: '50%',
+          radius: ['40%', '70%'], // 调整为环形图，视觉效果更好
+          center: ['60%', '50%'], // 向右移动，避免遮挡图例
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 10,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
+          label: {
+            show: false,
+            position: 'center'
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: '20',
+              fontWeight: 'bold'
+            },
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          },
+          labelLine: {
+            show: false
+          },
           data: [
             { value: data.success || 0, name: '成功', itemStyle: { color: '#67C23A' } },
             { value: data.failed || 0, name: '失败', itemStyle: { color: '#F56C6C' } },
             { value: data.running || 0, name: '运行中', itemStyle: { color: '#409EFF' } },
             { value: data.pending || 0, name: '等待中', itemStyle: { color: '#E6A23C' } },
             { value: data.cancelled || 0, name: '已取消', itemStyle: { color: '#909399' } }
-          ],
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
-          }
+          ]
         }
       ]
     }
@@ -842,7 +879,7 @@ const formatTime = (timestamp) => {
  */
 const startAutoRefresh = () => {
   refreshTimer = setInterval(() => {
-    fetchMonitoringData()
+    fetchMonitoringData(false)
   }, 30000) // 30秒刷新一次
   
   if (autoRefreshLogs.value) {

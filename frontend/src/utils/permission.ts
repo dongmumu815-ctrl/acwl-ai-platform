@@ -302,7 +302,15 @@ export const PERMISSIONS = {
   TRAINING_READ: 'training:read',
   TRAINING_CREATE: 'training:create',
   TRAINING_UPDATE: 'training:update',
-  TRAINING_DELETE: 'training:delete'
+  TRAINING_DELETE: 'training:delete',
+
+  // 资源管理权限
+  RESOURCE_READ: 'resource:read',
+  RESOURCE_CREATE: 'resource:create',
+  RESOURCE_UPDATE: 'resource:update',
+  RESOURCE_DELETE: 'resource:delete',
+  
+  // 数据治理权限 removed
 } as const
 
 /**

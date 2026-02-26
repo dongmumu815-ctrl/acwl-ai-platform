@@ -597,16 +597,86 @@ async def create_executor_group(
     if existing_group:
         raise ValidationError(f"执行器分组名称 '{group_data.group_name}' 已存在")
     
+    # 提取 executor_ids 并不包含在 model_dump 中
+    dump_data = group_data.model_dump(exclude={"executor_ids"})
+    
     # 创建执行器分组
     executor_group = ExecutorGroup(
-        **group_data.model_dump(),
+        **dump_data,
         created_by=current_user.id
     )
+    
+    # 处理执行器节点关联
+    if group_data.executor_ids:
+        nodes_stmt = select(ExecutorNode).where(ExecutorNode.id.in_(group_data.executor_ids))
+        nodes_result = await db.execute(nodes_stmt)
+        nodes = nodes_result.scalars().all()
+        executor_group.executors = list(nodes)
+        
     db.add(executor_group)
     await db.commit()
     await db.refresh(executor_group)
     
     return executor_group
+
+
+@router.put("/executor-groups/{group_id}", response_model=ExecutorGroupSchema)
+async def update_executor_group(
+    group_id: int,
+    group_data: ExecutorGroupUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """更新执行器分组"""
+    stmt = select(ExecutorGroup).where(ExecutorGroup.id == group_id)
+    result = await db.execute(stmt)
+    executor_group = result.scalar_one_or_none()
+    
+    if not executor_group:
+        raise NotFoundError(f"执行器分组 {group_id} 不存在")
+        
+    # 处理基本字段更新
+    update_data = group_data.model_dump(exclude_unset=True, exclude={"executor_ids"})
+    for field, value in update_data.items():
+        setattr(executor_group, field, value)
+    
+    # 处理执行器节点关联更新
+    if group_data.executor_ids is not None:
+        # 加载现有关系（如果尚未加载）
+        # 注意：如果是 async session，访问 relationship 可能需要 explicit loading 或者 ensure loaded
+        # 这里直接赋值新列表，SQLAlchemy 会处理差异
+        nodes_stmt = select(ExecutorNode).where(ExecutorNode.id.in_(group_data.executor_ids))
+        nodes_result = await db.execute(nodes_stmt)
+        nodes = nodes_result.scalars().all()
+        executor_group.executors = list(nodes)
+        
+    await db.commit()
+    await db.refresh(executor_group)
+    return executor_group
+
+
+@router.delete("/executor-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_executor_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """删除执行器分组"""
+    stmt = select(ExecutorGroup).where(ExecutorGroup.id == group_id)
+    result = await db.execute(stmt)
+    executor_group = result.scalar_one_or_none()
+    
+    if not executor_group:
+        raise NotFoundError(f"执行器分组 {group_id} 不存在")
+        
+    # 检查该分组下是否有执行器节点
+    node_stmt = select(ExecutorNode).where(ExecutorNode.group_id == group_id).limit(1)
+    node_result = await db.execute(node_stmt)
+    if node_result.scalar_one_or_none():
+        raise ValidationError(f"无法删除分组 {group_id}，因为该分组下仍有执行器节点")
+
+    await db.delete(executor_group)
+    await db.commit()
 
 
 @router.get("/executor-groups/{group_id}/nodes", response_model=ExecutorNodeListResponse)

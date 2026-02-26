@@ -42,7 +42,13 @@ class ExecutorService:
         self.config = config
         self.node_id = config.get('node_id') or str(uuid.uuid4())
         self.node_name = config.get('node_name') or f'executor-{self.node_id[:8]}'
-        self.group_id = config.get('group_id', 'default')
+        # 支持多分组配置，优先使用 group_names，如果未配置则回退到 group_id
+        self.group_names = config.get('group_names', [])
+        if not self.group_names and config.get('group_id'):
+            self.group_names = [config.get('group_id')]
+        if not self.group_names:
+            self.group_names = ['default']
+            
         self.host_ip = config.get('host_ip') or self._get_local_ip()
         self.port = config.get('port', 8001)
         self.max_concurrent_tasks = config.get('max_concurrent_tasks', 5)
@@ -166,8 +172,25 @@ class ExecutorService:
             async for db in get_db():
                 service = ExecutorClusterService(db)
                 
-                # 获取或创建默认执行器分组
-                group_id = await self._get_or_create_default_group(service)
+                # 获取或创建所有配置的分组
+                group_ids = []
+                for name in self.group_names:
+                    try:
+                        gid = await self._get_or_create_group(service, name)
+                        group_ids.append(gid)
+                    except Exception as e:
+                        logger.error(f"处理分组 {name} 失败: {e}")
+                
+                if not group_ids:
+                    logger.warning("未能获取任何有效分组，将尝试使用默认分组")
+                    try:
+                        gid = await self._get_or_create_group(service, 'default')
+                        group_ids.append(gid)
+                    except:
+                        pass
+                
+                # 为了兼容旧代码，取第一个分组作为主分组
+                group_id = group_ids[0] if group_ids else 1
                 
                 # 1. 检查并清理相同IP和端口的旧节点（解决幽灵节点问题）
                 try:
@@ -217,6 +240,7 @@ class ExecutorService:
                         node_id=self.node_id,
                         node_name=self.node_name,
                         group_id=group_id,
+                        group_ids=group_ids,
                         host_ip=self.host_ip,
                         port=self.port,
                         status=ExecutorStatus.ONLINE,
@@ -240,30 +264,33 @@ class ExecutorService:
             logger.error(f"注册节点过程中发生未捕获异常: {e}")
             raise
     
-    async def _get_or_create_default_group(self, service: ExecutorClusterService) -> int:
+    async def _get_or_create_group(self, service: ExecutorClusterService, group_name: str) -> int:
         """
-        获取或创建默认执行器分组
+        获取或创建执行器分组
         
         Args:
             service: 执行器集群服务
+            group_name: 分组名称
             
         Returns:
             分组ID
         """
         try:
-            # 尝试获取默认分组
+            # 尝试获取分组
             from app.schemas.executor import ExecutorGroupQueryParams
-            params = ExecutorGroupQueryParams(group_name="default")
+            params = ExecutorGroupQueryParams(group_name=group_name)
             groups, total = await service.get_executor_groups(params)
             
-            if groups:
-                return groups[0].id
+            # 精确匹配名称
+            for group in groups:
+                if group.group_name == group_name:
+                    return group.id
             
-            # 如果不存在，创建默认分组
+            # 如果不存在，创建分组
             group_data = ExecutorGroupCreate(
-                group_name="default",
-                display_name="默认执行器分组",
-                description="系统默认的执行器分组",
+                group_name=group_name,
+                group_display_name=f"{group_name}分组",
+                group_description=f"自动创建的{group_name}执行器分组",
                 group_type="DEFAULT",
                 max_concurrent_tasks=50,
                 tags=[],
@@ -271,13 +298,15 @@ class ExecutorService:
             )
             
             group = await service.create_executor_group(group_data)
-            logger.info(f"创建默认执行器分组: {group.group_name}")
+            logger.info(f"创建执行器分组: {group.group_name}")
             return group.id
             
         except Exception as e:
-             logger.error(f"获取或创建默认分组失败: {e}")
-             # 返回一个默认值，假设ID为1的分组存在
-             return 1
+             logger.error(f"获取或创建分组 '{group_name}' 失败: {e}")
+             # 如果是 default 分组失败，返回 1
+             if group_name == 'default':
+                 return 1
+             raise
     
     async def _heartbeat_loop(self):
         """
@@ -634,6 +663,8 @@ def main():
         'node_id': args.node_id,
         'node_name': args.node_name,
         'group_id': args.group_id,
+        # 支持多分组配置，使用逗号分隔
+        'group_names': os.getenv('GROUP_NAMES', '').split(',') if os.getenv('GROUP_NAMES') else [],
         'host_ip': args.host_ip,
         'port': args.port,
         'max_concurrent_tasks': args.max_concurrent_tasks,

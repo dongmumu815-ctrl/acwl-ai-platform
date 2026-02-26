@@ -21,7 +21,9 @@ from app.schemas.agent import (
     AgentConversationCreate, AgentConversationUpdate, AgentConversationResponse, AgentConversationListResponse,
     AgentMessageCreate, AgentMessageResponse, AgentMessageListResponse,
     AgentChatRequest, AgentChatResponse, AgentStatsResponse,
-    AgentConfigValidationResponse
+    AgentConfigValidationResponse,
+    AgentToolGenerateRequest, AgentToolGenerateResponse,
+    AgentToolExecuteRequest, AgentToolExecuteResponse
 )
 from app.services.review_content_safety_agent_db import EnhancedContentSafetyAgentDB
 from app.schemas.common import SimpleResponseModel as ResponseModel
@@ -442,20 +444,11 @@ async def list_agent_tools(
 ):
     """
     获取Agent工具列表
-    
-    Args:
-        page: 页码
-        size: 每页数量
-        search: 搜索关键词
-        tool_type: 工具类型
-        is_enabled: 是否启用
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        工具列表和分页信息
     """
     try:
+        # 同步文件系统中的技能到数据库
+        await agent_skill_service.sync_skills_with_db(db)
+        
         query = select(AgentTool)
         
         # 应用过滤条件
@@ -495,7 +488,7 @@ async def list_agent_tools(
         total = total_result.scalar()
         
         offset = (page - 1) * size
-        query = query.offset(offset).limit(size)
+        query = query.offset(offset).limit(size).order_by(desc(AgentTool.created_at))
         result = await db.execute(query)
         tools = result.scalars().all()
         
@@ -514,6 +507,475 @@ async def list_agent_tools(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list agent tools: {str(e)}"
+        )
+
+
+from app.services.agent_skills import agent_skill_service
+
+@router.post("/tools/execute", response_model=AgentToolExecuteResponse)
+async def execute_agent_tool_task(
+    request: AgentToolExecuteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    执行Agent工具任务
+    """
+    try:
+        # 1. 确定模型配置
+        model_config = {}
+        if request.model_service_config_id:
+            query = select(ModelServiceConfig).where(ModelServiceConfig.id == request.model_service_config_id)
+            result = await db.execute(query)
+            config = result.scalar_one_or_none()
+            if not config:
+                raise HTTPException(status_code=404, detail="Model service config not found")
+            model_config = {
+                'model_name': config.model_name,
+                'api_key': config.api_key or "",
+                'provider': config.provider,
+                'base_url': config.api_endpoint or ""
+            }
+        else:
+            # 尝试使用第一个可用的配置，或者系统默认
+            query = select(ModelServiceConfig).where(ModelServiceConfig.is_active == True).limit(1)
+            result = await db.execute(query)
+            config = result.scalar_one_or_none()
+            if config:
+                model_config = {
+                    'model_name': config.model_name,
+                    'api_key': config.api_key or "",
+                    'provider': config.provider,
+                    'base_url': config.api_endpoint or ""
+                }
+            else:
+                 raise HTTPException(status_code=400, detail="No active model service config found. Please specify one.")
+
+        # 2. 调用 AgentSkillService
+        result = await agent_skill_service.execute_skill_task(
+            prompt=request.prompt,
+            model_config=model_config,
+            enabled_skills=request.skill_names
+        )
+        
+        return AgentToolExecuteResponse(
+            result=result
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        logger.error(f"Error executing tool task: {str(e)}\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to execute tool task: {str(e)}"
+        )
+
+
+@router.post("/tools/generate", response_model=AgentToolGenerateResponse)
+async def generate_agent_tool_code(
+    request: AgentToolGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    生成Agent工具代码
+    """
+    try:
+        # 1. 确定模型配置
+        model_config = {}
+        if request.model_service_config_id:
+            query = select(ModelServiceConfig).where(ModelServiceConfig.id == request.model_service_config_id)
+            result = await db.execute(query)
+            config = result.scalar_one_or_none()
+            if not config:
+                raise HTTPException(status_code=404, detail="Model service config not found")
+            model_config = {
+                'model_name': config.model_name,
+                'api_key': config.api_key or "",
+                'provider': config.provider,
+                'base_url': config.api_endpoint or ""
+            }
+        else:
+            # 尝试使用第一个可用的配置，或者系统默认
+            # 这里简单起见，如果没有指定，我们查找第一个启用的配置
+            query = select(ModelServiceConfig).where(ModelServiceConfig.is_active == True).limit(1)
+            result = await db.execute(query)
+            config = result.scalar_one_or_none()
+            if config:
+                model_config = {
+                    'model_name': config.model_name,
+                    'api_key': config.api_key or "",
+                    'provider': config.provider,
+                    'base_url': config.api_endpoint or ""
+                }
+            else:
+                 raise HTTPException(status_code=400, detail="No active model service config found. Please specify one.")
+
+        # 2. 调用 AgentSkillService
+        # 使用 execute_skill_task，只启用 agent_skill_generator
+        
+        # 尝试读取 skill-creator 的指南以增强 Prompt
+        skill_guide = ""
+        try:
+            # 假设 skill-creator 位于 system skills 目录下
+            from pathlib import Path
+            system_skills_path = Path(agent_skill_service.skill_adapter.system_skills_path)
+            skill_creator_md = system_skills_path / "skill-creator" / "SKILL.md"
+            
+            if skill_creator_md.exists():
+                skill_guide = skill_creator_md.read_text(encoding="utf-8")
+                # 截取一部分关键原则，避免 Prompt 过长
+                # 这里我们提取 "Core Principles" 和 "Anatomy of a Skill" 部分
+                # 或者简单地作为参考附录
+        except Exception as e:
+            logger.warning(f"Failed to load skill-creator guide: {e}")
+
+        # 构造 Prompt
+        prompt = f"""
+You are an expert in ModelScope Agent development and Skill creation.
+I need to generate a new Agent Skill based on the following requirements.
+
+Requirements: {request.requirements}
+
+"""
+
+        prompt_with_guide = prompt
+        if skill_guide:
+            prompt_with_guide += f"""
+Reference Guide (Best Practices for Skill Creation):
+---
+{skill_guide[:2000]}... (truncated)
+---
+
+Based on the guide above, please generate a high-quality skill structure.
+The skill MUST include a `SKILL.md` file following the guide's format.
+"""
+
+        prompt_with_guide += f"""
+Please follow these strict rules:
+1. DO NOT use LangChain or any other framework. Use `modelscope-agent` SDK for Python scripts.
+2. The output MUST be a valid JSON object where keys are filenames (e.g., "SKILL.md", "scripts/plugin.py") and values are the file content.
+3. Provide ONLY the JSON object in your final answer, wrapped in ```json ... ```.
+
+Structure the skill as:
+- `SKILL.md`: Metadata and instructions (Required)
+- `scripts/`: Directory for Python scripts (if needed)
+- `references/`: Directory for documentation (if needed)
+
+Example Output JSON Structure:
+{{
+  "SKILL.md": "---\\nname: my-skill\\ndescription: ...\\n---\\n\\n# My Skill\\n...",
+  "scripts/my_tool.py": "from modelscope_agent.tools import BaseTool, register_tool\\n\\n@register_tool('my_tool')\\nclass MyTool(BaseTool):\\n..."
+}}
+
+Now, generate the JSON.
+"""
+        
+        # 首次尝试：带指南
+        raw_result = await agent_skill_service.execute_skill_task(
+            prompt=prompt_with_guide,
+            model_config=model_config,
+            enabled_skills=[] # 不使用任何工具，强制直接生成
+        )
+
+        # 检查是否失败 (502, timeout, etc causing "Execution failed")
+        if "Execution failed" in raw_result or "status code: 502" in raw_result:
+            logger.warning("Generation with skill guide failed, retrying without guide...")
+            
+            # 降级重试：不带指南
+            simple_prompt = prompt + f"""
+Please follow these strict rules:
+1. DO NOT use LangChain or any other framework. Use `modelscope-agent` SDK for Python scripts.
+2. The output MUST be a valid JSON object where keys are filenames (e.g., "SKILL.md", "scripts/plugin.py") and values are the file content.
+3. Provide ONLY the JSON object in your final answer, wrapped in ```json ... ```.
+
+Structure the skill as:
+- `SKILL.md`: Metadata and instructions (Required)
+- `scripts/`: Directory for Python scripts (if needed)
+- `references/`: Directory for documentation (if needed)
+
+Example Output JSON Structure:
+{{
+  "SKILL.md": "---\\nname: my-skill\\ndescription: ...\\n---\\n\\n# My Skill\\n...",
+  "scripts/my_tool.py": "from modelscope_agent.tools import BaseTool, register_tool\\n\\n@register_tool('my_tool')\\nclass MyTool(BaseTool):\\n..."
+}}
+
+Now, generate the JSON.
+"""
+            raw_result = await agent_skill_service.execute_skill_task(
+                prompt=simple_prompt,
+                model_config=model_config,
+                enabled_skills=[]
+            )
+
+        
+        # 3. 解析结果
+        # 结果可能包含自然语言，也可能直接是JSON。
+        # 我们尝试寻找 JSON 块
+        import json
+        import re
+        
+        code_structure = {}
+        
+        # 尝试提取 ```json ... ``` (最常见)
+        json_match = re.search(r"```json\s*(.*?)\s*```", raw_result, re.DOTALL)
+        if json_match:
+            try:
+                code_structure = json.loads(json_match.group(1))
+            except Exception as e:
+                logger.warning(f"Failed to parse JSON block: {e}")
+        
+        # 尝试提取 ``` ... ``` (没有语言标识)
+        if not code_structure:
+             json_match = re.search(r"```\s*(\{.*?\})\s*```", raw_result, re.DOTALL)
+             if json_match:
+                try:
+                    code_structure = json.loads(json_match.group(1))
+                except Exception as e:
+                    logger.warning(f"Failed to parse generic code block as JSON: {e}")
+
+        # 如果没有找到代码块，尝试直接解析（如果整个返回就是JSON）
+        if not code_structure:
+            try:
+                # 尝试清理前后空白
+                cleaned_result = raw_result.strip()
+                code_structure = json.loads(cleaned_result)
+            except:
+                pass
+
+        # 尝试更宽泛的正则提取 (寻找最外层的 { ... })
+        if not code_structure:
+            try:
+                # 寻找第一个 { 和最后一个 }
+                start = raw_result.find('{')
+                end = raw_result.rfind('}')
+                if start != -1 and end != -1:
+                    json_str = raw_result[start:end+1]
+                    code_structure = json.loads(json_str)
+            except Exception as e:
+                logger.warning(f"Failed to extract JSON using broad search: {e}")
+            
+        # 如果还是空的，可能在 tool output 里，或者 Agent 没有正确返回 JSON。
+        
+        return AgentToolGenerateResponse(
+            code_structure=code_structure,
+            raw_response=raw_result
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        logger.error(f"Error generating tool code: {str(e)}\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate tool code: {str(e)}"
+        )
+
+
+@router.post("/tools/", response_model=AgentToolResponse)
+async def create_agent_tool(
+    tool_data: AgentToolCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    创建Agent工具
+    """
+    # 只有管理员可以创建工具
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin can create agent tools"
+        )
+        
+    try:
+        # 检查名称是否存在
+        query = select(AgentTool).where(AgentTool.name == tool_data.name)
+        result = await db.execute(query)
+        if result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tool with name {tool_data.name} already exists"
+            )
+            
+        new_tool = AgentTool(**tool_data.model_dump())
+        db.add(new_tool)
+        await db.commit()
+        await db.refresh(new_tool)
+        
+        return AgentToolResponse.model_validate(new_tool)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error creating agent tool: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create agent tool: {str(e)}"
+        )
+
+
+@router.get("/tools/{tool_id}", response_model=AgentToolResponse)
+async def get_agent_tool(
+    tool_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取单个Agent工具详情
+    """
+    try:
+        query = select(AgentTool).where(AgentTool.id == tool_id)
+        result = await db.execute(query)
+        tool = result.scalar_one_or_none()
+        
+        if not tool:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tool with id {tool_id} not found"
+            )
+            
+        # 总是尝试同步最新代码，确保 IDE 看到的是磁盘上的真实内容
+        try:
+            skill_info = agent_skill_service.skill_adapter.get_skill(tool.name)
+            if skill_info:
+                path = skill_info.get("path", "")
+                if path:
+                    # 读取最新文件内容
+                    code_content = agent_skill_service._read_skill_files(path)
+                    
+                    # 如果数据库中的代码与磁盘不一致，或者数据库为空，则更新
+                    # 注意：这里我们信任磁盘内容。如果用户在 UI 上做了修改但没保存，刷新页面会丢失修改（符合预期）
+                    if code_content != "{}" and tool.code != code_content:
+                        tool.code = code_content
+                        db.add(tool)
+                        await db.commit()
+                        await db.refresh(tool)
+                        logger.info(f"Auto-synced skill code for {tool.name} from disk")
+        except Exception as e:
+            logger.warning(f"Failed to auto-sync skill code for {tool.name}: {e}")
+            
+        return AgentToolResponse.model_validate(tool)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting agent tool: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get agent tool: {str(e)}"
+        )
+
+
+@router.put("/tools/{tool_id}", response_model=AgentToolResponse)
+async def update_agent_tool(
+    tool_id: int,
+    tool_data: AgentToolUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    更新Agent工具
+    """
+    # 只有管理员可以更新工具
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin can update agent tools"
+        )
+        
+    try:
+        query = select(AgentTool).where(AgentTool.id == tool_id)
+        result = await db.execute(query)
+        tool = result.scalar_one_or_none()
+        
+        if not tool:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tool with id {tool_id} not found"
+            )
+            
+        # 更新字段
+        update_data = tool_data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(tool, field, value)
+            
+        await db.commit()
+        await db.refresh(tool)
+        
+        return AgentToolResponse.model_validate(tool)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error updating agent tool: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update agent tool: {str(e)}"
+        )
+
+
+@router.delete("/tools/{tool_id}")
+async def delete_agent_tool(
+    tool_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    删除Agent工具
+    """
+    # 只有管理员可以删除工具
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin can delete agent tools"
+        )
+        
+    try:
+        query = select(AgentTool).where(AgentTool.id == tool_id)
+        result = await db.execute(query)
+        tool = result.scalar_one_or_none()
+        
+        if not tool:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tool with id {tool_id} not found"
+            )
+            
+        if tool.is_builtin:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete builtin tool"
+            )
+            
+        # 尝试删除文件系统中的技能文件
+        try:
+            # 只有 custom 类型的工具才可能在文件系统中
+            if tool.tool_type == 'custom':
+                if agent_skill_service.skill_adapter.delete_skill(tool.name):
+                    logger.info(f"Deleted skill files for {tool.name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete skill files for {tool.name}: {e}")
+            # 不阻断数据库删除，但记录日志
+            
+        await db.delete(tool)
+        await db.commit()
+        
+        return {"message": "Tool deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error deleting agent tool: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete agent tool: {str(e)}"
         )
 
 

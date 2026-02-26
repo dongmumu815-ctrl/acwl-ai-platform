@@ -9,7 +9,7 @@ import router from '@/router'
 const service: AxiosInstance = axios.create({
   // 开发环境使用代理，生产环境使用相对路径（因为前端部署在同一服务下）
   baseURL: import.meta.env.VITE_APP_BASE_API || '/api/v1',
-  timeout: 30000,
+  timeout: 120000, // 增加超时时间到120秒，适应生成式AI任务
   headers: {
     'Content-Type': 'application/json'
   }

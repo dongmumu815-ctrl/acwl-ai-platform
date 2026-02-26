@@ -8,19 +8,20 @@ import asyncio
 import logging
 from enum import Enum
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
-from app.core.database import get_db
+from app.core.database import get_db, get_db_context
 from app.models.server import Server, GPUResource, ServerMetrics, ServerStatus, ServerType
 from app.models.server_group import ServerGroup
 from app.models.user import User
 from app.schemas.server import (
     ServerCreate, ServerUpdate, ServerResponse, ServerListResponse,
     GPUResourceResponse, ServerMetricsResponse, ServerStatusResponse,
-    BatchTestConnectionRequest, BatchUpdatePasswordRequest
+    BatchTestConnectionRequest, BatchUpdatePasswordRequest,
+    BatchRestartRequest, BatchDeleteRequest, BatchExecuteScriptRequest
 )
 from app.schemas.common import PaginatedResponse, IDResponse
 from app.core.exceptions import NotFoundError, ValidationError
@@ -33,7 +34,7 @@ router = APIRouter()
 @router.get("/", response_model=PaginatedResponse, summary="获取服务器列表")
 async def get_servers(
     page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(20, ge=1, le=100, description="每页数量"),
+    size: int = Query(20, ge=1, le=1000, description="每页数量"),
     sort_by: str = Query("sort_order", description="排序字段: created_at, name, status, cpu, sort_order"),
     sort_order: str = Query("asc", description="排序顺序: asc, desc"),
     search: str = Query(None, description="搜索关键词"),
@@ -233,6 +234,91 @@ async def batch_update_server_password(
         return {"results": results}
     except Exception as e:
         return {"status": "error", "message": f"批量更新密码时发生错误: {str(e)}"}
+
+
+@router.post("/batch/restart", summary="批量重启服务器")
+async def batch_restart_server(
+    request: BatchRestartRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """批量重启服务器"""
+    try:
+        service = ServerService(db)
+        results = await service.batch_restart_servers(request.ids)
+        return {"results": results}
+    except Exception as e:
+        return {"status": "error", "message": f"批量重启时发生错误: {str(e)}"}
+
+
+@router.post("/batch/delete", summary="批量删除服务器")
+async def batch_delete_server(
+    request: BatchDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """批量删除服务器"""
+    try:
+        service = ServerService(db)
+        results = await service.batch_delete_servers(request.ids)
+        return {"results": results}
+    except Exception as e:
+        return {"status": "error", "message": f"批量删除时发生错误: {str(e)}"}
+
+
+@router.post("/batch/execute-script", summary="批量执行脚本")
+async def batch_execute_script(
+    request: BatchExecuteScriptRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    批量执行脚本（异步）
+    
+    1. 创建执行记录和详情
+    2. 启动后台任务执行脚本
+    3. 立即返回任务ID
+    """
+    try:
+        service = ServerService(db)
+        # 创建任务记录
+        title = request.script.split('\n')[0][:50] if request.script else "未命名脚本"
+        task_id = await service.create_script_execution_task(
+            server_ids=request.ids,
+            script=request.script,
+            title=title,
+            user_id=current_user.id
+        )
+        
+        # 启动后台任务
+        # 注意：这里我们传递一个特殊的包装函数，它会自己获取新的 DB session
+        background_tasks.add_task(run_script_task, task_id)
+        
+        return {"task_id": task_id, "message": "脚本执行任务已提交"}
+    except Exception as e:
+        return {"status": "error", "message": f"批量执行脚本提交失败: {str(e)}"}
+
+async def run_script_task(task_id: int):
+    """后台任务包装函数"""
+    async with get_db_context() as db:
+        service = ServerService(db)
+        await service.execute_script_background(task_id)
+
+@router.get("/batch/execute-script/{task_id}", summary="获取脚本执行任务详情")
+async def get_script_execution_status(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取脚本执行任务详情（用于轮询进度）"""
+    try:
+        service = ServerService(db)
+        return await service.get_execution_record(task_id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取任务详情失败: {str(e)}")
 
 
 @router.post("/{server_id}/restart", summary="重启服务器")
@@ -441,7 +527,8 @@ async def test_server_connection(
                     "total_cpu_cores": server.total_cpu_cores,
                     "total_memory": server.total_memory,
                     "gpu_count": gpu_count,
-                    "status": server.status
+                    "status": server.status,
+                    "monitor": connection_result["data"].get("monitor", {})
                 }
             }
         else:
