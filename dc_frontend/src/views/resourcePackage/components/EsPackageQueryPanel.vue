@@ -377,6 +377,11 @@
                                 )
                               "
                             ></span>
+                            <template v-if="col === 'snippet' && row?.pdf_url && row?.pdf_url !== 'null' && row?.pageNumber">
+                              <el-link type="primary" :underline="true" style="margin-left: 6px" @click.stop="openPdfAtHit(row)">
+                                查看
+                              </el-link>
+                            </template>
                           </template>
                         </el-table-column>
                       </el-table>
@@ -460,6 +465,16 @@
                                     )
                                   "
                                 ></span>
+                                <template v-if="f === 'snippet' && row?.pdf_url && row?.pdf_url !== 'null' && row?.pageNumber">
+                                  <el-link
+                                    type="primary"
+                                    :underline="true"
+                                    style="margin-left: 6px"
+                                    @click.stop="openPdfAtHit(row)"
+                                  >
+                                    查看 
+                                  </el-link>
+                                </template>
                                 <template v-if="f === 'publication_category'">
                                   <el-icon v-if="String(row[f]).toUpperCase() === 'BOOK'" style="margin-left: 6px; color: #6b7fd7;">
                                     <Reading />
@@ -1373,6 +1388,51 @@ const openPdf = () => {
   }
 };
 
+function buildPdfOpenUrl(url: string, page?: number | null, keyword?: string | null): string {
+  try {
+    const u = String(url);
+    const base = u.split('#')[0];
+    const hash = u.includes('#') ? u.substring(u.indexOf('#') + 1) : '';
+    const params = new URLSearchParams(hash);
+    if (page && Number.isFinite(Number(page))) {
+      params.set('page', String(page));
+    }
+    if (keyword && String(keyword).trim()) {
+      params.set('search', String(keyword).trim());
+      params.set('q', String(keyword).trim());
+    }
+    const newHash = params.toString();
+    return newHash ? `${base}#${newHash}` : `${base}`;
+  } catch {
+    if (page && Number.isFinite(Number(page))) {
+      return `${url}#page=${page}`;
+    }
+    return url;
+  }
+}
+
+const openPdfAtHit = (row: Record<string, any>) => {
+  try {
+    const url = row?.['pdf_url'];
+    const page = row?.['pageNumber'];
+    let keyword: string | null = null;
+    if (Array.isArray(executedSearchValue.value)) {
+      keyword = executedSearchValue.value.find((k) => typeof k === 'string' && k.trim()) || null;
+    } else {
+      const k = executedSearchValue.value?.trim();
+      keyword = k ? k : null;
+    }
+    if (!url || url === 'null') {
+      ElMessage.warning('未找到有效的 PDF 链接');
+      return;
+    }
+    const finalUrl = buildPdfOpenUrl(String(url), page ?? null, keyword);
+    window.open(finalUrl, '_blank');
+  } catch (e) {
+    console.error(e);
+    ElMessage.error('打开PDF失败');
+  }
+};
 // 分页
 const currentPage = ref(1);
 const pageSize = ref(100);
