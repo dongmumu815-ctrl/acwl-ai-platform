@@ -40,6 +40,15 @@ const routes = [
            requiresAuth: true
          }
        },
+       {
+         path: 'workflows/instances',
+         name: 'WorkflowInstanceList',
+         component: () => import('@/views/workflows/WorkflowInstanceList.vue'),
+         meta: {
+           title: '工作流实例',
+           requiresAuth: true
+         }
+       },
         {
           path: 'workflows/:id',
           name: 'WorkflowDetail',
@@ -73,6 +82,15 @@ const routes = [
           component: () => import('@/views/workflows/WorkflowExecutionDetail.vue'),
           meta: {
             title: '执行详情',
+            requiresAuth: true
+          }
+        },
+        {
+          path: 'tasks/instances',
+          name: 'TaskInstanceList',
+          component: () => import('@/views/tasks/TaskInstanceList.vue'),
+          meta: {
+            title: '任务实例',
             requiresAuth: true
           }
         },
@@ -147,6 +165,35 @@ const routes = [
             title: '编辑项目',
             requiresAuth: true
           }
+        },
+        
+        {
+          path: 'resources',
+          redirect: '/resources/executor-groups',
+          meta: {
+            title: '资源管理',
+            requiresAuth: true
+          },
+          children: [
+            {
+              path: 'executor-groups',
+              name: 'ExecutorGroupList',
+              component: () => import('@/views/resources/ExecutorGroupList.vue'),
+              meta: {
+                title: '执行器分组',
+                requiresAuth: true
+              }
+            },
+            {
+              path: 'environments',
+              name: 'EnvironmentList',
+              component: () => import('@/views/resources/EnvironmentList.vue'),
+              meta: {
+                title: '环境管理',
+                requiresAuth: true
+              }
+            }
+          ]
         },
 
         {

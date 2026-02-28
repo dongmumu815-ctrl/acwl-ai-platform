@@ -330,12 +330,12 @@ class SchedulerClusterService:
         
         # 统计各状态节点数量
         total_nodes = len(nodes)
-        running_nodes = sum(1 for node in nodes if node.status == "running")
+        running_nodes = sum(1 for node in nodes if node.status == "active")
         offline_nodes = sum(1 for node in nodes if node.status == "offline")
         error_nodes = sum(1 for node in nodes if node.status == "error")
         
         # 查找Leader节点
-        leader_node = next((node for node in nodes if node.role == "leader"), None)
+        leader_node = next((node for node in nodes if node.role == "leader" and node.status in ["active", "running", "online"]), None)
         
         # 计算集群健康度
         health_score = (running_nodes / total_nodes * 100) if total_nodes > 0 else 0
@@ -470,7 +470,7 @@ class SchedulerClusterService:
             select(SchedulerNode)
             .where(
                 and_(
-                    SchedulerNode.status.in_(["running", "standby"]),
+                    SchedulerNode.status.in_(["active", "standby", "online", "running"]),
                     SchedulerNode.role == "follower"
                 )
             )

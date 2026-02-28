@@ -157,6 +157,31 @@
                 </el-button>
               </el-tooltip>
               
+              <el-tooltip 
+                :content="row.workflow_status === 'active' ? '停用' : '发布'" 
+                placement="top"
+              >
+                <el-button
+                  :type="row.workflow_status === 'active' ? 'warning' : 'success'"
+                  link
+                  size="small"
+                  @click="handleStatusChange(row)"
+                >
+                  <el-icon><SwitchButton /></el-icon>
+                </el-button>
+              </el-tooltip>
+
+              <el-tooltip content="调度管理" placement="top">
+                <el-button
+                  type="info"
+                  link
+                  size="small"
+                  @click="handleSchedule(row)"
+                >
+                  <el-icon><Timer /></el-icon>
+                </el-button>
+              </el-tooltip>
+
               <el-tooltip content="执行" placement="top">
                 <el-button
                   type="success"
@@ -205,6 +230,14 @@
             <el-icon><VideoPlay /></el-icon>
             批量执行
           </el-button>
+          <el-button type="primary" @click="handleBatchStatusChange('active')">
+            <el-icon><SwitchButton /></el-icon>
+            批量发布
+          </el-button>
+          <el-button type="warning" @click="handleBatchStatusChange('inactive')">
+            <el-icon><SwitchButton /></el-icon>
+            批量停用
+          </el-button>
           <el-button type="danger" @click="handleBatchDelete">
             <el-icon><Delete /></el-icon>
             批量删除
@@ -225,6 +258,56 @@
         />
       </div>
     </el-card>
+
+    <!-- 调度管理抽屉 -->
+    <el-drawer
+      v-model="scheduleDrawerVisible"
+      title="调度管理"
+      size="50%"
+      destroy-on-close
+    >
+      <div class="schedule-header" style="margin-bottom: 20px;">
+        <el-button type="primary" @click="handleCreateSchedule">
+          <el-icon><Plus /></el-icon> 创建调度
+        </el-button>
+      </div>
+      
+      <el-table :data="schedules" v-loading="schedulesLoading" style="width: 100%">
+        <el-table-column prop="schedule_name" label="名称" />
+        <el-table-column prop="schedule_type" label="类型">
+          <template #default="{ row }">
+            <el-tag size="small">{{ row.schedule_type }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="详情">
+          <template #default="{ row }">
+            <span v-if="row.schedule_type === 'cron'">{{ row.cron_expression }}</span>
+            <span v-else-if="row.schedule_type === 'interval'">每 {{ row.interval_seconds }} 秒</span>
+            <span v-else>--</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="is_enabled" label="状态">
+          <template #default="{ row }">
+            <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
+              {{ row.is_enabled ? '启用' : '禁用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="handleEditSchedule(row)">编辑</el-button>
+            <el-button link type="danger" size="small" @click="handleDeleteSchedule(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-drawer>
+
+    <WorkflowScheduleDialog
+      v-model:visible="scheduleDialogVisible"
+      :workflow-id="currentWorkflow?.id"
+      :schedule-data="currentSchedule"
+      @success="loadSchedules"
+    />
   </div>
 </template>
 
@@ -237,8 +320,9 @@ import { formatDistanceToNow, format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import {
   Plus, Search, Refresh, View, Edit, VideoPlay, 
-  CopyDocument, Delete
+  CopyDocument, Delete, Timer, SwitchButton
 } from '@element-plus/icons-vue'
+import WorkflowScheduleDialog from './components/WorkflowScheduleDialog.vue'
 
 /**
  * 工作流列表页面组件
@@ -258,6 +342,14 @@ const projects = ref([])
 
 // 选中的工作流
 const selectedWorkflows = ref([])
+
+// 调度相关状态
+const scheduleDrawerVisible = ref(false)
+const scheduleDialogVisible = ref(false)
+const schedules = ref([])
+const schedulesLoading = ref(false)
+const currentWorkflow = ref(null)
+const currentSchedule = ref(null)
 
 // 搜索表单
 const searchForm = reactive({
@@ -424,6 +516,37 @@ const handleEdit = (workflow) => {
 }
 
 /**
+ * 切换工作流状态
+ */
+const handleStatusChange = async (workflow) => {
+  const isToActive = workflow.workflow_status !== 'active'
+  const actionText = isToActive ? '发布' : '停用'
+  const newStatus = isToActive ? 'active' : 'inactive'
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要${actionText}工作流 "${workflow.name}" 吗？`,
+      `确认${actionText}`,
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: isToActive ? 'success' : 'warning'
+      }
+    )
+    
+    await workflowStore.updateWorkflow(workflow.id, { workflow_status: newStatus })
+    ElMessage.success(`工作流${actionText}成功`)
+    // 不需要重新加载整个列表，因为 store 里的 updateWorkflow 已经更新了本地状态
+    // 但为了确保万无一失，或者如果有其他副作用，也可以刷新
+    // loadWorkflowList() 
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || `${actionText}工作流失败`)
+    }
+  }
+}
+
+/**
  * 执行工作流
  */
 const handleExecute = async (workflow) => {
@@ -443,7 +566,8 @@ const handleExecute = async (workflow) => {
     loadWorkflowList()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error.message || '执行工作流失败')
+      // 移除这里的 ElMessage.error，因为 request.js 拦截器中已经统一处理了错误显示
+      // ElMessage.error(error.message || '执行工作流失败')
     }
   }
 }
@@ -513,6 +637,33 @@ const handleBatchExecute = async () => {
 }
 
 /**
+ * 批量更新状态
+ */
+const handleBatchStatusChange = async (status) => {
+  const actionText = status === 'active' ? '发布' : '停用'
+  try {
+    await ElMessageBox.confirm(
+      `确定要${actionText}选中的 ${selectedWorkflows.value.length} 个工作流吗？`,
+      `确认批量${actionText}`,
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const ids = selectedWorkflows.value.map(item => item.id)
+    await workflowStore.batchUpdateStatusWorkflows(ids, status)
+    ElMessage.success(`批量${actionText}成功`)
+    loadWorkflowList()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || `批量${actionText}失败`)
+    }
+  }
+}
+
+/**
  * 批量删除
  */
 const handleBatchDelete = async () => {
@@ -534,6 +685,72 @@ const handleBatchDelete = async () => {
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error(error.message || '批量删除失败')
+    }
+  }
+}
+
+/**
+ * 打开调度管理
+ */
+const handleSchedule = (workflow) => {
+  currentWorkflow.value = workflow
+  scheduleDrawerVisible.value = true
+  loadSchedules()
+}
+
+/**
+ * 加载调度列表
+ */
+const loadSchedules = async () => {
+  if (!currentWorkflow.value) return
+  try {
+    schedulesLoading.value = true
+    const response = await workflowStore.getWorkflowSchedules(currentWorkflow.value.id)
+    schedules.value = response || []
+  } catch (error) {
+    ElMessage.error('加载调度列表失败')
+  } finally {
+    schedulesLoading.value = false
+  }
+}
+
+/**
+ * 创建调度
+ */
+const handleCreateSchedule = () => {
+  currentSchedule.value = null
+  scheduleDialogVisible.value = true
+}
+
+/**
+ * 编辑调度
+ */
+const handleEditSchedule = (schedule) => {
+  currentSchedule.value = schedule
+  scheduleDialogVisible.value = true
+}
+
+/**
+ * 删除调度
+ */
+const handleDeleteSchedule = async (schedule) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除调度 "${schedule.schedule_name}" 吗？`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await workflowStore.deleteWorkflowSchedule(currentWorkflow.value.id, schedule.id)
+    ElMessage.success('调度删除成功')
+    loadSchedules()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除调度失败')
     }
   }
 }

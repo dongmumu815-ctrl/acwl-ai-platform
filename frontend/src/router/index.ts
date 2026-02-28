@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { PERMISSIONS, ROLES } from '@/utils/permission'
 
@@ -293,6 +293,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
       }
     ]
   },
+  // Governance routes removed
   {
     path: '/agents',
     component: Layout,
@@ -341,6 +342,42 @@ export const asyncRoutes: RouteRecordRaw[] = [
           permission: PERMISSIONS.AGENT_READ,
           noPermissionBehavior: 'hide'
         }
+      },
+      {
+        path: 'skills',
+        name: 'AgentSkills',
+        component: () => import('@/views/agent-skills/index.vue'),
+        meta: {
+          title: '技能管理',
+          icon: 'Tools',
+          requiresAuth: true,
+          permission: PERMISSIONS.AGENT_READ,
+          noPermissionBehavior: 'hide'
+        }
+      },
+      {
+        path: 'skills/edit/:id?',
+        name: 'AgentSkillEdit',
+        component: () => import('@/views/agent-skills/edit.vue'),
+        meta: {
+          title: '编辑技能',
+          hidden: true,
+          requiresAuth: true,
+          permission: PERMISSIONS.AGENT_UPDATE,
+          noPermissionBehavior: 'hide'
+        }
+      },
+      {
+        path: 'skills/test-runner',
+        name: 'AgentSkillTestRunner',
+        component: () => import('@/views/agent-skills/test-runner.vue'),
+        meta: {
+          title: '技能测试',
+          hidden: true,
+          requiresAuth: true,
+          permission: PERMISSIONS.AGENT_READ,
+          noPermissionBehavior: 'hide'
+        }
       }
     ]
   },
@@ -377,6 +414,56 @@ export const asyncRoutes: RouteRecordRaw[] = [
           icon: 'Plus',
           requiresAuth: true,
           permission: PERMISSIONS.TRAINING_CREATE,
+          noPermissionBehavior: 'hide'
+        }
+      }
+    ]
+  },
+  {
+    path: '/applications',
+    component: Layout,
+    redirect: '/applications/market',
+    meta: {
+      title: '应用管理',
+      icon: 'App',
+      requiresAuth: true,
+      permission: PERMISSIONS.SYSTEM_MONITOR, // TODO: Add specific permission
+      noPermissionBehavior: 'hide'
+    },
+    children: [
+      {
+        path: 'market',
+        name: 'AppMarket',
+        component: () => import('@/views/applications/market/index.vue'),
+        meta: {
+          title: '应用市场',
+          icon: 'Shop',
+          requiresAuth: true,
+          permission: PERMISSIONS.SYSTEM_MONITOR,
+          noPermissionBehavior: 'hide'
+        }
+      },
+      {
+        path: 'instances',
+        name: 'AppInstances',
+        component: () => import('@/views/applications/instances/index.vue'),
+        meta: {
+          title: '已安装应用',
+          icon: 'Box',
+          requiresAuth: true,
+          permission: PERMISSIONS.SYSTEM_MONITOR,
+          noPermissionBehavior: 'hide'
+        }
+      },
+      {
+        path: 'harbor',
+        name: 'HarborConfig',
+        component: () => import('@/views/applications/harbor/index.vue'),
+        meta: {
+          title: 'Harbor配置',
+          icon: 'Setting',
+          requiresAuth: true,
+          permission: PERMISSIONS.SYSTEM_MONITOR,
           noPermissionBehavior: 'hide'
         }
       }

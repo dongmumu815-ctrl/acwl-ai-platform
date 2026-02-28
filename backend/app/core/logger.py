@@ -37,9 +37,9 @@ def setup_logger(
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper()))
     
-    # 避免重复添加处理器
+    # 清除现有的处理器，确保不重复添加
     if logger.handlers:
-        return logger
+        logger.handlers.clear()
     
     # 创建格式化器
     formatter = logging.Formatter(format_string)
@@ -49,6 +49,9 @@ def setup_logger(
     console_handler.setLevel(getattr(logging, level.upper()))
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
+    
+    # 确保立即输出
+    console_handler.flush = sys.stdout.flush
     
     # 文件处理器（如果指定了日志文件）
     if log_file:

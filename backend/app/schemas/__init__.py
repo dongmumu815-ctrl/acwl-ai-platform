@@ -150,7 +150,6 @@ __all__ = [
     "TaskInstanceResponse",
     "TaskInstanceListResponse",
     "TaskExecutionBase",
-    "TaskExecutionCreate",
     "TaskExecutionUpdate",
     "TaskExecutionResponse",
     "TaskExecutionListResponse",

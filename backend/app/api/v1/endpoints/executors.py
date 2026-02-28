@@ -8,6 +8,7 @@ import uuid
 from ....core.database import get_db
 from ....models.executor import ExecutorNode, ExecutorGroup
 from ....models.task import TaskInstance
+from ....services.executor_cluster import get_executor_cluster_service
 from ....schemas.executor import (
     ExecutorNodeCreate, ExecutorNodeUpdate, ExecutorNode as ExecutorNodeSchema,
     ExecutorNodeQueryParams, ExecutorNodeListResponse, ExecutorNodeHeartbeat,
@@ -84,51 +85,8 @@ async def register_executor_node(
     current_user: User = Depends(get_current_user)
 ):
     """注册执行器节点"""
-    # 检查执行器分组是否存在
-    group = db.query(ExecutorGroup).filter(ExecutorGroup.id == node_data.group_id).first()
-    if not group:
-        raise NotFoundError(f"执行器分组 {node_data.group_id} 不存在")
-    
-    # 检查节点是否已存在（基于host_ip和port）
-    existing_node = db.query(ExecutorNode).filter(
-        and_(
-            ExecutorNode.host_ip == node_data.node_host,
-            ExecutorNode.port == node_data.node_port
-        )
-    ).first()
-    
-    if existing_node:
-        raise ValidationError(f"执行器节点 {node_data.node_host}:{node_data.node_port} 已存在")
-    
-    # 生成唯一的节点ID
-    node_id = f"executor-{uuid.uuid4().hex[:8]}"
-    
-    # 创建执行器节点
-    db_node = ExecutorNode(
-        node_id=node_id,
-        node_name=node_data.node_name,
-        group_id=node_data.group_id,
-        host_ip=node_data.node_host,
-        port=node_data.node_port,
-        status=ExecutorNodeStatus.ONLINE,
-        version="1.0.0",  # 默认版本
-        capabilities=node_data.config or {},
-        resource_info={
-            "cpu_cores": node_data.cpu_cores,
-            "memory_gb": node_data.memory_gb,
-            "disk_gb": node_data.disk_gb
-        },
-        current_load=0,
-        max_concurrent_tasks=node_data.max_concurrent_tasks,
-        last_heartbeat=datetime.utcnow(),
-        node_metadata=node_data.metadata or {}
-    )
-    
-    db.add(db_node)
-    db.commit()
-    db.refresh(db_node)
-    
-    return db_node
+    service = await get_executor_cluster_service(db)
+    return await service.register_executor_node(node_data)
 
 
 @router.get("/nodes/{node_id}", response_model=ExecutorNodeSchema)
@@ -138,11 +96,8 @@ async def get_executor_node(
     current_user: User = Depends(get_current_user)
 ):
     """获取执行器节点详情"""
-    node = db.query(ExecutorNode).filter(ExecutorNode.node_id == node_id).first()
-    if not node:
-        raise NotFoundError(f"执行器节点 {node_id} 不存在")
-    
-    return node
+    service = await get_executor_cluster_service(db)
+    return await service.get_executor_node(node_id)
 
 
 @router.put("/nodes/{node_id}", response_model=ExecutorNodeSchema)
@@ -153,41 +108,8 @@ async def update_executor_node(
     current_user: User = Depends(get_current_user)
 ):
     """更新执行器节点信息"""
-    node = db.query(ExecutorNode).filter(ExecutorNode.node_id == node_id).first()
-    if not node:
-        raise NotFoundError(f"执行器节点 {node_id} 不存在")
-    
-    # 更新字段
-    update_data = node_data.model_dump(exclude_unset=True)
-    
-    # 处理资源信息更新
-    if any(key in update_data for key in ["cpu_cores", "memory_gb", "disk_gb"]):
-        resource_info = node.resource_info or {}
-        if "cpu_cores" in update_data:
-            resource_info["cpu_cores"] = update_data.pop("cpu_cores")
-        if "memory_gb" in update_data:
-            resource_info["memory_gb"] = update_data.pop("memory_gb")
-        if "disk_gb" in update_data:
-            resource_info["disk_gb"] = update_data.pop("disk_gb")
-        update_data["resource_info"] = resource_info
-    
-    # 处理配置信息更新
-    if "config" in update_data:
-        update_data["capabilities"] = update_data.pop("config")
-    
-    # 处理元数据更新
-    if "metadata" in update_data:
-        update_data["node_metadata"] = update_data.pop("metadata")
-    
-    # 应用更新
-    for field, value in update_data.items():
-        if hasattr(node, field):
-            setattr(node, field, value)
-    
-    db.commit()
-    db.refresh(node)
-    
-    return node
+    service = await get_executor_cluster_service(db)
+    return await service.update_executor_node(node_id, node_data)
 
 
 @router.delete("/nodes/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -198,24 +120,31 @@ async def unregister_executor_node(
     current_user: User = Depends(get_current_user)
 ):
     """注销执行器节点"""
-    node = db.query(ExecutorNode).filter(ExecutorNode.node_id == node_id).first()
-    if not node:
-        raise NotFoundError(f"执行器节点 {node_id} 不存在")
+    service = await get_executor_cluster_service(db)
+    # 注意：service 中没有 force 参数的处理，这里先简单调用
+    # 实际应该在 service 中添加 force 参数支持
+    # 目前 service.unregister_executor_node 没有检查任务状态，
+    # 我们可以先在 API 层检查，或者接受 service 的行为
     
-    # 检查是否有运行中的任务
+    # 为了保持 API 行为一致，我们这里还是先检查任务
     if not force:
-        running_tasks = db.query(TaskInstance).filter(
-            and_(
-                TaskInstance.assigned_executor_node == node_id,
-                TaskInstance.status.in_([TaskStatus.RUNNING, TaskStatus.QUEUED])
+        # 使用 service 获取节点
+        node = await service.get_executor_node(node_id)
+        
+        # 检查是否有运行中的任务 (这里需要手动查询，或者给 service 添加 check 方法)
+        running_tasks = await db.scalar(
+            select(func.count(TaskInstance.id)).where(
+                and_(
+                    TaskInstance.assigned_executor_node == node_id,
+                    TaskInstance.status.in_([TaskStatus.RUNNING, TaskStatus.QUEUED])
+                )
             )
-        ).count()
+        )
         
         if running_tasks > 0:
             raise ValidationError(f"节点 {node_id} 还有 {running_tasks} 个运行中的任务，请先停止任务或使用强制删除")
-    
-    db.delete(node)
-    db.commit()
+            
+    await service.unregister_executor_node(node_id)
 
 
 # ============================================
@@ -229,42 +158,8 @@ async def executor_heartbeat(
     db: AsyncSession = Depends(get_db)
 ):
     """执行器节点心跳接口"""
-    node = db.query(ExecutorNode).filter(ExecutorNode.node_id == node_id).first()
-    if not node:
-        raise NotFoundError(f"执行器节点 {node_id} 不存在")
-    
-    # 更新心跳时间和状态信息
-    node.last_heartbeat = datetime.utcnow()
-    
-    # 更新节点状态
-    if heartbeat_data.status:
-        node.status = heartbeat_data.status
-    
-    # 更新当前负载
-    if heartbeat_data.current_load is not None:
-        node.current_load = heartbeat_data.current_load
-    
-    # 更新资源使用情况
-    if heartbeat_data.resource_usage:
-        resource_info = node.resource_info or {}
-        resource_info.update(heartbeat_data.resource_usage)
-        node.resource_info = resource_info
-    
-    # 更新版本信息
-    if heartbeat_data.version:
-        node.version = heartbeat_data.version
-    
-    # 更新能力配置
-    if heartbeat_data.capabilities:
-        node.capabilities = heartbeat_data.capabilities
-    
-    # 更新元数据
-    if heartbeat_data.metadata:
-        metadata = node.node_metadata or {}
-        metadata.update(heartbeat_data.metadata)
-        node.node_metadata = metadata
-    
-    db.commit()
+    service = await get_executor_cluster_service(db)
+    await service.update_heartbeat(node_id, heartbeat_data)
     
     return {"status": "success", "message": "心跳更新成功"}
 
@@ -277,41 +172,12 @@ async def update_executor_status(
     current_user: User = Depends(get_current_user)
 ):
     """更新执行器节点状态"""
-    node = db.query(ExecutorNode).filter(ExecutorNode.node_id == node_id).first()
-    if not node:
-        raise NotFoundError(f"执行器节点 {node_id} 不存在")
-    
-    old_status = node.status
-    node.status = status_data.status
-    
-    # 如果设置为维护模式，需要处理运行中的任务
-    if status_data.status == ExecutorNodeStatus.MAINTENANCE:
-        # 这里可以添加任务迁移逻辑
-        pass
-    
-    # 更新元数据记录状态变更
-    metadata = node.node_metadata or {}
-    status_history = metadata.get("status_history", [])
-    status_history.append({
-        "from_status": old_status,
-        "to_status": status_data.status,
-        "reason": status_data.reason,
-        "timestamp": datetime.utcnow().isoformat(),
-        "updated_by": current_user.username
-    })
-    metadata["status_history"] = status_history[-10:]  # 只保留最近10条记录
-    
-    # 合并传入的元数据
-    if status_data.metadata:
-        metadata.update(status_data.metadata)
-    
-    node.node_metadata = metadata
-    
-    db.commit()
+    service = await get_executor_cluster_service(db)
+    node = await service.update_node_status(node_id, status_data)
     
     return {
         "status": "success",
-        "message": f"节点状态已从 {old_status} 更新为 {new_status}"
+        "message": f"节点状态已更新为 {node.status}"
     }
 
 

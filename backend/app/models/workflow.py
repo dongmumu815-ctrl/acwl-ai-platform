@@ -22,6 +22,8 @@ class NodeType(enum.Enum):
     END = "end"                       # 结束节点
     PYTHON_CODE = "python_code"       # Python代码执行
     SQL_QUERY = "sql_query"           # SQL查询执行
+    SHELL_SCRIPT = "shell_script"     # Shell脚本
+    LLM_PROCESS = "llm_process"       # LLM处理
     CONDITION = "condition"           # 条件判断
     LOOP = "loop"                     # 循环节点
     PARALLEL = "parallel"             # 并行节点

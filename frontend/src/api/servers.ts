@@ -2,6 +2,7 @@
  * 服务器管理相关的API接口
  */
 import { request } from '@/utils/request'
+import type { PaginatedResponse } from '@/types/common'
 
 /**
  * 服务器表单数据接口
@@ -29,6 +30,8 @@ export interface ServerForm {
   total_storage: string
   /** CPU核心数 */
   total_cpu_cores: number | null
+  /** 排序权重 */
+  sort_order: number
 }
 
 /**
@@ -64,16 +67,7 @@ export interface ApiResponse<T = any> {
 /**
  * 分页响应接口
  */
-export interface PaginatedResponse<T = any> {
-  /** 数据列表 */
-  data: T[]
-  /** 总数量 */
-  total: number
-  /** 当前页 */
-  page: number
-  /** 每页大小 */
-  size: number
-}
+
 
 /**
  * 创建服务器
@@ -105,6 +99,9 @@ export function getServers(params?: {
   search?: string
   server_type?: string
   status?: string
+  group_id?: number
+  sort_by?: string
+  sort_order?: string
 }): Promise<ApiResponse<PaginatedResponse<ServerResponse>>> {
   return request.get('/servers/', params)
 }
@@ -160,4 +157,69 @@ export function scanServerGpus(id: number): Promise<ApiResponse<any[]>> {
  */
 export function getServerStats(): Promise<ApiResponse<{ total: number; online: number; offline: number; total_gpus: number }>> {
   return request.get('/servers/stats')
+}
+
+/**
+ * 批量测试服务器连接
+ * @param ids 服务器ID列表
+ * @returns Promise<ApiResponse<any>>
+ */
+export function batchTestConnection(ids: number[]): Promise<ApiResponse<any>> {
+  return request.post('/servers/batch/test-connection', { ids })
+}
+
+/**
+ * 批量更新SSH密码
+ * @param ids 服务器ID列表
+ * @param password 新密码
+ * @returns Promise<ApiResponse<any>>
+ */
+export function batchUpdatePassword(ids: number[], password: string): Promise<ApiResponse<any>> {
+  return request.post('/servers/batch/update-password', { ids, password })
+}
+
+/**
+ * 重启服务器
+ * @param id 服务器ID
+ * @returns Promise<ApiResponse<any>>
+ */
+export function restartServer(id: number): Promise<ApiResponse<any>> {
+  return request.post(`/servers/${id}/restart`)
+}
+
+/**
+ * 批量重启服务器
+ * @param ids 服务器ID列表
+ * @returns Promise<ApiResponse<any>>
+ */
+export function batchRestartServers(ids: number[]): Promise<ApiResponse<any>> {
+  return request.post('/servers/batch/restart', { ids })
+}
+
+/**
+ * 批量删除服务器
+ * @param ids 服务器ID列表
+ * @returns Promise<ApiResponse<any>>
+ */
+export function batchDeleteServers(ids: number[]): Promise<ApiResponse<any>> {
+  return request.post('/servers/batch/delete', { ids })
+}
+
+/**
+ * 批量执行脚本
+ * @param ids 服务器ID列表
+ * @param script 脚本内容
+ * @returns Promise<ApiResponse<{ task_id: number; message: string }>>
+ */
+export function batchExecuteScript(ids: number[], script: string): Promise<ApiResponse<{ task_id: number; message: string }>> {
+  return request.post('/servers/batch/execute-script', { ids, script })
+}
+
+/**
+ * 获取脚本执行任务状态
+ * @param taskId 任务ID
+ * @returns Promise<ApiResponse<any>>
+ */
+export function getScriptExecutionStatus(taskId: number): Promise<ApiResponse<any>> {
+  return request.get(`/servers/batch/execute-script/${taskId}`)
 }

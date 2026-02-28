@@ -214,9 +214,16 @@
                     </div>
                   </div>
                   <div class="field-status">
-                    <el-tag v-if="hasSourceMapping(sf.field_name)" size="small"
-                      >已映射</el-tag
-                    >
+                    <el-tag size="small" type="warning" v-if="sf.is_custom">自定义</el-tag>
+                    <el-tag size="small" v-if="hasSourceMapping(sf.field_name)">已映射</el-tag>
+                    <div class="field-actions" v-if="sf.is_custom">
+                      <el-button type="primary" link size="small" @click.stop="editCustomSourceField(sf.field_name)">
+                        <el-icon><Edit /></el-icon>
+                      </el-button>
+                      <el-button type="danger" link size="small" @click.stop="removeCustomSourceField(sf.field_name)">
+                        <el-icon><Delete /></el-icon>
+                      </el-button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -978,18 +985,13 @@ const selectedTarget = ref<string | null>(null);
 const mappings = ref<Record<string, string>>({});
 
 // 自定义字段状态
-const showSourceFieldDialog = ref(false);
-const editingSourceField = ref<number | null>(null);
-const fieldTypeOptions = [
-  "VARCHAR",
-  "INT",
-  "BIGINT",
-  "DECIMAL",
-  "DATE",
-  "DATETIME",
-  "TEXT",
-  "BOOLEAN",
-];
+const showSourceFieldDialog = ref(false)
+const editingSourceField = ref<number | null>(null)
+const editingSourceFieldOriginalName = ref<string | null>(null)
+const fieldTypeOptions = ['VARCHAR', 'INT', 'BIGINT', 'DECIMAL', 'DATE', 'DATETIME', 'TEXT', 'BOOLEAN']
+const sourceSearch = ref('')
+const targetSearch = ref('')
+const highlightedField = ref<string | null>(null)
 
 const sourceFieldForm = reactive({
   name: "",
@@ -1768,29 +1770,86 @@ const setTargetRef = (name: string, el: HTMLElement | null) => {
 };
 
 const addSourceField = () => {
-  editingSourceField.value = null;
-  sourceFieldForm.name = "";
-  sourceFieldForm.type = "VARCHAR";
-  sourceFieldForm.generateType = "external_param";
-  sourceFieldForm.parameterName = "";
-  sourceFieldForm.constantValue = "";
-  sourceFieldForm.concatFields = [];
-  sourceFieldForm.separator = "";
-  sourceFieldForm.conditionField = "";
-  sourceFieldForm.conditionOperator = "=";
-  sourceFieldForm.conditionValue = "";
-  sourceFieldForm.trueValue = "";
-  sourceFieldForm.falseValue = "";
-  sourceFieldForm.caseWhenField = "";
-  sourceFieldForm.caseBranches = [];
-  sourceFieldForm.defaultValue = "";
-  sourceFieldForm.mathExpression = "";
-  sourceFieldForm.dateFunction = "NOW()";
-  sourceFieldForm.dateFormat = "%Y-%m-%d %H:%i:%s";
-  sourceFieldForm.dateInterval = "";
+  editingSourceField.value = null
+  editingSourceFieldOriginalName.value = null
+  sourceFieldForm.name = ''
+  sourceFieldForm.type = 'VARCHAR'
+  sourceFieldForm.generateType = 'external_param'
+  sourceFieldForm.parameterName = ''
+  sourceFieldForm.constantValue = ''
+  sourceFieldForm.concatFields = []
+  sourceFieldForm.separator = ''
+  sourceFieldForm.conditionField = ''
+  sourceFieldForm.conditionOperator = '='
+  sourceFieldForm.conditionValue = ''
+  sourceFieldForm.trueValue = ''
+  sourceFieldForm.falseValue = ''
+  sourceFieldForm.caseWhenField = ''
+  sourceFieldForm.caseBranches = []
+  sourceFieldForm.defaultValue = ''
+  sourceFieldForm.mathExpression = ''
+  sourceFieldForm.dateFunction = 'NOW()'
+  sourceFieldForm.dateFormat = '%Y-%m-%d %H:%i:%s'
+  sourceFieldForm.dateInterval = ''
+  
+  showSourceFieldDialog.value = true
+}
 
-  showSourceFieldDialog.value = true;
-};
+const editCustomSourceField = (fieldName: string) => {
+  const idx = customFields.value.findIndex(f => f.field_name === fieldName)
+  if (idx === -1) return
+  const field = customFields.value[idx]
+
+  Object.assign(sourceFieldForm, {
+    name: field.field_name,
+    type: field.field_type || 'VARCHAR',
+    generateType: field.generateType || 'external_param',
+    parameterName: field.parameterName || '',
+    constantValue: field.constantValue || '',
+    concatFields: field.concatFields || [],
+    separator: field.separator || '',
+    conditionField: field.conditionField || '',
+    conditionOperator: field.conditionOperator || '=',
+    conditionValue: field.conditionValue || '',
+    trueValue: field.trueValue || '',
+    falseValue: field.falseValue || '',
+    caseWhenField: field.caseWhenField || '',
+    caseBranches: field.caseBranches || [],
+    defaultValue: field.defaultValue || '',
+    mathExpression: field.mathExpression || '',
+    dateFunction: field.dateFunction || 'NOW()',
+    dateFormat: field.dateFormat || '%Y-%m-%d %H:%i:%s',
+    dateInterval: field.dateInterval || ''
+  })
+
+  editingSourceField.value = idx
+  editingSourceFieldOriginalName.value = field.field_name
+  showSourceFieldDialog.value = true
+}
+
+const removeCustomSourceField = async (fieldName: string) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这个自定义字段吗？', '确认删除', { type: 'warning' })
+
+    const idx = customFields.value.findIndex(f => f.field_name === fieldName)
+    if (idx !== -1) {
+      customFields.value.splice(idx, 1)
+    }
+
+    if (mappings.value[fieldName]) {
+      delete mappings.value[fieldName]
+    }
+    sortedMappedSourceNames.value = sortedMappedSourceNames.value.filter(n => n !== fieldName)
+
+    if (selectedSource.value === fieldName) selectedSource.value = null
+
+    await nextTick()
+    refreshLines()
+    ElMessage.success('删除成功')
+  } catch {
+    return
+  }
+}
 
 const addCaseBranch = () => {
   sourceFieldForm.caseBranches.push({
@@ -1876,9 +1935,10 @@ const saveSourceField = () => {
   }
 
   // Check duplicates
+  const originalName = editingSourceFieldOriginalName.value
   const exists = sourceFields.value.find(
-    (f) => f.field_name === sourceFieldForm.name,
-  );
+    f => f.field_name === sourceFieldForm.name && f.field_name !== originalName
+  )
   if (exists && editingSourceField.value === null) {
     ElMessage.warning("字段名称已存在");
     return;
@@ -1917,12 +1977,24 @@ const saveSourceField = () => {
 
   // 更新或添加
   if (editingSourceField.value !== null) {
-    // 暂时不支持编辑，如果需要支持，可以根据索引更新
-    // 这里我们只做添加
+    customFields.value[editingSourceField.value] = fieldData
+    if (originalName && originalName !== fieldData.field_name) {
+      const oldTarget = mappings.value[originalName]
+      if (oldTarget) {
+        mappings.value[fieldData.field_name] = oldTarget
+        delete mappings.value[originalName]
+      }
+      sortedMappedSourceNames.value = sortedMappedSourceNames.value.map(n =>
+        n === originalName ? fieldData.field_name : n
+      )
+      if (selectedSource.value === originalName) selectedSource.value = fieldData.field_name
+    }
+    editingSourceField.value = null
+    editingSourceFieldOriginalName.value = null
+  } else {
+    customFields.value.push(fieldData)
   }
-
-  customFields.value.push(fieldData);
-
+  
   // 自动映射：如果是外部参数，且参数名与源字段名相同，或者其他逻辑
   // 这里不强制自动映射，由用户手动连线
 
@@ -2094,13 +2166,44 @@ const submitForm = async () => {
 };
 
 const onRequiredChange = async (row: ApiField, val: any) => {
-  // Implementation for quick update
-  // Currently placeholder, assume backend update or separate implementation
-};
+  if (!row?.id) return
+  const apiId = parseInt(route.params.id as string)
+  const nextVal = !!val
+  const prevVal = row.is_required
+  row.is_required = nextVal
+  try {
+    const resp = await updateApiField(apiId, row.id, { is_required: nextVal })
+    if (!resp.success) {
+      row.is_required = prevVal
+      ElMessage.error(resp.message || '保存失败')
+      return
+    }
+    ElMessage.success('保存成功')
+  } catch (e: any) {
+    row.is_required = prevVal
+    ElMessage.error(e?.message || '保存失败')
+  }
+}
 
 const onUploadChange = async (row: ApiField, val: any) => {
-  // Implementation for quick update
-};
+  if (!row?.id) return
+  const apiId = parseInt(route.params.id as string)
+  const nextVal = val === 1 || val === '1' || val === true ? 1 : 0
+  const prevVal = typeof row.is_upload === 'number' ? row.is_upload : Number(row.is_upload || 0)
+  row.is_upload = nextVal
+  try {
+    const resp = await updateApiField(apiId, row.id, { is_upload: nextVal })
+    if (!resp.success) {
+      row.is_upload = prevVal
+      ElMessage.error(resp.message || '保存失败')
+      return
+    }
+    ElMessage.success('保存成功')
+  } catch (e: any) {
+    row.is_upload = prevVal
+    ElMessage.error(e?.message || '保存失败')
+  }
+}
 
 const saveFieldsOrder = async () => {
   saving.value = true;
@@ -2273,11 +2376,7 @@ const handleTargetSearch = (val: string) => {
   }
 };
 
-const scrollToField = (fieldName: string, type: "source" | "target") => {
-  const id =
-    type === "source"
-      ? `source-field-${fieldName}`
-      : `target-field-${fieldName}`;
+const scrollToField = (fieldName: string, type: 'source' | 'target') => {
   // 此时需要通过id获取DOM，因为ref是基于v-for的函数引用，查找起来稍微麻烦点，虽然也可以用 sourceFieldRefs
   // 这里尝试用 sourceFieldRefs / targetFieldRefs
   const refs =
@@ -2509,6 +2608,20 @@ const highlightText = (text: string, query: string) => {
 
 .field-status {
   margin-left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.field-item:hover .field-actions {
+  opacity: 1;
 }
 
 .field-map-info {

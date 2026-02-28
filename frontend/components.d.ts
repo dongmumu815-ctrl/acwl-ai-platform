@@ -33,6 +33,7 @@ declare module 'vue' {
     ElForm: typeof import('element-plus/es')['ElForm']
     ElFormItem: typeof import('element-plus/es')['ElFormItem']
     ElIcon: typeof import('element-plus/es')['ElIcon']
+    ElImage: typeof import('element-plus/es')['ElImage']
     ElInput: typeof import('element-plus/es')['ElInput']
     ElInputNumber: typeof import('element-plus/es')['ElInputNumber']
     ElLink: typeof import('element-plus/es')['ElLink']
@@ -67,6 +68,7 @@ declare module 'vue' {
     InstructionTreeView: typeof import('./src/components/InstructionTreeView.vue')['default']
     MindMapView: typeof import('./src/components/MindMapView.vue')['default']
     NodeConfigModal: typeof import('./src/components/InstructionTree/NodeConfigModal.vue')['default']
+    Pagination: typeof import('./src/components/Pagination/index.vue')['default']
     PermissionButton: typeof import('./src/components/Permission/PermissionButton.vue')['default']
     PermissionMenu: typeof import('./src/components/Permission/PermissionMenu.vue')['default']
     PermissionTable: typeof import('./src/components/Permission/PermissionTable.vue')['default']
@@ -74,6 +76,7 @@ declare module 'vue' {
     RobotIcon: typeof import('./src/components/RobotIcon.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    WebTerminal: typeof import('./src/components/WebTerminal.vue')['default']
   }
   export interface ComponentCustomProperties {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

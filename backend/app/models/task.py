@@ -75,6 +75,15 @@ class DependencyType(str, PyEnum):
     CONDITIONAL = "conditional"       # 条件依赖
 
 
+class TriggerType(str, PyEnum):
+    """触发类型枚举"""
+    MANUAL = "manual"                 # 手动触发
+    SCHEDULED = "scheduled"           # 调度触发
+    DEPENDENCY = "dependency"         # 依赖触发
+    EVENT = "event"                   # 事件触发
+    API = "api"                       # API触发
+
+
 
 
 
@@ -534,6 +543,32 @@ class TaskInstance(Base, TimestampMixin):
         comment="任务定义ID"
     )
 
+    task_version: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        comment="任务版本"
+    )
+
+    triggered_by: Mapped[TriggerType] = mapped_column(
+        Enum(TriggerType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=TriggerType.MANUAL,
+        comment="触发方式"
+    )
+
+    triggered_by_user: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("acwl_users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="触发用户ID"
+    )
+
+    task_metadata: Mapped[Optional[dict]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="元数据"
+    )
+
     schedule_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("acwl_task_schedules.id", ondelete="SET NULL"),
@@ -549,14 +584,14 @@ class TaskInstance(Base, TimestampMixin):
     )
 
     status: Mapped[TaskStatus] = mapped_column(
-        Enum(TaskStatus),
+        Enum(TaskStatus, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=TaskStatus.PENDING,
         comment="实例状态"
     )
 
     priority: Mapped[TaskPriority] = mapped_column(
-        Enum(TaskPriority),
+        Enum(TaskPriority, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=TaskPriority.NORMAL,
         comment="实例优先级"
@@ -668,6 +703,11 @@ class TaskInstance(Base, TimestampMixin):
         foreign_keys=[assigned_executor_node],
         primaryjoin="TaskInstance.assigned_executor_node == ExecutorNode.node_id",
         back_populates="task_instances"
+    )
+
+    trigger_user: Mapped[Optional["User"]] = relationship(
+        "User",
+        foreign_keys=[triggered_by_user]
     )
 
     executions: Mapped[List["TaskExecution"]] = relationship(

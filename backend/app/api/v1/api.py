@@ -6,11 +6,30 @@ API v1 主路由
 
 from fastapi import APIRouter
 
-from .endpoints import auth, users, models, model_service_configs, deployments, environments, health, servers, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure, roles, permissions, api_management, es_aggregations, user_operation_logs, data_upload_logs, templates
+from .endpoints import auth, users, models, model_service_configs, deployments, environments, health, servers, server_groups, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure, roles, permissions, api_management, es_aggregations, user_operation_logs, data_upload_logs, templates, ws_ssh, ws_monitor, monitoring, applications
 from . import instruction_sets, data_resource, resource_package, resource_type
 
 # 创建API路由器
 api_router = APIRouter()
+
+# 注册各个模块的路由
+api_router.include_router(
+    ws_ssh.router,
+    prefix="/ws",
+    tags=["WebSocket SSH"]
+)
+
+api_router.include_router(
+    ws_monitor.router,
+    prefix="/ws",
+    tags=["WebSocket Monitor"]
+)
+
+api_router.include_router(
+    monitoring.router,
+    prefix="/monitoring",
+    tags=["系统监控"]
+)
 
 # 注册各个模块的路由
 api_router.include_router(
@@ -65,6 +84,12 @@ api_router.include_router(
     servers.router,
     prefix="/servers",
     tags=["服务器管理"]
+)
+
+api_router.include_router(
+    server_groups.router,
+    prefix="/server-groups",
+    tags=["服务器分组管理"]
 )
 
 api_router.include_router(
@@ -190,6 +215,14 @@ api_router.include_router(
     user_operation_logs.router,
     prefix="/user-operation-logs",
     tags=["日志管理"]
+)
+
+# Governance router removed
+
+api_router.include_router(
+    applications.router,
+    prefix="/applications",
+    tags=["应用管理"]
 )
 
 # 新增：数据上传日志（Doris）

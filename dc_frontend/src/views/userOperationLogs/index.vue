@@ -4,14 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>用户操作日志</span>
-          <el-space>
-            <el-button type="primary" :loading="loading" @click="loadLogs"
-              >刷新</el-button
-            >
-            <el-button :disabled="loading" @click="resetFilters"
-              >重置</el-button
-            >
-          </el-space>
+          
         </div>
       </template>
 
@@ -37,25 +30,12 @@
             <el-option v-for="m in methods" :key="m" :label="m" :value="m" />
           </el-select>
         </el-form-item>
-        <el-form-item label="路径">
-          <el-input
-            v-model="filters.path"
-            placeholder="请求路径"
-            clearable
-            style="width: 260px"
-          />
-        </el-form-item>
-        <el-form-item label="状态码">
-          <el-input-number
-            v-model="filters.status_code"
-            :min="100"
-            :max="599"
-            :step="1"
-            :controls="false"
-            placeholder="200"
-            style="width: 120px"
-          />
-        </el-form-item>
+        <!-- <el-form-item label="路径">
+          <el-input v-model="filters.path" placeholder="请求路径" clearable style="width: 260px" />
+        </el-form-item> -->
+        <!-- <el-form-item label="状态码">
+          <el-input-number v-model="filters.status_code" :min="100" :max="599" :step="1" :controls="false" placeholder="200" style="width: 120px" />
+        </el-form-item> -->
         <el-form-item label="结果">
           <el-select
             v-model="filters.success"
@@ -79,16 +59,20 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="loading" @click="onSearch"
-            >查询</el-button
-          >
+          <el-button type="primary" @click="onSearch" :loading="loading" style="margin-left: 25px">查询</el-button>
+            <el-button type="primary" @click="loadLogs" :loading="loading">刷新</el-button>
+            <el-button @click="resetFilters" :disabled="loading">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <el-card shadow="never">
-      <el-table v-loading="loading" :data="logs" stripe height="500px">
-        <el-table-column prop="created_at" label="时间" width="180" />
+      <el-table :data="logs" v-loading="loading" stripe height="500px">
+        <el-table-column prop="created_at" label="时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.created_at) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="module" label="业务模块" width="160" />
         <el-table-column prop="method" label="方法" width="110">
           <template #default="{ row }">
@@ -145,30 +129,14 @@
     <el-drawer v-model="detailVisible" title="日志详情" size="50%">
       <template v-if="currentDetail">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="时间">{{
-            currentDetail.created_at
-          }}</el-descriptions-item>
-          <el-descriptions-item label="业务模块">{{
-            currentDetail.module || "-"
-          }}</el-descriptions-item>
-          <el-descriptions-item label="方法">{{
-            currentDetail.method
-          }}</el-descriptions-item>
-          <el-descriptions-item label="路径">{{
-            currentDetail.path
-          }}</el-descriptions-item>
-          <el-descriptions-item label="状态码">{{
-            currentDetail.status_code
-          }}</el-descriptions-item>
-          <el-descriptions-item label="结果">{{
-            currentDetail.success ? "成功" : "失败"
-          }}</el-descriptions-item>
-          <el-descriptions-item label="耗时(ms)">{{
-            currentDetail.duration_ms ?? "-"
-          }}</el-descriptions-item>
-          <el-descriptions-item label="请求ID" :span="2">{{
-            currentDetail.request_id || "-"
-          }}</el-descriptions-item>
+          <el-descriptions-item label="时间">{{ formatDateTime(currentDetail.created_at) }}</el-descriptions-item>
+          <el-descriptions-item label="业务模块">{{ currentDetail.module || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="方法">{{ currentDetail.method }}</el-descriptions-item>
+          <el-descriptions-item label="路径">{{ currentDetail.path }}</el-descriptions-item>
+          <el-descriptions-item label="状态码">{{ currentDetail.status_code }}</el-descriptions-item>
+          <el-descriptions-item label="结果">{{ currentDetail.success ? '成功' : '失败' }}</el-descriptions-item>
+          <el-descriptions-item label="耗时(ms)">{{ currentDetail.duration_ms ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="请求ID" :span="2">{{ currentDetail.request_id || '-' }}</el-descriptions-item>
         </el-descriptions>
 
         <el-collapse class="mt-3">
@@ -216,13 +184,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
-import { ElMessage } from "element-plus";
-import { userOperationLogsApi } from "@/api/userOperationLogs";
-import type {
-  UserOperationLog,
-  UserOperationLogDetail,
-} from "@/api/userOperationLogs";
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { userOperationLogsApi } from '@/api/userOperationLogs'
+import type { UserOperationLog, UserOperationLogDetail } from '@/api/userOperationLogs'
+import dayjs from 'dayjs'
 
 const methods = ["GET", "POST", "PUT", "DELETE", "PATCH"];
 
@@ -387,7 +353,13 @@ function pretty(obj: any) {
   }
 }
 
-onMounted(loadLogs);
+function formatDateTime(v: any) {
+  if (!v) return '-'
+  const d = dayjs(v)
+  return d.isValid() ? d.format('YYYY-MM-DD HH:mm:ss') : String(v)
+}
+
+onMounted(loadLogs)
 </script>
 
 <style scoped>
@@ -409,10 +381,6 @@ onMounted(loadLogs);
   white-space: pre-wrap;
   word-break: break-word;
 }
-.mb-3 {
-  margin-bottom: 12px;
-}
-.mt-3 {
-  margin-top: 12px;
-}
+.mb-3 { margin-bottom: 12px; }
+.mt-3 { margin-top: 12px; }
 </style>

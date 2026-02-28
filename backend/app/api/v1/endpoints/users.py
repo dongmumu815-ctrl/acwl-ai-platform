@@ -196,7 +196,10 @@ async def change_current_user_password(
         raise ValidationError("当前密码错误")
     
     # 更新密码
-    current_user.password_hash = get_password_hash(password_data.new_password)
+    try:
+        current_user.password_hash = get_password_hash(password_data.new_password)
+    except ValueError as e:
+        raise ValidationError(str(e))
     
     await db.commit()
     

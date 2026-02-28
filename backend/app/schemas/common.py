@@ -115,4 +115,4 @@ class ConfigUpdateRequest(BaseModel):
     """配置更新请求模式"""
     config: Dict[str, Any] = Field(..., description="配置数据")
     merge: bool = Field(True, description="是否合并现有配置")
-    validate: bool = Field(True, description="是否验证配置")
+    should_validate: bool = Field(True, alias="validate", description="是否验证配置")

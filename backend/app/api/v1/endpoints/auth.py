@@ -31,20 +31,43 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> User:
     """获取当前用户"""
+    import sys
+    print("[AUTH_DEBUG] get_current_user called", file=sys.stderr, flush=True)
     try:
         payload = decode_access_token(token)
         user_id_str = payload.get("sub")
         if user_id_str is None:
+            print("[AUTH_DEBUG] No sub in payload", file=sys.stderr, flush=True)
             raise AuthenticationError("无效的认证令牌")
         user_id = int(user_id_str)  # 将字符串转换为整数
-    except Exception:
+    except Exception as e:
+        print(f"[AUTH_DEBUG] Token decode error: {e}", file=sys.stderr, flush=True)
         raise AuthenticationError("无效的认证令牌")
     
+    print(f"[AUTH_DEBUG] Querying user {user_id}", file=sys.stderr, flush=True)
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
     if user is None:
+        print(f"[AUTH_DEBUG] User {user_id} not found", file=sys.stderr, flush=True)
         raise AuthenticationError("用户不存在")
+    
+    return user
+
+
+async def get_current_user_ws(token: str, db: AsyncSession) -> User:
+    """获取当前用户（WebSocket用）"""
+    try:
+        payload = decode_access_token(token)
+        user_id_str = payload.get("sub")
+        if user_id_str is None:
+            return None
+        user_id = int(user_id_str)
+    except Exception:
+        return None
+    
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
     
     return user
 
@@ -86,7 +109,11 @@ async def register(
         raise ValidationError("邮箱已存在")
     
     # 创建新用户
-    hashed_password = get_password_hash(user_data.password)
+    try:
+        hashed_password = get_password_hash(user_data.password)
+    except ValueError as e:
+        raise ValidationError(str(e))
+    
     # 角色安全限制：注册阶段一律为普通用户
     # 其他可选字段按需设置
     new_user = User(

@@ -474,7 +474,11 @@ async def reset_customer_password(
             raise HTTPException(status_code=404, detail="客户不存在")
 
         # 仅保存哈希，不保存明文
-        db_customer.password_hash = get_password_hash(plain_password)
+        try:
+            db_customer.password_hash = get_password_hash(plain_password)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+            
         db_customer.updated_at = datetime.utcnow()
 
         await api_db.commit()

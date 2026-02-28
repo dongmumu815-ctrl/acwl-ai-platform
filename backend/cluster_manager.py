@@ -48,21 +48,7 @@ class ClusterManager:
                     "node_id": "scheduler-001",
                     "node_name": "主调度器-1",
                     "host_ip": "127.0.0.1",
-                    "port": 8002,
-                    "log_level": "INFO"
-                },
-                {
-                    "node_id": "scheduler-002",
-                    "node_name": "主调度器-2",
-                    "host_ip": "127.0.0.1",
-                    "port": 8003,
-                    "log_level": "INFO"
-                },
-                {
-                    "node_id": "scheduler-003",
-                    "node_name": "主调度器-3",
-                    "host_ip": "127.0.0.1",
-                    "port": 8004,
+                    "port": 6789,
                     "log_level": "INFO"
                 }
             ],
@@ -72,29 +58,18 @@ class ClusterManager:
                     "node_name": "执行器-1",
                     "group_id": "default",
                     "host_ip": "127.0.0.1",
-                    "port": 8011,
+                    "port": 9876,
                     "max_concurrent_tasks": 5,
-                    "log_level": "INFO"
-                },
-                {
-                    "node_id": "executor-002",
-                    "node_name": "执行器-2",
-                    "group_id": "default",
-                    "host_ip": "127.0.0.1",
-                    "port": 8012,
-                    "max_concurrent_tasks": 5,
-                    "log_level": "INFO"
-                },
-                {
-                    "node_id": "executor-003",
-                    "node_name": "执行器-3",
-                    "group_id": "high-performance",
-                    "host_ip": "127.0.0.1",
-                    "port": 8013,
-                    "max_concurrent_tasks": 10,
                     "log_level": "INFO"
                 }
-            ]
+            ],
+            "monitor": {
+                "enabled": True,
+                "heartbeat_timeout": 300,
+                "cleanup_interval": 600,
+                "offline_retention": 3600,
+                "log_level": "INFO"
+            }
         }
     
     def save_config(self):
@@ -137,6 +112,46 @@ class ClusterManager:
             self._start_executor(executor)
             time.sleep(1)  # 间隔1秒启动下一个
     
+    def start_monitor(self):
+        """
+        启动监控服务
+        """
+        config = self.config.get('monitor', {})
+        if not config.get('enabled', True):
+            print("监控服务未启用")
+            return
+            
+        print("启动执行器监控服务...")
+        
+        cmd = [
+            sys.executable,
+            'executor_monitor.py',
+            '--heartbeat-timeout', str(config.get('heartbeat_timeout', 300)),
+            '--cleanup-interval', str(config.get('cleanup_interval', 600)),
+            '--offline-retention', str(config.get('offline_retention', 3600)),
+            '--log-level', config.get('log_level', 'INFO')
+        ]
+        
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            self.processes['executor-monitor'] = {
+                'process': process,
+                'type': 'monitor',
+                'config': config,
+                'start_time': time.time()
+            }
+            
+            print(f"✓ 监控服务启动成功 (PID: {process.pid})")
+            
+        except Exception as e:
+            print(f"✗ 监控服务启动失败: {e}")
+
     def _start_scheduler(self, config: Dict[str, Any]):
         """
         启动单个调度器实例
@@ -152,10 +167,14 @@ class ClusterManager:
         ]
         
         try:
+            # 确保日志目录存在
+            os.makedirs('logs', exist_ok=True)
+            log_file = open(f"logs/scheduler-{config['node_id']}.log", 'w', encoding='utf-8')
+            
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=log_file,
+                stderr=log_file,
                 text=True
             )
             
@@ -163,10 +182,11 @@ class ClusterManager:
                 'process': process,
                 'type': 'scheduler',
                 'config': config,
-                'start_time': time.time()
+                'start_time': time.time(),
+                'log_file': log_file
             }
             
-            print(f"✓ 调度器启动成功: {config['node_name']} (PID: {process.pid})")
+            print(f"✓ 调度器启动成功: {config['node_name']} (PID: {process.pid}), 日志: logs/scheduler-{config['node_id']}.log")
             
         except Exception as e:
             print(f"✗ 调度器启动失败: {config['node_name']} - {e}")
@@ -188,10 +208,14 @@ class ClusterManager:
         ]
         
         try:
+            # 确保日志目录存在
+            os.makedirs('logs', exist_ok=True)
+            log_file = open(f"logs/executor-{config['node_id']}.log", 'w', encoding='utf-8')
+            
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=log_file,
+                stderr=log_file,
                 text=True
             )
             
@@ -199,10 +223,11 @@ class ClusterManager:
                 'process': process,
                 'type': 'executor',
                 'config': config,
-                'start_time': time.time()
+                'start_time': time.time(),
+                'log_file': log_file
             }
             
-            print(f"✓ 执行器启动成功: {config['node_name']} (PID: {process.pid})")
+            print(f"✓ 执行器启动成功: {config['node_name']} (PID: {process.pid}), 日志: logs/executor-{config['node_id']}.log")
             
         except Exception as e:
             print(f"✗ 执行器启动失败: {config['node_name']} - {e}")
@@ -270,6 +295,23 @@ class ClusterManager:
         
         for name in to_remove:
             del self.processes[name]
+
+    def stop_monitor(self):
+        """
+        停止监控服务
+        """
+        print("停止监控服务...")
+        
+        if 'executor-monitor' in self.processes:
+            try:
+                info = self.processes['executor-monitor']
+                process = info['process']
+                if process.poll() is None:
+                    process.terminate()
+                    print(f"✓ 已停止监控服务 (PID: {process.pid})")
+                del self.processes['executor-monitor']
+            except Exception as e:
+                print(f"✗ 停止监控服务失败: {e}")
     
     def status(self):
         """
@@ -283,6 +325,7 @@ class ClusterManager:
         
         schedulers = []
         executors = []
+        monitor = None
         
         for name, info in self.processes.items():
             process = info['process']
@@ -299,9 +342,15 @@ class ClusterManager:
             
             if info['type'] == 'scheduler':
                 schedulers.append(item)
-            else:
+            elif info['type'] == 'executor':
                 executors.append(item)
+            elif info['type'] == 'monitor':
+                monitor = item
         
+        if monitor:
+            print(f"\n监控服务:")
+            print(f"  - {monitor['name']}: {monitor['status']} (PID: {monitor['pid']}, 运行时间: {monitor['uptime']})")
+
         if schedulers:
             print(f"\n调度器 ({len(schedulers)} 个):")
             for s in schedulers:
@@ -342,7 +391,7 @@ def parse_args():
     
     # 停止命令
     stop_parser = subparsers.add_parser('stop', help='停止服务')
-    stop_parser.add_argument('--type', choices=['all', 'schedulers', 'executors'], default='all', help='停止类型')
+    stop_parser.add_argument('--type', choices=['all', 'schedulers', 'executors', 'monitor'], default='all', help='停止类型')
     stop_parser.add_argument('--group', help='执行器分组')
     
     # 状态命令
@@ -375,6 +424,8 @@ def main():
                 manager.start_schedulers()
                 time.sleep(5)
                 manager.start_executors()
+                time.sleep(2)
+                manager.start_monitor()
         
         elif args.command == 'stop':
             if args.type == 'schedulers':

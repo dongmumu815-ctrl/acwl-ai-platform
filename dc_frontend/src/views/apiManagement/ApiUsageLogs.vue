@@ -81,7 +81,7 @@
             }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="response_time" label="耗时(ms)" width="110" />
+        <!-- <el-table-column prop="response_time" label="耗时(ms)" width="110" /> -->
         <el-table-column prop="ip_address" label="IP" width="150" />
         <el-table-column prop="customer" label="客户" width="180">
           <template #default="{ row }">

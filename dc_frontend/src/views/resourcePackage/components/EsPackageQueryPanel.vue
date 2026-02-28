@@ -323,7 +323,7 @@
 
               <div v-else class="results-grid">
                 <!-- 左侧聚合结果 20% -->
-                <div class="agg-pane">
+                <div class="agg-pane" ref="aggPaneRef">
                   <!-- <div class="agg-header">聚合结果</div> -->
                   <div v-if="!results.aggregations" class="agg-empty">
                     <el-empty description="无聚合数据" :image-size="60" />
@@ -387,7 +387,7 @@
                 <!-- 右侧查询结果 80% -->
                 <div class="result-pane">
                   <template v-if="viewMode === 'list'">
-                    <div class="table-container">
+                    <div class="table-container" ref="tableContainerRef" @scroll="onResultScroll">
                       <el-table
                         ref="tableRef"
                         :data="processedRecords"
@@ -441,7 +441,7 @@
                     <!-- <div class="result-summary">
                       检索结果：为您检索到 {{ totalHits }} 条结果
                     </div> -->
-                    <div class="cards-container" @scroll="onCardsScroll">
+                    <div class="cards-container" ref="cardsContainerRef" @scroll="onCardsScroll">
                       <div class="cards" :class="{ compact: compactMode }">
                         <el-card
                           v-for="(row, idx) in visibleRecords"
@@ -776,6 +776,11 @@ import * as XLSX from "xlsx";
 
 const props = defineProps<{ packageData: any }>();
 
+const aggPaneRef = ref<HTMLElement | null>(null);
+const cardsContainerRef = ref<HTMLElement | null>(null);
+const tableContainerRef = ref<HTMLElement | null>(null);
+const AGG_SCROLL_RATIO = 0.6;
+
 const loading = ref(false);
 const downloadLoading = ref(false);
 const generateLoading = ref(false);
@@ -1009,10 +1014,25 @@ function loadMoreCards() {
 function onCardsScroll(e: Event) {
   const el = e.target as HTMLElement;
   if (!el) return;
+  syncAggScroll(el.scrollTop);
   const threshold = 200; // 距底部 200px 触发加载
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
     loadMoreCards();
   }
+}
+
+function onResultScroll(e: Event) {
+  const el = e.target as HTMLElement;
+  if (!el) return;
+  syncAggScroll(el.scrollTop);
+}
+
+function syncAggScroll(scrollTop: number) {
+  const aggEl = aggPaneRef.value;
+  if (!aggEl) return;
+  const scaledTop = scrollTop * AGG_SCROLL_RATIO;
+  const maxTop = Math.max(0, aggEl.scrollHeight - aggEl.clientHeight);
+  aggEl.scrollTop = Math.min(Math.max(scaledTop, 0), maxTop);
 }
 // 全字段搜索与列排序
 const sortState = ref<{

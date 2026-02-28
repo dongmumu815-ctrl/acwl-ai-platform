@@ -3,8 +3,8 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-left">
-        <h2>任务管理</h2>
-        <p>管理和监控所有任务的执行状态</p>
+        <h2>任务定义</h2>
+        <p>管理任务的定义和配置</p>
       </div>
       <div class="header-right">
         <el-button type="primary" @click="createTask">
@@ -232,18 +232,20 @@ const fetchTasks = async () => {
     loading.value = true
     const params = {
       page: pagination.page,
-      size: pagination.size,
-      name: filterForm.name,
-      task_type: filterForm.task_type,
-      status: filterForm.status,
-      project_id: filterForm.project_id
+      size: pagination.size
     }
+    
+    if (filterForm.name) params.name = filterForm.name
+    if (filterForm.task_type) params.task_type = filterForm.task_type
+    if (filterForm.status) params.status = filterForm.status
+    if (filterForm.project_id) params.project_id = filterForm.project_id
     
     const result = await taskStore.getTaskList(params)
     taskList.value = result.items || []
     pagination.total = result.total || 0
   } catch (error) {
-    ElMessage.error('获取任务列表失败')
+    // 错误已由全局拦截器处理，无需再次显示 ElMessage
+    // ElMessage.error('获取任务列表失败')
   } finally {
     loading.value = false
   }

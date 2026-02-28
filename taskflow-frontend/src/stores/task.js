@@ -189,6 +189,37 @@ export const useTaskStore = defineStore('task', () => {
   }
   
   /**
+   * 获取所有任务实例
+   * @param {object} params 查询参数
+   */
+  const getAllTaskInstances = async (params = {}) => {
+    loading.value = true
+    try {
+      const response = await taskApi.getAllTaskInstances(params)
+      return response.data
+    } catch (error) {
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 获取任务实例日志文件
+   * @param {number} instanceId 实例ID
+   * @param {object} params 查询参数
+   */
+  const getTaskInstanceLogFile = async (instanceId, params = {}) => {
+    // 日志获取不影响全局loading，因为通常在对话框中加载
+    try {
+      const response = await taskApi.getTaskInstanceLogFile(instanceId, params)
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+  
+  /**
    * 获取任务模板列表
    */
   const getTaskTemplates = async () => {
@@ -272,6 +303,8 @@ export const useTaskStore = defineStore('task', () => {
     deleteTask,
     executeTask,
     getTaskExecutions,
+    getAllTaskInstances,
+    getTaskInstanceLogFile,
     getTaskTemplates,
     getTaskTypes,
     setCurrentTask,

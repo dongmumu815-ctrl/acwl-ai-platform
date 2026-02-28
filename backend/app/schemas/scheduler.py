@@ -16,7 +16,6 @@ class SchedulerRole(str, Enum):
 
 class SchedulerStatus(str, Enum):
     """调度器状态枚举"""
-    ACTIVE = "active"  # 添加active状态以匹配模型
     ONLINE = "online"
     OFFLINE = "offline"
     MAINTENANCE = "maintenance"
@@ -24,6 +23,7 @@ class SchedulerStatus(str, Enum):
     STARTING = "starting"
     STANDBY = "standby"
     RUNNING = "running"
+    ACTIVE = "active"
 
 # ============================================
 # 调度器节点相关Schema

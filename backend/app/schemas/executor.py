@@ -59,7 +59,7 @@ class ExecutorGroupBase(BaseModel):
 
 class ExecutorGroupCreate(ExecutorGroupBase):
     """创建执行器分组Schema"""
-    pass
+    executor_ids: Optional[List[int]] = Field(None, description="关联的执行器ID列表")
 
 class ExecutorGroupUpdate(BaseModel):
     """更新执行器分组Schema"""
@@ -72,6 +72,7 @@ class ExecutorGroupUpdate(BaseModel):
     config: Optional[Dict[str, Any]] = None
     tags: Optional[List[str]] = None
     group_metadata: Optional[Dict[str, Any]] = None
+    executor_ids: Optional[List[int]] = Field(None, description="关联的执行器ID列表")
 
 class ExecutorGroupInDB(ExecutorGroupBase):
     """数据库中的执行器分组Schema"""
@@ -106,12 +107,15 @@ class ExecutorNodeBase(BaseModel):
 
 class ExecutorNodeCreate(ExecutorNodeBase):
     """创建执行器节点Schema"""
-    group_id: int = Field(..., description="分组ID")
+    group_id: Optional[int] = Field(None, description="主分组ID（可选）")
+    group_ids: Optional[List[int]] = Field(None, description="所属分组ID列表")
     node_id: Optional[str] = Field(None, description="节点ID，如果不提供将自动生成")
 
 class ExecutorNodeUpdate(BaseModel):
     """更新执行器节点Schema"""
     node_name: Optional[str] = None
+    group_id: Optional[int] = None
+    group_ids: Optional[List[int]] = None
     host_ip: Optional[str] = None
     port: Optional[int] = None
     status: Optional[ExecutorStatus] = None
@@ -126,7 +130,7 @@ class ExecutorNodeInDB(ExecutorNodeBase):
     """数据库中的执行器节点Schema"""
     id: int
     node_id: str
-    group_id: int
+    group_id: Optional[int] = None
     last_heartbeat: Optional[datetime] = None
     registration_time: datetime
     
@@ -134,7 +138,7 @@ class ExecutorNodeInDB(ExecutorNodeBase):
 
 class ExecutorNode(ExecutorNodeInDB):
     """执行器节点Schema"""
-    pass
+    groups: Optional[List[ExecutorGroupBase]] = Field(None, description="所属分组列表")
 
 # ============================================
 # 执行器节点管理相关Schema
@@ -203,6 +207,7 @@ class ExecutorGroupQueryParams(BaseQueryParams):
 
 class ExecutorNodeQueryParams(BaseQueryParams):
     """执行器节点查询参数Schema"""
+    size: int = Field(20, ge=1, le=2000, description="每页大小")
     group_id: Optional[int] = Field(None, description="分组ID")
     node_name: Optional[str] = Field(None, description="节点名称")
     status: Optional[ExecutorStatus] = Field(None, description="节点状态")
