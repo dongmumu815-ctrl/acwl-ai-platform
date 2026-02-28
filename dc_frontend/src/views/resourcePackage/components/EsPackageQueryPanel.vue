@@ -410,22 +410,31 @@
                           sortable="custom"
                         >
                           <template #default="{ row }">
-                            <span
-                              :class="
-                                wrapLongText ? 'cell wrap' : 'cell ellipsis'
-                              "
-                              v-html="
-                                formatTextWithHighlight(
-                                  formatCell(row[col]),
-                                  DEFAULT_MAX_CHARS,
-                                  executedSearchValue,
-                                )
-                              "
-                            ></span>
                             <template v-if="col === 'snippet' && row?.pdf_url && row?.pdf_url !== 'null' && row?.pageNumber">
-                              <el-link type="primary" :underline="true" style="margin-left: 6px" @click.stop="openPdfAtHit(row)">
-                                查看
-                              </el-link>
+                              <span
+                                :class="wrapLongText ? 'cell wrap' : 'cell ellipsis'"
+                                style="cursor: pointer"
+                                @click.stop="openPdfAtHit(row)"
+                                v-html="
+                                  formatTextWithHighlight(
+                                    formatCell(row[col]),
+                                    DEFAULT_MAX_CHARS,
+                                    executedSearchValue,
+                                  )
+                                "
+                              ></span>
+                            </template>
+                            <template v-else>
+                              <span
+                                :class="wrapLongText ? 'cell wrap' : 'cell ellipsis'"
+                                v-html="
+                                  formatTextWithHighlight(
+                                    formatCell(row[col]),
+                                    DEFAULT_MAX_CHARS,
+                                    executedSearchValue,
+                                  )
+                                "
+                              ></span>
                             </template>
                           </template>
                         </el-table-column>
@@ -505,6 +514,7 @@
                                 <span
                                   class="v"
                                   :class="{ wrap: wrapLongText }"
+                                  v-if="!(f === 'snippet' && row?.pdf_url && row?.pdf_url !== 'null' && row?.pageNumber)"
                                   v-html="
                                     formatTextWithHighlight(
                                       formatCell(row[f]),
@@ -513,15 +523,20 @@
                                     )
                                   "
                                 ></span>
-                                <template v-if="f === 'snippet' && row?.pdf_url && row?.pdf_url !== 'null' && row?.pageNumber">
-                                  <el-link
-                                    type="primary"
-                                    :underline="true"
-                                    style="margin-left: 6px"
+                                <template v-else>
+                                  <span
+                                    class="v"
+                                    :class="{ wrap: wrapLongText }"
+                                    style="cursor: pointer"
                                     @click.stop="openPdfAtHit(row)"
-                                  >
-                                    查看 
-                                  </el-link>
+                                    v-html="
+                                      formatTextWithHighlight(
+                                        formatCell(row[f]),
+                                        DEFAULT_MAX_CHARS,
+                                        executedSearchValue,
+                                      )
+                                    "
+                                  ></span>
                                 </template>
                                 <template v-if="f === 'publication_category'">
                                   <el-icon
@@ -1491,26 +1506,19 @@ const openPdf = () => {
 };
 
 function buildPdfOpenUrl(url: string, page?: number | null, keyword?: string | null): string {
-  try {
-    const u = String(url);
-    const base = u.split('#')[0];
-    const hash = u.includes('#') ? u.substring(u.indexOf('#') + 1) : '';
-    const params = new URLSearchParams(hash);
-    if (page && Number.isFinite(Number(page))) {
-      params.set('page', String(page));
-    }
-    if (keyword && String(keyword).trim()) {
-      params.set('search', String(keyword).trim());
-      params.set('q', String(keyword).trim());
-    }
-    const newHash = params.toString();
-    return newHash ? `${base}#${newHash}` : `${base}`;
-  } catch {
-    if (page && Number.isFinite(Number(page))) {
-      return `${url}#page=${page}`;
-    }
-    return url;
+  const origin = window.location.origin;
+  const viewer = `${origin}/ui/pdf-viewer.html`;
+  const proxied = `${origin}/api/v1/utils/pdf-proxy?url=${encodeURIComponent(String(url))}`;
+  const file = encodeURIComponent(proxied);
+  const params = new URLSearchParams();
+  if (page && Number.isFinite(Number(page))) {
+    params.set('page', String(page));
   }
+  if (keyword && String(keyword).trim()) {
+    params.set('search', String(keyword).trim());
+  }
+  const hash = params.toString();
+  return `${viewer}?file=${file}${hash ? '#' + hash : ''}`;
 }
 
 const openPdfAtHit = (row: Record<string, any>) => {
