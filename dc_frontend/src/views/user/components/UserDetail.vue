@@ -5,16 +5,12 @@
       <h3 class="section-title">基本信息</h3>
       <div class="user-profile">
         <div class="avatar-section">
-          <el-avatar
-            :src="user.avatar"
-            :alt="user.full_name"
-            :size="80"
-          >
+          <el-avatar :src="user.avatar" :alt="user.full_name" :size="80">
             {{ user.full_name?.charAt(0) }}
           </el-avatar>
           <div class="status-badge">
             <el-tag :type="user.is_active ? 'success' : 'danger'">
-              {{ user.is_active ? '启用' : '禁用' }}
+              {{ user.is_active ? "启用" : "禁用" }}
             </el-tag>
           </div>
         </div>
@@ -34,21 +30,21 @@
             </div>
             <div class="info-item">
               <span class="label">手机：</span>
-              <span class="value">{{ user.phone || '-' }}</span>
+              <span class="value">{{ user.phone || "-" }}</span>
             </div>
             <div class="info-item">
               <span class="label">部门：</span>
-              <span class="value">{{ user.department || '-' }}</span>
+              <span class="value">{{ user.department || "-" }}</span>
             </div>
             <div class="info-item">
               <span class="label">职位：</span>
-              <span class="value">{{ user.position || '-' }}</span>
+              <span class="value">{{ user.position || "-" }}</span>
             </div>
             <div class="info-item">
               <span class="label">超级管理员：</span>
               <span class="value">
                 <el-tag :type="user.is_superuser ? 'warning' : 'info'">
-                  {{ user.is_superuser ? '是' : '否' }}
+                  {{ user.is_superuser ? "是" : "否" }}
                 </el-tag>
               </span>
             </div>
@@ -137,7 +133,9 @@
         <el-table-column prop="user_agent" label="用户代理" min-width="200">
           <template #default="{ row }">
             <el-tooltip :content="row.user_agent" placement="top">
-              <span class="user-agent-text">{{ formatUserAgent(row.user_agent) }}</span>
+              <span class="user-agent-text">{{
+                formatUserAgent(row.user_agent)
+              }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -154,7 +152,7 @@
         <el-table-column prop="is_current" label="当前会话" width="100">
           <template #default="{ row }">
             <el-tag :type="row.is_current ? 'success' : 'info'">
-              {{ row.is_current ? '是' : '否' }}
+              {{ row.is_current ? "是" : "否" }}
             </el-tag>
           </template>
         </el-table-column>
@@ -190,7 +188,9 @@
             <div class="activity-description">{{ activity.description }}</div>
             <div class="activity-meta">
               <span>{{ activity.resource_type }}</span>
-              <span v-if="activity.resource_id">ID: {{ activity.resource_id }}</span>
+              <span v-if="activity.resource_id"
+                >ID: {{ activity.resource_id }}</span
+              >
               <span>{{ activity.ip_address }}</span>
             </div>
           </div>
@@ -213,27 +213,25 @@
         @click="handleToggleStatus"
       >
         <el-icon><Switch /></el-icon>
-        {{ user.is_active ? '禁用' : '启用' }}用户
+        {{ user.is_active ? "禁用" : "启用" }}用户
       </el-button>
-      <el-button @click="$emit('close')">
-        关闭
-      </el-button>
+      <el-button @click="$emit('close')"> 关闭 </el-button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Key, Switch } from '@element-plus/icons-vue'
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { Edit, Key, Switch } from "@element-plus/icons-vue";
 import type {
   User,
   UserDetail as UserDetailType,
   UserStats,
   UserSession,
-  UserActivity
-} from '@/types/user'
+  UserActivity,
+} from "@/types/user";
 import {
   getUserDetail,
   getUserStats,
@@ -241,75 +239,77 @@ import {
   getUserActivities,
   updateUserStatus,
   resetUserPassword,
-  terminateUserSession
-} from '@/api/user'
-import { formatDateTime } from '@/utils/format'
+  terminateUserSession,
+} from "@/api/user";
+import { formatDateTime } from "@/utils/format";
 
 interface Props {
-  user: User
+  user: User;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 const emit = defineEmits<{
-  close: []
-}>()
+  close: [];
+}>();
 
-const router = useRouter()
+const router = useRouter();
 
 // 响应式数据
-const loading = ref(false)
-const userDetail = ref<UserDetailType | null>(null)
-const userStats = ref<UserStats | null>(null)
-const userSessions = ref<UserSession[]>([])
-const userActivities = ref<UserActivity[]>([])
+const loading = ref(false);
+const userDetail = ref<UserDetailType | null>(null);
+const userStats = ref<UserStats | null>(null);
+const userSessions = ref<UserSession[]>([]);
+const userActivities = ref<UserActivity[]>([]);
 
 /**
  * 加载用户详细信息
  */
 const loadUserDetail = async () => {
   try {
-    loading.value = true
-    const [detailRes, statsRes, sessionsRes, activitiesRes] = await Promise.all([
-      getUserDetail(props.user.id),
-      getUserStats(props.user.id),
-      getUserSessions(props.user.id),
-      getUserActivities(props.user.id, { page: 1, page_size: 10 })
-    ])
-    
-    userDetail.value = detailRes.data
-    userStats.value = statsRes.data
-    userSessions.value = sessionsRes.data
-    userActivities.value = activitiesRes.data.items
+    loading.value = true;
+    const [detailRes, statsRes, sessionsRes, activitiesRes] = await Promise.all(
+      [
+        getUserDetail(props.user.id),
+        getUserStats(props.user.id),
+        getUserSessions(props.user.id),
+        getUserActivities(props.user.id, { page: 1, page_size: 10 }),
+      ],
+    );
+
+    userDetail.value = detailRes.data;
+    userStats.value = statsRes.data;
+    userSessions.value = sessionsRes.data;
+    userActivities.value = activitiesRes.data.items;
   } catch (error) {
-    ElMessage.error('加载用户详情失败')
+    ElMessage.error("加载用户详情失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 /**
  * 格式化用户代理字符串
  */
 const formatUserAgent = (userAgent: string): string => {
-  if (userAgent.includes('Chrome')) {
-    return 'Chrome'
-  } else if (userAgent.includes('Firefox')) {
-    return 'Firefox'
-  } else if (userAgent.includes('Safari')) {
-    return 'Safari'
-  } else if (userAgent.includes('Edge')) {
-    return 'Edge'
+  if (userAgent.includes("Chrome")) {
+    return "Chrome";
+  } else if (userAgent.includes("Firefox")) {
+    return "Firefox";
+  } else if (userAgent.includes("Safari")) {
+    return "Safari";
+  } else if (userAgent.includes("Edge")) {
+    return "Edge";
   }
-  return '未知浏览器'
-}
+  return "未知浏览器";
+};
 
 /**
  * 处理编辑用户
  */
 const handleEdit = () => {
-  router.push(`/user/edit/${props.user.id}`)
-  emit('close')
-}
+  router.push(`/user/edit/${props.user.id}`);
+  emit("close");
+};
 
 /**
  * 处理重置密码
@@ -317,76 +317,68 @@ const handleEdit = () => {
 const handleResetPassword = async () => {
   try {
     await ElMessageBox.confirm(
-      '确定要重置该用户的密码吗？新密码将通过邮件发送给用户。',
-      '重置密码',
+      "确定要重置该用户的密码吗？新密码将通过邮件发送给用户。",
+      "重置密码",
       {
-        type: 'warning'
-      }
-    )
-    
-    await resetUserPassword(props.user.id)
-    ElMessage.success('密码重置成功，新密码已发送到用户邮箱')
+        type: "warning",
+      },
+    );
+
+    await resetUserPassword(props.user.id);
+    ElMessage.success("密码重置成功，新密码已发送到用户邮箱");
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('密码重置失败')
+    if (error !== "cancel") {
+      ElMessage.error("密码重置失败");
     }
   }
-}
+};
 
 /**
  * 处理切换用户状态
  */
 const handleToggleStatus = async () => {
   try {
-    const action = props.user.is_active ? '禁用' : '启用'
-    await ElMessageBox.confirm(
-      `确定要${action}该用户吗？`,
-      `${action}用户`,
-      {
-        type: 'warning'
-      }
-    )
-    
-    await updateUserStatus(props.user.id, !props.user.is_active)
-    ElMessage.success(`用户${action}成功`)
+    const action = props.user.is_active ? "禁用" : "启用";
+    await ElMessageBox.confirm(`确定要${action}该用户吗？`, `${action}用户`, {
+      type: "warning",
+    });
+
+    await updateUserStatus(props.user.id, !props.user.is_active);
+    ElMessage.success(`用户${action}成功`);
     // 更新本地状态
-    props.user.is_active = !props.user.is_active
+    props.user.is_active = !props.user.is_active;
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('操作失败')
+    if (error !== "cancel") {
+      ElMessage.error("操作失败");
     }
   }
-}
+};
 
 /**
  * 处理终止会话
  */
 const handleTerminateSession = async (session: UserSession) => {
   try {
-    await ElMessageBox.confirm(
-      '确定要终止该会话吗？',
-      '终止会话',
-      {
-        type: 'warning'
-      }
-    )
-    
-    await terminateUserSession(session.id)
-    ElMessage.success('会话终止成功')
+    await ElMessageBox.confirm("确定要终止该会话吗？", "终止会话", {
+      type: "warning",
+    });
+
+    await terminateUserSession(session.id);
+    ElMessage.success("会话终止成功");
     // 重新加载会话列表
-    const sessionsRes = await getUserSessions(props.user.id)
-    userSessions.value = sessionsRes.data
+    const sessionsRes = await getUserSessions(props.user.id);
+    userSessions.value = sessionsRes.data;
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('终止会话失败')
+    if (error !== "cancel") {
+      ElMessage.error("终止会话失败");
     }
   }
-}
+};
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadUserDetail()
-})
+  loadUserDetail();
+});
 </script>
 
 <style lang="scss" scoped>

@@ -24,7 +24,7 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :xs="24" :sm="12" :md="6">
         <el-card class="stat-card">
           <div class="stat-content">
@@ -38,7 +38,7 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :xs="24" :sm="12" :md="6">
         <el-card class="stat-card">
           <div class="stat-content">
@@ -52,7 +52,7 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :xs="24" :sm="12" :md="6">
         <el-card class="stat-card">
           <div class="stat-content">
@@ -86,7 +86,7 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :xs="24" :lg="12">
         <el-card class="chart-card">
           <template #header>
@@ -111,7 +111,10 @@
         <span>快速操作</span>
       </template>
       <div class="actions-grid">
-        <el-button type="primary" @click="$router.push('/data-center/resources')">
+        <el-button
+          type="primary"
+          @click="$router.push('/data-center/resources')"
+        >
           <el-icon><Plus /></el-icon>
           新建资源
         </el-button>
@@ -133,16 +136,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, onMounted } from "vue";
+import { ElMessage } from "element-plus";
 
 // 统计数据
 const stats = ref({
   totalResources: 0,
   totalUsers: 0,
   todayViews: 0,
-  todayDownloads: 0
-})
+  todayDownloads: 0,
+});
 
 /**
  * 加载统计数据
@@ -150,38 +153,38 @@ const stats = ref({
 const loadStats = async () => {
   try {
     // 模拟数据加载
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     stats.value = {
       totalResources: 1248,
       totalUsers: 356,
       todayViews: 2847,
-      todayDownloads: 156
-    }
+      todayDownloads: 156,
+    };
   } catch (error) {
-    console.error('加载统计数据失败:', error)
-    ElMessage.error('加载统计数据失败')
+    console.error("加载统计数据失败:", error);
+    ElMessage.error("加载统计数据失败");
   }
-}
+};
 
 /**
  * 刷新图表
  */
 const refreshChart = () => {
-  ElMessage.success('图表已刷新')
-}
+  ElMessage.success("图表已刷新");
+};
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadStats()
-})
+  loadStats();
+});
 </script>
 
 <style lang="scss" scoped>
 .data-center-overview {
   .page-header {
     margin-bottom: 24px;
-    
+
     .page-title {
       display: flex;
       align-items: center;
@@ -189,27 +192,27 @@ onMounted(() => {
       font-weight: 600;
       color: var(--el-text-color-primary);
       margin: 0 0 8px 0;
-      
+
       .title-icon {
         margin-right: 8px;
         color: var(--el-color-primary);
       }
     }
-    
+
     .page-description {
       color: var(--el-text-color-regular);
       margin: 0;
     }
   }
-  
+
   .stats-cards {
     margin-bottom: 24px;
-    
+
     .stat-card {
       .stat-content {
         display: flex;
         align-items: center;
-        
+
         .stat-icon {
           width: 48px;
           height: 48px;
@@ -218,29 +221,29 @@ onMounted(() => {
           align-items: center;
           justify-content: center;
           margin-right: 16px;
-          
+
           .el-icon {
             font-size: 24px;
             color: white;
           }
-          
+
           &.primary {
             background: var(--el-color-primary);
           }
-          
+
           &.success {
             background: var(--el-color-success);
           }
-          
+
           &.warning {
             background: var(--el-color-warning);
           }
-          
+
           &.info {
             background: var(--el-color-info);
           }
         }
-        
+
         .stat-info {
           .stat-value {
             font-size: 28px;
@@ -248,7 +251,7 @@ onMounted(() => {
             color: var(--el-text-color-primary);
             line-height: 1;
           }
-          
+
           .stat-label {
             font-size: 14px;
             color: var(--el-text-color-regular);
@@ -258,20 +261,20 @@ onMounted(() => {
       }
     }
   }
-  
+
   .charts-section {
     margin-bottom: 24px;
-    
+
     .chart-card {
       .card-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
       }
-      
+
       .chart-container {
         height: 300px;
-        
+
         .chart-placeholder {
           height: 100%;
           display: flex;
@@ -279,7 +282,7 @@ onMounted(() => {
           align-items: center;
           justify-content: center;
           color: var(--el-text-color-placeholder);
-          
+
           .chart-icon {
             font-size: 48px;
             margin-bottom: 16px;
@@ -288,16 +291,16 @@ onMounted(() => {
       }
     }
   }
-  
+
   .quick-actions {
     .actions-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 16px;
-      
+
       .el-button {
         height: 48px;
-        
+
         .el-icon {
           margin-right: 8px;
         }
@@ -314,13 +317,13 @@ onMounted(() => {
         margin-bottom: 16px;
       }
     }
-    
+
     .charts-section {
       .el-col {
         margin-bottom: 16px;
       }
     }
-    
+
     .quick-actions {
       .actions-grid {
         grid-template-columns: 1fr;

@@ -67,7 +67,7 @@ const menuRoutes = computed(() => {
  */
 function filterMenuRoutes(
   routes: RouteRecordRaw[],
-  basePath = ""
+  basePath = "",
 ): RouteRecordRaw[] {
   const filteredRoutes: RouteRecordRaw[] = [];
 
@@ -141,9 +141,11 @@ function hasPermission(route: RouteRecordRaw): boolean {
 
   // 单个权限码
   if (route.meta?.permission) {
-    const perm = route.meta.permission as string
-    const useStrict = Boolean((route.meta as any)?.strictPermission)
-    const ok = useStrict ? userStore.hasPermissionStrict(perm) : userStore.hasPermission(perm)
+    const perm = route.meta.permission as string;
+    const useStrict = Boolean((route.meta as any)?.strictPermission);
+    const ok = useStrict
+      ? userStore.hasPermissionStrict(perm)
+      : userStore.hasPermission(perm);
     if (!ok) {
       return false;
     }
@@ -152,10 +154,10 @@ function hasPermission(route: RouteRecordRaw): boolean {
   // 任一权限
   if (route.meta?.permissionsAny) {
     const any = route.meta.permissionsAny as string[];
-    const useStrict = Boolean((route.meta as any)?.strictPermission)
+    const useStrict = Boolean((route.meta as any)?.strictPermission);
     const ok = useStrict
       ? any.some((p) => userStore.hasPermissionStrict(p))
-      : userStore.hasAnyPermission(any)
+      : userStore.hasAnyPermission(any);
     if (!ok) {
       return false;
     }
@@ -164,10 +166,10 @@ function hasPermission(route: RouteRecordRaw): boolean {
   // 所有权限
   if (route.meta?.permissionsAll) {
     const all = route.meta.permissionsAll as string[];
-    const useStrict = Boolean((route.meta as any)?.strictPermission)
+    const useStrict = Boolean((route.meta as any)?.strictPermission);
     const ok = useStrict
       ? all.every((p) => userStore.hasPermissionStrict(p))
-      : userStore.hasAllPermissions(all)
+      : userStore.hasAllPermissions(all);
     if (!ok) {
       return false;
     }
@@ -365,14 +367,14 @@ function isExternalLink(path: string): boolean {
 .is-collapsed {
   .sidebar-menu {
     :deep(.el-sub-menu) {
-        &.is-opened {
-          .el-sub-menu__title {
-            .el-sub-menu__icon-arrow {
-              color: var(--el-color-primary);
-              transform: rotateZ(90deg) !important;
-            }
+      &.is-opened {
+        .el-sub-menu__title {
+          .el-sub-menu__icon-arrow {
+            color: var(--el-color-primary);
+            transform: rotateZ(90deg) !important;
           }
         }
+      }
     }
   }
 }

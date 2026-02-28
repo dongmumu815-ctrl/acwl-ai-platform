@@ -6,27 +6,56 @@
         <div class="card-header">
           <span class="card-title">资源中心查询</span>
           <div class="header-actions">
-            <el-button type="primary" size="small" @click="openExportDialog('current')" :disabled="!results?.hits?.hits?.length">
+            <el-button
+              type="primary"
+              size="small"
+              :disabled="!results?.hits?.hits?.length"
+              @click="openExportDialog('current')"
+            >
               <el-icon style="margin-right: 4px"><Download /></el-icon>
               导出当前页结果
             </el-button>
-            <el-button type="primary" size="small" @click="openExportDialog('all')" :disabled="!results?.hits?.hits?.length">
+            <el-button
+              type="primary"
+              size="small"
+              :disabled="!results?.hits?.hits?.length"
+              @click="openExportDialog('all')"
+            >
               <el-icon style="margin-right: 4px"><Download /></el-icon>
               导出全部结果
             </el-button>
-            
+
             <!-- 导出进度显示 -->
-            <div v-if="exportStatus === 'processing' || exportStatus === 'completed' || latestFileAvailable" class="export-progress">
-              <el-progress 
+            <div
+              v-if="
+                exportStatus === 'processing' ||
+                exportStatus === 'completed' ||
+                latestFileAvailable
+              "
+              class="export-progress"
+            >
+              <el-progress
                 v-if="exportPercentage !== undefined"
-                :percentage="exportPercentage" 
-                :stroke-width="8" 
-                :status="exportStatus === 'failed' ? 'exception' : (exportStatus === 'completed' ? 'success' : undefined)"
-                style="width: 180px; margin-left: 8px;"
+                :percentage="exportPercentage"
+                :stroke-width="8"
+                :status="
+                  exportStatus === 'failed'
+                    ? 'exception'
+                    : exportStatus === 'completed'
+                      ? 'success'
+                      : undefined
+                "
+                style="width: 180px; margin-left: 8px"
               />
               <div v-if="exportProgress" class="export-progress-text">
-                <span v-if="exportProgress?.total != null">已处理 {{ formatNumber(exportProgress?.processed) }} / {{ formatNumber(exportProgress?.total) }}</span>
-                <span v-else>已处理 {{ formatNumber(exportProgress?.processed || 0) }}</span>
+                <span v-if="exportProgress?.total != null"
+                  >已处理 {{ formatNumber(exportProgress?.processed) }} /
+                  {{ formatNumber(exportProgress?.total) }}</span
+                >
+                <span v-else
+                  >已处理
+                  {{ formatNumber(exportProgress?.processed || 0) }}</span
+                >
                 <span class="divider">|</span>
                 <span>页 {{ exportProgress?.pages_fetched || 0 }}</span>
                 <span class="divider">|</span>
@@ -37,8 +66,8 @@
                 v-if="canDownloadNow || latestFileAvailable"
                 type="primary"
                 :underline="true"
+                style="margin-left: 8px"
                 @click="downloadExportFile"
-                style="margin-left: 8px;"
               >
                 <el-icon><Download /></el-icon>
                 下载文件
@@ -97,7 +126,7 @@
               </el-button>
             </div>
           </div>
-          <div class="locked-conditions" v-if="fixedConditions.length">
+          <div v-if="fixedConditions.length" class="locked-conditions">
             <span class="section-title">限定条件</span>
             <div class="condition-list">
               <el-tag
@@ -113,7 +142,7 @@
           </div>
 
           <!-- 高级检索：点击按钮后展示，查询/重置/添加条件都在此处 -->
-          <div class="query-builder" v-if="showAdvanced">
+          <div v-if="showAdvanced" class="query-builder">
             <div class="qb-header">
               <span class="section-title">高级检索</span>
               <div class="qb-actions">
@@ -132,8 +161,8 @@
                   plain
                   type="primary"
                   size="small"
-                  @click="addCondition"
                   :disabled="availableFieldNames.length === 0"
+                  @click="addCondition"
                 >
                   <el-icon><Plus /></el-icon>
                   添加条件
@@ -141,14 +170,22 @@
                 <el-button size="small" @click="toggleAdvanced">收起</el-button>
               </div>
             </div>
-            <div class="conditions" v-show="!conditionsCollapsed">
+            <div v-show="!conditionsCollapsed" class="conditions">
               <div v-for="(c, i) in conditions" :key="i" class="condition-item">
-                <el-select v-if="i > 0" v-model="c.logic" size="small" style="width: 90px">
+                <el-select
+                  v-if="i > 0"
+                  v-model="c.logic"
+                  size="small"
+                  style="width: 90px"
+                >
                   <el-option label="AND" value="must" />
                   <el-option label="OR" value="should" />
                   <el-option label="NOT" value="must_not" />
                 </el-select>
-                <div v-else :style="{ width: '90px', display: 'inline-block' }"></div>
+                <div
+                  v-else
+                  :style="{ width: '90px', display: 'inline-block' }"
+                ></div>
 
                 <el-select
                   v-model="c.field"
@@ -203,10 +240,10 @@
                 </template>
 
                 <el-button
-                  @click="removeCondition(i)"
                   size="small"
                   type="danger"
                   plain
+                  @click="removeCondition(i)"
                 >
                   <el-icon><Delete /></el-icon>
                 </el-button>
@@ -242,23 +279,29 @@
                   inactive-text="省略"
                 />
                 <el-button
-                  @click="toggleFullscreen"
                   size="small"
                   :type="isFullscreen ? 'default' : 'primary'"
                   :icon="FullScreen"
+                  @click="toggleFullscreen"
                 >
                   {{ isFullscreen ? "退出全屏" : "全屏显示" }}
                 </el-button>
                 <el-button
-                  @click="toggleSelectAll"
                   size="small"
                   :type="isAllSelected ? 'success' : 'default'"
                   :icon="Check"
                   style="margin-left: 8px"
+                  @click="toggleSelectAll"
                 >
                   {{ isAllSelected ? "取消全选" : "全选当前页" }}
                 </el-button>
-                <span class="selected-count" style="margin-left: 8px; color: var(--el-text-color-secondary)">
+                <span
+                  class="selected-count"
+                  style="
+                    margin-left: 8px;
+                    color: var(--el-text-color-secondary);
+                  "
+                >
                   已选 {{ selectedCount }} 条
                 </span>
               </div>
@@ -267,7 +310,7 @@
         </div>
         <div class="section-body">
           <!-- 结果展示：左右两栏 -->
-          <div class="section results-section" v-loading="loading">
+          <div v-loading="loading" class="section results-section">
             <!-- <div class="section-header">
           <div class="results-header">
             <span class="section-title">查询结果</span>
@@ -306,7 +349,9 @@
                               class="agg-row clickable"
                               @click="onAggBucketClick(String(aggName), bucket)"
                             >
-                              <span class="agg-key">{{ formatAggKey(bucket.key) }}</span>
+                              <span class="agg-key">{{
+                                formatAggKey(bucket.key)
+                              }}</span>
                               <span class="agg-count">{{
                                 bucket.doc_count
                               }}</span>
@@ -319,7 +364,7 @@
                                 'avg',
                                 'max',
                                 'min',
-                                'value_count'
+                                'value_count',
                               ].includes(agg.type)
                             "
                           >
@@ -373,7 +418,7 @@
                                 formatTextWithHighlight(
                                   formatCell(row[col]),
                                   DEFAULT_MAX_CHARS,
-                                  executedSearchValue
+                                  executedSearchValue,
                                 )
                               "
                             ></span>
@@ -425,8 +470,11 @@
                             <div class="card-title-row">
                               <el-checkbox
                                 :model-value="isCardSelected(idx)"
-                                @change="(val: boolean) => toggleCardSelection(idx, val)"
                                 style="margin-right: 8px"
+                                @change="
+                                  (val: boolean) =>
+                                    toggleCardSelection(idx, val)
+                                "
                               />
                               <el-link
                                 type="primary"
@@ -439,7 +487,7 @@
                                     formatTextWithHighlight(
                                       formatCell(row[getTitleField(row)]),
                                       null,
-                                      executedSearchValue
+                                      executedSearchValue,
                                     )
                                   "
                                 ></span>
@@ -461,7 +509,7 @@
                                     formatTextWithHighlight(
                                       formatCell(row[f]),
                                       DEFAULT_MAX_CHARS,
-                                      executedSearchValue
+                                      executedSearchValue,
                                     )
                                   "
                                 ></span>
@@ -476,10 +524,21 @@
                                   </el-link>
                                 </template>
                                 <template v-if="f === 'publication_category'">
-                                  <el-icon v-if="String(row[f]).toUpperCase() === 'BOOK'" style="margin-left: 6px; color: #6b7fd7;">
+                                  <el-icon
+                                    v-if="
+                                      String(row[f]).toUpperCase() === 'BOOK'
+                                    "
+                                    style="margin-left: 6px; color: #6b7fd7"
+                                  >
                                     <Reading />
                                   </el-icon>
-                                  <el-icon v-else-if="String(row[f]).toUpperCase() === 'JOURNAL_ARTICLE'" style="margin-left: 6px; color: #e37b40;">
+                                  <el-icon
+                                    v-else-if="
+                                      String(row[f]).toUpperCase() ===
+                                      'JOURNAL_ARTICLE'
+                                    "
+                                    style="margin-left: 6px; color: #e37b40"
+                                  >
                                     <Document />
                                   </el-icon>
                                 </template>
@@ -487,13 +546,13 @@
                             </div>
                             <!-- 描述字段单独展示（如果存在），使用宽行显示更易读 -->
                             <div
-                              class="card-row wide"
                               v-if="
                                 row &&
                                 'description' in row &&
                                 row['description'] !== undefined &&
                                 row['description'] !== null
                               "
+                              class="card-row wide"
                             >
                               <div class="kv">
                                 <span class="k">{{
@@ -506,7 +565,7 @@
                                     formatTextWithHighlight(
                                       formatCell(row['description']),
                                       DEFAULT_MAX_CHARS,
-                                      executedSearchValue
+                                      executedSearchValue,
                                     )
                                   "
                                 ></span>
@@ -517,11 +576,11 @@
                       </div>
                     </div>
                   </template>
-                  <div class="pager" v-if="results">
+                  <div v-if="results" class="pager">
                     <el-pagination
                       v-model:current-page="currentPage"
                       v-model:page-size="pageSize"
-                      :page-sizes="[10, 20, 50, 100,1000,2000,3000,4000]"
+                      :page-sizes="[10, 20, 50, 100, 1000, 2000, 3000, 4000]"
                       layout="total, sizes, prev, pager, next, jumper"
                       :total="totalHits"
                       @current-change="onPageChange"
@@ -536,14 +595,14 @@
                     class="detail-drawer"
                   >
                     <div class="detail-header">
-                      <el-page-header
-                        @back="detailVisible = false"
-                      >
+                      <el-page-header @back="detailVisible = false">
                         <template #icon>
-                          <el-icon style="font-size: 22px;"><ArrowLeft /></el-icon>
+                          <el-icon style="font-size: 22px"
+                            ><ArrowLeft
+                          /></el-icon>
                         </template>
-                        <template #title> 
-                          <span style="font-size: 22px;">数据详情</span>  
+                        <template #title>
+                          <span style="font-size: 22px">数据详情</span>
                         </template>
                       </el-page-header>
                     </div>
@@ -607,11 +666,11 @@
                                         ? JSON.stringify(
                                             selectedRow?.[f],
                                             null,
-                                            2
+                                            2,
                                           )
                                         : selectedRow?.[f],
                                       null,
-                                      executedSearchValue
+                                      executedSearchValue,
                                     )
                                   "
                                 ></span>
@@ -649,11 +708,13 @@
 
     <!-- 导出字段选择弹窗 -->
     <el-dialog v-model="exportDialogVisible" title="导出选项" width="500px">
-      <div style="margin-bottom: 16px;">
-        <span style="font-weight: bold; margin-right: 8px;">导出范围:</span>
-        <el-tag>{{ exportType === 'current' ? '当前页结果' : '全部查询结果' }}</el-tag>
+      <div style="margin-bottom: 16px">
+        <span style="font-weight: bold; margin-right: 8px">导出范围:</span>
+        <el-tag>{{
+          exportType === "current" ? "当前页结果" : "全部查询结果"
+        }}</el-tag>
       </div>
-      <div style="margin-bottom: 8px; font-weight: bold;">选择导出字段:</div>
+      <div style="margin-bottom: 8px; font-weight: bold">选择导出字段:</div>
       <el-checkbox
         v-model="checkAllExportFields"
         :indeterminate="isIndeterminateExportFields"
@@ -661,16 +722,28 @@
       >
         全选
       </el-checkbox>
-      <div style="margin: 10px 0;"></div>
-      <el-checkbox-group v-model="selectedExportFields" @change="handleCheckedExportFieldsChange" class="export-fields-group">
-        <el-checkbox v-for="field in availableFieldNames" :key="field" :label="field">
+      <div style="margin: 10px 0"></div>
+      <el-checkbox-group
+        v-model="selectedExportFields"
+        class="export-fields-group"
+        @change="handleCheckedExportFieldsChange"
+      >
+        <el-checkbox
+          v-for="field in availableFieldNames"
+          :key="field"
+          :label="field"
+        >
           {{ getFieldDisplayName(field) }}
         </el-checkbox>
       </el-checkbox-group>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="exportDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="executeExport" :loading="exportLoading">
+          <el-button
+            type="primary"
+            :loading="exportLoading"
+            @click="executeExport"
+          >
             确认导出
           </el-button>
         </span>
@@ -681,7 +754,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, nextTick, onUnmounted } from "vue";
+import {
+  ref,
+  reactive,
+  computed,
+  onMounted,
+  watch,
+  nextTick,
+  onUnmounted,
+} from "vue";
 
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
@@ -697,7 +778,7 @@ import {
   Reading,
   Collection,
   Document,
-  Check
+  Check,
 } from "@element-plus/icons-vue";
 import { ArrowLeft, Close } from "@element-plus/icons-vue";
 import { templateApi } from "@/api/template";
@@ -727,7 +808,7 @@ const dialogData = reactive<{
 }>({
   excel_time: undefined,
   download_time: undefined,
-  download_url: undefined
+  download_url: undefined,
 });
 
 // 历史文件相关状态
@@ -742,7 +823,7 @@ const availableFields = ref<Array<{ name: string; type?: string }>>([]);
 const availableFieldNames = computed(() =>
   sourceFields.value.length > 0
     ? sourceFields.value
-    : availableFields.value.map((f) => f.name)
+    : availableFields.value.map((f) => f.name),
 );
 const selectedIndices = ref<string[]>([]);
 
@@ -787,7 +868,7 @@ function stripTags(html: string): string {
 function extractSentence(
   text: string,
   keyword: string | string[],
-  maxLen = 200
+  maxLen = 200,
 ): string {
   if (!text) return "";
   if (!keyword)
@@ -826,7 +907,7 @@ function extractSentence(
     text.lastIndexOf(";", idx),
     text.lastIndexOf(".", idx),
     text.lastIndexOf("!", idx),
-    text.lastIndexOf("?", idx)
+    text.lastIndexOf("?", idx),
   );
   const rightCandidates = [
     text.indexOf("。", idx),
@@ -835,7 +916,7 @@ function extractSentence(
     text.indexOf(";", idx),
     text.indexOf(".", idx),
     text.indexOf("!", idx),
-    text.indexOf("?", idx)
+    text.indexOf("?", idx),
   ].filter((v) => v >= 0);
   const right = rightCandidates.length ? Math.min(...rightCandidates) : -1;
   const start = left >= 0 ? left + 1 : 0;
@@ -846,9 +927,7 @@ function extractSentence(
     const half = Math.floor(maxLen / 2);
     const s = Math.max(0, idx - half);
     const e = Math.min(text.length, idx + kLen + half);
-    return (
-      (s > 0 ? "…" : "") + text.slice(s, e) + (e < text.length ? "…" : "")
-    );
+    return (s > 0 ? "…" : "") + text.slice(s, e) + (e < text.length ? "…" : "");
   }
   return sentence;
 }
@@ -864,8 +943,8 @@ const records = computed<any[]>(() => {
 
   const isPagesSearch = Boolean(
     defaultSearchField.value &&
-      (defaultSearchField.value === "pages" ||
-        defaultSearchField.value.startsWith("pages"))
+    (defaultSearchField.value === "pages" ||
+      defaultSearchField.value.startsWith("pages")),
   );
   const expanded: any[] = [];
 
@@ -885,14 +964,14 @@ const records = computed<any[]>(() => {
             const pagesArr = Array.isArray(src?.pages) ? src.pages : [];
             const found = pagesArr.find(
               (p: any) =>
-                typeof p?.content === "string" && p.content.includes(fragPlain)
+                typeof p?.content === "string" && p.content.includes(fragPlain),
             );
             pageNum = found?.pageNumber ?? null;
           }
           expanded.push({
             ...common,
             pageNumber: pageNum ?? null,
-            snippet: fragPlain
+            snippet: fragPlain,
           });
         });
         return;
@@ -902,11 +981,15 @@ const records = computed<any[]>(() => {
       pagesArr.forEach((p: any) => {
         const content: string = String(p?.content ?? "");
         if (!content) return;
-        
+
         let matched = false;
         if (!keyword) matched = true;
         else if (Array.isArray(keyword)) {
-          matched = keyword.length === 0 || keyword.some(k => content.toLowerCase().includes(k.toLowerCase()));
+          matched =
+            keyword.length === 0 ||
+            keyword.some((k) =>
+              content.toLowerCase().includes(k.toLowerCase()),
+            );
         } else {
           matched = content.toLowerCase().includes(keyword.toLowerCase());
         }
@@ -916,7 +999,7 @@ const records = computed<any[]>(() => {
           expanded.push({
             ...common,
             pageNumber: p?.pageNumber ?? null,
-            snippet: sent
+            snippet: sent,
           });
         }
       });
@@ -934,13 +1017,13 @@ const CARD_INITIAL_BATCH = 50;
 const CARD_BATCH_SIZE = 50;
 const visibleCount = ref<number>(CARD_INITIAL_BATCH);
 const visibleRecords = computed<any[]>(() =>
-  records.value.slice(0, Math.max(0, visibleCount.value))
+  records.value.slice(0, Math.max(0, visibleCount.value)),
 );
 function loadMoreCards() {
   if (visibleCount.value >= records.value.length) return;
   visibleCount.value = Math.min(
     visibleCount.value + CARD_BATCH_SIZE,
-    records.value.length
+    records.value.length,
   );
 }
 function onCardsScroll(e: Event) {
@@ -982,21 +1065,21 @@ const processedRecords = computed<any[]>(() => {
         typeof va === "number"
           ? va
           : Number.isFinite(Number(va))
-          ? Number(va)
-          : null;
+            ? Number(va)
+            : null;
       const nb =
         typeof vb === "number"
           ? vb
           : Number.isFinite(Number(vb))
-          ? Number(vb)
-          : null;
+            ? Number(vb)
+            : null;
       let cmp = 0;
       if (na !== null && nb !== null) cmp = na - nb;
       else
         cmp = String(formatCell(va)).localeCompare(
           String(formatCell(vb)),
           "zh-CN",
-          { numeric: true, sensitivity: "base" }
+          { numeric: true, sensitivity: "base" },
         );
       return order === "ascending" ? cmp : -cmp;
     });
@@ -1010,7 +1093,7 @@ const onSortChange = (payload: {
 }) => {
   sortState.value = {
     field: payload?.prop || null,
-    order: payload?.order || null
+    order: payload?.order || null,
   };
 };
 
@@ -1021,7 +1104,7 @@ const selectedCardIndices = ref<Set<number>>(new Set());
 const selectedCount = computed(() =>
   viewMode.value === "list"
     ? selectedTableRows.value.length
-    : selectedCardIndices.value.size
+    : selectedCardIndices.value.size,
 );
 
 const onTableSelectionChange = (rows: Record<string, any>[]) => {
@@ -1044,12 +1127,12 @@ watch(
       try {
         tableRef.value?.clearSelection?.();
         (rows || []).forEach((r: Record<string, any>) =>
-          tableRef.value?.toggleRowSelection?.(r, true)
+          tableRef.value?.toggleRowSelection?.(r, true),
         );
       } catch {}
     });
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 watch(
@@ -1060,18 +1143,18 @@ watch(
     // 卡片选择默认全选
     selectedCardIndices.value = new Set((rows || []).map((_, i) => i));
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // 导出弹窗相关状态
 const exportDialogVisible = ref(false);
-const exportType = ref<'current' | 'all'>('current');
+const exportType = ref<"current" | "all">("current");
 const checkAllExportFields = ref(false);
 const isIndeterminateExportFields = ref(false);
 const selectedExportFields = ref<string[]>([]);
 const exportLoading = ref(false);
 
-const openExportDialog = (type: 'current' | 'all') => {
+const openExportDialog = (type: "current" | "all") => {
   exportType.value = type;
   exportDialogVisible.value = true;
   // 默认全选所有字段
@@ -1087,23 +1170,25 @@ const handleCheckAllExportFieldsChange = (val: boolean) => {
 
 const handleCheckedExportFieldsChange = (value: string[]) => {
   const checkedCount = value.length;
-  checkAllExportFields.value = checkedCount === availableFieldNames.value.length;
-  isIndeterminateExportFields.value = checkedCount > 0 && checkedCount < availableFieldNames.value.length;
+  checkAllExportFields.value =
+    checkedCount === availableFieldNames.value.length;
+  isIndeterminateExportFields.value =
+    checkedCount > 0 && checkedCount < availableFieldNames.value.length;
 };
 
 const executeExport = async () => {
   if (selectedExportFields.value.length === 0) {
-    ElMessage.warning('请至少选择一个导出字段');
+    ElMessage.warning("请至少选择一个导出字段");
     return;
   }
-  
+
   exportLoading.value = true;
   try {
     await handleExport();
     exportDialogVisible.value = false;
   } catch (error) {
-    console.error('导出异常:', error);
-    ElMessage.error('导出失败');
+    console.error("导出异常:", error);
+    ElMessage.error("导出失败");
   } finally {
     exportLoading.value = false;
   }
@@ -1113,20 +1198,21 @@ const handleExport = async () => {
   const columns = selectedExportFields.value;
   let dataToExport: any[] = [];
 
-  if (exportType.value === 'current') {
+  if (exportType.value === "current") {
     // 导出当前页：基于当前勾选或当前页所有数据
     // 优先使用勾选的数据
-    let candidates = viewMode.value === 'list'
-      ? selectedTableRows.value
-      : Array.from(selectedCardIndices.value)
-          .map((i) => records.value?.[i])
-          .filter(Boolean);
-          
+    let candidates =
+      viewMode.value === "list"
+        ? selectedTableRows.value
+        : Array.from(selectedCardIndices.value)
+            .map((i) => records.value?.[i])
+            .filter(Boolean);
+
     // 如果没有勾选，则导出当前页所有数据
     if (!candidates || candidates.length === 0) {
       candidates = records.value || [];
     }
-    
+
     if (candidates.length === 0) {
       ElMessage.warning("当前页无数据可导出");
       return;
@@ -1156,11 +1242,11 @@ const fetchAllData = async (columns: string[]) => {
   const allRows: any[] = [];
   const batchSize = 1000;
   let searchAfter = null;
-  
+
   // 构建基础查询
   const dsl = buildDSL();
   const query = dsl.query;
-  
+
   // 循环拉取
   while (true) {
     const req: any = {
@@ -1169,9 +1255,9 @@ const fetchAllData = async (columns: string[]) => {
       query: query,
       size: batchSize,
       // 仅获取需要的字段，减少传输量
-      _source: columns
+      _source: columns,
     };
-    
+
     // 使用 search_after 进行深度分页
     if (searchAfter) {
       req.search_after = searchAfter;
@@ -1179,28 +1265,28 @@ const fetchAllData = async (columns: string[]) => {
       // 第一页
       req.from = 0;
     }
-    
+
     // 强制使用 _shard_doc 排序以确保游标稳定
     // 如果原查询有排序，附加 _shard_doc；否则直接使用 _shard_doc
     if (dsl.sort) {
-       req.sort = [...dsl.sort];
-       // 检查是否已有 _shard_doc，没有则追加
-       const hasShardDoc = req.sort.some((s: any) => s._shard_doc);
-       if (!hasShardDoc) {
-         req.sort.push({ _shard_doc: { order: "asc" } });
-       }
+      req.sort = [...dsl.sort];
+      // 检查是否已有 _shard_doc，没有则追加
+      const hasShardDoc = req.sort.some((s: any) => s._shard_doc);
+      if (!hasShardDoc) {
+        req.sort.push({ _shard_doc: { order: "asc" } });
+      }
     } else {
-       req.sort = [{ _shard_doc: { order: "asc" } }];
+      req.sort = [{ _shard_doc: { order: "asc" } }];
     }
 
     const resp = await executeESQuery(req);
     const data = resp?.data || resp;
     const hits = data?.hits?.hits || [];
-    
+
     if (hits.length === 0) break;
-    
+
     allRows.push(...hits.map((h: any) => h._source));
-    
+
     // 更新游标
     const lastHit = hits[hits.length - 1];
     if (lastHit && lastHit.sort) {
@@ -1209,27 +1295,29 @@ const fetchAllData = async (columns: string[]) => {
       // 如果没有 sort 字段，无法继续
       break;
     }
-    
+
     if (hits.length < batchSize) break;
-    
+
     // 安全限制：防止浏览器崩溃，限制最大导出 10万条
     if (allRows.length >= 100000) {
       ElMessage.warning("导出数据量过大，已截断为前100,000条");
       break;
     }
   }
-  
+
   return allRows;
 };
 
 const exportToCSV = (rows: any[], columns: string[]) => {
   // 构建CSV内容
   let csvContent = "";
-  
+
   // 添加表头
-  const headers = columns.map(field => `"${getFieldDisplayName(field).replace(/"/g, '""')}"`);
+  const headers = columns.map(
+    (field) => `"${getFieldDisplayName(field).replace(/"/g, '""')}"`,
+  );
   csvContent += headers.join(",") + "\n";
-  
+
   // 添加数据行
   rows.forEach((row: Record<string, any>) => {
     const values: string[] = [];
@@ -1245,7 +1333,7 @@ const exportToCSV = (rows: any[], columns: string[]) => {
       } else {
         cellValue = String(cellValue);
       }
-      
+
       // 处理CSV特殊字符
       cellValue = cellValue.replace(/"/g, '""');
       values.push(`"${cellValue}"`);
@@ -1254,25 +1342,33 @@ const exportToCSV = (rows: any[], columns: string[]) => {
   });
 
   // 创建并下载CSV文件
-  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + csvContent], {
+    type: "text/csv;charset=utf-8;",
+  });
   const link = document.createElement("a");
-  const fileName = `${props.packageData?.name || "资源包查询"}_${exportType.value === 'all' ? '全部' : '当前页'}_${new Date()
+  const fileName = `${props.packageData?.name || "资源包查询"}_${exportType.value === "all" ? "全部" : "当前页"}_${new Date()
     .toISOString()
     .slice(0, 10)}.csv`;
   link.href = URL.createObjectURL(blob);
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(link.href);
-  
+
   ElMessage.success("导出成功");
 };
 
 // 全选/取消全选逻辑与状态
 const isAllSelected = computed(() => {
   if (viewMode.value === "list") {
-    return processedRecords.value.length > 0 && selectedTableRows.value.length === processedRecords.value.length;
+    return (
+      processedRecords.value.length > 0 &&
+      selectedTableRows.value.length === processedRecords.value.length
+    );
   }
-  return records.value.length > 0 && selectedCardIndices.value.size === records.value.length;
+  return (
+    records.value.length > 0 &&
+    selectedCardIndices.value.size === records.value.length
+  );
 });
 
 const selectAllCurrentView = () => {
@@ -1282,7 +1378,9 @@ const selectAllCurrentView = () => {
     nextTick(() => {
       try {
         tableRef.value?.clearSelection?.();
-        rows.forEach((r: Record<string, any>) => tableRef.value?.toggleRowSelection?.(r, true));
+        rows.forEach((r: Record<string, any>) =>
+          tableRef.value?.toggleRowSelection?.(r, true),
+        );
       } catch {}
     });
   } else {
@@ -1327,22 +1425,24 @@ const exportResults = async () => {
     await ElMessageBox.confirm("确定要导出查询结果吗？", "确认导出", {
       confirmButtonText: "确定",
       cancelButtonText: "取消",
-      type: "info"
+      type: "info",
     });
 
     // 构建CSV内容
     let csvContent = "";
-    
+
     // 添加表头
-    const headers = displayFields.value.map(field => `"${getFieldDisplayName(field).replace(/"/g, '""')}"`);
+    const headers = displayFields.value.map(
+      (field) => `"${getFieldDisplayName(field).replace(/"/g, '""')}"`,
+    );
     csvContent += headers.join(",") + "\n";
-    
+
     // 添加数据行
     exportRows.forEach((row: Record<string, any>) => {
       const values: string[] = [];
       displayFields.value.forEach((field: string) => {
         const v = row?.[field];
-        let cellValue = typeof v === "object" ? JSON.stringify(v) : v ?? "";
+        let cellValue = typeof v === "object" ? JSON.stringify(v) : (v ?? "");
         // 处理CSV特殊字符
         cellValue = String(cellValue).replace(/"/g, '""');
         values.push(`"${cellValue}"`);
@@ -1351,7 +1451,9 @@ const exportResults = async () => {
     });
 
     // 创建并下载CSV文件
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\uFEFF" + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
     const link = document.createElement("a");
     const fileName = `${props.packageData?.name || "资源包查询"}_${new Date()
       .toISOString()
@@ -1360,7 +1462,7 @@ const exportResults = async () => {
     link.download = fileName;
     link.click();
     URL.revokeObjectURL(link.href);
-    
+
     ElMessage.success("导出成功");
   } catch (error: any) {
     if (error !== "cancel") {
@@ -1460,7 +1562,9 @@ function onPageChange(page: number) {
     currentPage.value = maxOffsetPages;
     lastPageLoaded.value = maxOffsetPages;
     lastSearchAfter.value = null;
-    ElMessage.warning(`超过 10,000 结果窗口限制，已跳转至上限页（第 ${maxOffsetPages} 页），继续点击“下一页”将进入滑动查询模式`);
+    ElMessage.warning(
+      `超过 10,000 结果窗口限制，已跳转至上限页（第 ${maxOffsetPages} 页），继续点击“下一页”将进入滑动查询模式`,
+    );
     executeQuery();
     return;
   }
@@ -1491,15 +1595,15 @@ const totalHits = computed<number>(() => {
 // 重复的深分页状态与方法已移除，统一使用上方 onPageChange 实现
 
 // 按字段值长度构建一致的字段顺序
-  const fieldOrder = ref<string[]>([]);
-  const displayFields = computed<string[]>(() => {
+const fieldOrder = ref<string[]>([]);
+const displayFields = computed<string[]>(() => {
   // 收集所有潜在字段（来源于映射或当前记录）
   const allFields = new Set<string>();
   if (sourceFields.value.length) {
     sourceFields.value.forEach((f) => allFields.add(f));
   } else {
     records.value.forEach((r) =>
-      Object.keys(r || {}).forEach((k) => allFields.add(k))
+      Object.keys(r || {}).forEach((k) => allFields.add(k)),
     );
   }
 
@@ -1507,7 +1611,7 @@ const totalHits = computed<number>(() => {
   if (fieldOrder.value.length) {
     const ordered = [...fieldOrder.value];
     const leftover = Array.from(allFields).filter(
-      (f) => !fieldOrder.value.includes(f)
+      (f) => !fieldOrder.value.includes(f),
     );
     return ordered.concat(leftover);
   }
@@ -1547,8 +1651,8 @@ const basicDisplayFields = computed<string[]>(() => {
       "data_source",
       "source",
       "pdf_url",
-      "abstract"
-    ])
+      "abstract",
+    ]),
   );
 
   const preferredPresent = preferred.filter(hasField);
@@ -1565,21 +1669,32 @@ const basicDisplayFields = computed<string[]>(() => {
 const normalizedAggs = computed<Record<string, any>>(() => {
   const aggs = results.value?.aggregations;
   if (!aggs) return {};
-  const tplQuery = templateDetail.value?.query || templateDetail.value?.query_content;
+  const tplQuery =
+    templateDetail.value?.query || templateDetail.value?.query_content;
 
   // 收集条目，包含识别字段，后续按优先级排序
-  const entries: Array<{ name: string; info: any; isPreferred: boolean; orderHint: number }> = [];
-  const preferredFields = new Set(["publication_category", "data_type", "type"]);
+  const entries: Array<{
+    name: string;
+    info: any;
+    isPreferred: boolean;
+    orderHint: number;
+  }> = [];
+  const preferredFields = new Set([
+    "publication_category",
+    "data_type",
+    "type",
+  ]);
 
   Object.entries(aggs).forEach(([name, cfg]: [string, any]) => {
     if (cfg?.buckets && Array.isArray(cfg.buckets)) {
       const field = tplQuery?.aggs?.[name]?.terms?.field;
       const info = { type: "terms", buckets: cfg.buckets, field, raw: cfg };
       const nameLower = String(name).toLowerCase();
-      const isPreferred = (field && preferredFields.has(String(field)))
-        || nameLower.includes("data_type")
-        || nameLower.includes("publication")
-        || nameLower.includes("type");
+      const isPreferred =
+        (field && preferredFields.has(String(field))) ||
+        nameLower.includes("data_type") ||
+        nameLower.includes("publication") ||
+        nameLower.includes("type");
       // 使用 orderHint 便于扩展更多优先策略
       const orderHint = isPreferred ? 0 : 1;
       entries.push({ name, info, isPreferred, orderHint });
@@ -1635,7 +1750,7 @@ async function initFromTemplate() {
     if (!props.packageData?.template_id) return;
     const resp: any = await templateApi.getByType(
       props.packageData.template_id,
-      "es"
+      "es",
     );
     const detail = resp?.data || resp;
     templateDetail.value = detail;
@@ -1656,7 +1771,7 @@ async function initFromTemplate() {
     // 解析模板条件（锁定为限定条件）
     const conditionsCfg = detail?.config?.conditions || [];
     fixedConditions.value = conditionsCfg.filter(
-      (c: any) => c.locked || c.lockType === "locked"
+      (c: any) => c.locked || c.lockType === "locked",
     );
 
     // 如未提供_source，尝试加载字段映射
@@ -1667,7 +1782,7 @@ async function initFromTemplate() {
     ) {
       const fieldsResp = await getESFieldMapping(
         props.packageData.datasource_id,
-        selectedIndices.value
+        selectedIndices.value,
       );
       const fields = (fieldsResp?.data || []) as Array<{
         name: string;
@@ -1689,7 +1804,7 @@ async function loadInitialFieldMappings() {
       query: { match_all: {} },
       size: 0,
       from: 0,
-      _source: []
+      _source: [],
     };
     const resp = await executeESQuery(req);
     // 兼容不同返回结构：优先从 resp.data 读取
@@ -1726,7 +1841,10 @@ async function ensureIndicesFromResource() {
 
 // 索引就绪状态：有数据源ID且已解析到索引
 const isIndicesReady = computed(() => {
-  return Boolean(props.packageData?.datasource_id) && selectedIndices.value.length > 0;
+  return (
+    Boolean(props.packageData?.datasource_id) &&
+    selectedIndices.value.length > 0
+  );
 });
 
 function addCondition() {
@@ -1786,7 +1904,7 @@ function buildDSL(): any {
   const bool = {
     must: [] as any[],
     should: [] as any[],
-    must_not: [] as any[]
+    must_not: [] as any[],
   };
 
   // 固定条件
@@ -1836,7 +1954,7 @@ function buildDSL(): any {
           nested: {
             path: "pages",
             query: {
-              match: { "pages.content": keyword }
+              match: { "pages.content": keyword },
             },
             inner_hits: {
               name: "pages",
@@ -1846,18 +1964,18 @@ function buildDSL(): any {
                     fragment_size: 200,
                     number_of_fragments: 5,
                     pre_tags: ["<em>"],
-                    post_tags: ["</em>"]
-                  }
-                }
+                    post_tags: ["</em>"],
+                  },
+                },
               },
-              size: 20
-            }
-          }
+              size: 20,
+            },
+          },
         });
       } else {
         // 非嵌套字段，使用 match 查询
         bool.must.push({
-          match: { [fld]: keyword }
+          match: { [fld]: keyword },
         });
       }
     } else {
@@ -1874,8 +1992,8 @@ function buildDSL(): any {
             multi_match: {
               query: defaultSearchValue.value.trim(),
               fields: nonDateFields,
-              type: "best_fields"
-            }
+              type: "best_fields",
+            },
           });
         }
       }
@@ -1951,161 +2069,165 @@ function buildDSL(): any {
       // pages 字段为嵌套类型，改造为 nested 查询，并附带 inner_hits 高亮
       const isPagesField = c.field === "pages" || c.field.startsWith("pages");
       if (isPagesField) {
-      const f = "pages.content";
-      switch (c.type) {
-        case "term":
-          clause = {
-            nested: {
-              path: "pages",
-              query: { term: { [f]: c.value } },
-              inner_hits: {
-                name: "pages",
-                highlight: {
-                  fields: {
-                    "pages.content": {
-                      fragment_size: 200,
-                      number_of_fragments: 5,
-                      pre_tags: ["<em>"],
-                      post_tags: ["</em>"]
-                    }
-                  }
+        const f = "pages.content";
+        switch (c.type) {
+          case "term":
+            clause = {
+              nested: {
+                path: "pages",
+                query: { term: { [f]: c.value } },
+                inner_hits: {
+                  name: "pages",
+                  highlight: {
+                    fields: {
+                      "pages.content": {
+                        fragment_size: 200,
+                        number_of_fragments: 5,
+                        pre_tags: ["<em>"],
+                        post_tags: ["</em>"],
+                      },
+                    },
+                  },
+                  size: 20,
                 },
-                size: 20
-              }
-            }
-          };
-          break;
-        case "match":
-          clause = {
-            nested: {
-              path: "pages",
-              query: { match: { [f]: c.value } },
-              inner_hits: {
-                name: "pages",
-                highlight: {
-                  fields: {
-                    "pages.content": {
-                      fragment_size: 200,
-                      number_of_fragments: 5,
-                      pre_tags: ["<em>"],
-                      post_tags: ["</em>"]
-                    }
-                  }
+              },
+            };
+            break;
+          case "match":
+            clause = {
+              nested: {
+                path: "pages",
+                query: { match: { [f]: c.value } },
+                inner_hits: {
+                  name: "pages",
+                  highlight: {
+                    fields: {
+                      "pages.content": {
+                        fragment_size: 200,
+                        number_of_fragments: 5,
+                        pre_tags: ["<em>"],
+                        post_tags: ["</em>"],
+                      },
+                    },
+                  },
+                  size: 20,
                 },
-                size: 20
+              },
+            };
+            break;
+          case "prefix":
+            clause = {
+              nested: {
+                path: "pages",
+                query: {
+                  prefix: { [f]: { value: c.value, case_insensitive: true } },
+                },
+                inner_hits: { name: "pages" },
+              },
+            };
+            break;
+          case "wildcard":
+            clause = {
+              nested: {
+                path: "pages",
+                query: {
+                  wildcard: {
+                    [f]: { value: `*${c.value}*`, case_insensitive: true },
+                  },
+                },
+                inner_hits: { name: "pages" },
+              },
+            };
+            break;
+          case "exists":
+            clause = {
+              nested: {
+                path: "pages",
+                query: { exists: { field: f } },
+                inner_hits: { name: "pages" },
+              },
+            };
+            break;
+          case "range":
+            const range: any = {};
+            if (c.value?.gte !== undefined) range.gte = c.value.gte;
+            if (c.value?.lte !== undefined) range.lte = c.value.lte;
+            clause = {
+              nested: {
+                path: "pages",
+                query: { range: { [f]: range } },
+                inner_hits: { name: "pages" },
+              },
+            };
+            break;
+        }
+      } else {
+        switch (c.type) {
+          case "term":
+            {
+              let termField = c.field;
+              // 尝试获取字段类型
+              const fType =
+                fieldMappings.value[c.field]?.type ||
+                availableFields.value.find((af) => af.name === c.field)?.type;
+
+              // 如果是 text 类型，且未指定 .keyword 后缀，则自动追加 .keyword 以支持精确匹配
+              if (fType === "text" && !termField.endsWith(".keyword")) {
+                termField = `${termField}.keyword`;
               }
+              clause = { term: { [termField]: c.value } };
             }
-          };
-          break;
-        case "prefix":
-          clause = {
-            nested: {
-              path: "pages",
-              query: {
-                prefix: { [f]: { value: c.value, case_insensitive: true } },
-              },
-              inner_hits: { name: "pages" },
-            },
-          };
-          break;
-        case "wildcard":
-          clause = {
-            nested: {
-              path: "pages",
-              query: {
-                wildcard: { [f]: { value: `*${c.value}*`, case_insensitive: true } },
-              },
-              inner_hits: { name: "pages" },
-            },
-          };
-          break;
-        case "exists":
-          clause = {
-            nested: {
-              path: "pages",
-              query: { exists: { field: f } },
-              inner_hits: { name: "pages" }
+            break;
+          case "match":
+            clause = {
+              match: { [c.field]: { query: c.value, operator: "and" } },
+            };
+            break;
+          case "prefix":
+            {
+              let prefixField = c.field;
+              const fType =
+                fieldMappings.value[c.field]?.type ||
+                availableFields.value.find((af) => af.name === c.field)?.type;
+
+              if (fType === "text" && !prefixField.endsWith(".keyword")) {
+                prefixField = `${prefixField}.keyword`;
+              }
+              clause = {
+                prefix: {
+                  [prefixField]: { value: c.value, case_insensitive: true },
+                },
+              };
             }
-          };
-          break;
-        case "range":
-          const range: any = {};
-          if (c.value?.gte !== undefined) range.gte = c.value.gte;
-          if (c.value?.lte !== undefined) range.lte = c.value.lte;
-          clause = {
-            nested: {
-              path: "pages",
-              query: { range: { [f]: range } },
-              inner_hits: { name: "pages" }
+            break;
+          case "wildcard":
+            {
+              let wcField = c.field;
+              const fType =
+                fieldMappings.value[c.field]?.type ||
+                availableFields.value.find((af) => af.name === c.field)?.type;
+
+              if (fType === "text" && !wcField.endsWith(".keyword")) {
+                wcField = `${wcField}.keyword`;
+              }
+              clause = {
+                wildcard: {
+                  [wcField]: { value: `*${c.value}*`, case_insensitive: true },
+                },
+              };
             }
-          };
-          break;
+            break;
+          case "exists":
+            clause = { exists: { field: c.field } };
+            break;
+          case "range":
+            const range: any = {};
+            if (c.value?.gte !== undefined) range.gte = c.value.gte;
+            if (c.value?.lte !== undefined) range.lte = c.value.lte;
+            clause = { range: { [c.field]: range } };
+            break;
+        }
       }
-    } else {
-    switch (c.type) {
-      case "term":
-        {
-          let termField = c.field;
-          // 尝试获取字段类型
-          const fType =
-            fieldMappings.value[c.field]?.type ||
-            availableFields.value.find((af) => af.name === c.field)?.type;
-
-          // 如果是 text 类型，且未指定 .keyword 后缀，则自动追加 .keyword 以支持精确匹配
-          if (fType === "text" && !termField.endsWith(".keyword")) {
-            termField = `${termField}.keyword`;
-          }
-          clause = { term: { [termField]: c.value } };
-        }
-        break;
-      case "match":
-        clause = { match: { [c.field]: { query: c.value, operator: "and" } } };
-        break;
-      case "prefix":
-        {
-          let prefixField = c.field;
-          const fType =
-            fieldMappings.value[c.field]?.type ||
-            availableFields.value.find((af) => af.name === c.field)?.type;
-
-          if (fType === "text" && !prefixField.endsWith(".keyword")) {
-            prefixField = `${prefixField}.keyword`;
-          }
-          clause = {
-            prefix: {
-              [prefixField]: { value: c.value, case_insensitive: true },
-            },
-          };
-        }
-        break;
-      case "wildcard":
-        {
-          let wcField = c.field;
-          const fType =
-            fieldMappings.value[c.field]?.type ||
-            availableFields.value.find((af) => af.name === c.field)?.type;
-
-          if (fType === "text" && !wcField.endsWith(".keyword")) {
-            wcField = `${wcField}.keyword`;
-          }
-          clause = {
-            wildcard: {
-              [wcField]: { value: `*${c.value}*`, case_insensitive: true },
-            },
-          };
-        }
-        break;
-      case "exists":
-        clause = { exists: { field: c.field } };
-        break;
-      case "range":
-        const range: any = {};
-        if (c.value?.gte !== undefined) range.gte = c.value.gte;
-        if (c.value?.lte !== undefined) range.lte = c.value.lte;
-        clause = { range: { [c.field]: range } };
-        break;
-    }
-    }
     }
     if (Object.keys(clause).length) {
       bool[c.logic].push(clause);
@@ -2133,7 +2255,7 @@ function buildDSL(): any {
     if (availableFieldNames.value.includes("update_time")) {
       query.sort = [
         { update_time: { order: "desc" } },
-        { _shard_doc: { order: "asc" } }
+        { _shard_doc: { order: "asc" } },
       ];
     } else {
       query.sort = [{ _shard_doc: { order: "asc" } }];
@@ -2209,30 +2331,49 @@ async function executeQuery() {
       index: selectedIndices.value,
       query: dsl.query,
       size: dsl.size,
-      from: dsl.from
+      from: dsl.from,
     };
     if (dsl.sort) req.sort = dsl.sort;
     if (dsl._source) req._source = dsl._source;
     if (dsl.aggs) req.aggs = dsl.aggs;
-    
+
     // 添加模板中预设的查询条件（如果存在）
-    const tplQuery = templateDetail.value?.query || templateDetail.value?.query_content;
+    const tplQuery =
+      templateDetail.value?.query || templateDetail.value?.query_content;
     if (tplQuery && tplQuery.query) {
       // 修复查询结构，确保不会出现 {match_all: {}, bool: {...}} 这种非法结构
       if (tplQuery.query.bool) {
         // 如果模板中有bool查询条件，则与动态构建的查询合并
         if (req.query.bool) {
           // 合并must条件
-          if (tplQuery.query.bool.must && Array.isArray(tplQuery.query.bool.must)) {
-            req.query.bool.must = [...req.query.bool.must, ...tplQuery.query.bool.must];
+          if (
+            tplQuery.query.bool.must &&
+            Array.isArray(tplQuery.query.bool.must)
+          ) {
+            req.query.bool.must = [
+              ...req.query.bool.must,
+              ...tplQuery.query.bool.must,
+            ];
           }
           // 合并should条件
-          if (tplQuery.query.bool.should && Array.isArray(tplQuery.query.bool.should)) {
-            req.query.bool.should = [...req.query.bool.should, ...tplQuery.query.bool.should];
+          if (
+            tplQuery.query.bool.should &&
+            Array.isArray(tplQuery.query.bool.should)
+          ) {
+            req.query.bool.should = [
+              ...req.query.bool.should,
+              ...tplQuery.query.bool.should,
+            ];
           }
           // 合并must_not条件
-          if (tplQuery.query.bool.must_not && Array.isArray(tplQuery.query.bool.must_not)) {
-            req.query.bool.must_not = [...req.query.bool.must_not, ...tplQuery.query.bool.must_not];
+          if (
+            tplQuery.query.bool.must_not &&
+            Array.isArray(tplQuery.query.bool.must_not)
+          ) {
+            req.query.bool.must_not = [
+              ...req.query.bool.must_not,
+              ...tplQuery.query.bool.must_not,
+            ];
           }
         } else {
           // 如果动态查询没有bool条件，则直接使用模板的bool条件
@@ -2258,13 +2399,13 @@ async function executeQuery() {
             bool: {
               must: [tplQuery.query],
               should: [],
-              must_not: []
-            }
+              must_not: [],
+            },
           };
         }
       }
     }
-    
+
     // 确保查询结构正确，修复可能的非法结构
     if (req.query && req.query.match_all !== undefined && req.query.bool) {
       // 将match_all和bool合并为合法的bool查询
@@ -2273,11 +2414,11 @@ async function executeQuery() {
         bool: {
           must: [matchAllClause, ...(req.query.bool.must || [])],
           should: req.query.bool.should || [],
-          must_not: req.query.bool.must_not || []
-        }
+          must_not: req.query.bool.must_not || [],
+        },
       };
     }
-    
+
     // 滑动查询：不传 from，传递 search_after
     if (pagingMode.value === "search_after") {
       delete req.from;
@@ -2290,7 +2431,11 @@ async function executeQuery() {
     // 处理响应数据
     if (resp?.data) {
       // 从 resp.data 中提取 fieldMappings 和 stats
-      const { fieldMappings: respFieldMappings, stats, ...esData } = resp.data as any;
+      const {
+        fieldMappings: respFieldMappings,
+        stats,
+        ...esData
+      } = resp.data as any;
 
       // 更新 fieldMappings
       if (respFieldMappings) {
@@ -2313,7 +2458,10 @@ async function executeQuery() {
             lastSearchAfter.value = nextSearchAfter;
           } else {
             const hits = esData?.hits?.hits || [];
-            if (hits.length > 0 && Array.isArray((hits[hits.length - 1] as any)?.sort)) {
+            if (
+              hits.length > 0 &&
+              Array.isArray((hits[hits.length - 1] as any)?.sort)
+            ) {
               lastSearchAfter.value = (hits[hits.length - 1] as any).sort;
             }
           }
@@ -2369,7 +2517,7 @@ function computeFieldOrder() {
 
   const entries = Object.entries(lenStats).map(([k, s]) => ({
     field: k,
-    avg: s.total / (s.count || 1)
+    avg: s.total / (s.count || 1),
   }));
   // 按平均长度升序：短字段优先（在“空字段”之后）
   entries.sort((a, b) => a.avg - b.avg);
@@ -2424,7 +2572,7 @@ const typeLabelMap: Record<string, string> = {
   THESIS: "学位论文",
   STANDARD: "标准",
   PATENT: "专利",
-  OTHER: "其他"
+  OTHER: "其他",
 };
 
 function mapTypeLabel(val: any): string {
@@ -2434,7 +2582,9 @@ function mapTypeLabel(val: any): string {
 
 function formatAggKey(val: any): string {
   const label = mapTypeLabel(val);
-  return getValueLength(label) > 40 ? formatText(String(label), 40) : String(label);
+  return getValueLength(label) > 40
+    ? formatText(String(label), 40)
+    : String(label);
 }
 
 function formatText(text: string, max: number): string {
@@ -2474,7 +2624,7 @@ function highlightText(text: string, keyword: string | string[]): string {
 function formatTextWithHighlight(
   text: string,
   max: number | null,
-  keyword?: string | string[]
+  keyword?: string | string[],
 ): string {
   if (!text) return "";
 
@@ -2486,7 +2636,7 @@ function formatTextWithHighlight(
   if (keyword) {
     if (typeof keyword === "string" && !keyword.trim()) return truncatedText;
     if (Array.isArray(keyword) && keyword.length === 0) return truncatedText;
-    
+
     return highlightText(truncatedText, keyword);
   }
 
@@ -2500,7 +2650,7 @@ const TITLE_FIELDS = [
   "doc_title",
   "headline",
   "subject",
-  "paper_title"
+  "paper_title",
 ];
 function getTitleField(row: Record<string, any>): string {
   const r = row || {};
@@ -2517,7 +2667,7 @@ const KEY_FIELDS = [
   "publisher",
   "pageNumber",
   "snippet",
-  "abstract"
+  "abstract",
 ];
 function getKeyFields(row: Record<string, any>): string[] {
   const r = row || {};
@@ -2590,7 +2740,7 @@ const WIDE_MAX_CHARS = 500;
 
 // 构建卡片行分块：遵循全局顺序，长内容占满一行，其余三等分
 function buildCardChunks(
-  row: Record<string, any>
+  row: Record<string, any>,
 ): Array<{ fields: string[]; wide?: boolean }> {
   const orderedFields = displayFields.value.filter((f) => row && f in row);
   const chunks: Array<{ fields: string[]; wide?: boolean }> = [];
@@ -2651,7 +2801,7 @@ async function downloadResourcePackage() {
     const queryData = {
       index: selectedIndices.value,
       query: dsl.query,
-      _source: dsl._source
+      _source: dsl._source,
     };
 
     // 调用下载API
@@ -2661,10 +2811,10 @@ async function downloadResourcePackage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify(queryData)
-      }
+        body: JSON.stringify(queryData),
+      },
     );
 
     const result = await response.json();
@@ -2732,7 +2882,7 @@ async function fetchHistoryFiles() {
     const resp = await resourcePackageApi.listFiles(
       props.packageData.id,
       1,
-      50
+      50,
     );
     if (resp.success) {
       historyFiles.value = resp.data?.items || [];
@@ -2761,7 +2911,7 @@ async function handleDownloadHistory() {
     historyDownloadLoading.value = true;
     const resp = await resourcePackageApi.downloadFile(
       props.packageData.id,
-      selectedFileId.value
+      selectedFileId.value,
     );
     if (!resp.success) {
       throw new Error(resp.message || "下载失败");
@@ -2808,13 +2958,13 @@ async function handleGenerateExcel() {
     const dsl = buildDSL();
     const payload: any = {
       index: selectedIndices.value,
-      query: dsl.query
+      query: dsl.query,
     };
     if (dsl._source) payload._source = dsl._source;
 
     const resp = await resourcePackageApi.generateExcel(
       props.packageData.id,
-      payload
+      payload,
     );
     if (resp?.success) {
       const hasNew = resp?.data?.has_new_data;
@@ -2891,7 +3041,9 @@ async function handleDownloadLatest() {
 const exportAllLoading = ref(false);
 const exportTaskId = ref(null);
 const exportPollingTimer = ref(null);
-const exportStatus = ref<'started' | 'processing' | 'completed' | 'failed' | null>(null);
+const exportStatus = ref<
+  "started" | "processing" | "completed" | "failed" | null
+>(null);
 const exportProgress = ref<{
   total?: number;
   processed: number;
@@ -2907,8 +3059,9 @@ const latestFileCheckTimer = ref<any>(null);
 const exportPercentage = computed<number | undefined>(() => {
   if (!exportProgress.value) return undefined;
   const p = exportProgress.value;
-  if (typeof p.percentage === 'number') return Math.max(0, Math.min(100, p.percentage));
-  if (typeof p.total === 'number' && p.total > 0) {
+  if (typeof p.percentage === "number")
+    return Math.max(0, Math.min(100, p.percentage));
+  if (typeof p.total === "number" && p.total > 0) {
     const val = Math.round((p.processed * 10000) / p.total) / 100;
     return Math.max(0, Math.min(100, val));
   }
@@ -2917,10 +3070,13 @@ const exportPercentage = computed<number | undefined>(() => {
 
 // 可下载状态：导出已完成且进度100%
 const canDownloadNow = computed<boolean>(() => {
-  const statusOk = exportStatus.value === 'completed';
+  const statusOk = exportStatus.value === "completed";
   const percent = exportPercentage.value;
   const progressPercent = exportProgress.value?.percentage;
-  const isFull = (typeof percent === 'number' && Math.round(percent) >= 100) || progressPercent === 100 || progressPercent === 100.0;
+  const isFull =
+    (typeof percent === "number" && Math.round(percent) >= 100) ||
+    progressPercent === 100 ||
+    progressPercent === 100.0;
   return Boolean(statusOk && isFull);
 });
 
@@ -2929,10 +3085,10 @@ const canDownloadNow = computed<boolean>(() => {
  * @param num 数字或字符串
  */
 function formatNumber(num: number | string | undefined): string {
-  if (num === null || num === undefined || num === '') return '';
-  const numValue = typeof num === 'string' ? parseFloat(num) : num;
+  if (num === null || num === undefined || num === "") return "";
+  const numValue = typeof num === "string" ? parseFloat(num) : num;
   if (isNaN(numValue as number)) return String(num);
-  return (numValue as number).toLocaleString('zh-CN');
+  return (numValue as number).toLocaleString("zh-CN");
 }
 
 /**
@@ -2942,45 +3098,55 @@ function formatNumber(num: number | string | undefined): string {
 const exportAllResults = async (columns?: string[], skipConfirm = false) => {
   try {
     if (!skipConfirm) {
-      await ElMessageBox.confirm("确定要导出全部查询结果吗？这可能需要一些时间，导出完成后会提供下载链接。", "确认导出", {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        type: "info"
-      });
+      await ElMessageBox.confirm(
+        "确定要导出全部查询结果吗？这可能需要一些时间，导出完成后会提供下载链接。",
+        "确认导出",
+        {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "info",
+        },
+      );
     }
 
     exportAllLoading.value = true;
-    
+
     // 构建查询数据
     const dsl = buildDSL();
     const queryData = {
       index: selectedIndices.value,
       query: dsl.query,
-      _source: columns && columns.length > 0 ? columns : dsl._source
+      _source: columns && columns.length > 0 ? columns : dsl._source,
     };
 
     // 优先检查是否有与当前查询条件完全匹配的缓存文件（有效期1小时）
-    const cacheResp = await resourcePackageApi.getLatestExportFileByQuery(props.packageData.id, queryData);
+    const cacheResp = await resourcePackageApi.getLatestExportFileByQuery(
+      props.packageData.id,
+      queryData,
+    );
     if (cacheResp.success) {
       const fileData = cacheResp.data;
       latestFileAvailable.value = true;
       latestDownloadUrl.value = fileData?.download_url || null;
       ElMessage.success("命中缓存，正在下载...");
       if (fileData?.download_url) {
-        window.open(fileData.download_url, '_blank');
+        window.open(fileData.download_url, "_blank");
       }
       // 命中缓存则不再触发导出任务
       return;
     }
 
     // 调用后端异步导出API（统一请求封装）
-    const resp = await resourcePackageApi.exportAllResults(props.packageData.id, queryData);
+    const resp = await resourcePackageApi.exportAllResults(
+      props.packageData.id,
+      queryData,
+    );
     if (!resp.success) {
       throw new Error(resp.message || "导出请求失败");
     }
     ElMessage.success("已开始导出全部结果");
     exportTaskId.value = resp.data?.task_id;
-    exportStatus.value = 'started';
+    exportStatus.value = "started";
     exportProgress.value = null;
     startPollingExportStatus();
   } catch (error: any) {
@@ -3002,23 +3168,26 @@ const startPollingExportStatus = () => {
   if (exportPollingTimer.value) {
     clearInterval(exportPollingTimer.value);
   }
-  
+
   // 每5秒轮询一次任务状态
   exportPollingTimer.value = setInterval(async () => {
     if (!exportTaskId.value) {
       clearInterval(exportPollingTimer.value);
       return;
     }
-    
+
     try {
-      const resp = await resourcePackageApi.getExportStatus(props.packageData.id, exportTaskId.value);
+      const resp = await resourcePackageApi.getExportStatus(
+        props.packageData.id,
+        exportTaskId.value,
+      );
       if (resp.success) {
         const status = resp.data;
         exportStatus.value = status?.status || null;
         exportProgress.value = status?.progress || null;
         exportFileUrl.value = status?.file_url || exportFileUrl.value;
         exportFileUrl.value = status?.file_url || exportFileUrl.value;
-        
+
         if (status.status === "completed") {
           // 导出完成，提供下载链接
           clearInterval(exportPollingTimer.value);
@@ -3055,10 +3224,13 @@ async function checkLatestExportFile() {
     const queryData = {
       index: selectedIndices.value,
       query: dsl.query,
-      _source: dsl._source
+      _source: dsl._source,
     };
     // 先按查询条件检查匹配的缓存文件
-    const respByQuery = await resourcePackageApi.getLatestExportFileByQuery(props.packageData.id, queryData);
+    const respByQuery = await resourcePackageApi.getLatestExportFileByQuery(
+      props.packageData.id,
+      queryData,
+    );
     if (respByQuery.success) {
       latestFileAvailable.value = true;
       latestDownloadUrl.value = respByQuery.data?.download_url || null;
@@ -3086,22 +3258,27 @@ const downloadExportFile = async () => {
     const queryData = {
       index: selectedIndices.value,
       query: dsl.query,
-      _source: dsl._source
+      _source: dsl._source,
     };
-    const respByQuery = await resourcePackageApi.getLatestExportFileByQuery(props.packageData.id, queryData);
+    const respByQuery = await resourcePackageApi.getLatestExportFileByQuery(
+      props.packageData.id,
+      queryData,
+    );
     if (respByQuery.success) {
       const fileData = respByQuery.data;
-      window.open(fileData.download_url, '_blank');
+      window.open(fileData.download_url, "_blank");
       latestFileAvailable.value = true;
       latestDownloadUrl.value = fileData.download_url;
       return;
     }
     // 回退：若轮询状态中有URL则使用
     if (exportFileUrl.value) {
-      window.open(exportFileUrl.value, '_blank');
+      window.open(exportFileUrl.value, "_blank");
       return;
     }
-    ElMessage.warning(respByQuery.message || "没有可用的导出文件或文件已过期，请重新导出");
+    ElMessage.warning(
+      respByQuery.message || "没有可用的导出文件或文件已过期，请重新导出",
+    );
   } catch (error) {
     console.error("下载导出文件失败:", error);
     ElMessage.error("下载导出文件失败");
@@ -3123,8 +3300,8 @@ onUnmounted(() => {
 // 暴露查询方法，便于父组件在进入页面时触发默认查询
 defineExpose({
   executeQuery,
-  isIndicesReady
-})
+  isIndicesReady,
+});
 </script>
 
 <style scoped lang="scss">

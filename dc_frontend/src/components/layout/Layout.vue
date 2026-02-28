@@ -22,8 +22,8 @@
 
     <!-- 移动端遮罩层（侧边栏展开时显示） -->
     <div
-      class="sidebar-overlay"
       v-if="showOverlay"
+      class="sidebar-overlay"
       @click="toggleSidebar"
     ></div>
 
@@ -51,14 +51,14 @@
       </div>
 
       <!-- 底部 -->
-      <div class="footer" v-if="showFooter">
+      <div v-if="showFooter" class="footer">
         <AppFooter />
       </div>
     </div>
 
     <!-- 设置面板 -->
     <SettingsPanel
-      v-model:modelValue="showSettings"
+      v-model:model-value="showSettings"
       @settings-change="handleSettingsChange"
     />
   </div>
@@ -186,7 +186,10 @@ onUnmounted(() => {
   background-color: var(--el-bg-color);
   border-right: 1px solid var(--el-border-color-light);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
-  transition: width 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    width 0.3s ease,
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -217,7 +220,9 @@ onUnmounted(() => {
       padding: 0 8px;
       border-radius: $border-radius-lg;
       cursor: pointer;
-      transition: background-color 0.3s ease, opacity 0.3s ease;
+      transition:
+        background-color 0.3s ease,
+        opacity 0.3s ease;
 
       &:hover {
         background-color: var(--el-fill-color-light);

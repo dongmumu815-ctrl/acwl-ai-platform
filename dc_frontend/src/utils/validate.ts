@@ -9,7 +9,7 @@
  * @returns 是否为外部链接
  */
 export function isExternal(path: string): boolean {
-  return /^(https?:|mailto:|tel:)/.test(path)
+  return /^(https?:|mailto:|tel:)/.test(path);
 }
 
 /**
@@ -19,10 +19,10 @@ export function isExternal(path: string): boolean {
  */
 export function isValidURL(url: string): boolean {
   try {
-    new URL(url)
-    return true
+    new URL(url);
+    return true;
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -32,8 +32,8 @@ export function isValidURL(url: string): boolean {
  * @returns 是否为有效邮箱
  */
 export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
 }
 
 /**
@@ -42,8 +42,8 @@ export function isValidEmail(email: string): boolean {
  * @returns 是否为有效手机号
  */
 export function isValidPhone(phone: string): boolean {
-  const phoneRegex = /^1[3-9]\d{9}$/
-  return phoneRegex.test(phone)
+  const phoneRegex = /^1[3-9]\d{9}$/;
+  return phoneRegex.test(phone);
 }
 
 /**
@@ -52,25 +52,25 @@ export function isValidPhone(phone: string): boolean {
  * @returns 密码强度等级 (0-4)
  */
 export function getPasswordStrength(password: string): number {
-  let strength = 0
-  
+  let strength = 0;
+
   // 长度检查
-  if (password.length >= 8) strength++
-  if (password.length >= 12) strength++
-  
+  if (password.length >= 8) strength++;
+  if (password.length >= 12) strength++;
+
   // 包含小写字母
-  if (/[a-z]/.test(password)) strength++
-  
+  if (/[a-z]/.test(password)) strength++;
+
   // 包含大写字母
-  if (/[A-Z]/.test(password)) strength++
-  
+  if (/[A-Z]/.test(password)) strength++;
+
   // 包含数字
-  if (/\d/.test(password)) strength++
-  
+  if (/\d/.test(password)) strength++;
+
   // 包含特殊字符
-  if (/[^\w\s]/.test(password)) strength++
-  
-  return Math.min(strength, 4)
+  if (/[^\w\s]/.test(password)) strength++;
+
+  return Math.min(strength, 4);
 }
 
 /**
@@ -79,23 +79,24 @@ export function getPasswordStrength(password: string): number {
  * @returns 是否为有效身份证号
  */
 export function isValidIdCard(idCard: string): boolean {
-  const idCardRegex = /^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/
-  
+  const idCardRegex =
+    /^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/;
+
   if (!idCardRegex.test(idCard)) {
-    return false
+    return false;
   }
-  
+
   // 校验码验证
-  const weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
-  const checkCodes = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
-  
-  let sum = 0
+  const weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+  const checkCodes = ["1", "0", "X", "9", "8", "7", "6", "5", "4", "3", "2"];
+
+  let sum = 0;
   for (let i = 0; i < 17; i++) {
-    sum += parseInt(idCard[i]) * weights[i]
+    sum += parseInt(idCard[i]) * weights[i];
   }
-  
-  const checkCode = checkCodes[sum % 11]
-  return checkCode === idCard[17].toUpperCase()
+
+  const checkCode = checkCodes[sum % 11];
+  return checkCode === idCard[17].toUpperCase();
 }
 
 /**
@@ -104,8 +105,9 @@ export function isValidIdCard(idCard: string): boolean {
  * @returns 是否为有效IP地址
  */
 export function isValidIP(ip: string): boolean {
-  const ipRegex = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/
-  return ipRegex.test(ip)
+  const ipRegex =
+    /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+  return ipRegex.test(ip);
 }
 
 /**
@@ -114,8 +116,8 @@ export function isValidIP(ip: string): boolean {
  * @returns 是否为有效端口号
  */
 export function isValidPort(port: number | string): boolean {
-  const portNum = typeof port === 'string' ? parseInt(port) : port
-  return Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535
+  const portNum = typeof port === "string" ? parseInt(port) : port;
+  return Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535;
 }
 
 /**
@@ -125,8 +127,8 @@ export function isValidPort(port: number | string): boolean {
  */
 export function isValidUsername(username: string): boolean {
   // 用户名：3-20位，只能包含字母、数字、下划线，不能以数字开头
-  const usernameRegex = /^[a-zA-Z_][a-zA-Z0-9_]{2,19}$/
-  return usernameRegex.test(username)
+  const usernameRegex = /^[a-zA-Z_][a-zA-Z0-9_]{2,19}$/;
+  return usernameRegex.test(username);
 }
 
 /**
@@ -135,9 +137,12 @@ export function isValidUsername(username: string): boolean {
  * @param allowedExtensions 允许的扩展名数组
  * @returns 是否为允许的文件类型
  */
-export function isValidFileExtension(filename: string, allowedExtensions: string[]): boolean {
-  const extension = filename.split('.').pop()?.toLowerCase()
-  return extension ? allowedExtensions.includes(extension) : false
+export function isValidFileExtension(
+  filename: string,
+  allowedExtensions: string[],
+): boolean {
+  const extension = filename.split(".").pop()?.toLowerCase();
+  return extension ? allowedExtensions.includes(extension) : false;
 }
 
 /**
@@ -147,7 +152,7 @@ export function isValidFileExtension(filename: string, allowedExtensions: string
  * @returns 是否在允许范围内
  */
 export function isValidFileSize(fileSize: number, maxSize: number): boolean {
-  return fileSize > 0 && fileSize <= maxSize
+  return fileSize > 0 && fileSize <= maxSize;
 }
 
 /**
@@ -157,10 +162,10 @@ export function isValidFileSize(fileSize: number, maxSize: number): boolean {
  */
 export function isValidJSON(jsonString: string): boolean {
   try {
-    JSON.parse(jsonString)
-    return true
+    JSON.parse(jsonString);
+    return true;
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -171,8 +176,8 @@ export function isValidJSON(jsonString: string): boolean {
  */
 export function isValidSQLName(name: string): boolean {
   // SQL标识符：字母开头，可包含字母、数字、下划线
-  const sqlNameRegex = /^[a-zA-Z][a-zA-Z0-9_]*$/
-  return sqlNameRegex.test(name) && name.length <= 64
+  const sqlNameRegex = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+  return sqlNameRegex.test(name) && name.length <= 64;
 }
 
 /**
@@ -182,11 +187,11 @@ export function isValidSQLName(name: string): boolean {
  */
 export function isValidConnectionString(connectionString: string): boolean {
   // 简单验证：包含必要的组件
-  const hasHost = /host=/.test(connectionString)
-  const hasPort = /port=/.test(connectionString)
-  const hasDatabase = /database=/.test(connectionString)
-  
-  return hasHost && hasPort && hasDatabase
+  const hasHost = /host=/.test(connectionString);
+  const hasPort = /port=/.test(connectionString);
+  const hasDatabase = /database=/.test(connectionString);
+
+  return hasHost && hasPort && hasDatabase;
 }
 
 /**
@@ -195,8 +200,8 @@ export function isValidConnectionString(connectionString: string): boolean {
  * @returns 是否为有效颜色值
  */
 export function isValidHexColor(color: string): boolean {
-  const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
-  return hexColorRegex.test(color)
+  const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+  return hexColorRegex.test(color);
 }
 
 /**
@@ -205,8 +210,8 @@ export function isValidHexColor(color: string): boolean {
  * @returns 是否为有效版本号
  */
 export function isValidVersion(version: string): boolean {
-  const versionRegex = /^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$/
-  return versionRegex.test(version)
+  const versionRegex = /^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$/;
+  return versionRegex.test(version);
 }
 
 /**
@@ -215,16 +220,16 @@ export function isValidVersion(version: string): boolean {
  * @returns 是否为有效CRON表达式
  */
 export function isValidCron(cron: string): boolean {
-  const cronParts = cron.trim().split(/\s+/)
-  
+  const cronParts = cron.trim().split(/\s+/);
+
   // 标准CRON表达式应该有5或6个部分
   if (cronParts.length !== 5 && cronParts.length !== 6) {
-    return false
+    return false;
   }
-  
+
   // 简单验证每个部分的格式
-  const cronRegex = /^(\*|\d+(-\d+)?(,\d+(-\d+)?)*|\*\/\d+)$/
-  return cronParts.every(part => cronRegex.test(part))
+  const cronRegex = /^(\*|\d+(-\d+)?(,\d+(-\d+)?)*|\*\/\d+)$/;
+  return cronParts.every((part) => cronRegex.test(part));
 }
 
 /**
@@ -233,8 +238,8 @@ export function isValidCron(cron: string): boolean {
  * @returns 是否为有效MAC地址
  */
 export function isValidMacAddress(mac: string): boolean {
-  const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/
-  return macRegex.test(mac)
+  const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+  return macRegex.test(mac);
 }
 
 /**
@@ -243,6 +248,7 @@ export function isValidMacAddress(mac: string): boolean {
  * @returns 是否为有效UUID
  */
 export function isValidUUID(uuid: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-  return uuidRegex.test(uuid)
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
 }

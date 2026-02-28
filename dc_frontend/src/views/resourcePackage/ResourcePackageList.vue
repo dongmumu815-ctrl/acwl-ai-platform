@@ -9,7 +9,9 @@
               <Box />
             </el-icon>
             资源包管理
-            <span class="page-description">管理和配置数据查询资源包，支持SQL和Elasticsearch查询</span>
+            <span class="page-description"
+              >管理和配置数据查询资源包，支持SQL和Elasticsearch查询</span
+            >
           </h1>
         </div>
         <div class="header-right">
@@ -95,8 +97,13 @@
       <el-card shadow="never">
         <el-form :model="filters" inline>
           <el-form-item label="搜索">
-            <el-input v-model="filters.search" placeholder="搜索资源包名称或描述" clearable style="width: 250px"
-              @input="handleSearch">
+            <el-input
+              v-model="filters.search"
+              placeholder="搜索资源包名称或描述"
+              clearable
+              style="width: 250px"
+              @input="handleSearch"
+            >
               <template #prefix>
                 <el-icon>
                   <Search />
@@ -106,7 +113,13 @@
           </el-form-item>
 
           <el-form-item label="类型">
-            <el-select v-model="filters.type" placeholder="选择类型" clearable style="width: 150px" @change="handleFilter">
+            <el-select
+              v-model="filters.type"
+              placeholder="选择类型"
+              clearable
+              style="width: 150px"
+              @change="handleFilter"
+            >
               <el-option label="全部" value="" />
               <el-option label="SQL" value="sql" />
               <el-option label="Elasticsearch" value="elasticsearch" />
@@ -114,16 +127,31 @@
           </el-form-item>
 
           <el-form-item label="数据源">
-            <el-select v-model="filters.datasource_id" placeholder="选择数据源" clearable style="width: 150px"
-              @change="handleFilter">
+            <el-select
+              v-model="filters.datasource_id"
+              placeholder="选择数据源"
+              clearable
+              style="width: 150px"
+              @change="handleFilter"
+            >
               <el-option label="全部" value="" />
-              <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
+              <el-option
+                v-for="ds in datasources"
+                :key="ds.id"
+                :label="ds.name"
+                :value="ds.id"
+              />
             </el-select>
           </el-form-item>
 
           <el-form-item label="状态">
-            <el-select v-model="filters.status" placeholder="选择状态" clearable style="width: 120px"
-              @change="handleFilter">
+            <el-select
+              v-model="filters.status"
+              placeholder="选择状态"
+              clearable
+              style="width: 120px"
+              @change="handleFilter"
+            >
               <el-option label="全部" value="" />
               <el-option label="启用" value="true" />
               <el-option label="禁用" value="false" />
@@ -131,7 +159,11 @@
           </el-form-item>
 
           <el-form-item label="排序">
-            <el-select v-model="filters.sortBy" style="width: 150px" @change="handleSort">
+            <el-select
+              v-model="filters.sortBy"
+              style="width: 150px"
+              @change="handleSort"
+            >
               <el-option label="创建时间" value="created_at" />
               <el-option label="更新时间" value="updated_at" />
               <el-option label="名称" value="name" />
@@ -176,7 +208,14 @@
         <!-- 网格视图 -->
         <div v-if="viewMode === 'grid'" class="grid-view">
           <el-row :gutter="20">
-            <el-col v-for="pkg in paginatedPackages" :key="pkg.id" :xs="24" :sm="12" :md="8" :lg="6">
+            <el-col
+              v-for="pkg in paginatedPackages"
+              :key="pkg.id"
+              :xs="24"
+              :sm="12"
+              :md="8"
+              :lg="6"
+            >
               <div class="package-card">
                 <div class="package-header">
                   <div class="package-type">
@@ -186,14 +225,16 @@
                   </div>
                   <div class="package-status">
                     <el-tag :type="getStatusType(pkg.is_active)" size="small">
-                      {{ pkg.is_active ? '启用' : '禁用' }}
+                      {{ pkg.is_active ? "启用" : "禁用" }}
                     </el-tag>
                   </div>
                 </div>
 
                 <div class="package-content">
                   <h3 class="package-name">{{ pkg.name }}</h3>
-                  <p class="package-description">{{ pkg.description || '暂无描述' }}</p>
+                  <p class="package-description">
+                    {{ pkg.description || "暂无描述" }}
+                  </p>
 
                   <div class="package-meta">
                     <div class="meta-item">
@@ -212,26 +253,41 @@
                       <el-icon>
                         <Setting />
                       </el-icon>
-                      <span>{{ pkg.template_type || '未知' }} 模板</span>
+                      <span>{{ pkg.template_type || "未知" }} 模板</span>
                     </div>
                   </div>
 
-                  <div class="package-tags" v-if="pkg.tags && pkg.tags.length > 0">
-                    <el-tag v-for="tag in pkg.tags.slice(0, 3)" :key="tag.id" size="small" class="tag-item"
-                      :color="tag.tag_color">
+                  <div
+                    v-if="pkg.tags && pkg.tags.length > 0"
+                    class="package-tags"
+                  >
+                    <el-tag
+                      v-for="tag in pkg.tags.slice(0, 3)"
+                      :key="tag.id"
+                      size="small"
+                      class="tag-item"
+                      :color="tag.tag_color"
+                    >
                       {{ tag.tag_name }}
                     </el-tag>
-                    <el-tag v-if="pkg.tags.length > 3" size="small" type="info" class="tag-item">
+                    <el-tag
+                      v-if="pkg.tags.length > 3"
+                      size="small"
+                      type="info"
+                      class="tag-item"
+                    >
                       +{{ pkg.tags.length - 3 }}
                     </el-tag>
                   </div>
 
                   <!-- 模板预览 -->
-                  <div class="package-preview" v-if="pkg.template_id">
+                  <div v-if="pkg.template_id" class="package-preview">
                     <div class="preview-label">模板信息:</div>
                     <div class="preview-content">
                       <div class="condition-info">
-                        <el-text type="primary" size="small">模板名称: {{ pkg.name }}</el-text>
+                        <el-text type="primary" size="small"
+                          >模板名称: {{ pkg.name }}</el-text
+                        >
                       </div>
                       <!-- <div class="condition-info" v-if="pkg.dynamic_params && Object.keys(pkg.dynamic_params).length > 0">
                         <el-text type="success" size="small">参数: {{ Object.keys(pkg.dynamic_params).length }}</el-text>
@@ -241,26 +297,47 @@
                 </div>
 
                 <div class="package-actions">
-                  
-                  <el-tooltip v-if="!pkg.is_active" content="资源包已禁用，无法查询" placement="top">
+                  <el-tooltip
+                    v-if="!pkg.is_active"
+                    content="资源包已禁用，无法查询"
+                    placement="top"
+                  >
                     <span>
-                      <el-button type="primary" size="small" @click="handleQuery(pkg)" :disabled="!pkg.is_active">
+                      <el-button
+                        type="primary"
+                        size="small"
+                        :disabled="!pkg.is_active"
+                        @click="handleQuery(pkg)"
+                      >
                         查询
                       </el-button>
                     </span>
                   </el-tooltip>
-                  <el-button v-else type="primary" size="small" @click="handleQuery(pkg)">
+                  <el-button
+                    v-else
+                    type="primary"
+                    size="small"
+                    @click="handleQuery(pkg)"
+                  >
                     查询
                   </el-button>
-                  <el-button type="warning" size="small" @click="handleQuerySetting(pkg)">
+                  <el-button
+                    type="warning"
+                    size="small"
+                    @click="handleQuerySetting(pkg)"
+                  >
                     查询设定
                   </el-button>
-                  <el-button type="success" size="small" :loading="downloadLoading" @click="openDownloadDialog(pkg)">
+                  <el-button
+                    type="success"
+                    size="small"
+                    :loading="downloadLoading"
+                    @click="openDownloadDialog(pkg)"
+                  >
                     下载资源包
                   </el-button>
                   <el-dropdown trigger="click">
-                    
-                    <el-button size="small" >
+                    <el-button size="small">
                       <el-icon>
                         <MoreFilled />
                       </el-icon>
@@ -268,7 +345,7 @@
                     </el-button>
                     <template #dropdown>
                       <el-dropdown-menu>
-                        <el-dropdown-item  @click="showApiEndpoint(pkg)">
+                        <el-dropdown-item @click="showApiEndpoint(pkg)">
                           <el-icon>
                             <Link />
                           </el-icon>
@@ -297,9 +374,21 @@
 
         <!-- 列表视图 -->
         <div v-else class="list-view">
-          <el-table v-loading="loading" :data="paginatedPackages" style="width: 100%" border
-            @header-dragend="handleColumnResize" @sort-change="handleTableSort">
-            <el-table-column prop="name" column-key="name" label="资源包名称" :width="getColumnWidth('name', 200)" sortable>
+          <el-table
+            v-loading="loading"
+            :data="paginatedPackages"
+            style="width: 100%"
+            border
+            @header-dragend="handleColumnResize"
+            @sort-change="handleTableSort"
+          >
+            <el-table-column
+              prop="name"
+              column-key="name"
+              label="资源包名称"
+              :width="getColumnWidth('name', 200)"
+              sortable
+            >
               <template #default="{ row }">
                 <div class="package-name-cell">
                   <div class="package-type-icon">
@@ -313,84 +402,148 @@
                         {{ row.name }}
                       </el-link>
                     </div>
-                    <div class="description">{{ row.description || '暂无描述' }}</div>
+                    <div class="description">
+                      {{ row.description || "暂无描述" }}
+                    </div>
                   </div>
                 </div>
               </template>
             </el-table-column>
 
-            <el-table-column prop="type" column-key="type" label="类型" :width="getColumnWidth('type', 120)">
+            <el-table-column
+              prop="type"
+              column-key="type"
+              label="类型"
+              :width="getColumnWidth('type', 120)"
+            >
               <template #default="{ row }">
                 <el-tag :type="row.type === 'sql' ? 'primary' : 'success'">
-                  {{ row.type === 'sql' ? 'SQL' : 'Elasticsearch' }}
+                  {{ row.type === "sql" ? "SQL" : "Elasticsearch" }}
                 </el-tag>
               </template>
             </el-table-column>
 
-            <el-table-column column-key="datasource" label="数据源" :width="getColumnWidth('datasource', 150)">
+            <el-table-column
+              column-key="datasource"
+              label="数据源"
+              :width="getColumnWidth('datasource', 150)"
+            >
               <template #default="{ row }">
                 {{ getDatasourceName(row.datasource_id) }}
               </template>
             </el-table-column>
 
-            <el-table-column column-key="template" label="模板信息" :width="getColumnWidth('template', 120)">
+            <el-table-column
+              column-key="template"
+              label="模板信息"
+              :width="getColumnWidth('template', 120)"
+            >
               <template #default="{ row }">
                 <div class="condition-info">
                   <div>
-                    <el-text type="primary" size="small">{{ row.template_type || '未知' }}</el-text>
+                    <el-text type="primary" size="small">{{
+                      row.template_type || "未知"
+                    }}</el-text>
                   </div>
                   <div v-if="row.template_id">
-                    <el-text type="info" size="small">ID: {{ row.template_id }}</el-text>
+                    <el-text type="info" size="small"
+                      >ID: {{ row.template_id }}</el-text
+                    >
                   </div>
                 </div>
               </template>
             </el-table-column>
 
-            <el-table-column column-key="tags" label="标签" :width="getColumnWidth('tags', 200)">
+            <el-table-column
+              column-key="tags"
+              label="标签"
+              :width="getColumnWidth('tags', 200)"
+            >
               <template #default="{ row }">
-                <div class="package-tags" v-if="row.tags && row.tags.length > 0">
-                  <el-tag v-for="tag in row.tags.slice(0, 3)" :key="tag.id" size="small" :color="tag.tag_color"
-                    style="margin-right: 4px; margin-top: 4px">
+                <div
+                  v-if="row.tags && row.tags.length > 0"
+                  class="package-tags"
+                >
+                  <el-tag
+                    v-for="tag in row.tags.slice(0, 3)"
+                    :key="tag.id"
+                    size="small"
+                    :color="tag.tag_color"
+                    style="margin-right: 4px; margin-top: 4px"
+                  >
                     {{ tag.tag_name }}
                   </el-tag>
-                  <el-tag v-if="row.tags.length > 3" size="small" type="info" style="margin-top: 4px">
+                  <el-tag
+                    v-if="row.tags.length > 3"
+                    size="small"
+                    type="info"
+                    style="margin-top: 4px"
+                  >
                     +{{ row.tags.length - 3 }}
                   </el-tag>
                 </div>
               </template>
             </el-table-column>
 
-            <el-table-column prop="is_active" column-key="status" label="状态" :width="getColumnWidth('status', 80)">
+            <el-table-column
+              prop="is_active"
+              column-key="status"
+              label="状态"
+              :width="getColumnWidth('status', 80)"
+            >
               <template #default="{ row }">
                 <el-tag :type="getStatusType(row.is_active)">
-                  {{ row.is_active ? '启用' : '禁用' }}
+                  {{ row.is_active ? "启用" : "禁用" }}
                 </el-tag>
               </template>
             </el-table-column>
 
-            <el-table-column prop="created_at" column-key="created_at" label="创建时间"
-              :width="getColumnWidth('created_at', 160)" sortable>
+            <el-table-column
+              prop="created_at"
+              column-key="created_at"
+              label="创建时间"
+              :width="getColumnWidth('created_at', 160)"
+              sortable
+            >
               <template #default="{ row }">
                 {{ formatDate(row.created_at) }}
               </template>
             </el-table-column>
 
-            <el-table-column column-key="actions" label="操作" :width="getColumnWidth('actions', 240)" fixed="right">
+            <el-table-column
+              column-key="actions"
+              label="操作"
+              :width="getColumnWidth('actions', 240)"
+              fixed="right"
+            >
               <template #default="{ row }">
                 <div class="action-buttons">
-                  <el-button type="primary" size="small" @click="handleQuery(row)">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    @click="handleQuery(row)"
+                  >
                     <el-icon>
                       <Search />
                     </el-icon>
                     查询
                   </el-button>
-                  <el-button type="warning" size="small" @click="handleQuerySetting(row)">
+                  <el-button
+                    type="warning"
+                    size="small"
+                    @click="handleQuerySetting(row)"
+                  >
                     <el-icon>
                       <Setting />
                     </el-icon>
                     查询设定
                   </el-button>
-                  <el-button type="success" size="small" :loading="downloadLoading" @click="openDownloadDialog(row)">
+                  <el-button
+                    type="success"
+                    size="small"
+                    :loading="downloadLoading"
+                    @click="openDownloadDialog(row)"
+                  >
                     下载资源包
                   </el-button>
                   <el-dropdown trigger="click">
@@ -402,27 +555,27 @@
                     <template #dropdown>
                       <el-dropdown-menu>
                         <el-dropdown-item @click="showApiEndpoint(row)">
-                          <el-icon>
-                            <View />
-                          </el-icon>API
+                          <el-icon> <View /> </el-icon>API
                         </el-dropdown-item>
                         <el-dropdown-item @click="handleEdit(row)">
-                          <el-icon>
-                            <Edit />
-                          </el-icon>编辑
+                          <el-icon> <Edit /> </el-icon>编辑
                         </el-dropdown-item>
-                        <el-dropdown-item divided @click="handleDelete(row)" :disabled="row.is_lock === '1'">
-                          <el-tooltip v-if="row.is_lock === '1'" content="该资源包已锁定，不可删除" placement="top">
+                        <el-dropdown-item
+                          divided
+                          :disabled="row.is_lock === '1'"
+                          @click="handleDelete(row)"
+                        >
+                          <el-tooltip
+                            v-if="row.is_lock === '1'"
+                            content="该资源包已锁定，不可删除"
+                            placement="top"
+                          >
                             <span>
-                              <el-icon>
-                                <Delete />
-                              </el-icon>删除
+                              <el-icon> <Delete /> </el-icon>删除
                             </span>
                           </el-tooltip>
                           <span v-else>
-                            <el-icon>
-                              <Delete />
-                            </el-icon>删除
+                            <el-icon> <Delete /> </el-icon>删除
                           </span>
                         </el-dropdown-item>
                       </el-dropdown-menu>
@@ -436,47 +589,90 @@
 
         <!-- 分页 -->
         <div class="pagination-wrapper">
-          <el-pagination v-model:current-page="pagination.currentPage" v-model:page-size="pagination.pageSize"
-            :page-sizes="[10, 20, 50, 100]" :total="pagination.total" layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange" @current-change="handleCurrentChange" />
+          <el-pagination
+            v-model:current-page="pagination.currentPage"
+            v-model:page-size="pagination.pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="pagination.total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
         </div>
       </el-card>
     </div>
 
     <!-- 创建资源包 -->
-    <ResourcePackageForm v-model:visible="createDialogVisible" :isEdit="false" @success="onCreateSuccess" />
+    <ResourcePackageForm
+      v-model:visible="createDialogVisible"
+      :is-edit="false"
+      @success="onCreateSuccess"
+    />
 
     <!-- 编辑资源包基本信息 -->
-    <ResourcePackageForm v-model:visible="editDialogVisible" :packageData="selectedPackage as any" :isEdit="true"
-      @success="onEditSuccess" />
+    <ResourcePackageForm
+      v-model:visible="editDialogVisible"
+      :package-data="selectedPackage as any"
+      :is-edit="true"
+      @success="onEditSuccess"
+    />
 
     <!-- 查询设定：根据资源包类型加载对应查询构建器 -->
     <el-drawer v-model="querySettingVisible" title="查询设定" size="80%">
       <!-- <p>test{{ initialSchema }}{{ initialTableName }}</p> -->
-      <template v-if="querySettingPackage && querySettingPackage.type === 'sql'">
-        <SQLQueryBuilder ref="sqlQueryBuilderRef" :sqlResources="sqlResources" :hasQueryPermission="hasQueryPermission"
-          :hasExportPermission="hasExportPermission" :hasSavePermission="hasSavePermission"
-          :initialDatasourceId="querySettingPackage.datasource_id"
-          :initialResourceId="querySettingPackage.resource_id || null" :initialSchema="initialSchema"
-          :initialTableName="initialTableName" :isInResourcePackage="true" :resourcePackageId="querySettingPackage.id"
-          :resourcePackageName="querySettingPackage.name" @execute-query="onSQLQueryExecute"
-          @save-query="onSQLQuerySave" @update-query="onSQLQueryUpdate" @export-results="onSQLResultsExport" />
+      <template
+        v-if="querySettingPackage && querySettingPackage.type === 'sql'"
+      >
+        <SQLQueryBuilder
+          ref="sqlQueryBuilderRef"
+          :sql-resources="sqlResources"
+          :has-query-permission="hasQueryPermission"
+          :has-export-permission="hasExportPermission"
+          :has-save-permission="hasSavePermission"
+          :initial-datasource-id="querySettingPackage.datasource_id"
+          :initial-resource-id="querySettingPackage.resource_id || null"
+          :initial-schema="initialSchema"
+          :initial-table-name="initialTableName"
+          :is-in-resource-package="true"
+          :resource-package-id="querySettingPackage.id"
+          :resource-package-name="querySettingPackage.name"
+          @execute-query="onSQLQueryExecute"
+          @save-query="onSQLQuerySave"
+          @update-query="onSQLQueryUpdate"
+          @export-results="onSQLResultsExport"
+        />
       </template>
-      <template v-else-if="querySettingPackage && querySettingPackage.type === 'elasticsearch'">
-        <ESQueryBuilder ref="esQueryBuilderRef" :es-datasources="esDatasources"
-          :initial-datasource-id="String(querySettingPackage.datasource_id)" :initial-indices="initialIndices"
-          :data-resource-id="querySettingPackage.resource_id || null" :has-es-query-permission="hasESQueryPermission"
-          :has-export-permission="hasExportPermission" :has-save-permission="hasSavePermission"
-          :isInResourcePackage="true" :resourcePackageId="querySettingPackage.id"
-          :resourcePackageName="querySettingPackage.name" @execute-query="onESQueryExecute" @save-query="onESQuerySave"
-          @export-results="onESResultsExport" @datasources-loaded="onESDatasourcesLoaded" />
+      <template
+        v-else-if="
+          querySettingPackage && querySettingPackage.type === 'elasticsearch'
+        "
+      >
+        <ESQueryBuilder
+          ref="esQueryBuilderRef"
+          :es-datasources="esDatasources"
+          :initial-datasource-id="String(querySettingPackage.datasource_id)"
+          :initial-indices="initialIndices"
+          :data-resource-id="querySettingPackage.resource_id || null"
+          :has-es-query-permission="hasESQueryPermission"
+          :has-export-permission="hasExportPermission"
+          :has-save-permission="hasSavePermission"
+          :is-in-resource-package="true"
+          :resource-package-id="querySettingPackage.id"
+          :resource-package-name="querySettingPackage.name"
+          @execute-query="onESQueryExecute"
+          @save-query="onESQuerySave"
+          @export-results="onESResultsExport"
+          @datasources-loaded="onESDatasourcesLoaded"
+        />
       </template>
     </el-drawer>
 
     <!-- API端点弹窗 -->
     <el-dialog v-model="apiDialogVisible" title="API端点" width="600px">
-      <p>资源包接口：<code>{{ apiEndpoint }}</code></p>
-      <div style="margin-top: 12px;">
+      <p>
+        资源包接口：<code>{{ apiEndpoint }}</code>
+      </p>
+      <div style="margin-top: 12px">
         <el-button type="primary" @click="copyApiEndpoint">
           复制端点
         </el-button>
@@ -491,31 +687,59 @@
       <div class="download-info">
         <div class="info-row">
           <span class="label">最新生成时间：</span>
-          <span class="value">{{ formatTime(downloadDialogData?.excel_time) || '暂无' }}</span>
+          <span class="value">{{
+            formatTime(downloadDialogData?.excel_time) || "暂无"
+          }}</span>
         </div>
         <div class="info-row">
           <span class="label">最新下载时间：</span>
-          <span class="value">{{ formatTime(downloadDialogData?.download_time) || '暂无' }}</span>
+          <span class="value">{{
+            formatTime(downloadDialogData?.download_time) || "暂无"
+          }}</span>
         </div>
         <!-- 历史文件选择 -->
         <div class="info-row">
           <span class="label">历史文件：</span>
-          <el-select v-model="selectedFileId" placeholder="选择历史Excel" filterable style="width: 260px"
-            :loading="historyLoading">
-            <el-option v-for="f in historyFiles" :key="f.id" :label="formatHistoryLabel(f)" :value="f.id" />
+          <el-select
+            v-model="selectedFileId"
+            placeholder="选择历史Excel"
+            filterable
+            style="width: 260px"
+            :loading="historyLoading"
+          >
+            <el-option
+              v-for="f in historyFiles"
+              :key="f.id"
+              :label="formatHistoryLabel(f)"
+              :value="f.id"
+            />
           </el-select>
-          <el-button size="small" type="success" :disabled="!selectedFileId" :loading="historyDownloadLoading"
-            @click="handleDownloadHistory">下载资源包</el-button>
+          <el-button
+            size="small"
+            type="success"
+            :disabled="!selectedFileId"
+            :loading="historyDownloadLoading"
+            @click="handleDownloadHistory"
+            >下载资源包</el-button
+          >
         </div>
       </div>
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="downloadDialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="generateLoading" @click="handleGenerateExcel">
+          <el-button
+            type="primary"
+            :loading="generateLoading"
+            @click="handleGenerateExcel"
+          >
             生成资源包
           </el-button>
-          <el-button type="success" :disabled="!downloadDialogData?.download_url" :loading="latestDownloadLoading"
-            @click="handleDownloadLatest">
+          <el-button
+            type="success"
+            :disabled="!downloadDialogData?.download_url"
+            :loading="latestDownloadLoading"
+            @click="handleDownloadLatest"
+          >
             下载最新资源包
           </el-button>
         </div>
@@ -525,10 +749,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useUserStore } from "@/stores/user";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Box,
   Plus,
@@ -547,104 +771,123 @@ import {
   Download,
   Delete,
   View,
-  Coin
-} from '@element-plus/icons-vue'
-import { resourcePackageApi, type ResourcePackage, type ResourcePackageSearchRequest, type ResourcePackageFile } from '@/api/resourcePackage'
-import { dataResourceApi } from '@/api/dataResource'
-import { templateApi } from '@/api/template'
-import { saveSQLTemplate, updateSQLTemplate, executeSQLQuery } from '@/api/sqlQuery'
-import { formatDate } from '@/utils/date'
-import SQLQueryBuilder from '@/components/SQLQueryBuilder.vue'
-import ESQueryBuilder from '@/components/ESQueryBuilder.vue'
-import ResourcePackageForm from '@/views/resourcePackage/components/ResourcePackageForm.vue'
+  Coin,
+} from "@element-plus/icons-vue";
+import {
+  resourcePackageApi,
+  type ResourcePackage,
+  type ResourcePackageSearchRequest,
+  type ResourcePackageFile,
+} from "@/api/resourcePackage";
+import { dataResourceApi } from "@/api/dataResource";
+import { templateApi } from "@/api/template";
+import {
+  saveSQLTemplate,
+  updateSQLTemplate,
+  executeSQLQuery,
+} from "@/api/sqlQuery";
+import { formatDate } from "@/utils/date";
+import SQLQueryBuilder from "@/components/SQLQueryBuilder.vue";
+import ESQueryBuilder from "@/components/ESQueryBuilder.vue";
+import ResourcePackageForm from "@/views/resourcePackage/components/ResourcePackageForm.vue";
 
 // 定义数据源接口
 interface Datasource {
-  id: number
-  name: string
-  type: string
-  description?: string
-  host: string
-  port: number
-  database?: string
-  username: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
+  id: number;
+  name: string;
+  type: string;
+  description?: string;
+  host: string;
+  port: number;
+  database?: string;
+  username: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // 路由和用户状态管理
-const router = useRouter()
-const userStore = useUserStore()
+const router = useRouter();
+const userStore = useUserStore();
 
 // 响应式数据
-const loading = ref(false)
-const downloadLoading = ref(false)
-const packageList = ref<ResourcePackage[]>([])
-const datasources = ref<Datasource[]>([])
-const esDatasources = ref([])
-const currentDataResource = ref<any>(null)
-const viewMode = ref('grid')
+const loading = ref(false);
+const downloadLoading = ref(false);
+const packageList = ref<ResourcePackage[]>([]);
+const datasources = ref<Datasource[]>([]);
+const esDatasources = ref([]);
+const currentDataResource = ref<any>(null);
+const viewMode = ref("grid");
 // SQL资源列表
-const sqlResources = ref<any[]>([])
+const sqlResources = ref<any[]>([]);
 
 // 编辑对话框与查询设定抽屉、API端点
-const editDialogVisible = ref(false)
-const createDialogVisible = ref(false)
-const selectedPackage = ref<ResourcePackage | null>(null)
-const querySettingVisible = ref(false)
-const querySettingPackage = ref<ResourcePackage | null>(null)
-const apiDialogVisible = ref(false)
-const apiEndpoint = ref('')
+const editDialogVisible = ref(false);
+const createDialogVisible = ref(false);
+const selectedPackage = ref<ResourcePackage | null>(null);
+const querySettingVisible = ref(false);
+const querySettingPackage = ref<ResourcePackage | null>(null);
+const apiDialogVisible = ref(false);
+const apiEndpoint = ref("");
 
 // 搜索和筛选
 const filters = reactive({
-  search: '',
-  type: '',
-  datasource_id: '',
-  status: '',
-  sortBy: 'created_at'
-})
+  search: "",
+  type: "",
+  datasource_id: "",
+  status: "",
+  sortBy: "created_at",
+});
 
 // 分页信息
 const pagination = reactive({
   currentPage: 1,
   pageSize: 20,
-  total: 0
-})
+  total: 0,
+});
 
 // 统计数据
 const stats = reactive({
   total: 0,
   active: 0,
   sqlCount: 0,
-  elasticsearchCount: 0
-})
+  elasticsearchCount: 0,
+});
 
 // 计算属性
 const getDatasourceName = computed(() => {
   return (datasourceId: number) => {
-    const ds = datasources.value.find((d: Datasource) => d.id === datasourceId)
-    return ds ? ds.name : '数据源'
-  }
-})
+    const ds = datasources.value.find((d: Datasource) => d.id === datasourceId);
+    return ds ? ds.name : "数据源";
+  };
+});
 
 // 权限控制
 const hasESQueryPermission = computed(() => {
-  return userStore.hasPermission('data:elasticsearch:query') || userStore.hasRole('admin')
-})
+  return (
+    userStore.hasPermission("data:elasticsearch:query") ||
+    userStore.hasRole("admin")
+  );
+});
 
 const hasExportPermission = computed(() => {
-  return userStore.hasPermission('data:resource:export') || userStore.hasRole('admin')
-})
+  return (
+    userStore.hasPermission("data:resource:export") ||
+    userStore.hasRole("admin")
+  );
+});
 
 const hasSavePermission = computed(() => {
-  return userStore.hasPermission('data:resource:save') || userStore.hasRole('admin')
-})
+  return (
+    userStore.hasPermission("data:resource:save") || userStore.hasRole("admin")
+  );
+});
 
 const hasQueryPermission = computed(() => {
-  return userStore.hasPermission('data:resource:query') || userStore.hasRole('admin')
-})
+  return (
+    userStore.hasPermission("data:resource:query") || userStore.hasRole("admin")
+  );
+});
 
 /**
  * 计算属性：获取初始索引列表
@@ -652,145 +895,158 @@ const hasQueryPermission = computed(() => {
  */
 const initialIndices = computed(() => {
   if (!currentDataResource.value) {
-    return []
+    return [];
   }
 
   // 如果数据资源有 indices 字段，直接返回
-  if (currentDataResource.value.indices && Array.isArray(currentDataResource.value.indices)) {
-    return currentDataResource.value.indices
+  if (
+    currentDataResource.value.indices &&
+    Array.isArray(currentDataResource.value.indices)
+  ) {
+    return currentDataResource.value.indices;
   }
 
   // 如果数据资源有 table_name 或 index_name，返回对应的名称
   if (currentDataResource.value.table_name) {
-    return [currentDataResource.value.table_name]
+    return [currentDataResource.value.table_name];
   }
 
   if (currentDataResource.value.index_name) {
-    return [currentDataResource.value.index_name]
+    return [currentDataResource.value.index_name];
   }
 
-  return []
-})
+  return [];
+});
 
 // SQL 初始 Schema 与表名（从当前数据资源详情推断）
 const initialSchema = computed(() => {
-  const dr = currentDataResource.value as any
+  const dr = currentDataResource.value as any;
   // 兼容多种字段来源：schema_name（部分类型）、database_name（后端返回的数据库名）、connection_config.database（旧结构）
   return (
     (dr?.schema_name as string) ||
     (dr?.database_name as string) ||
     (dr?.connection_config?.database as string) ||
-    ''
-  )
-})
+    ""
+  );
+});
 
 const initialTableName = computed(() => {
-  return (currentDataResource.value?.table_name as string) || (currentDataResource.value?.tableName as string) || ''
-})
+  return (
+    (currentDataResource.value?.table_name as string) ||
+    (currentDataResource.value?.tableName as string) ||
+    ""
+  );
+});
 
 // 组件引用
-const esQueryBuilderRef = ref(null)
-const sqlQueryBuilderRef = ref(null)
+const esQueryBuilderRef = ref(null);
+const sqlQueryBuilderRef = ref(null);
 
 // 列宽拖拽与持久化
-const COLUMN_WIDTHS_STORAGE_KEY = 'resourcePackageTableColumnWidths'
-const columnWidths = ref<Record<string, number>>({})
+const COLUMN_WIDTHS_STORAGE_KEY = "resourcePackageTableColumnWidths";
+const columnWidths = ref<Record<string, number>>({});
 
 function loadColumnWidths() {
   try {
-    const saved = localStorage.getItem(COLUMN_WIDTHS_STORAGE_KEY)
+    const saved = localStorage.getItem(COLUMN_WIDTHS_STORAGE_KEY);
     if (saved) {
-      const parsed = JSON.parse(saved)
-      if (parsed && typeof parsed === 'object') {
-        columnWidths.value = parsed
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === "object") {
+        columnWidths.value = parsed;
       }
     }
   } catch (e) {
-    console.warn('加载列宽失败:', e)
+    console.warn("加载列宽失败:", e);
   }
 }
 
 function saveColumnWidths() {
   try {
-    localStorage.setItem(COLUMN_WIDTHS_STORAGE_KEY, JSON.stringify(columnWidths.value))
+    localStorage.setItem(
+      COLUMN_WIDTHS_STORAGE_KEY,
+      JSON.stringify(columnWidths.value),
+    );
   } catch (e) {
-    console.warn('保存列宽失败:', e)
+    console.warn("保存列宽失败:", e);
   }
 }
 
 function getColumnWidth(key: string, defaultWidth: number) {
-  const val = columnWidths.value[key]
-  return typeof val === 'number' && val > 0 ? val : defaultWidth
+  const val = columnWidths.value[key];
+  return typeof val === "number" && val > 0 ? val : defaultWidth;
 }
 
 function handleColumnResize(newWidth: number, oldWidth: number, column: any) {
-  const key = column?.columnKey || column?.property || column?.label
+  const key = column?.columnKey || column?.property || column?.label;
   if (key) {
-    columnWidths.value[key] = newWidth
-    saveColumnWidths()
+    columnWidths.value[key] = newWidth;
+    saveColumnWidths();
   }
 }
 
 onMounted(() => {
-  loadColumnWidths()
-  loadSQLResources()
-})
+  loadColumnWidths();
+  loadSQLResources();
+});
 
 /**
  * 过滤后的资源包列表
  */
 const filteredPackages = computed(() => {
-  let result = packageList.value
+  let result = packageList.value;
 
   // 搜索过滤
   if (filters.search) {
-    const keyword = filters.search.toLowerCase()
-    result = result.filter(pkg =>
-      pkg.name.toLowerCase().includes(keyword) ||
-      (pkg.description && pkg.description.toLowerCase().includes(keyword))
-    )
+    const keyword = filters.search.toLowerCase();
+    result = result.filter(
+      (pkg) =>
+        pkg.name.toLowerCase().includes(keyword) ||
+        (pkg.description && pkg.description.toLowerCase().includes(keyword)),
+    );
   }
 
   // 类型过滤
   if (filters.type) {
-    result = result.filter(pkg => pkg.type === filters.type)
+    result = result.filter((pkg) => pkg.type === filters.type);
   }
 
   // 数据源过滤
   if (filters.datasource_id) {
-    result = result.filter(pkg => pkg.datasource_id === Number(filters.datasource_id))
+    result = result.filter(
+      (pkg) => pkg.datasource_id === Number(filters.datasource_id),
+    );
   }
 
   // 状态过滤
   if (filters.status) {
-    const isActive = filters.status === 'true'
-    result = result.filter(pkg => pkg.is_active === isActive)
+    const isActive = filters.status === "true";
+    result = result.filter((pkg) => pkg.is_active === isActive);
   }
 
   // 排序
   result.sort((a, b) => {
-    const field = filters.sortBy as keyof ResourcePackage
-    const aValue = a[field]
-    const bValue = b[field]
+    const field = filters.sortBy as keyof ResourcePackage;
+    const aValue = a[field];
+    const bValue = b[field];
 
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return bValue.localeCompare(aValue) // 降序
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return bValue.localeCompare(aValue); // 降序
     }
 
-    return 0
-  })
+    return 0;
+  });
 
-  return result
-})
+  return result;
+});
 
 /**
  * 分页后的资源包列表
  */
 const paginatedPackages = computed(() => {
-  const start = (pagination.currentPage - 1) * pagination.pageSize
-  const end = start + pagination.pageSize
-  return filteredPackages.value.slice(start, end)
-})
+  const start = (pagination.currentPage - 1) * pagination.pageSize;
+  const end = start + pagination.pageSize;
+  return filteredPackages.value.slice(start, end);
+});
 
 // 方法
 
@@ -798,64 +1054,65 @@ const paginatedPackages = computed(() => {
  * 获取类型图标
  */
 const getTypeIcon = (type: string) => {
-  return type === 'sql' ? Coin : Search
-}
+  return type === "sql" ? Coin : Search;
+};
 
 /**
  * 获取状态类型
  */
-const getStatusType = (isActive: boolean): 'success' | 'danger' => {
-  return isActive ? 'success' : 'danger'
-}
+const getStatusType = (isActive: boolean): "success" | "danger" => {
+  return isActive ? "success" : "danger";
+};
 
 /**
  * 加载资源包列表
  */
 const loadPackages = async () => {
   try {
-    loading.value = true
+    loading.value = true;
 
     const searchParams: ResourcePackageSearchRequest = {
       keyword: filters.search || undefined,
-      type: filters.type as any || undefined,
-      datasource_id: filters.datasource_id ? Number(filters.datasource_id) : undefined,
-      is_active: filters.status ? filters.status === 'true' : undefined,
+      type: (filters.type as any) || undefined,
+      datasource_id: filters.datasource_id
+        ? Number(filters.datasource_id)
+        : undefined,
+      is_active: filters.status ? filters.status === "true" : undefined,
       page: pagination.currentPage,
       size: Math.min(pagination.pageSize, 100), // 后端限制最大为100
-      sort_by: 'created_at',
-      sort_order: 'desc'
-    }
+      sort_by: "created_at",
+      sort_order: "desc",
+    };
 
-    const res = await resourcePackageApi.search(searchParams)
-    console.log('搜索资源包响应:', res)
-    packageList.value = res.data?.items || []
-    pagination.total = res.data?.total || 0 // 更新总数
+    const res = await resourcePackageApi.search(searchParams);
+    console.log("搜索资源包响应:", res);
+    packageList.value = res.data?.items || [];
+    pagination.total = res.data?.total || 0; // 更新总数
 
     // 更新统计数据
-    updateStats()
-
+    updateStats();
   } catch (error) {
-    console.error('加载资源包列表失败:', error)
-    ElMessage.error('加载资源包列表失败')
+    console.error("加载资源包列表失败:", error);
+    ElMessage.error("加载资源包列表失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // 复制API端点
 const copyApiEndpoint = async () => {
   try {
-    await navigator.clipboard.writeText(apiEndpoint.value)
-    ElMessage.success('已复制API端点')
+    await navigator.clipboard.writeText(apiEndpoint.value);
+    ElMessage.success("已复制API端点");
   } catch (e) {
-    ElMessage.error('复制失败')
+    ElMessage.error("复制失败");
   }
-}
+};
 
 // 查看详情（当前行为：打开编辑弹窗）
 const handleView = (row: ResourcePackage) => {
-  handleEdit(row)
-}
+  handleEdit(row);
+};
 
 /**
  * 加载数据源列表
@@ -868,157 +1125,188 @@ const loadDatasources = async () => {
 
     // 临时使用模拟数据
     datasources.value = [
-      { id: 1, name: 'MySQL主库', type: 'mysql', host: 'localhost', port: 3306, username: 'root', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
-      { id: 2, name: 'Elasticsearch集群', type: 'elasticsearch', host: 'localhost', port: 9200, username: 'elastic', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01' }
-    ]
+      {
+        id: 1,
+        name: "MySQL主库",
+        type: "mysql",
+        host: "localhost",
+        port: 3306,
+        username: "root",
+        is_active: true,
+        created_at: "2024-01-01",
+        updated_at: "2024-01-01",
+      },
+      {
+        id: 2,
+        name: "Elasticsearch集群",
+        type: "elasticsearch",
+        host: "localhost",
+        port: 9200,
+        username: "elastic",
+        is_active: true,
+        created_at: "2024-01-01",
+        updated_at: "2024-01-01",
+      },
+    ];
   } catch (error) {
-    console.error('加载数据源列表失败:', error)
+    console.error("加载数据源列表失败:", error);
   }
-}
+};
 
 /**
  * 加载可用于SQL查询的数据资源列表
  */
 const loadSQLResources = async () => {
   try {
-    const response: any = await dataResourceApi.getResourceList({ page: 1, page_size: 1000 })
+    const response: any = await dataResourceApi.getResourceList({
+      page: 1,
+      page_size: 1000,
+    });
     // 兼容不同返回结构
-    const items = response?.data?.items || response?.items || response?.data?.list || []
-    sqlResources.value = items
+    const items =
+      response?.data?.items || response?.items || response?.data?.list || [];
+    sqlResources.value = items;
   } catch (error) {
-    console.error('加载数据资源失败:', error)
-    ElMessage.error('加载数据资源失败')
+    console.error("加载数据资源失败:", error);
+    ElMessage.error("加载数据资源失败");
   }
-}
+};
 
 /**
  * 更新统计数据
  */
 const updateStats = () => {
   // 总数使用后端返回的 total（全量数据总数）
-  stats.total = pagination.total
-  stats.active = packageList.value.filter(pkg => pkg.is_active).length
-  stats.sqlCount = packageList.value.filter(pkg => pkg.type === 'sql').length
-  stats.elasticsearchCount = packageList.value.filter(pkg => pkg.type === 'elasticsearch').length
-}
+  stats.total = pagination.total;
+  stats.active = packageList.value.filter((pkg) => pkg.is_active).length;
+  stats.sqlCount = packageList.value.filter((pkg) => pkg.type === "sql").length;
+  stats.elasticsearchCount = packageList.value.filter(
+    (pkg) => pkg.type === "elasticsearch",
+  ).length;
+};
 
 /**
  * 刷新资源包列表
  */
 const refreshPackages = () => {
-  loadPackages()
-}
+  loadPackages();
+};
 
 /**
  * 搜索处理
  */
 const handleSearch = () => {
-  pagination.currentPage = 1
-  loadPackages() // 重新加载数据
-}
+  pagination.currentPage = 1;
+  loadPackages(); // 重新加载数据
+};
 
 /**
  * 筛选处理
  */
 const handleFilter = () => {
-  pagination.currentPage = 1
-  loadPackages() // 重新加载数据
-}
+  pagination.currentPage = 1;
+  loadPackages(); // 重新加载数据
+};
 
 /**
  * 排序处理
  */
 const handleSort = () => {
-  pagination.currentPage = 1
-  loadPackages() // 重新加载数据
-}
+  pagination.currentPage = 1;
+  loadPackages(); // 重新加载数据
+};
 
 /**
  * 重置筛选条件
  */
 const resetFilters = () => {
   Object.assign(filters, {
-    search: '',
-    type: '',
-    datasource_id: '',
-    status: '',
-    sortBy: 'created_at'
-  })
-  pagination.currentPage = 1
-  loadPackages() // 重新加载数据
-}
+    search: "",
+    type: "",
+    datasource_id: "",
+    status: "",
+    sortBy: "created_at",
+  });
+  pagination.currentPage = 1;
+  loadPackages(); // 重新加载数据
+};
 
 /**
  * 表格排序处理
  */
 const handleTableSort = ({ prop, order }: { prop: string; order: string }) => {
-  filters.sortBy = prop
+  filters.sortBy = prop;
   // 这里可以根据 order 调整排序方向
-}
+};
 
 /**
  * 创建资源包
  */
 const handleCreate = () => {
-  createDialogVisible.value = true
-}
+  createDialogVisible.value = true;
+};
 
 /**
  * 编辑资源包 - 跳转到数据查询页面
  */
 const handleEdit = (row: ResourcePackage) => {
-  selectedPackage.value = row
-  editDialogVisible.value = true
-}
+  selectedPackage.value = row;
+  editDialogVisible.value = true;
+};
 
 /**
  * 查询设定（打开查询构建器）
  */
 const handleQuerySetting = async (row: ResourcePackage) => {
-  querySettingPackage.value = row
+  querySettingPackage.value = row;
 
   // 如果资源包有关联的数据资源ID，获取数据资源详情
   if (row.resource_id) {
-    await fetchDataResourceDetail(row.resource_id)
+    await fetchDataResourceDetail(row.resource_id);
   }
 
-  querySettingVisible.value = true
-}
+  querySettingVisible.value = true;
+};
 
 /**
  * 查看资源包详情
  */
-const buildApiEndpoint = (row: ResourcePackage) => `/api/v1/resource-packages/${row.id}`
+const buildApiEndpoint = (row: ResourcePackage) =>
+  `/api/v1/resource-packages/${row.id}`;
 
 const showApiEndpoint = (row: ResourcePackage) => {
-  apiEndpoint.value = buildApiEndpoint(row)
-  apiDialogVisible.value = true
-}
+  apiEndpoint.value = buildApiEndpoint(row);
+  apiDialogVisible.value = true;
+};
 
 // 下载相关状态与方法
-const downloadDialogVisible = ref(false)
-const downloadPackage = ref<ResourcePackage | null>(null)
-const downloadDialogData = ref<{ excel_time?: string; download_time?: string; download_url?: string } | null>(null)
-const historyFiles = ref<ResourcePackageFile[]>([])
-const selectedFileId = ref<number | null>(null)
-const historyLoading = ref(false)
-const latestDownloadLoading = ref(false)
-const historyDownloadLoading = ref(false)
-const generateLoading = ref(false)
+const downloadDialogVisible = ref(false);
+const downloadPackage = ref<ResourcePackage | null>(null);
+const downloadDialogData = ref<{
+  excel_time?: string;
+  download_time?: string;
+  download_url?: string;
+} | null>(null);
+const historyFiles = ref<ResourcePackageFile[]>([]);
+const selectedFileId = ref<number | null>(null);
+const historyLoading = ref(false);
+const latestDownloadLoading = ref(false);
+const historyDownloadLoading = ref(false);
+const generateLoading = ref(false);
 // 下载弹窗的模板兜底数据：ES模板的_source与indices
-const downloadTemplateSourceFields = ref<string[]>([])
-const downloadTemplateIndices = ref<string[]>([])
+const downloadTemplateSourceFields = ref<string[]>([]);
+const downloadTemplateIndices = ref<string[]>([]);
 
 function formatTime(time?: string) {
-  if (!time) return '-'
-  const d = new Date(time)
-  if (isNaN(d.getTime())) return time
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+  if (!time) return "-";
+  const d = new Date(time);
+  if (isNaN(d.getTime())) return time;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
 }
 
 function formatHistoryLabel(f: ResourcePackageFile): string {
-  const t = f.generated_at ? new Date(f.generated_at).toLocaleString() : ''
-  return `${f.filename} (${t})`
+  const t = f.generated_at ? new Date(f.generated_at).toLocaleString() : "";
+  return `${f.filename} (${t})`;
 }
 
 /**
@@ -1026,224 +1314,258 @@ function formatHistoryLabel(f: ResourcePackageFile): string {
  */
 async function handleGenerateExcel() {
   if (!downloadPackage.value?.id) {
-    ElMessage.error('缺少资源包ID')
-    return
+    ElMessage.error("缺少资源包ID");
+    return;
   }
 
   try {
-    generateLoading.value = true
+    generateLoading.value = true;
     // 调用生成Excel的API，构造与查询页一致的payload
-    let payload: Record<string, any> = {}
+    let payload: Record<string, any> = {};
 
-    if (downloadPackage.value?.type === 'elasticsearch') {
+    if (downloadPackage.value?.type === "elasticsearch") {
       // 优先从查询构建器获取当前选择的索引与DSL
-      let indices: string[] = []
-      let builtQuery: any = null
+      let indices: string[] = [];
+      let builtQuery: any = null;
       try {
         // 依赖 ESQueryBuilder 暴露的方法
-        if (esQueryBuilderRef.value && typeof esQueryBuilderRef.value.getSelectedIndices === 'function') {
-          indices = esQueryBuilderRef.value.getSelectedIndices()
+        if (
+          esQueryBuilderRef.value &&
+          typeof esQueryBuilderRef.value.getSelectedIndices === "function"
+        ) {
+          indices = esQueryBuilderRef.value.getSelectedIndices();
         }
-        if (esQueryBuilderRef.value && typeof esQueryBuilderRef.value.getQuery === 'function') {
-          builtQuery = esQueryBuilderRef.value.getQuery()
+        if (
+          esQueryBuilderRef.value &&
+          typeof esQueryBuilderRef.value.getQuery === "function"
+        ) {
+          builtQuery = esQueryBuilderRef.value.getQuery();
         }
       } catch (e) {
-        console.warn('从查询构建器获取索引或DSL失败，尝试使用数据资源索引兜底:', e)
+        console.warn(
+          "从查询构建器获取索引或DSL失败，尝试使用数据资源索引兜底:",
+          e,
+        );
       }
 
       // 索引兜底优先顺序：模板indices -> 数据资源indices
-      if ((!indices || indices.length === 0) && downloadTemplateIndices.value && downloadTemplateIndices.value.length > 0) {
-        indices = downloadTemplateIndices.value
+      if (
+        (!indices || indices.length === 0) &&
+        downloadTemplateIndices.value &&
+        downloadTemplateIndices.value.length > 0
+      ) {
+        indices = downloadTemplateIndices.value;
       }
-      if ((!indices || indices.length === 0) && initialIndices.value && initialIndices.value.length > 0) {
-        indices = initialIndices.value as string[]
+      if (
+        (!indices || indices.length === 0) &&
+        initialIndices.value &&
+        initialIndices.value.length > 0
+      ) {
+        indices = initialIndices.value as string[];
       }
 
       if (!indices || indices.length === 0) {
-        ElMessage.error('缺少索引信息，无法生成Excel，请先在查询设定中选择索引')
-        return
+        ElMessage.error(
+          "缺少索引信息，无法生成Excel，请先在查询设定中选择索引",
+        );
+        return;
       }
 
       // 构造与查询页一致的 payload 结构
-      const queryPart = builtQuery && builtQuery.query ? builtQuery.query : { match_all: {} }
-      payload = { index: indices, query: queryPart }
+      const queryPart =
+        builtQuery && builtQuery.query ? builtQuery.query : { match_all: {} };
+      payload = { index: indices, query: queryPart };
       // 字段导出优先顺序：查询设定的_source -> 模板_source
       if (builtQuery && builtQuery._source) {
-        payload._source = builtQuery._source
-      } else if (downloadTemplateSourceFields.value && downloadTemplateSourceFields.value.length > 0) {
-        payload._source = downloadTemplateSourceFields.value
+        payload._source = builtQuery._source;
+      } else if (
+        downloadTemplateSourceFields.value &&
+        downloadTemplateSourceFields.value.length > 0
+      ) {
+        payload._source = downloadTemplateSourceFields.value;
       }
     }
 
-    const resp = await resourcePackageApi.generateExcel(downloadPackage.value.id, payload)
+    const resp = await resourcePackageApi.generateExcel(
+      downloadPackage.value.id,
+      payload,
+    );
 
     if (resp?.success) {
-      const hasNew = resp?.data?.has_new_data
+      const hasNew = resp?.data?.has_new_data;
       if (hasNew === false) {
-        ElMessage.warning(resp?.message || '无最新数据，无需生成')
+        ElMessage.warning(resp?.message || "无最新数据，无需生成");
       } else {
         // 更新弹窗中的下载链接
-        const data = resp.data || {}
+        const data = resp.data || {};
         if (data.download_url && downloadDialogData.value) {
-          downloadDialogData.value.download_url = data.download_url
+          downloadDialogData.value.download_url = data.download_url;
         }
         // 仅在有新数据时刷新弹窗时间为本地当前时间
         if (downloadDialogData.value) {
-          downloadDialogData.value.excel_time = new Date().toISOString()
+          downloadDialogData.value.excel_time = new Date().toISOString();
         }
-        ElMessage.success('Excel文件生成成功')
+        ElMessage.success("Excel文件生成成功");
       }
     } else {
-      ElMessage.error(resp?.message || '生成Excel失败，请稍后重试')
+      ElMessage.error(resp?.message || "生成Excel失败，请稍后重试");
     }
   } catch (e: any) {
-    console.error('生成Excel失败:', e)
-    ElMessage.error(e?.message || '生成Excel失败，请稍后重试')
+    console.error("生成Excel失败:", e);
+    ElMessage.error(e?.message || "生成Excel失败，请稍后重试");
   } finally {
-    generateLoading.value = false
+    generateLoading.value = false;
   }
 }
 
 function openDownloadDialog(pkg: ResourcePackage) {
-  downloadPackage.value = pkg
-  downloadDialogVisible.value = true
+  downloadPackage.value = pkg;
+  downloadDialogVisible.value = true;
   downloadDialogData.value = {
     excel_time: pkg.excel_time,
     download_time: pkg.download_time,
     download_url: pkg.download_url,
-  }
-  selectedFileId.value = null
+  };
+  selectedFileId.value = null;
   // 预加载数据资源详情，以便 initialIndices 兜底
   if (pkg.resource_id) {
-    fetchDataResourceDetail(pkg.resource_id).catch(err => {
-      console.warn('预加载数据资源详情失败:', err)
-    })
+    fetchDataResourceDetail(pkg.resource_id).catch((err) => {
+      console.warn("预加载数据资源详情失败:", err);
+    });
   }
   // 清空模板兜底数据并在ES类型时预加载模板详情（_source与indices）
-  downloadTemplateSourceFields.value = []
-  downloadTemplateIndices.value = []
-  if (pkg.type === 'elasticsearch' && pkg.template_id) {
-    templateApi.getByType(pkg.template_id, 'es')
+  downloadTemplateSourceFields.value = [];
+  downloadTemplateIndices.value = [];
+  if (pkg.type === "elasticsearch" && pkg.template_id) {
+    templateApi
+      .getByType(pkg.template_id, "es")
       .then((resp: any) => {
-        const detail = resp?.data || resp
-        const idx = detail?.indices || detail?.config?.indices || []
+        const detail = resp?.data || resp;
+        const idx = detail?.indices || detail?.config?.indices || [];
         if (Array.isArray(idx)) {
-          downloadTemplateIndices.value = idx
+          downloadTemplateIndices.value = idx;
         }
-        let q = detail?.query || detail?.query_content || null
+        let q = detail?.query || detail?.query_content || null;
         try {
-          if (q && typeof q === 'string') {
-            q = JSON.parse(q)
+          if (q && typeof q === "string") {
+            q = JSON.parse(q);
           }
         } catch (e) {
-          console.warn('解析模板query_content失败，按原值处理:', e)
+          console.warn("解析模板query_content失败，按原值处理:", e);
         }
         if (q && Array.isArray(q._source)) {
-          downloadTemplateSourceFields.value = q._source
+          downloadTemplateSourceFields.value = q._source;
         }
       })
-      .catch(err => {
-        console.warn('预加载ES模板详情失败:', err)
-      })
+      .catch((err) => {
+        console.warn("预加载ES模板详情失败:", err);
+      });
   }
-  fetchHistoryFiles(pkg.id)
+  fetchHistoryFiles(pkg.id);
 }
 
 async function fetchHistoryFiles(packageId: number) {
   try {
-    historyLoading.value = true
-    const resp = await resourcePackageApi.listFiles(packageId, 1, 50)
+    historyLoading.value = true;
+    const resp = await resourcePackageApi.listFiles(packageId, 1, 50);
     if (resp.success) {
-      historyFiles.value = resp.data?.items || []
+      historyFiles.value = resp.data?.items || [];
     } else {
-      historyFiles.value = []
+      historyFiles.value = [];
     }
   } catch (err) {
-    console.warn('加载历史文件失败:', err)
-    historyFiles.value = []
+    console.warn("加载历史文件失败:", err);
+    historyFiles.value = [];
   } finally {
-    historyLoading.value = false
+    historyLoading.value = false;
   }
 }
 
 async function handleDownloadLatest() {
   try {
-    if (!downloadPackage.value) return
+    if (!downloadPackage.value) return;
     if (!downloadDialogData.value?.download_url) {
-      ElMessage.error('暂无可下载的最新资源包，请先生成Excel')
-      return
+      ElMessage.error("暂无可下载的最新资源包，请先生成Excel");
+      return;
     }
-    latestDownloadLoading.value = true
-    const resp = await resourcePackageApi.downloadLatest(downloadPackage.value.id)
+    latestDownloadLoading.value = true;
+    const resp = await resourcePackageApi.downloadLatest(
+      downloadPackage.value.id,
+    );
     if (!resp.success) {
-      throw new Error(resp.message || '下载失败')
+      throw new Error(resp.message || "下载失败");
     }
-    const url = resp.data?.download_url || downloadDialogData.value?.download_url
-    const filename = resp.data?.filename || ''
+    const url =
+      resp.data?.download_url || downloadDialogData.value?.download_url;
+    const filename = resp.data?.filename || "";
     if (url) {
-      const newWin = window.open(url, '_blank')
+      const newWin = window.open(url, "_blank");
       if (!newWin) {
         try {
-          const link = document.createElement('a')
-          link.href = url
-          link.download = filename
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         } catch (e) {
-          console.warn('下载链接触发失败，已尝试回退方案:', e)
+          console.warn("下载链接触发失败，已尝试回退方案:", e);
         }
       }
-      if (resp.data?.download_time) downloadDialogData.value!.download_time = resp.data.download_time
-      downloadDialogData.value!.download_time = new Date().toISOString()
-      ElMessage.success('正在下载最新资源包...')
+      if (resp.data?.download_time)
+        downloadDialogData.value!.download_time = resp.data.download_time;
+      downloadDialogData.value!.download_time = new Date().toISOString();
+      ElMessage.success("正在下载最新资源包...");
     } else {
-      ElMessage.error('未返回下载链接')
+      ElMessage.error("未返回下载链接");
     }
   } catch (e: any) {
-    console.error('下载最新资源包失败:', e)
-    ElMessage.error(e.message || '下载失败，请稍后重试')
+    console.error("下载最新资源包失败:", e);
+    ElMessage.error(e.message || "下载失败，请稍后重试");
   } finally {
-    latestDownloadLoading.value = false
+    latestDownloadLoading.value = false;
   }
 }
 
 async function handleDownloadHistory() {
   try {
     if (!downloadPackage.value || !selectedFileId.value) {
-      ElMessage.error('请选择需要下载的历史文件')
-      return
+      ElMessage.error("请选择需要下载的历史文件");
+      return;
     }
-    historyDownloadLoading.value = true
-    const resp = await resourcePackageApi.downloadFile(downloadPackage.value.id, selectedFileId.value)
+    historyDownloadLoading.value = true;
+    const resp = await resourcePackageApi.downloadFile(
+      downloadPackage.value.id,
+      selectedFileId.value,
+    );
     if (!resp.success) {
-      throw new Error(resp.message || '下载失败')
+      throw new Error(resp.message || "下载失败");
     }
-    const url = resp.data?.download_url
-    const filename = resp.data?.filename || ''
+    const url = resp.data?.download_url;
+    const filename = resp.data?.filename || "";
     if (url) {
-      const newWin = window.open(url, '_blank')
+      const newWin = window.open(url, "_blank");
       if (!newWin) {
         try {
-          const link = document.createElement('a')
-          link.href = url
-          link.download = filename
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         } catch (e) {
-          console.warn('下载链接触发失败，已尝试回退方案:', e)
+          console.warn("下载链接触发失败，已尝试回退方案:", e);
         }
       }
-      ElMessage.success('正在下载历史文件...')
+      ElMessage.success("正在下载历史文件...");
     } else {
-      ElMessage.error('未返回下载链接')
+      ElMessage.error("未返回下载链接");
     }
   } catch (e: any) {
-    console.error('下载历史文件失败:', e)
-    ElMessage.error(e.message || '下载失败，请稍后重试')
+    console.error("下载历史文件失败:", e);
+    ElMessage.error(e.message || "下载失败，请稍后重试");
   } finally {
-    historyDownloadLoading.value = false
+    historyDownloadLoading.value = false;
   }
 }
 
@@ -1251,65 +1573,65 @@ async function handleDownloadHistory() {
  * 跳转到资源包查询页面
  */
 const handleQuery = (row: ResourcePackage) => {
-  router.push(`/data-resources/packages/${row.id}/query`)
-}
+  router.push(`/data-resources/packages/${row.id}/query`);
+};
 
 /**
  * 克隆资源包
  */
 const handleClone = (row: ResourcePackage) => {
-  ElMessage.info('克隆功能开发中...')
-}
+  ElMessage.info("克隆功能开发中...");
+};
 
 /**
  * 删除资源包
  */
 const handleDelete = async (row: ResourcePackage) => {
   // 检查资源包是否被锁定
-  if (row.is_lock === '1') {
-    ElMessage.warning('该资源包已锁定，不可删除')
-    return
+  if (row.is_lock === "1") {
+    ElMessage.warning("该资源包已锁定，不可删除");
+    return;
   }
 
   try {
     await ElMessageBox.confirm(
       `确定要删除资源包 “${row.name}” 吗？`,
-      '确认删除',
+      "确认删除",
       {
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
+        confirmButtonText: "删除",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    );
 
-    await resourcePackageApi.delete(row.id)
-    ElMessage.success('删除成功')
-    loadPackages()
+    await resourcePackageApi.delete(row.id);
+    ElMessage.success("删除成功");
+    loadPackages();
   } catch (error) {
     // 取消会抛出错误（通常为 'cancel'），不提示为失败
-    if (error !== 'cancel') {
-      console.error('删除失败:', error)
-      ElMessage.error('删除失败')
+    if (error !== "cancel") {
+      console.error("删除失败:", error);
+      ElMessage.error("删除失败");
     }
   }
-}
+};
 
 /**
  * 分页大小变化处理
  */
 const handleSizeChange = (size: number) => {
-  pagination.pageSize = size
-  pagination.currentPage = 1
-  loadPackages() // 重新加载数据
-}
+  pagination.pageSize = size;
+  pagination.currentPage = 1;
+  loadPackages(); // 重新加载数据
+};
 
 /**
  * 当前页变化处理
  */
 const handleCurrentChange = (page: number) => {
-  pagination.currentPage = page
-  loadPackages() // 重新加载数据
-}
+  pagination.currentPage = page;
+  loadPackages(); // 重新加载数据
+};
 
 /**
  * 获取数据资源详情
@@ -1317,24 +1639,24 @@ const handleCurrentChange = (page: number) => {
  */
 const fetchDataResourceDetail = async (resourceId: number) => {
   try {
-    const response = await dataResourceApi.getResourceDetail(resourceId)
+    const response = await dataResourceApi.getResourceDetail(resourceId);
     if (response.success && response.data) {
-      currentDataResource.value = response.data
-      return response.data
+      currentDataResource.value = response.data;
+      return response.data;
     }
   } catch (error) {
-    console.error('获取数据资源详情失败:', error)
-    ElMessage.error('获取数据资源详情失败')
+    console.error("获取数据资源详情失败:", error);
+    ElMessage.error("获取数据资源详情失败");
   }
-  return null
-}
+  return null;
+};
 
 /**
  * ES查询执行处理
  */
 const onESQueryExecute = (queryData) => {
-  console.log('执行ES查询:', queryData)
-}
+  console.log("执行ES查询:", queryData);
+};
 
 /**
  * SQL 查询模板保存
@@ -1344,27 +1666,35 @@ const onSQLQuerySave = async (queryData: any) => {
     const templateData = {
       name: queryData.name,
       description: queryData.description,
-      datasourceId: queryData.datasourceId || querySettingPackage.value?.datasource_id,
-      dataResourceId: queryData.queryConfig?.resourceId ? parseInt(queryData.queryConfig.resourceId) : (querySettingPackage.value?.resource_id || null),
+      datasourceId:
+        queryData.datasourceId || querySettingPackage.value?.datasource_id,
+      dataResourceId: queryData.queryConfig?.resourceId
+        ? parseInt(queryData.queryConfig.resourceId)
+        : querySettingPackage.value?.resource_id || null,
       query: queryData.sql,
       tags: queryData.tags || [],
       config: queryData.config || {},
-      isTemplate: true
+      isTemplate: true,
+    };
+
+    const response: any = await saveSQLTemplate(templateData as any);
+
+    if (
+      response &&
+      response.data &&
+      response.data.id &&
+      sqlQueryBuilderRef.value
+    ) {
+      const templateId = response.data.id;
+      sqlQueryBuilderRef.value.setCurrentTemplateId(templateId);
     }
 
-    const response: any = await saveSQLTemplate(templateData as any)
-
-    if (response && response.data && response.data.id && sqlQueryBuilderRef.value) {
-      const templateId = response.data.id
-      sqlQueryBuilderRef.value.setCurrentTemplateId(templateId)
-    }
-
-    ElMessage.success('SQL查询模板保存成功')
+    ElMessage.success("SQL查询模板保存成功");
   } catch (error) {
-    console.error('保存SQL查询模板失败:', error)
-    ElMessage.error('保存SQL查询模板失败')
+    console.error("保存SQL查询模板失败:", error);
+    ElMessage.error("保存SQL查询模板失败");
   }
-}
+};
 
 /**
  * SQL 查询模板更新
@@ -1374,22 +1704,25 @@ const onSQLQueryUpdate = async (queryData: any) => {
     const templateData = {
       name: queryData.name,
       description: queryData.description,
-      datasourceId: queryData.datasourceId || querySettingPackage.value?.datasource_id,
-      dataResourceId: queryData.queryConfig?.resourceId ? parseInt(queryData.queryConfig.resourceId) : (querySettingPackage.value?.resource_id || null),
+      datasourceId:
+        queryData.datasourceId || querySettingPackage.value?.datasource_id,
+      dataResourceId: queryData.queryConfig?.resourceId
+        ? parseInt(queryData.queryConfig.resourceId)
+        : querySettingPackage.value?.resource_id || null,
       query: queryData.sql,
       tags: queryData.tags || [],
       config: queryData.config || {},
-      isTemplate: true
-    }
+      isTemplate: true,
+    };
 
-    await updateSQLTemplate(queryData.id, templateData as any)
+    await updateSQLTemplate(queryData.id, templateData as any);
 
-    ElMessage.success('SQL查询模板更新成功')
+    ElMessage.success("SQL查询模板更新成功");
   } catch (error) {
-    console.error('更新SQL查询模板失败:', error)
-    ElMessage.error('更新SQL查询模板失败')
+    console.error("更新SQL查询模板失败:", error);
+    ElMessage.error("更新SQL查询模板失败");
   }
-}
+};
 
 /**
  * 执行 SQL 查询
@@ -1397,107 +1730,111 @@ const onSQLQueryUpdate = async (queryData: any) => {
 const onSQLQueryExecute = async (queryData: any) => {
   try {
     if (!queryData.datasourceId) {
-      ElMessage.error('缺少数据源ID')
-      return
+      ElMessage.error("缺少数据源ID");
+      return;
     }
     if (!queryData.sql) {
-      ElMessage.error('缺少SQL查询语句')
-      return
+      ElMessage.error("缺少SQL查询语句");
+      return;
     }
 
     const queryRequest = {
       datasourceId: queryData.datasourceId,
       query: queryData.sql,
       limit: queryData.limit || 1000,
-      offset: queryData.offset || 0
-    }
+      offset: queryData.offset || 0,
+    };
 
-    const response: any = await executeSQLQuery(queryRequest as any)
+    const response: any = await executeSQLQuery(queryRequest as any);
 
     if (response && response.success) {
-      const { columns, data, row_count } = response
+      const { columns, data, row_count } = response;
       if (columns && data) {
         const resultColumns = columns.map((col: string) => ({
           prop: col,
           label: col,
-          type: 'string',
-          width: 150
-        }))
+          type: "string",
+          width: 150,
+        }));
         const resultData = data.map((row: any[]) => {
-          const obj: Record<string, any> = {}
-          columns.forEach((col: string, index: number) => { obj[col] = row[index] })
-          return obj
-        })
+          const obj: Record<string, any> = {};
+          columns.forEach((col: string, index: number) => {
+            obj[col] = row[index];
+          });
+          return obj;
+        });
         if (sqlQueryBuilderRef.value) {
-          sqlQueryBuilderRef.value.setQueryResults(resultData, resultColumns)
+          sqlQueryBuilderRef.value.setQueryResults(resultData, resultColumns);
         }
-        ElMessage.success(`查询执行成功，返回 ${row_count} 条记录`)
+        ElMessage.success(`查询执行成功，返回 ${row_count} 条记录`);
       } else {
         if (sqlQueryBuilderRef.value) {
-          sqlQueryBuilderRef.value.setQueryResults([], [])
+          sqlQueryBuilderRef.value.setQueryResults([], []);
         }
-        ElMessage.info('查询成功但无数据返回')
+        ElMessage.info("查询成功但无数据返回");
       }
     } else {
-      const errorMessage = response?.error_details || response?.message || '查询执行失败'
+      const errorMessage =
+        response?.error_details || response?.message || "查询执行失败";
       if (sqlQueryBuilderRef.value) {
-        sqlQueryBuilderRef.value.handleQueryError(new Error(errorMessage))
+        sqlQueryBuilderRef.value.handleQueryError(new Error(errorMessage));
       }
-      ElMessage.error(`查询执行失败: ${errorMessage}`)
+      ElMessage.error(`查询执行失败: ${errorMessage}`);
     }
   } catch (error: any) {
     if (sqlQueryBuilderRef.value) {
-      sqlQueryBuilderRef.value.handleQueryError(error)
+      sqlQueryBuilderRef.value.handleQueryError(error);
     }
-    const errorMessage = error.response?.data?.detail || error.message || '查询执行失败'
-    ElMessage.error(`查询执行失败: ${errorMessage}`)
+    const errorMessage =
+      error.response?.data?.detail || error.message || "查询执行失败";
+    ElMessage.error(`查询执行失败: ${errorMessage}`);
   }
-}
+};
 
 const onSQLResultsExport = (results: any) => {
-  console.log('导出SQL查询结果:', results)
-}
+  console.log("导出SQL查询结果:", results);
+};
 
 /**
  * ES查询保存处理
  */
 const onESQuerySave = (queryData) => {
-  console.log('保存ES查询:', queryData)
-}
+  console.log("保存ES查询:", queryData);
+};
 
 /**
  * ES查询结果导出处理
  */
 const onESResultsExport = (results) => {
-  console.log('导出ES查询结果:', results)
-}
+  console.log("导出ES查询结果:", results);
+};
 
 /**
  * ES数据源加载完成处理
  */
 const onESDatasourcesLoaded = (datasources) => {
-  esDatasources.value = datasources
-  console.log('ES数据源加载完成:', datasources)
-}
+  esDatasources.value = datasources;
+  console.log("ES数据源加载完成:", datasources);
+};
 
 // 生命周期
 onMounted(() => {
-  loadDatasources()
-  loadPackages()
-  loadSQLResources()
-})
+  loadDatasources();
+  loadPackages();
+  loadSQLResources();
+});
 
 /** 创建成功后刷新列表 */
 const onCreateSuccess = () => {
-  createDialogVisible.value = false
-  loadPackages()
-}
+  createDialogVisible.value = false;
+  loadPackages();
+};
 
 /** 编辑成功后刷新列表 */
 const onEditSuccess = () => {
-  editDialogVisible.value = false
-  loadPackages()
-}
+  editDialogVisible.value = false;
+  loadPackages();
+};
 </script>
 
 <style scoped lang="scss">
@@ -1771,7 +2108,7 @@ const onEditSuccess = () => {
   gap: 12px;
   align-items: center;
 
-  .el-button+.el-button {
+  .el-button + .el-button {
     margin-left: 0;
   }
 }

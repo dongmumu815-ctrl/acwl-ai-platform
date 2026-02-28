@@ -21,7 +21,7 @@
 
     <div v-loading="loading" class="page-content">
       <!-- 资源包信息卡片 -->
-      <el-card class="package-info-card" v-if="packageData">
+      <el-card v-if="packageData" class="package-info-card">
         <template #header>
           <div class="card-header">
             <span class="card-title">资源包信息</span>
@@ -85,11 +85,11 @@
       <!-- 基于查询类型渲染组件 -->
       <SqlPackageQueryPanel
         v-if="packageData?.type === 'sql' && packageData"
-        :packageData="packageData"
+        :package-data="packageData"
       />
       <EsPackageQueryPanel
         v-else-if="packageData?.type === 'elasticsearch' && packageData"
-        :packageData="packageData"
+        :package-data="packageData"
       />
     </div>
   </div>
@@ -102,7 +102,7 @@ import { ElMessage } from "element-plus";
 import { ArrowLeft } from "@element-plus/icons-vue";
 import {
   resourcePackageApi,
-  type ResourcePackage
+  type ResourcePackage,
 } from "@/api/resourcePackage";
 import { datasourceApi } from "@/api/datasource";
 import { type DataSource } from "@/types/datasource";
@@ -148,7 +148,7 @@ const getDatasourceName = computed(() => {
 // 计算标签的可读文本颜色，避免文字与背景同色
 const getTagStyle = (bg: string) => {
   const hexToRgb = (
-    hex: string
+    hex: string,
   ): { r: number; g: number; b: number } | null => {
     try {
       let h = hex.trim();
@@ -175,7 +175,7 @@ const getTagStyle = (bg: string) => {
   return {
     backgroundColor: bg,
     color: textColor,
-    borderColor: bg
+    borderColor: bg,
   };
 };
 
@@ -219,14 +219,14 @@ const loadPackageData = async () => {
       packageData.value = response.data;
       console.log(
         "✅ 资源包数据加载成功 (从response.data):",
-        packageData.value
+        packageData.value,
       );
     } else {
       // 如果直接是数据对象
       packageData.value = response as any;
       console.log(
         "✅ 资源包数据加载成功 (直接使用response):",
-        packageData.value
+        packageData.value,
       );
     }
 
@@ -241,7 +241,7 @@ const loadPackageData = async () => {
     } else {
       console.warn("⚠️ 不满足模板加载条件:", {
         template_id: packageData.value?.template_id,
-        template_type: packageData.value?.template_type
+        template_type: packageData.value?.template_type,
       });
     }
 
@@ -269,7 +269,7 @@ const loadTemplateParams = async () => {
       "🔄 开始加载模板参数，模板ID:",
       packageData.value.template_id,
       "类型:",
-      packageData.value.template_type
+      packageData.value.template_type,
     );
 
     let templateData: SQLTemplateResponse | any = null;
@@ -282,7 +282,7 @@ const loadTemplateParams = async () => {
       // 调用ES模板API
       const response = await templateApi.getByType(
         packageData.value.template_id,
-        "es"
+        "es",
       );
       templateData = (response as any)?.data || response;
     }
@@ -292,7 +292,7 @@ const loadTemplateParams = async () => {
       // 从模板配置中解析条件参数，过滤掉锁定的条件
       const conditions = templateData.config.conditions || [];
       const unlockedConditions = conditions.filter(
-        (condition: any) => !condition.locked
+        (condition: any) => !condition.locked,
       );
 
       // 将未锁定的条件转换为动态参数格式
@@ -355,7 +355,7 @@ watch(
     if (route.params.id) {
       loadPackageData();
     }
-  }
+  },
 );
 </script>
 

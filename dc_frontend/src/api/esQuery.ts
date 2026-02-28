@@ -1,95 +1,95 @@
-import request from '@/utils/request'
+import request from "@/utils/request";
 
 // ES数据源接口
 export interface ESDatasource {
-  id: number
-  name: string
-  host: string
-  port: number
-  username?: string
-  password?: string
-  ssl?: boolean
-  version?: string
-  status?: string
+  id: number;
+  name: string;
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  ssl?: boolean;
+  version?: string;
+  status?: string;
 }
 
 // ES索引接口
 export interface ESIndex {
-  name: string
-  docsCount: number
-  storeSize: string
-  health?: string
-  status?: string
-  primaryShards?: number
-  replicaShards?: number
+  name: string;
+  docsCount: number;
+  storeSize: string;
+  health?: string;
+  status?: string;
+  primaryShards?: number;
+  replicaShards?: number;
 }
 
 // ES字段映射接口
 export interface ESField {
-  name: string
-  type: string
-  comment?: string
-  analyzer?: string
-  searchAnalyzer?: string
-  properties?: Record<string, ESField>
-  format?: string
-  index?: boolean
+  name: string;
+  type: string;
+  comment?: string;
+  analyzer?: string;
+  searchAnalyzer?: string;
+  properties?: Record<string, ESField>;
+  format?: string;
+  index?: boolean;
 }
 
 // ES查询请求接口
 export interface ESQueryRequest {
-  datasourceId: number
-  index: string[]
-  query: any
-  size?: number
-  from?: number
-  sort?: any[]
-  _source?: string[]
-  timeout?: string
-  aggs?: any
+  datasourceId: number;
+  index: string[];
+  query: any;
+  size?: number;
+  from?: number;
+  sort?: any[];
+  _source?: string[];
+  timeout?: string;
+  aggs?: any;
   // 深分页支持
-  search_after?: any[]
-  scroll?: string
-  scroll_id?: string
+  search_after?: any[];
+  scroll?: string;
+  scroll_id?: string;
 }
 
 // ES查询响应接口
 export interface ESQueryResponse {
-  took: number
-  timed_out: boolean
+  took: number;
+  timed_out: boolean;
   _shards: {
-    total: number
-    successful: number
-    skipped: number
-    failed: number
-  }
+    total: number;
+    successful: number;
+    skipped: number;
+    failed: number;
+  };
   hits: {
     total: {
-      value: number
-      relation: string
-    }
-    max_score: number
+      value: number;
+      relation: string;
+    };
+    max_score: number;
     hits: Array<{
-      _index: string
-      _type: string
-      _id: string
-      _score: number
-      _source: any
-    }>
-  }
-  aggregations?: any
+      _index: string;
+      _type: string;
+      _id: string;
+      _score: number;
+      _source: any;
+    }>;
+  };
+  aggregations?: any;
 }
 
 // ES查询统计接口
 export interface ESQueryStats {
-  totalHits: number
-  took: number
-  maxScore: number
+  totalHits: number;
+  took: number;
+  maxScore: number;
   shardsInfo: {
-    total: number
-    successful: number
-    failed: number
-  }
+    total: number;
+    successful: number;
+    failed: number;
+  };
 }
 
 /**
@@ -98,13 +98,13 @@ export interface ESQueryStats {
  */
 export function getESDatasources(): Promise<{ data: ESDatasource[] }> {
   return request({
-    url: '/datasources/',
-    method: 'get',
+    url: "/datasources/",
+    method: "get",
     params: {
-      datasource_type: 'elasticsearch'
+      datasource_type: "elasticsearch",
     },
-    permission: 'data:es:datasource:view'
-  })
+    permission: "data:es:datasource:view",
+  });
 }
 
 /**
@@ -115,9 +115,9 @@ export function getESDatasources(): Promise<{ data: ESDatasource[] }> {
 export function getESDatasource(id: number): Promise<{ data: ESDatasource }> {
   return request({
     url: `/datasources/${id}/`,
-    method: 'get',
-    permission: 'data:es:datasource:view'
-  })
+    method: "get",
+    permission: "data:es:datasource:view",
+  });
 }
 
 /**
@@ -125,19 +125,19 @@ export function getESDatasource(id: number): Promise<{ data: ESDatasource }> {
  * @param datasourceId 数据源ID
  * @returns 连接测试结果
  */
-export function testESConnection(datasourceId: number): Promise<{ 
-  data: { 
-    success: boolean
-    message: string
-    clusterInfo?: any
-    health?: any
-  } 
+export function testESConnection(datasourceId: number): Promise<{
+  data: {
+    success: boolean;
+    message: string;
+    clusterInfo?: any;
+    health?: any;
+  };
 }> {
   return request({
     url: `/datasources/${datasourceId}/test/`,
-    method: 'post',
-    permission: 'data:es:datasource:test'
-  })
+    method: "post",
+    permission: "data:es:datasource:test",
+  });
 }
 
 /**
@@ -145,12 +145,14 @@ export function testESConnection(datasourceId: number): Promise<{
  * @param datasourceId 数据源ID
  * @returns ES索引列表
  */
-export function getESIndices(datasourceId: number): Promise<{ data: ESIndex[] }> {
+export function getESIndices(
+  datasourceId: number,
+): Promise<{ data: ESIndex[] }> {
   return request({
     url: `/datasources/${datasourceId}/tables/`,
-    method: 'get',
-    permission: 'data:es:index:view'
-  })
+    method: "get",
+    permission: "data:es:index:view",
+  });
 }
 
 /**
@@ -159,18 +161,21 @@ export function getESIndices(datasourceId: number): Promise<{ data: ESIndex[] }>
  * @param indexName 索引名称
  * @returns ES索引详情
  */
-export function getESIndexInfo(datasourceId: number, indexName: string): Promise<{ 
+export function getESIndexInfo(
+  datasourceId: number,
+  indexName: string,
+): Promise<{
   data: ESIndex & {
-    mappings: any
-    settings: any
-    aliases: any
-  }
+    mappings: any;
+    settings: any;
+    aliases: any;
+  };
 }> {
   return request({
     url: `/datasources/${datasourceId}/tables/${indexName}/`,
-    method: 'get',
-    permission: 'data:es:index:view'
-  })
+    method: "get",
+    permission: "data:es:index:view",
+  });
 }
 
 /**
@@ -179,14 +184,17 @@ export function getESIndexInfo(datasourceId: number, indexName: string): Promise
  * @param indices 索引名称数组
  * @returns ES字段映射列表
  */
-export function getESFieldMapping(datasourceId: number, indices: string[]): Promise<{ data: ESField[] }> {
+export function getESFieldMapping(
+  datasourceId: number,
+  indices: string[],
+): Promise<{ data: ESField[] }> {
   return request({
     url: `/es/fields/${datasourceId}`,
-    method: 'get',
+    method: "get",
     params: {
-      indices: indices.join(',')
+      indices: indices.join(","),
     },
-    permission: 'data:es:fields:view'
+    permission: "data:es:fields:view",
   });
 }
 
@@ -195,17 +203,20 @@ export function getESFieldMapping(datasourceId: number, indices: string[]): Prom
  * @param queryRequest ES查询请求
  * @returns ES查询响应
  */
-export function executeESQuery(queryRequest: ESQueryRequest): Promise<{ 
-  data: ESQueryResponse
-  stats: ESQueryStats
-  fieldMappings?: Record<string, { name: string; type: string; comment?: string; display_name: string }>
+export function executeESQuery(queryRequest: ESQueryRequest): Promise<{
+  data: ESQueryResponse;
+  stats: ESQueryStats;
+  fieldMappings?: Record<
+    string,
+    { name: string; type: string; comment?: string; display_name: string }
+  >;
 }> {
   return request({
-    url: '/es/query',
-    method: 'post',
+    url: "/es/query",
+    method: "post",
     data: queryRequest,
-    permission: 'data:es:query'
-  })
+    permission: "data:es:query",
+  });
 }
 
 /**
@@ -214,19 +225,22 @@ export function executeESQuery(queryRequest: ESQueryRequest): Promise<{
  * @param query DSL查询对象
  * @returns 验证结果
  */
-export function validateESQuery(datasourceId: number, query: any): Promise<{ 
+export function validateESQuery(
+  datasourceId: number,
+  query: any,
+): Promise<{
   data: {
-    valid: boolean
-    error?: string
-    explanation?: any
-  }
+    valid: boolean;
+    error?: string;
+    explanation?: any;
+  };
 }> {
   return request({
     url: `/datasources/${datasourceId}/validate/`,
-    method: 'post',
+    method: "post",
     data: { query },
-    permission: 'data:es:validate'
-  })
+    permission: "data:es:validate",
+  });
 }
 
 /**
@@ -236,18 +250,22 @@ export function validateESQuery(datasourceId: number, query: any): Promise<{
  * @param query DSL查询对象
  * @returns 查询执行计划
  */
-export function explainESQuery(datasourceId: number, index: string, query: any): Promise<{ 
-  data: any
+export function explainESQuery(
+  datasourceId: number,
+  index: string,
+  query: any,
+): Promise<{
+  data: any;
 }> {
   return request({
     url: `/datasources/${datasourceId}/explain/`,
-    method: 'post',
+    method: "post",
     data: {
       index,
-      query
+      query,
     },
-    permission: 'data:es:explain'
-  })
+    permission: "data:es:explain",
+  });
 }
 
 /**
@@ -258,23 +276,28 @@ export function explainESQuery(datasourceId: number, index: string, query: any):
  * @param text 输入文本
  * @returns 查询建议列表
  */
-export function getESQuerySuggestions(datasourceId: number, index: string, field: string, text: string): Promise<{ 
+export function getESQuerySuggestions(
+  datasourceId: number,
+  index: string,
+  field: string,
+  text: string,
+): Promise<{
   data: Array<{
-    text: string
-    score: number
-    freq: number
-  }>
+    text: string;
+    score: number;
+    freq: number;
+  }>;
 }> {
   return request({
     url: `/datasources/${datasourceId}/suggest/`,
-    method: 'post',
+    method: "post",
     data: {
       index,
       field,
-      text
+      text,
     },
-    permission: 'data:es:suggest'
-  })
+    permission: "data:es:suggest",
+  });
 }
 
 /**
@@ -289,30 +312,30 @@ export function getESAggregations(
   indices: string[],
   aggregations: any,
   query?: any,
-  timeout?: string
-): Promise<{ 
+  timeout?: string,
+): Promise<{
   data: {
-    aggregations: any
-    took: number
+    aggregations: any;
+    took: number;
     hits: {
       total: {
-        value: number
-      }
-    }
-  }
+        value: number;
+      };
+    };
+  };
 }> {
   return request({
-    url: '/es/aggregations',
-    method: 'post',
+    url: "/es/aggregations",
+    method: "post",
     data: {
       datasourceId,
       indices,
       aggregations,
       query,
-      timeout
+      timeout,
     },
-    permission: 'data:es:aggregations'
-  })
+    permission: "data:es:aggregations",
+  });
 }
 
 /**
@@ -321,17 +344,20 @@ export function getESAggregations(
  * @param format 导出格式 (csv, json, excel)
  * @returns 导出文件流
  */
-export function exportESQueryResult(queryRequest: ESQueryRequest, format: 'csv' | 'json' | 'excel' = 'csv'): Promise<ApiResponse<Blob>> {
+export function exportESQueryResult(
+  queryRequest: ESQueryRequest,
+  format: "csv" | "json" | "excel" = "csv",
+): Promise<ApiResponse<Blob>> {
   return request({
-    url: '/es/export',
-    method: 'post',
+    url: "/es/export",
+    method: "post",
     data: {
       ...queryRequest,
-      format
+      format,
     },
-    responseType: 'blob',
-    permission: 'data:es:export'
-  })
+    responseType: "blob",
+    permission: "data:es:export",
+  });
 }
 
 /**
@@ -340,23 +366,23 @@ export function exportESQueryResult(queryRequest: ESQueryRequest, format: 'csv' 
  * @returns 保存结果
  */
 export function saveESQueryTemplate(template: {
-  name: string
-  description?: string
-  datasourceId: number
-  dataResourceId?: number
-  indices: string[]
-  query: any
-  tags?: string[]
-  conditionLockTypes?: Record<string, string>
-  conditionRanges?: Record<string, { min: string; max: string }>
-  allowedOperators?: Record<string, string[]>
+  name: string;
+  description?: string;
+  datasourceId: number;
+  dataResourceId?: number;
+  indices: string[];
+  query: any;
+  tags?: string[];
+  conditionLockTypes?: Record<string, string>;
+  conditionRanges?: Record<string, { min: string; max: string }>;
+  allowedOperators?: Record<string, string[]>;
 }): Promise<{ data: { id: number } }> {
   return request({
-    url: '/es/templates',
-    method: 'post',
+    url: "/es/templates",
+    method: "post",
     data: template,
-    permission: 'data:es:templates:create'
-  })
+    permission: "data:es:templates:create",
+  });
 }
 
 /**
@@ -364,28 +390,28 @@ export function saveESQueryTemplate(template: {
  * @param datasourceId 数据源ID（可选）
  * @returns 查询模板列表
  */
-export function getESQueryTemplates(datasourceId?: number): Promise<{ 
+export function getESQueryTemplates(datasourceId?: number): Promise<{
   data: Array<{
-    id: number
-    name: string
-    description: string
-    datasourceId: number
-    indices: string[]
-    query: any
-    tags: string[]
-    createdAt: string
-    updatedAt: string
-    conditionLockTypes?: Record<string, string>
-    conditionRanges?: Record<string, { min: string; max: string }>
-    allowedOperators?: Record<string, string[]>
-  }>
+    id: number;
+    name: string;
+    description: string;
+    datasourceId: number;
+    indices: string[];
+    query: any;
+    tags: string[];
+    createdAt: string;
+    updatedAt: string;
+    conditionLockTypes?: Record<string, string>;
+    conditionRanges?: Record<string, { min: string; max: string }>;
+    allowedOperators?: Record<string, string[]>;
+  }>;
 }> {
   return request({
-    url: '/es/templates',
-    method: 'get',
+    url: "/es/templates",
+    method: "get",
     params: datasourceId ? { datasourceId } : {},
-    permission: 'data:es:templates:view'
-  })
+    permission: "data:es:templates:view",
+  });
 }
 
 /**
@@ -394,23 +420,28 @@ export function getESQueryTemplates(datasourceId?: number): Promise<{
  * @param template 查询模板数据
  * @returns 更新结果
  */
-export function updateESQueryTemplate(templateId: number, template: {
-  name: string
-  description?: string
-  datasourceId: number
-  indices: string[]
-  query: any
-  tags?: string[]
-  conditionLockTypes?: Record<string, string>
-  conditionRanges?: Record<string, { min: string; max: string }>
-  allowedOperators?: Record<string, string[]>
-}): Promise<{ data: { id: number; name: string; description: string; isTemplate: boolean } }> {
+export function updateESQueryTemplate(
+  templateId: number,
+  template: {
+    name: string;
+    description?: string;
+    datasourceId: number;
+    indices: string[];
+    query: any;
+    tags?: string[];
+    conditionLockTypes?: Record<string, string>;
+    conditionRanges?: Record<string, { min: string; max: string }>;
+    allowedOperators?: Record<string, string[]>;
+  },
+): Promise<{
+  data: { id: number; name: string; description: string; isTemplate: boolean };
+}> {
   return request({
     url: `/es/templates/${templateId}`,
-    method: 'put',
+    method: "put",
     data: template,
-    permission: 'data:es:templates:edit'
-  })
+    permission: "data:es:templates:edit",
+  });
 }
 
 /**
@@ -418,12 +449,14 @@ export function updateESQueryTemplate(templateId: number, template: {
  * @param templateId 模板ID
  * @returns 删除结果
  */
-export function deleteESQueryTemplate(templateId: number): Promise<{ data: { success: boolean } }> {
+export function deleteESQueryTemplate(
+  templateId: number,
+): Promise<{ data: { success: boolean } }> {
   return request({
     url: `/es/templates/${templateId}`,
-    method: 'delete',
-    permission: 'data:es:templates:delete'
-  })
+    method: "delete",
+    permission: "data:es:templates:delete",
+  });
 }
 
 /**
@@ -431,28 +464,28 @@ export function deleteESQueryTemplate(templateId: number): Promise<{ data: { suc
  * @param datasourceId 数据源ID
  * @returns 集群统计信息
  */
-export function getESClusterStats(datasourceId: number): Promise<{ 
+export function getESClusterStats(datasourceId: number): Promise<{
   data: {
-    clusterName: string
-    status: string
-    nodeCount: number
-    dataNodeCount: number
-    activeShards: number
-    relocatingShards: number
-    initializingShards: number
-    unassignedShards: number
+    clusterName: string;
+    status: string;
+    nodeCount: number;
+    dataNodeCount: number;
+    activeShards: number;
+    relocatingShards: number;
+    initializingShards: number;
+    unassignedShards: number;
     indices: {
-      count: number
-      docsCount: number
-      storeSize: string
-    }
-  }
+      count: number;
+      docsCount: number;
+      storeSize: string;
+    };
+  };
 }> {
   return request({
     url: `/datasources/${datasourceId}/stats/`,
-    method: 'get',
-    permission: 'data:es:stats:view'
-  })
+    method: "get",
+    permission: "data:es:stats:view",
+  });
 }
 
 /**
@@ -461,23 +494,26 @@ export function getESClusterStats(datasourceId: number): Promise<{
  * @param indexName 索引名称
  * @returns 索引统计信息
  */
-export function getESIndexStats(datasourceId: number, indexName: string): Promise<{ 
+export function getESIndexStats(
+  datasourceId: number,
+  indexName: string,
+): Promise<{
   data: {
-    health: string
-    status: string
-    index: string
-    uuid: string
-    pri: number
-    rep: number
-    docsCount: number
-    docsDeleted: number
-    storeSize: string
-    priStoreSize: string
-  }
+    health: string;
+    status: string;
+    index: string;
+    uuid: string;
+    pri: number;
+    rep: number;
+    docsCount: number;
+    docsDeleted: number;
+    storeSize: string;
+    priStoreSize: string;
+  };
 }> {
   return request({
     url: `/datasources/${datasourceId}/tables/${indexName}/stats/`,
-    method: 'get',
-    permission: 'data:es:index:view'
-  })
+    method: "get",
+    permission: "data:es:index:view",
+  });
 }

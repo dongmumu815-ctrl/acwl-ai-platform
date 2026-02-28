@@ -8,7 +8,9 @@
             <el-icon><Document /></el-icon>
             SQL查询模板
           </h1>
-          <p class="page-description">管理和使用SQL查询模板，提高数据查询效率</p>
+          <p class="page-description">
+            管理和使用SQL查询模板，提高数据查询效率
+          </p>
         </div>
         <div class="header-actions">
           <el-button type="primary" @click="showCreateDialog">
@@ -31,11 +33,11 @@
             @template-selected="onTemplateSelected"
           />
         </el-col>
-        
+
         <!-- 右侧：查询执行和结果 -->
         <el-col :span="8">
           <!-- 查询执行面板 -->
-          <el-card class="query-panel" v-if="selectedTemplate">
+          <el-card v-if="selectedTemplate" class="query-panel">
             <template #header>
               <div class="panel-header">
                 <span>查询执行</span>
@@ -45,20 +47,25 @@
                 </el-button>
               </div>
             </template>
-            
+
             <div class="selected-template">
               <h4>{{ selectedTemplate.name }}</h4>
               <p class="template-desc">{{ selectedTemplate.description }}</p>
-              
+
               <div class="template-meta">
                 <div class="meta-item">
                   <span class="label">数据源:</span>
-                  <span class="value">{{ getDatasourceName(selectedTemplate.datasourceId) }}</span>
+                  <span class="value">{{
+                    getDatasourceName(selectedTemplate.datasourceId)
+                  }}</span>
                 </div>
                 <div class="meta-item">
                   <span class="label">类型:</span>
-                  <el-tag :type="selectedTemplate.isTemplate ? 'success' : 'info'" size="small">
-                    {{ selectedTemplate.isTemplate ? '模板' : '实例' }}
+                  <el-tag
+                    :type="selectedTemplate.isTemplate ? 'success' : 'info'"
+                    size="small"
+                  >
+                    {{ selectedTemplate.isTemplate ? "模板" : "实例" }}
                   </el-tag>
                 </div>
                 <div class="meta-item">
@@ -75,7 +82,7 @@
                   </div>
                 </div>
               </div>
-              
+
               <div class="query-preview">
                 <div class="preview-header">
                   <span>SQL预览:</span>
@@ -86,9 +93,13 @@
                 </div>
                 <pre class="query-content">{{ selectedTemplate.query }}</pre>
               </div>
-              
+
               <div class="action-buttons">
-                <el-button type="primary" @click="executeTemplate" :loading="executing">
+                <el-button
+                  type="primary"
+                  :loading="executing"
+                  @click="executeTemplate"
+                >
                   <el-icon><CaretRight /></el-icon>
                   执行查询
                 </el-button>
@@ -99,33 +110,44 @@
               </div>
             </div>
           </el-card>
-          
+
           <!-- 查询结果面板 -->
-          <el-card class="results-panel" v-if="queryResults.length > 0 || executing">
+          <el-card
+            v-if="queryResults.length > 0 || executing"
+            class="results-panel"
+          >
             <template #header>
               <div class="panel-header">
                 <span>查询结果 ({{ queryResults.length }} 条)</span>
                 <div class="result-actions">
-                  <el-button size="small" @click="exportResults" :disabled="queryResults.length === 0">
+                  <el-button
+                    size="small"
+                    :disabled="queryResults.length === 0"
+                    @click="exportResults"
+                  >
                     <el-icon><Download /></el-icon>
                     导出
                   </el-button>
-                  <el-button size="small" @click="refreshQuery" :loading="executing">
+                  <el-button
+                    size="small"
+                    :loading="executing"
+                    @click="refreshQuery"
+                  >
                     <el-icon><Refresh /></el-icon>
                     刷新
                   </el-button>
                 </div>
               </div>
             </template>
-            
-            <div class="results-content" v-loading="executing">
+
+            <div v-loading="executing" class="results-content">
               <el-table
+                v-if="queryResults.length > 0"
                 :data="queryResults"
                 stripe
                 border
                 style="width: 100%"
                 max-height="400"
-                v-if="queryResults.length > 0"
               >
                 <el-table-column
                   v-for="column in resultColumns"
@@ -148,19 +170,22 @@
                   </template>
                 </el-table-column>
               </el-table>
-              
-              <div v-if="queryResults.length === 0 && !executing" class="empty-results">
+
+              <div
+                v-if="queryResults.length === 0 && !executing"
+                class="empty-results"
+              >
                 <el-empty description="暂无查询结果" />
               </div>
             </div>
           </el-card>
-          
+
           <!-- 快速操作面板 -->
-          <el-card class="quick-actions" v-if="!selectedTemplate">
+          <el-card v-if="!selectedTemplate" class="quick-actions">
             <template #header>
               <span>快速操作</span>
             </template>
-            
+
             <div class="actions-grid">
               <div class="action-item" @click="showCreateDialog">
                 <el-icon><Plus /></el-icon>
@@ -221,7 +246,7 @@
             </el-form-item>
           </el-col>
         </el-row>
-        
+
         <el-form-item label="描述">
           <el-input
             v-model="createForm.description"
@@ -232,12 +257,12 @@
             show-word-limit
           />
         </el-form-item>
-        
+
         <el-form-item label="SQL查询" prop="query">
           <div class="sql-editor">
             <div class="editor-toolbar">
               <el-button size="small" @click="formatSQL">
-                <el-icon><Magic /></el-icon>
+                <el-icon><MagicStick /></el-icon>
                 格式化
               </el-button>
               <el-button size="small" @click="validateSQL">
@@ -258,7 +283,7 @@
             />
           </div>
         </el-form-item>
-        
+
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="标签">
@@ -289,12 +314,12 @@
           </el-col>
         </el-row>
       </el-form>
-      
+
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="createDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveTemplate" :loading="saving">
-            {{ isEditing ? '更新' : '创建' }}
+          <el-button type="primary" :loading="saving" @click="saveTemplate">
+            {{ isEditing ? "更新" : "创建" }}
           </el-button>
         </div>
       </template>
@@ -308,17 +333,21 @@
     >
       <div class="help-content">
         <h3>功能介绍</h3>
-        <p>SQL查询模板功能帮助您管理和重复使用常用的SQL查询语句，提高数据查询效率。</p>
-        
+        <p>
+          SQL查询模板功能帮助您管理和重复使用常用的SQL查询语句，提高数据查询效率。
+        </p>
+
         <h3>主要功能</h3>
         <ul>
           <li><strong>模板管理：</strong>创建、编辑、删除SQL查询模板</li>
           <li><strong>模板使用：</strong>快速加载和执行已保存的查询模板</li>
-          <li><strong>参数化查询：</strong>支持使用参数占位符，如 :param_name</li>
+          <li>
+            <strong>参数化查询：</strong>支持使用参数占位符，如 :param_name
+          </li>
           <li><strong>标签分类：</strong>使用标签对模板进行分类管理</li>
           <li><strong>搜索筛选：</strong>快速查找所需的查询模板</li>
         </ul>
-        
+
         <h3>使用技巧</h3>
         <ul>
           <li>使用有意义的模板名称和描述，便于后续查找</li>
@@ -326,20 +355,22 @@
           <li>对于需要动态参数的查询，使用 :参数名 格式</li>
           <li>定期整理和更新模板，删除不再使用的模板</li>
         </ul>
-        
+
         <h3>参数化查询示例</h3>
-        <pre class="code-example">SELECT * FROM users 
-WHERE created_at >= :start_date 
-  AND created_at <= :end_date 
-  AND status = :status</pre>
+        <pre class="code-example">
+SELECT * FROM users 
+WHERE created_at &gt;= :start_date 
+  AND created_at &lt;= :end_date 
+  AND status = :status</pre
+        >
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, computed, onMounted } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Document,
   Plus,
@@ -351,359 +382,370 @@ import {
   Refresh,
   Upload,
   QuestionFilled,
-  Magic,
+  MagicStick,
   Check,
-  DocumentAdd
-} from '@element-plus/icons-vue'
-import SQLTemplateManager from '@/components/SQLTemplateManager.vue'
+  DocumentAdd,
+} from "@element-plus/icons-vue";
+import SQLTemplateManager from "@/components/SQLTemplateManager.vue";
 import {
   saveSQLTemplate,
   updateSQLTemplate,
   executeSQLQuery,
   type SQLTemplateResponse,
-  type SQLTemplateRequest
-} from '@/api/sqlQuery'
-import { getDatasources } from '@/api/datasource'
+  type SQLTemplateRequest,
+} from "@/api/sqlQuery";
+import { getDatasources } from "@/api/datasource";
 
 // 响应式数据
-const templateManagerRef = ref()
-const createFormRef = ref()
-const createDialogVisible = ref(false)
-const helpDialogVisible = ref(false)
-const isEditing = ref(false)
-const saving = ref(false)
-const executing = ref(false)
+const templateManagerRef = ref();
+const createFormRef = ref();
+const createDialogVisible = ref(false);
+const helpDialogVisible = ref(false);
+const isEditing = ref(false);
+const saving = ref(false);
+const executing = ref(false);
 
 // 选中的模板和查询结果
-const selectedTemplate = ref<SQLTemplateResponse | null>(null)
-const selectedDatasourceId = ref<number>(0)
-const queryResults = ref<any[]>([])
-const resultColumns = ref<any[]>([])
-const datasources = ref<any[]>([])
+const selectedTemplate = ref<SQLTemplateResponse | null>(null);
+const selectedDatasourceId = ref<number>(0);
+const queryResults = ref<any[]>([]);
+const resultColumns = ref<any[]>([]);
+const datasources = ref<any[]>([]);
 
 // 创建表单
 const createForm = reactive<SQLTemplateRequest>({
-  name: '',
-  description: '',
+  name: "",
+  description: "",
   datasourceId: 0,
-  query: '',
+  query: "",
   tags: [],
-  isTemplate: true
-})
+  isTemplate: true,
+});
 
 // 可用标签
 const availableTags = ref<string[]>([
-  '常用查询', '报表查询', '数据分析', '业务查询', '统计查询',
-  '用户数据', '订单数据', '日志分析', '性能监控', '数据清洗'
-])
+  "常用查询",
+  "报表查询",
+  "数据分析",
+  "业务查询",
+  "统计查询",
+  "用户数据",
+  "订单数据",
+  "日志分析",
+  "性能监控",
+  "数据清洗",
+]);
 
 // 表单验证规则
 const createFormRules = {
   name: [
-    { required: true, message: '请输入模板名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+    { required: true, message: "请输入模板名称", trigger: "blur" },
+    { min: 2, max: 50, message: "长度在 2 到 50 个字符", trigger: "blur" },
   ],
   datasourceId: [
-    { required: true, message: '请选择数据源', trigger: 'change' }
+    { required: true, message: "请选择数据源", trigger: "change" },
   ],
-  query: [
-    { required: true, message: '请输入SQL查询语句', trigger: 'blur' }
-  ]
-}
+  query: [{ required: true, message: "请输入SQL查询语句", trigger: "blur" }],
+};
 
 /**
  * 获取数据源名称
  */
 const getDatasourceName = (datasourceId: number) => {
-  const datasource = datasources.value.find(ds => ds.id === datasourceId)
-  return datasource ? datasource.name : '未知数据源'
-}
+  const datasource = datasources.value.find((ds) => ds.id === datasourceId);
+  return datasource ? datasource.name : "未知数据源";
+};
 
 /**
  * 加载数据源列表
  */
 const loadDatasources = async () => {
   try {
-    const response = await getDatasources()
-    datasources.value = response.data || []
+    const response = await getDatasources();
+    datasources.value = response.data || [];
   } catch (error) {
-    console.error('加载数据源失败:', error)
-    ElMessage.error('加载数据源失败')
+    console.error("加载数据源失败:", error);
+    ElMessage.error("加载数据源失败");
   }
-}
+};
 
 /**
  * 模板选择事件处理
  */
 const onTemplateSelected = (template: SQLTemplateResponse) => {
-  selectedTemplate.value = template
+  selectedTemplate.value = template;
   // 清空之前的查询结果
-  queryResults.value = []
-  resultColumns.value = []
-}
+  queryResults.value = [];
+  resultColumns.value = [];
+};
 
 /**
  * 执行查询事件处理
  */
 const onExecuteQuery = async (query: string, datasourceId: number) => {
-  executing.value = true
+  executing.value = true;
   try {
     const response = await executeSQLQuery({
       datasourceId,
       query,
-      limit: 1000
-    })
-    
+      limit: 1000,
+    });
+
     // 处理查询结果
-    const { columns, data } = response.data
-    resultColumns.value = columns.map(col => ({
+    const { columns, data } = response.data;
+    resultColumns.value = columns.map((col) => ({
       prop: col.name,
       label: col.name,
       type: col.type,
-      width: 150
-    }))
-    
+      width: 150,
+    }));
+
     // 转换数据格式
-    queryResults.value = data.map(row => {
-      const obj: any = {}
+    queryResults.value = data.map((row) => {
+      const obj: any = {};
       columns.forEach((col, index) => {
-        obj[col.name] = row[index]
-      })
-      return obj
-    })
-    
-    ElMessage.success(`查询执行成功，返回 ${queryResults.value.length} 条记录`)
+        obj[col.name] = row[index];
+      });
+      return obj;
+    });
+
+    ElMessage.success(`查询执行成功，返回 ${queryResults.value.length} 条记录`);
   } catch (error) {
-    console.error('执行查询失败:', error)
-    ElMessage.error('执行查询失败')
+    console.error("执行查询失败:", error);
+    ElMessage.error("执行查询失败");
   } finally {
-    executing.value = false
+    executing.value = false;
   }
-}
+};
 
 /**
  * 清空选择
  */
 const clearSelection = () => {
-  selectedTemplate.value = null
-  queryResults.value = []
-  resultColumns.value = []
-}
+  selectedTemplate.value = null;
+  queryResults.value = [];
+  resultColumns.value = [];
+};
 
 /**
  * 复制查询
  */
 const copyQuery = async () => {
-  if (!selectedTemplate.value) return
-  
+  if (!selectedTemplate.value) return;
+
   try {
-    await navigator.clipboard.writeText(selectedTemplate.value.query)
-    ElMessage.success('SQL已复制到剪贴板')
+    await navigator.clipboard.writeText(selectedTemplate.value.query);
+    ElMessage.success("SQL已复制到剪贴板");
   } catch (error) {
-    ElMessage.error('复制失败')
+    ElMessage.error("复制失败");
   }
-}
+};
 
 /**
  * 执行模板
  */
 const executeTemplate = () => {
-  if (!selectedTemplate.value) return
-  onExecuteQuery(selectedTemplate.value.query, selectedTemplate.value.datasourceId)
-}
+  if (!selectedTemplate.value) return;
+  onExecuteQuery(
+    selectedTemplate.value.query,
+    selectedTemplate.value.datasourceId,
+  );
+};
 
 /**
  * 编辑模板
  */
 const editTemplate = () => {
-  if (!selectedTemplate.value) return
-  
-  isEditing.value = true
+  if (!selectedTemplate.value) return;
+
+  isEditing.value = true;
   Object.assign(createForm, {
     name: selectedTemplate.value.name,
     description: selectedTemplate.value.description,
     datasourceId: selectedTemplate.value.datasourceId,
     query: selectedTemplate.value.query,
     tags: [...selectedTemplate.value.tags],
-    isTemplate: selectedTemplate.value.isTemplate
-  })
-  createDialogVisible.value = true
-}
+    isTemplate: selectedTemplate.value.isTemplate,
+  });
+  createDialogVisible.value = true;
+};
 
 /**
  * 显示创建对话框
  */
 const showCreateDialog = () => {
-  isEditing.value = false
-  resetCreateForm()
-  createDialogVisible.value = true
-}
+  isEditing.value = false;
+  resetCreateForm();
+  createDialogVisible.value = true;
+};
 
 /**
  * 保存模板
  */
 const saveTemplate = async () => {
-  if (!createFormRef.value) return
-  
+  if (!createFormRef.value) return;
+
   try {
-    await createFormRef.value.validate()
-    saving.value = true
-    
+    await createFormRef.value.validate();
+    saving.value = true;
+
     if (isEditing.value && selectedTemplate.value) {
-      await updateSQLTemplate(selectedTemplate.value.id, createForm)
-      ElMessage.success('模板更新成功')
+      await updateSQLTemplate(selectedTemplate.value.id, createForm);
+      ElMessage.success("模板更新成功");
     } else {
-      await saveSQLTemplate(createForm)
-      ElMessage.success('模板创建成功')
+      await saveSQLTemplate(createForm);
+      ElMessage.success("模板创建成功");
     }
-    
-    createDialogVisible.value = false
-    
+
+    createDialogVisible.value = false;
+
     // 刷新模板列表
     if (templateManagerRef.value) {
-      templateManagerRef.value.loadTemplates()
+      templateManagerRef.value.loadTemplates();
     }
   } catch (error) {
-    console.error('保存模板失败:', error)
-    ElMessage.error('保存模板失败')
+    console.error("保存模板失败:", error);
+    ElMessage.error("保存模板失败");
   } finally {
-    saving.value = false
+    saving.value = false;
   }
-}
+};
 
 /**
  * 重置创建表单
  */
 const resetCreateForm = () => {
   Object.assign(createForm, {
-    name: '',
-    description: '',
+    name: "",
+    description: "",
     datasourceId: 0,
-    query: '',
+    query: "",
     tags: [],
-    isTemplate: true
-  })
+    isTemplate: true,
+  });
   if (createFormRef.value) {
-    createFormRef.value.clearValidate()
+    createFormRef.value.clearValidate();
   }
-}
+};
 
 /**
  * 导出结果
  */
 const exportResults = () => {
   if (queryResults.value.length === 0) {
-    ElMessage.warning('没有可导出的数据')
-    return
+    ElMessage.warning("没有可导出的数据");
+    return;
   }
-  
+
   // 这里可以实现导出功能
-  ElMessage.info('导出功能开发中...')
-}
+  ElMessage.info("导出功能开发中...");
+};
 
 /**
  * 刷新查询
  */
 const refreshQuery = () => {
   if (selectedTemplate.value) {
-    executeTemplate()
+    executeTemplate();
   }
-}
+};
 
 /**
  * 导入模板
  */
 const importTemplate = () => {
-  ElMessage.info('导入功能开发中...')
-}
+  ElMessage.info("导入功能开发中...");
+};
 
 /**
  * 显示帮助
  */
 const showHelp = () => {
-  helpDialogVisible.value = true
-}
+  helpDialogVisible.value = true;
+};
 
 /**
  * 格式化SQL
  */
 const formatSQL = () => {
   createForm.query = createForm.query
-    .replace(/\s+/g, ' ')
-    .replace(/\s*,\s*/g, ',\n  ')
-    .replace(/\s+(FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT)\s+/gi, '\n$1 ')
-    .replace(/\s+(AND|OR)\s+/gi, '\n  $1 ')
-    .trim()
-}
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ",\n  ")
+    .replace(/\s+(FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT)\s+/gi, "\n$1 ")
+    .replace(/\s+(AND|OR)\s+/gi, "\n  $1 ")
+    .trim();
+};
 
 /**
  * 验证SQL语法
  */
 const validateSQL = () => {
   // 简单的SQL语法验证
-  const sql = createForm.query.trim().toUpperCase()
+  const sql = createForm.query.trim().toUpperCase();
   if (!sql) {
-    ElMessage.warning('请输入SQL语句')
-    return
+    ElMessage.warning("请输入SQL语句");
+    return;
   }
-  
-  if (!sql.startsWith('SELECT') && !sql.startsWith('WITH')) {
-    ElMessage.warning('目前只支持SELECT查询语句')
-    return
+
+  if (!sql.startsWith("SELECT") && !sql.startsWith("WITH")) {
+    ElMessage.warning("目前只支持SELECT查询语句");
+    return;
   }
-  
-  ElMessage.success('SQL语法验证通过')
-}
+
+  ElMessage.success("SQL语法验证通过");
+};
 
 /**
  * 插入模板
  */
 const insertTemplate = () => {
   const templates = [
-    'SELECT * FROM table_name WHERE condition',
-    'SELECT COUNT(*) FROM table_name',
-    'SELECT column1, column2 FROM table_name ORDER BY column1',
-    'SELECT * FROM table_name WHERE date_column >= :start_date AND date_column <= :end_date'
-  ]
-  
-  ElMessageBox.prompt('选择要插入的SQL模板', '插入模板', {
-    confirmButtonText: '插入',
-    cancelButtonText: '取消',
-    inputType: 'textarea',
+    "SELECT * FROM table_name WHERE condition",
+    "SELECT COUNT(*) FROM table_name",
+    "SELECT column1, column2 FROM table_name ORDER BY column1",
+    "SELECT * FROM table_name WHERE date_column >= :start_date AND date_column <= :end_date",
+  ];
+
+  ElMessageBox.prompt("选择要插入的SQL模板", "插入模板", {
+    confirmButtonText: "插入",
+    cancelButtonText: "取消",
+    inputType: "textarea",
     inputValue: templates[0],
-    inputPlaceholder: '选择或输入SQL模板'
-  }).then(({ value }) => {
-    if (value) {
-      createForm.query = value
-    }
-  }).catch(() => {})
-}
+    inputPlaceholder: "选择或输入SQL模板",
+  })
+    .then(({ value }) => {
+      if (value) {
+        createForm.query = value;
+      }
+    })
+    .catch(() => {});
+};
 
 /**
  * 格式化日期
  */
 const formatDate = (dateString: string) => {
-  if (!dateString) return ''
-  return new Date(dateString).toLocaleString('zh-CN')
-}
+  if (!dateString) return "";
+  return new Date(dateString).toLocaleString("zh-CN");
+};
 
 /**
  * 格式化数字
  */
 const formatNumber = (value: any) => {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'number') {
-    return value.toLocaleString()
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") {
+    return value.toLocaleString();
   }
-  return value
-}
+  return value;
+};
 
 /**
  * 组件挂载时初始化
  */
 onMounted(async () => {
-  await loadDatasources()
-})
+  await loadDatasources();
+});
 </script>
 
 <style scoped>
@@ -843,7 +885,7 @@ onMounted(async () => {
 .query-content {
   padding: 12px;
   margin: 0;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 13px;
   line-height: 1.5;
   color: #303133;
@@ -909,7 +951,7 @@ onMounted(async () => {
 }
 
 .sql-textarea {
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   border: none;
 }
 
@@ -953,7 +995,7 @@ onMounted(async () => {
   border: 1px solid #ebeef5;
   border-radius: 4px;
   padding: 12px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 13px;
   line-height: 1.5;
   color: #303133;

@@ -8,20 +8,16 @@
           返回
         </el-button>
         <div class="header-info">
-          <h1 class="page-title">{{ isEdit ? '编辑用户' : '新建用户' }}</h1>
+          <h1 class="page-title">{{ isEdit ? "编辑用户" : "新建用户" }}</h1>
           <p class="page-description">
-            {{ isEdit ? '修改用户基本信息和权限设置' : '创建新的系统用户账户' }}
+            {{ isEdit ? "修改用户基本信息和权限设置" : "创建新的系统用户账户" }}
           </p>
         </div>
       </div>
       <div class="header-right">
         <el-button @click="handleCancel">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="saving"
-          @click="handleSave"
-        >
-          {{ isEdit ? '保存' : '创建' }}
+        <el-button type="primary" :loading="saving" @click="handleSave">
+          {{ isEdit ? "保存" : "创建" }}
         </el-button>
       </div>
     </div>
@@ -76,9 +72,7 @@
                   maxlength="50"
                   show-word-limit
                 />
-                <div class="field-tip">
-                  用户名用于登录，创建后不可修改
-                </div>
+                <div class="field-tip">用户名用于登录，创建后不可修改</div>
               </el-form-item>
 
               <!-- 邮箱 -->
@@ -179,9 +173,7 @@
                   active-text="是"
                   inactive-text="否"
                 />
-                <div class="field-tip">
-                  超级管理员拥有系统所有权限
-                </div>
+                <div class="field-tip">超级管理员拥有系统所有权限</div>
               </el-form-item>
             </el-form>
           </el-card>
@@ -251,9 +243,7 @@
                   </div>
                 </el-option>
               </el-select>
-              <div class="field-tip">
-                额外权限将在角色权限基础上叠加
-              </div>
+              <div class="field-tip">额外权限将在角色权限基础上叠加</div>
             </div>
           </el-card>
 
@@ -261,7 +251,10 @@
           <el-card title="偏好设置" style="margin-top: 16px">
             <el-form label-width="80px">
               <el-form-item label="主题">
-                <el-select v-model="formData.preferences.theme" style="width: 100%">
+                <el-select
+                  v-model="formData.preferences.theme"
+                  style="width: 100%"
+                >
                   <el-option label="浅色" value="light" />
                   <el-option label="深色" value="dark" />
                   <el-option label="自动" value="auto" />
@@ -269,14 +262,20 @@
               </el-form-item>
 
               <el-form-item label="语言">
-                <el-select v-model="formData.preferences.language" style="width: 100%">
+                <el-select
+                  v-model="formData.preferences.language"
+                  style="width: 100%"
+                >
                   <el-option label="中文" value="zh-CN" />
                   <el-option label="English" value="en-US" />
                 </el-select>
               </el-form-item>
 
               <el-form-item label="时区">
-                <el-select v-model="formData.preferences.timezone" style="width: 100%">
+                <el-select
+                  v-model="formData.preferences.timezone"
+                  style="width: 100%"
+                >
                   <el-option label="北京时间" value="Asia/Shanghai" />
                   <el-option label="UTC" value="UTC" />
                 </el-select>
@@ -300,154 +299,166 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance, FormRules, UploadRequestOptions } from 'element-plus'
-import {
-  ArrowLeft,
-  Plus
-} from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ElMessage, ElMessageBox } from "element-plus";
+import type {
+  FormInstance,
+  FormRules,
+  UploadRequestOptions,
+} from "element-plus";
+import { ArrowLeft, Plus } from "@element-plus/icons-vue";
 import type {
   User,
   UserRole,
   UserPermission,
   RegisterRequest,
-  UserUpdateRequest
-} from '@/types/user'
+  UserUpdateRequest,
+} from "@/types/user";
 import {
   getUserDetail,
   createUser,
   updateUser,
   getRoles,
   getPermissions,
-  uploadAvatar
-} from '@/api/user'
-import { validateEmail, validatePhone, validatePassword } from '@/utils/validate'
+  uploadAvatar,
+} from "@/api/user";
+import {
+  validateEmail,
+  validatePhone,
+  validatePassword,
+} from "@/utils/validate";
 
-const route = useRoute()
-const router = useRouter()
+const route = useRoute();
+const router = useRouter();
 
 // 响应式数据
-const formRef = ref<FormInstance>()
-const saving = ref(false)
-const isEdit = computed(() => !!route.params.id)
-const userId = computed(() => Number(route.params.id))
+const formRef = ref<FormInstance>();
+const saving = ref(false);
+const isEdit = computed(() => !!route.params.id);
+const userId = computed(() => Number(route.params.id));
 
 // 表单数据
-const formData = reactive<RegisterRequest & UserUpdateRequest & {
-  preferences: {
-    theme: 'light' | 'dark' | 'auto'
-    language: string
-    timezone: string
-    page_size: number
-  }
-}>({
-  username: '',
-  email: '',
-  password: '',
-  confirm_password: '',
-  full_name: '',
-  phone: '',
-  department: '',
-  position: '',
-  avatar: '',
+const formData = reactive<
+  RegisterRequest &
+    UserUpdateRequest & {
+      preferences: {
+        theme: "light" | "dark" | "auto";
+        language: string;
+        timezone: string;
+        page_size: number;
+      };
+    }
+>({
+  username: "",
+  email: "",
+  password: "",
+  confirm_password: "",
+  full_name: "",
+  phone: "",
+  department: "",
+  position: "",
+  avatar: "",
   is_active: true,
   is_superuser: false,
   preferences: {
-    theme: 'light',
-    language: 'zh-CN',
-    timezone: 'Asia/Shanghai',
-    page_size: 20
-  }
-})
+    theme: "light",
+    language: "zh-CN",
+    timezone: "Asia/Shanghai",
+    page_size: 20,
+  },
+});
 
 // 权限相关数据
-const selectedRoles = ref<number[]>([])
-const selectedPermissions = ref<number[]>([])
-const availableRoles = ref<UserRole[]>([])
-const availablePermissions = ref<UserPermission[]>([])
+const selectedRoles = ref<number[]>([]);
+const selectedPermissions = ref<number[]>([]);
+const availableRoles = ref<UserRole[]>([]);
+const availablePermissions = ref<UserPermission[]>([]);
 
 // 部门列表
 const departments = ref<string[]>([
-  '技术部',
-  '产品部',
-  '运营部',
-  '市场部',
-  '人事部',
-  '财务部'
-])
+  "技术部",
+  "产品部",
+  "运营部",
+  "市场部",
+  "人事部",
+  "财务部",
+]);
 
 // 表单验证规则
 const formRules: FormRules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 50, message: '用户名长度在 3 到 50 个字符', trigger: 'blur' },
+    { required: true, message: "请输入用户名", trigger: "blur" },
+    {
+      min: 3,
+      max: 50,
+      message: "用户名长度在 3 到 50 个字符",
+      trigger: "blur",
+    },
     {
       pattern: /^[a-zA-Z0-9_]+$/,
-      message: '用户名只能包含字母、数字和下划线',
-      trigger: 'blur'
-    }
+      message: "用户名只能包含字母、数字和下划线",
+      trigger: "blur",
+    },
   ],
   email: [
-    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-    { validator: validateEmail, trigger: 'blur' }
+    { required: true, message: "请输入邮箱地址", trigger: "blur" },
+    { validator: validateEmail, trigger: "blur" },
   ],
   full_name: [
-    { required: true, message: '请输入姓名', trigger: 'blur' },
-    { min: 2, max: 50, message: '姓名长度在 2 到 50 个字符', trigger: 'blur' }
+    { required: true, message: "请输入姓名", trigger: "blur" },
+    { min: 2, max: 50, message: "姓名长度在 2 到 50 个字符", trigger: "blur" },
   ],
-  phone: [
-    { validator: validatePhone, trigger: 'blur' }
-  ],
+  phone: [{ validator: validatePhone, trigger: "blur" }],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { validator: validatePassword, trigger: 'blur' }
+    { required: true, message: "请输入密码", trigger: "blur" },
+    { validator: validatePassword, trigger: "blur" },
   ],
   confirm_password: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
+    { required: true, message: "请确认密码", trigger: "blur" },
     {
       validator: (rule, value, callback) => {
         if (value !== formData.password) {
-          callback(new Error('两次输入的密码不一致'))
+          callback(new Error("两次输入的密码不一致"));
         } else {
-          callback()
+          callback();
         }
       },
-      trigger: 'blur'
-    }
-  ]
-}
+      trigger: "blur",
+    },
+  ],
+};
 
 // 计算有效权限
 const effectivePermissions = computed(() => {
   const rolePermissions = availableRoles.value
-    .filter(role => selectedRoles.value.includes(role.id))
-    .flatMap(role => role.permissions)
-  
-  const extraPermissions = availablePermissions.value
-    .filter(permission => selectedPermissions.value.includes(permission.id))
-  
+    .filter((role) => selectedRoles.value.includes(role.id))
+    .flatMap((role) => role.permissions);
+
+  const extraPermissions = availablePermissions.value.filter((permission) =>
+    selectedPermissions.value.includes(permission.id),
+  );
+
   // 去重
-  const allPermissions = [...rolePermissions, ...extraPermissions]
+  const allPermissions = [...rolePermissions, ...extraPermissions];
   const uniquePermissions = allPermissions.filter(
-    (permission, index, self) => 
-      index === self.findIndex(p => p.id === permission.id)
-  )
-  
-  return uniquePermissions
-})
+    (permission, index, self) =>
+      index === self.findIndex((p) => p.id === permission.id),
+  );
+
+  return uniquePermissions;
+});
 
 /**
  * 加载用户数据（编辑模式）
  */
 const loadUserData = async () => {
-  if (!isEdit.value) return
-  
+  if (!isEdit.value) return;
+
   try {
-    const response = await getUserDetail(userId.value.toString())
-    const user = response.data
-    
+    const response = await getUserDetail(userId.value.toString());
+    const user = response.data;
+
     // 填充表单数据
     Object.assign(formData, {
       username: user.username,
@@ -458,13 +469,13 @@ const loadUserData = async () => {
       position: user.position,
       avatar: user.avatar,
       is_active: user.is_active,
-      role: user.role || 'user'
-    })
+      role: user.role || "user",
+    });
   } catch (error) {
-    console.error('加载用户数据失败:', error)
-    ElMessage.error('加载用户数据失败')
+    console.error("加载用户数据失败:", error);
+    ElMessage.error("加载用户数据失败");
   }
-}
+};
 
 /**
  * 加载角色和权限数据
@@ -473,69 +484,69 @@ const loadRolesAndPermissions = async () => {
   try {
     const [rolesRes, permissionsRes] = await Promise.all([
       getRoles(),
-      getPermissions()
-    ])
-    
-    availableRoles.value = rolesRes.data
-    availablePermissions.value = permissionsRes.data
+      getPermissions(),
+    ]);
+
+    availableRoles.value = rolesRes.data;
+    availablePermissions.value = permissionsRes.data;
   } catch (error) {
-    ElMessage.error('加载权限数据失败')
+    ElMessage.error("加载权限数据失败");
   }
-}
+};
 
 /**
  * 处理角色变化
  */
 const handleRoleChange = () => {
   // 角色变化时可以做一些处理，比如自动添加某些权限
-}
+};
 
 /**
  * 头像上传前验证
  */
 const beforeAvatarUpload = (file: File) => {
-  const isImage = file.type.startsWith('image/')
-  const isLt2M = file.size / 1024 / 1024 < 2
-  
+  const isImage = file.type.startsWith("image/");
+  const isLt2M = file.size / 1024 / 1024 < 2;
+
   if (!isImage) {
-    ElMessage.error('只能上传图片文件')
-    return false
+    ElMessage.error("只能上传图片文件");
+    return false;
   }
   if (!isLt2M) {
-    ElMessage.error('图片大小不能超过 2MB')
-    return false
+    ElMessage.error("图片大小不能超过 2MB");
+    return false;
   }
-  return true
-}
+  return true;
+};
 
 /**
  * 处理头像上传
  */
 const handleAvatarUpload = async (options: UploadRequestOptions) => {
   try {
-    const formData = new FormData()
-    formData.append('file', options.file)
-    
-    const response = await uploadAvatar(formData)
-    formData.avatar = response.data.url
-    ElMessage.success('头像上传成功')
+    const formData = new FormData();
+    formData.append("file", options.file);
+
+    const response = await uploadAvatar(formData);
+    formData.avatar = response.data.url;
+    ElMessage.success("头像上传成功");
   } catch (error) {
-    ElMessage.error('头像上传失败')
+    ElMessage.error("头像上传失败");
   }
-}
+};
 
 /**
  * 处理保存
  */
 const handleSave = async () => {
-  if (!formRef.value) return
-  
+  if (!formRef.value) return;
+
   try {
-    const valid = await formRef.value.validate()
-    if (!valid) return
-    
-    saving.value = true
-    
+    const valid = await formRef.value.validate();
+    if (!valid) return;
+
+    saving.value = true;
+
     const userData = {
       username: formData.username,
       email: formData.email,
@@ -545,29 +556,29 @@ const handleSave = async () => {
       position: formData.position,
       avatar: formData.avatar,
       is_active: formData.is_active,
-      role: formData.role || 'user'
-    }
-    
+      role: formData.role || "user",
+    };
+
     if (isEdit.value) {
-      await updateUser(userId.value.toString(), userData)
-      ElMessage.success('用户更新成功')
+      await updateUser(userId.value.toString(), userData);
+      ElMessage.success("用户更新成功");
     } else {
       const createData = {
         ...userData,
-        password: formData.password
-      }
-      await createUser(createData)
-      ElMessage.success('用户创建成功')
+        password: formData.password,
+      };
+      await createUser(createData);
+      ElMessage.success("用户创建成功");
     }
-    
-    router.push('/users/list')
+
+    router.push("/users/list");
   } catch (error) {
-    console.error('保存用户失败:', error)
-    ElMessage.error(isEdit.value ? '用户更新失败' : '用户创建失败')
+    console.error("保存用户失败:", error);
+    ElMessage.error(isEdit.value ? "用户更新失败" : "用户创建失败");
   } finally {
-    saving.value = false
+    saving.value = false;
   }
-}
+};
 
 /**
  * 处理取消
@@ -575,32 +586,32 @@ const handleSave = async () => {
 const handleCancel = async () => {
   try {
     await ElMessageBox.confirm(
-      '确定要取消吗？未保存的更改将丢失。',
-      '确认取消',
+      "确定要取消吗？未保存的更改将丢失。",
+      "确认取消",
       {
-        type: 'warning'
-      }
-    )
-    router.push('/user')
+        type: "warning",
+      },
+    );
+    router.push("/user");
   } catch (error) {
     // 用户取消
   }
-}
+};
 
 /**
  * 处理返回
  */
 const handleBack = () => {
-  router.back()
-}
+  router.back();
+};
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadRolesAndPermissions()
+  loadRolesAndPermissions();
   if (isEdit.value) {
-    loadUserData()
+    loadUserData();
   }
-})
+});
 </script>
 
 <style lang="scss" scoped>

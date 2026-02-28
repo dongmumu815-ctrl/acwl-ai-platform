@@ -88,8 +88,8 @@
 
         <el-button
           type="primary"
-          @click="addResource"
           :disabled="!hasCreatePermission"
+          @click="addResource"
         >
           <el-icon><Plus /></el-icon>
           新增资源
@@ -105,8 +105,8 @@
     <!-- 资源列表 -->
     <div class="resource-content">
       <el-table
-        :data="filteredResources"
         v-loading="loading"
+        :data="filteredResources"
         stripe
         border
         style="width: 100%"
@@ -232,24 +232,24 @@
             <el-button
               type="primary"
               size="small"
-              @click="editResource(row)"
               :disabled="!hasEditPermission"
+              @click="editResource(row)"
             >
               编辑
             </el-button>
             <el-button
               type="danger"
               size="small"
-              @click="deleteResource(row)"
               :disabled="!hasDeletePermission"
+              @click="deleteResource(row)"
             >
               删除
             </el-button>
             <el-button
               type="success"
               size="small"
-              @click="queryData(row)"
               :disabled="!hasViewPermission"
+              @click="queryData(row)"
             >
               查询设定
             </el-button>
@@ -306,21 +306,21 @@
     </div>
 
     <!-- 批量操作栏 -->
-    <div class="batch-actions" v-show="selectedResources.length > 0">
+    <div v-show="selectedResources.length > 0" class="batch-actions">
       <div class="batch-info">已选择 {{ selectedResources.length }} 个资源</div>
       <div class="batch-buttons">
         <el-button
           size="small"
-          @click="batchDownload"
           :disabled="!hasDownloadPermission"
+          @click="batchDownload"
         >
           <el-icon><Download /></el-icon>
           批量下载
         </el-button>
         <el-button
           size="small"
-          @click="batchShare"
           :disabled="!hasSharePermission"
+          @click="batchShare"
         >
           <el-icon><Share /></el-icon>
           批量分享
@@ -328,8 +328,8 @@
         <el-button
           type="danger"
           size="small"
-          @click="batchDelete"
           :disabled="!hasDeletePermission"
+          @click="batchDelete"
         >
           <el-icon><Delete /></el-icon>
           批量删除
@@ -408,7 +408,7 @@
           v-if="
             selectedDatasourceType &&
             ['mysql', 'postgresql', 'doris', 'clickhouse'].includes(
-              selectedDatasourceType.toLowerCase()
+              selectedDatasourceType.toLowerCase(),
             )
           "
           label="Schema/数据库"
@@ -612,7 +612,7 @@
             editingResource &&
             editingResource.datasourceType &&
             ['mysql', 'postgresql', 'doris', 'clickhouse'].includes(
-              editingResource.datasourceType.toLowerCase()
+              editingResource.datasourceType.toLowerCase(),
             )
           "
           label="Schema/数据库"
@@ -978,7 +978,7 @@ const hasSharePermission = computed(() => {
 const securityConfig = reactive({
   enableDataMasking: true, // 启用数据脱敏
   sensitiveFields: ["password", "phone", "email", "id_card"], // 敏感字段
-  auditLog: true // 启用审计日志
+  auditLog: true, // 启用审计日志
 });
 
 /**
@@ -1034,7 +1034,7 @@ const newResourceForm = ref({
   tagsInput: "",
   category: "",
   apiEndpoint: "",
-  previewAvailable: true
+  previewAvailable: true,
 });
 
 // 编辑资源模态窗口
@@ -1055,7 +1055,7 @@ const editResourceForm = ref({
   tagsInput: "",
   category: "",
   apiEndpoint: "",
-  previewAvailable: true
+  previewAvailable: true,
 });
 const editingResource = ref<any>(null);
 
@@ -1085,7 +1085,7 @@ const resources = ref([
     tags: ["用户分析", "实时数据", "核心业务"],
     category: "用户数据",
     apiEndpoint: "/api/v1/data/user-behavior",
-    previewAvailable: true
+    previewAvailable: true,
   },
   {
     id: 2,
@@ -1105,7 +1105,7 @@ const resources = ref([
     tags: ["搜索分析", "商品推荐", "用户行为"],
     category: "搜索数据",
     apiEndpoint: "/api/v1/data/search-logs",
-    previewAvailable: true
+    previewAvailable: true,
   },
   {
     id: 3,
@@ -1125,7 +1125,7 @@ const resources = ref([
     tags: ["销售分析", "业务报表", "汇总数据"],
     category: "销售数据",
     apiEndpoint: "/api/v1/data/sales-summary",
-    previewAvailable: true
+    previewAvailable: true,
   },
   {
     id: 4,
@@ -1145,7 +1145,7 @@ const resources = ref([
     tags: ["系统监控", "实时指标", "运维数据"],
     category: "监控数据",
     apiEndpoint: "/api/v1/data/system-metrics",
-    previewAvailable: false
+    previewAvailable: false,
   },
   {
     id: 5,
@@ -1165,8 +1165,8 @@ const resources = ref([
     tags: ["历史数据", "订单分析", "归档数据"],
     category: "订单数据",
     apiEndpoint: "/api/v1/data/orders-history",
-    previewAvailable: true
-  }
+    previewAvailable: true,
+  },
 ]);
 
 /**
@@ -1178,21 +1178,22 @@ const filteredResources = computed(() => {
   // 按数据源筛选
   if (filterDatasource.value) {
     filtered = filtered.filter(
-      (resource) => String(resource.datasourceId ?? '') === filterDatasource.value
+      (resource) =>
+        String(resource.datasourceId ?? "") === filterDatasource.value,
     );
   }
 
   // 按分类筛选
   if (filterCategory.value) {
     filtered = filtered.filter(
-      (resource) => resource.category === filterCategory.value
+      (resource) => resource.category === filterCategory.value,
     );
   }
 
   // 按状态筛选
   if (filterStatus.value) {
     filtered = filtered.filter(
-      (resource) => resource.status === filterStatus.value
+      (resource) => resource.status === filterStatus.value,
     );
   }
 
@@ -1202,8 +1203,10 @@ const filteredResources = computed(() => {
     filtered = filtered.filter(
       (resource) =>
         (resource.name && resource.name.toLowerCase().includes(keyword)) ||
-        ((resource.description || '').toLowerCase().includes(keyword)) ||
-        getDisplayTagsForRow(resource).some((tag) => tag.toLowerCase().includes(keyword))
+        (resource.description || "").toLowerCase().includes(keyword) ||
+        getDisplayTagsForRow(resource).some((tag) =>
+          tag.toLowerCase().includes(keyword),
+        ),
     );
   }
 
@@ -1252,7 +1255,7 @@ const getDisplayTagsForRow = (row: any): string[] => {
 const selectedDatasourceType = computed(() => {
   if (!newResourceForm.value.datasourceId) return null;
   const datasource = datasourceList.value.find(
-    (ds) => ds.id === newResourceForm.value.datasourceId
+    (ds) => ds.id === newResourceForm.value.datasourceId,
   );
   return datasource?.datasource_type || null;
 });
@@ -1316,7 +1319,7 @@ const canSelectTable = () => {
   // 关系型数据库需要先选择Schema
   if (
     ["mysql", "postgresql", "doris", "clickhouse"].includes(
-      dsType.toLowerCase()
+      dsType.toLowerCase(),
     )
   ) {
     return !!newResourceForm.value.schema;
@@ -1333,7 +1336,7 @@ const getTypeIcon = (type: string) => {
     database: "Coin",
     file: "Document",
     api: "Connection",
-    report: "DataAnalysis"
+    report: "DataAnalysis",
   };
   return iconMap[type] || "Document";
 };
@@ -1346,7 +1349,7 @@ const getTypeColor = (type: string) => {
     database: "#409EFF",
     file: "#67C23A",
     api: "#E6A23C",
-    report: "#F56C6C"
+    report: "#F56C6C",
   };
   return colorMap[type] || "#909399";
 };
@@ -1358,7 +1361,7 @@ const getTypeTagType = (type: string) => {
   const tagMap: Record<string, string> = {
     table: "primary",
     index: "success",
-    view: "warning"
+    view: "warning",
   };
   return tagMap[type] || "info";
 };
@@ -1370,7 +1373,7 @@ const getTypeLabel = (type: string) => {
   const labelMap: Record<string, string> = {
     table: "数据表",
     index: "索引",
-    view: "视图"
+    view: "视图",
   };
   return labelMap[type] || type;
 };
@@ -1381,7 +1384,7 @@ const getTypeLabel = (type: string) => {
 const getDatasourceTagType = (datasourceType: string) => {
   const tagMap: Record<string, string> = {
     doris: "primary",
-    elasticsearch: "success"
+    elasticsearch: "success",
   };
   return tagMap[datasourceType] || "info";
 };
@@ -1392,7 +1395,7 @@ const getDatasourceTagType = (datasourceType: string) => {
 const getDatasourceLabel = (datasourceType: string) => {
   const labelMap: Record<string, string> = {
     doris: "Doris",
-    elasticsearch: "ES"
+    elasticsearch: "ES",
   };
   return labelMap[datasourceType] || datasourceType;
 };
@@ -1404,7 +1407,7 @@ const getStatusTagType = (status: string) => {
   const tagMap: Record<string, string> = {
     active: "success",
     maintenance: "warning",
-    inactive: "info"
+    inactive: "info",
   };
   return tagMap[status] || "info";
 };
@@ -1416,7 +1419,7 @@ const getStatusLabel = (status: string) => {
   const labelMap: Record<string, string> = {
     active: "正常",
     maintenance: "维护",
-    inactive: "停用"
+    inactive: "停用",
   };
   return labelMap[status] || status;
 };
@@ -1491,28 +1494,28 @@ const previewData = (resource: any) => {
         id: 1,
         name: "示例数据1",
         created_at: "2024-01-15 10:00:00",
-        updated_at: "2024-01-15 10:00:00"
+        updated_at: "2024-01-15 10:00:00",
       },
       {
         id: 2,
         name: "示例数据2",
         created_at: "2024-01-15 11:00:00",
-        updated_at: "2024-01-15 11:00:00"
+        updated_at: "2024-01-15 11:00:00",
       },
       {
         id: 3,
         name: "示例数据3",
         created_at: "2024-01-15 12:00:00",
-        updated_at: "2024-01-15 12:00:00"
-      }
-    ]
+        updated_at: "2024-01-15 12:00:00",
+      },
+    ],
   };
 
   // 记录审计日志
   if (securityConfig.auditLog) {
     logResourceActivity("PREVIEW_RESOURCE", {
       resourceId: resource.id,
-      resourceName: resource.name
+      resourceName: resource.name,
     });
   }
 
@@ -1539,7 +1542,7 @@ const showApiInfo = (resource: any) => {
   if (securityConfig.auditLog) {
     logResourceActivity("VIEW_API_INFO", {
       resourceId: resource.id,
-      resourceName: resource.name
+      resourceName: resource.name,
     });
   }
 
@@ -1552,10 +1555,10 @@ const showApiInfo = (resource: any) => {
         name: "limit",
         type: "int",
         description: "返回记录数限制",
-        default: "100"
+        default: "100",
       },
       { name: "offset", type: "int", description: "偏移量", default: "0" },
-      { name: "filter", type: "string", description: "过滤条件", default: "" }
+      { name: "filter", type: "string", description: "过滤条件", default: "" },
     ],
     examples: {
       curl: `curl -X GET "${resource.apiEndpoint}?limit=10&offset=0" -H "Authorization: Bearer YOUR_TOKEN"`,
@@ -1563,8 +1566,8 @@ const showApiInfo = (resource: any) => {
   headers: {
     'Authorization': 'Bearer YOUR_TOKEN'
   }
-}).then(response => response.json())`
-    }
+}).then(response => response.json())`,
+    },
   };
 
   showApiDialog.value = true;
@@ -1608,7 +1611,7 @@ const addResource = () => {
     tagsInput: "",
     category: "",
     apiEndpoint: "",
-    previewAvailable: true
+    previewAvailable: true,
   };
 
   showAddResourceDialog.value = true;
@@ -1640,7 +1643,7 @@ const confirmAddResource = async () => {
 
   // 获取选中的数据源信息
   const selectedDatasource = datasourceList.value.find(
-    (ds) => ds.id === newResourceForm.value.datasourceId
+    (ds) => ds.id === newResourceForm.value.datasourceId,
   );
   if (!selectedDatasource) {
     ElMessage.error("选择的数据源不存在");
@@ -1649,7 +1652,7 @@ const confirmAddResource = async () => {
 
   // 获取选中的表信息
   const selectedTable = availableTables.value.find(
-    (table) => table.name === newResourceForm.value.tableName
+    (table) => table.name === newResourceForm.value.tableName,
   );
   if (!selectedTable) {
     ElMessage.error("选择的表/视图/索引不存在");
@@ -1689,7 +1692,7 @@ const confirmAddResource = async () => {
       tags: tags.length > 0 ? { tags: tags } : null, // 标签格式调整
       category_id: newResourceForm.value.category || null,
       is_public: true,
-      status: "active" // 设置状态为活跃，使用小写
+      status: "active", // 设置状态为活跃，使用小写
     };
 
     console.log("=== 创建数据资源请求 ===");
@@ -1753,7 +1756,7 @@ const confirmEditResource = async () => {
 
   // 获取选中的数据源信息
   const selectedDatasource = datasourceList.value.find(
-    (ds) => ds.id === editResourceForm.value.datasourceId
+    (ds) => ds.id === editResourceForm.value.datasourceId,
   );
   if (!selectedDatasource) {
     ElMessage.error("选择的数据源不存在");
@@ -1795,7 +1798,7 @@ const confirmEditResource = async () => {
       tags: tags.length > 0 ? { tags: tags } : null, // 标签格式调整
       category_id: editResourceForm.value.category || null,
       is_public: true,
-      status: editResourceForm.value.status
+      status: editResourceForm.value.status,
     };
 
     console.log("=== 更新数据资源请求 ===");
@@ -1806,7 +1809,7 @@ const confirmEditResource = async () => {
     // 调用API更新数据资源
     const response = await dataResourceApi.updateResource(
       editResourceForm.value.id!,
-      updateData
+      updateData,
     );
 
     if (response.success) {
@@ -1823,7 +1826,7 @@ const confirmEditResource = async () => {
         logResourceActivity("UPDATE_RESOURCE", {
           resourceId: editResourceForm.value.id,
           resourceName: editResourceForm.value.name,
-          changes: updateData
+          changes: updateData,
         });
       }
 
@@ -1883,7 +1886,7 @@ const viewResource = (resource: any) => {
   if (securityConfig.auditLog) {
     logResourceActivity("VIEW_RESOURCE", {
       resourceId: resource.id,
-      resourceName: resource.name
+      resourceName: resource.name,
     });
   }
 
@@ -1928,21 +1931,23 @@ const queryData = (resource: any) => {
   if (securityConfig.auditLog) {
     logResourceActivity("QUERY_RESOURCE", {
       resourceId: resource.id,
-      resourceName: resource.name
+      resourceName: resource.name,
     });
   }
 
   // 跳转到数据查询页面，传递完整的数据源信息
   const queryParams: any = {
-    datasourceType: resource.type === 'index' ? 'elasticsearch' : 'sql'
+    datasourceType: resource.type === "index" ? "elasticsearch" : "sql",
   };
 
   // 根据数据源类型传递不同的参数
-  if (resource.type === 'index') {
+  if (resource.type === "index") {
     // ES数据源传递索引信息，确保格式正确
     if (resource.index_name) {
       // 传递初始索引列表，格式为对象数组
-      queryParams.initialIndices = JSON.stringify([{ name: resource.index_name }]);
+      queryParams.initialIndices = JSON.stringify([
+        { name: resource.index_name },
+      ]);
     }
   } else {
     // SQL数据源传递schema和表名信息
@@ -1960,7 +1965,7 @@ const queryData = (resource: any) => {
   // 修复：使用正确的属性名 datasourceId
   router.push({
     path: `/data-resources/query/${resource.datasourceId}`,
-    query: queryParams
+    query: queryParams,
   });
 
   // ElMessage.info(`查询数据: ${resource.name}`);
@@ -1988,7 +1993,7 @@ const editResource = (resource: any) => {
   if (securityConfig.auditLog) {
     logResourceActivity("EDIT_RESOURCE", {
       resourceId: resource.id,
-      resourceName: resource.name
+      resourceName: resource.name,
     });
   }
 
@@ -2029,7 +2034,7 @@ const editResource = (resource: any) => {
     tagsInput: tagsArray.join(", "),
     category: resource.categoryId,
     apiEndpoint: resource.apiEndpoint,
-    previewAvailable: resource.previewAvailable
+    previewAvailable: resource.previewAvailable,
   };
 
   // 如果有数据源ID，加载相关的Schema和表信息
@@ -2038,7 +2043,7 @@ const editResource = (resource: any) => {
     if (
       dsType &&
       ["mysql", "postgresql", "doris", "clickhouse"].includes(
-        dsType.toLowerCase()
+        dsType.toLowerCase(),
       )
     ) {
       // 关系型数据库：先获取Schema列表
@@ -2047,7 +2052,7 @@ const editResource = (resource: any) => {
         // 如果有Schema，获取表列表
         loadDataSourceTablesWithSchema(
           resource.datasourceId,
-          resource.database
+          resource.database,
         );
       }
     } else {
@@ -2076,7 +2081,7 @@ const downloadResource = (resource: any) => {
   if (securityConfig.auditLog) {
     logResourceActivity("DOWNLOAD_RESOURCE", {
       resourceId: resource.id,
-      resourceName: resource.name
+      resourceName: resource.name,
     });
   }
 
@@ -2097,7 +2102,7 @@ const shareResource = (resource: any) => {
   if (securityConfig.auditLog) {
     logResourceActivity("SHARE_RESOURCE", {
       resourceId: resource.id,
-      resourceName: resource.name
+      resourceName: resource.name,
     });
   }
 
@@ -2112,7 +2117,7 @@ const copyResource = (resource: any) => {
   if (securityConfig.auditLog) {
     logResourceActivity("COPY_RESOURCE_LINK", {
       resourceId: resource.id,
-      resourceName: resource.name
+      resourceName: resource.name,
     });
   }
 
@@ -2137,8 +2142,8 @@ const deleteResource = async (resource: any) => {
         confirmButtonText: "确定删除",
         cancelButtonText: "取消",
         type: "warning",
-        dangerouslyUseHTMLString: false
-      }
+        dangerouslyUseHTMLString: false,
+      },
     );
 
     // 显示删除中的加载状态
@@ -2146,7 +2151,7 @@ const deleteResource = async (resource: any) => {
       message: "正在删除资源...",
       type: "info",
       duration: 0,
-      showClose: false
+      showClose: false,
     });
 
     try {
@@ -2173,7 +2178,7 @@ const deleteResource = async (resource: any) => {
       if (securityConfig.auditLog) {
         logResourceActivity("DELETE_RESOURCE", {
           resourceId: resource.id,
-          resourceName: resource.name
+          resourceName: resource.name,
         });
       }
 
@@ -2222,7 +2227,7 @@ const batchDownload = () => {
   if (securityConfig.auditLog) {
     logResourceActivity("BATCH_DOWNLOAD_RESOURCES", {
       resourceIds: selectedResources.value.map((r) => r.id),
-      count: selectedResources.value.length
+      count: selectedResources.value.length,
     });
   }
 
@@ -2243,7 +2248,7 @@ const batchShare = () => {
   if (securityConfig.auditLog) {
     logResourceActivity("BATCH_SHARE_RESOURCES", {
       resourceIds: selectedResources.value.map((r) => r.id),
-      count: selectedResources.value.length
+      count: selectedResources.value.length,
     });
   }
 
@@ -2273,8 +2278,8 @@ const batchDelete = async () => {
         confirmButtonText: "确定删除",
         cancelButtonText: "取消",
         type: "warning",
-        dangerouslyUseHTMLString: false
-      }
+        dangerouslyUseHTMLString: false,
+      },
     );
 
     // 显示批量删除中的加载状态
@@ -2282,7 +2287,7 @@ const batchDelete = async () => {
       message: `正在删除 ${selectedResources.value.length} 个资源...`,
       type: "info",
       duration: 0,
-      showClose: false
+      showClose: false,
     });
 
     try {
@@ -2292,7 +2297,7 @@ const batchDelete = async () => {
       // 使用批量操作API
       const response = await dataResourceApi.batchOperation({
         operation: "delete",
-        resource_ids: selectedIds
+        resource_ids: selectedIds,
       });
 
       // 关闭加载消息
@@ -2305,13 +2310,13 @@ const batchDelete = async () => {
         if (success_count > 0) {
           // 从本地列表中移除成功删除的资源
           resources.value = resources.value.filter(
-            (r) => !selectedIds.includes(r.id)
+            (r) => !selectedIds.includes(r.id),
           );
 
           // 更新总数
           totalResources.value = Math.max(
             0,
-            totalResources.value - success_count
+            totalResources.value - success_count,
           );
 
           // 清空选择
@@ -2322,7 +2327,7 @@ const batchDelete = async () => {
             logResourceActivity("BATCH_DELETE_RESOURCES", {
               resourceIds: selectedIds,
               count: success_count,
-              failedCount: failed_count
+              failedCount: failed_count,
             });
           }
         }
@@ -2337,7 +2342,7 @@ const batchDelete = async () => {
           }
         } else {
           ElMessage.warning(
-            `部分删除成功：成功 ${success_count} 个，失败 ${failed_count} 个`
+            `部分删除成功：成功 ${success_count} 个，失败 ${failed_count} 个`,
           );
           if (errors && errors.length > 0) {
             console.error("批量删除错误:", errors);
@@ -2408,7 +2413,7 @@ const loadDatasources = async () => {
     datasourceLoading.value = true;
     const response = await datasourceApi.getDataSourceList({
       page: 1,
-      size: 100 // 获取所有数据源用于选择
+      size: 100, // 获取所有数据源用于选择
     });
 
     if (response.data && response.data.items) {
@@ -2455,7 +2460,7 @@ const loadDataSourceTables = async (datasourceId: number) => {
  */
 const loadDataSourceTablesWithSchema = async (
   datasourceId: number,
-  schema: string
+  schema: string,
 ) => {
   if (!datasourceId || !schema) {
     availableTables.value = [];
@@ -2466,7 +2471,7 @@ const loadDataSourceTablesWithSchema = async (
     tableLoading.value = true;
     const response = await datasourceApi.getDataSourceTablesWithSchema(
       datasourceId,
-      schema
+      schema,
     );
 
     if (response.data) {
@@ -2548,7 +2553,7 @@ const transformApiDataToTableFormat = (apiData: any) => {
     category: apiData.category?.name || "未分类",
     categoryId: apiData.category?.id || null,
     apiEndpoint: `/api/v1/data-resources/${apiData.id}`,
-    previewAvailable: true
+    previewAvailable: true,
   };
 };
 
@@ -2560,7 +2565,7 @@ const getResourceTypeFromApiType = (apiType: string) => {
     elasticsearch_index: "index",
     doris_table: "table",
     mysql_table: "table",
-    postgresql_table: "table"
+    postgresql_table: "table",
   };
   return typeMap[apiType] || "table";
 };
@@ -2579,7 +2584,7 @@ const loadResources = async () => {
         : undefined,
       // category_id：当前筛选为分类名称，暂不映射后端ID
       status: filterStatus.value || undefined,
-      keyword: searchKeyword.value || undefined
+      keyword: searchKeyword.value || undefined,
     });
 
     console.log("API返回的原始数据:", response.data);
@@ -2634,7 +2639,7 @@ watch(
       if (
         dsType &&
         ["mysql", "postgresql", "doris", "clickhouse"].includes(
-          dsType.toLowerCase()
+          dsType.toLowerCase(),
         )
       ) {
         // 关系型数据库：先获取Schema列表
@@ -2649,7 +2654,7 @@ watch(
       newResourceForm.value.schema = "";
       newResourceForm.value.tableName = "";
     }
-  }
+  },
 );
 
 /**
@@ -2664,13 +2669,13 @@ watch(
       // 获取指定Schema下的表列表
       loadDataSourceTablesWithSchema(
         newResourceForm.value.datasourceId,
-        newSchema
+        newSchema,
       );
     } else {
       availableTables.value = [];
       newResourceForm.value.tableName = "";
     }
-  }
+  },
 );
 
 /**

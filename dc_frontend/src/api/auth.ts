@@ -1,4 +1,4 @@
-import { request } from '@/utils/request'
+import { request } from "@/utils/request";
 import type {
   LoginRequest,
   LoginResponse,
@@ -11,8 +11,8 @@ import type {
   UserPermission,
   UserRole,
   ApiResponse,
-  MyPermissionsResponse
-} from '@/types/user'
+  MyPermissionsResponse,
+} from "@/types/user";
 
 /**
  * 认证相关API接口
@@ -24,11 +24,11 @@ export const authApi = {
    */
   login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
     return request({
-      url: '/auth/login/json',
-      method: 'POST',
+      url: "/auth/login/json",
+      method: "POST",
       data,
-      permission: 'auth:login'
-    })
+      permission: "auth:login",
+    });
   },
 
   /**
@@ -36,10 +36,10 @@ export const authApi = {
    */
   logout(): Promise<ApiResponse<void>> {
     return request({
-      url: '/auth/logout',
-      method: 'POST',
-      permission: 'auth:logout'
-    })
+      url: "/auth/logout",
+      method: "POST",
+      permission: "auth:logout",
+    });
   },
 
   /**
@@ -48,11 +48,11 @@ export const authApi = {
    */
   register(data: RegisterRequest): Promise<ApiResponse<User>> {
     return request({
-      url: '/auth/register',
-      method: 'POST',
+      url: "/auth/register",
+      method: "POST",
       data,
-      permission: 'auth:register'
-    })
+      permission: "auth:register",
+    });
   },
 
   /**
@@ -61,11 +61,11 @@ export const authApi = {
    */
   forgotPassword(data: ForgotPasswordRequest): Promise<ApiResponse<void>> {
     return request({
-      url: '/auth/forgot-password',
-      method: 'POST',
+      url: "/auth/forgot-password",
+      method: "POST",
       data,
-      permission: 'auth:password:forgot'
-    })
+      permission: "auth:password:forgot",
+    });
   },
 
   /**
@@ -74,11 +74,11 @@ export const authApi = {
    */
   resetPassword(data: ResetPasswordRequest): Promise<ApiResponse<void>> {
     return request({
-      url: '/auth/reset-password',
-      method: 'POST',
+      url: "/auth/reset-password",
+      method: "POST",
       data,
-      permission: 'auth:password:reset'
-    })
+      permission: "auth:password:reset",
+    });
   },
 
   /**
@@ -87,26 +87,28 @@ export const authApi = {
    */
   changePassword(data: PasswordChangeRequest): Promise<ApiResponse<void>> {
     return request({
-      url: '/auth/change-password',
-      method: 'POST',
+      url: "/auth/change-password",
+      method: "POST",
       data,
-      permission: 'auth:password:change'
-    })
+      permission: "auth:password:change",
+    });
   },
 
   /**
    * 获取当前用户信息
    */
-  getCurrentUser(): Promise<ApiResponse<{
-    user: User
-    permissions: string[]
-    roles: string[]
-  }>> {
+  getCurrentUser(): Promise<
+    ApiResponse<{
+      user: User;
+      permissions: string[];
+      roles: string[];
+    }>
+  > {
     return request({
-      url: '/auth/me',
-      method: 'GET',
-      permission: 'auth:me:view'
-    })
+      url: "/auth/me",
+      method: "GET",
+      permission: "auth:me:view",
+    });
   },
 
   /**
@@ -115,11 +117,11 @@ export const authApi = {
    */
   updateProfile(data: UserUpdateRequest): Promise<ApiResponse<User>> {
     return request({
-      url: '/auth/profile',
-      method: 'PUT',
+      url: "/auth/profile",
+      method: "PUT",
       data,
-      permission: 'auth:profile:edit'
-    })
+      permission: "auth:profile:edit",
+    });
   },
 
   /**
@@ -127,32 +129,34 @@ export const authApi = {
    * @param file 头像文件
    */
   uploadAvatar(file: File): Promise<ApiResponse<{ avatar_url: string }>> {
-    const formData = new FormData()
-    formData.append('avatar', file)
-    
+    const formData = new FormData();
+    formData.append("avatar", file);
+
     return request({
-      url: '/auth/avatar',
-      method: 'POST',
+      url: "/auth/avatar",
+      method: "POST",
       data: formData,
       headers: {
-        'Content-Type': 'multipart/form-data'
+        "Content-Type": "multipart/form-data",
       },
-      permission: 'auth:profile:avatar'
-    })
+      permission: "auth:profile:avatar",
+    });
   },
 
   /**
    * 获取用户权限
    */
-  getUserPermissions(): Promise<ApiResponse<{
-    permissions: string[]
-    roles: string[]
-  }>> {
+  getUserPermissions(): Promise<
+    ApiResponse<{
+      permissions: string[];
+      roles: string[];
+    }>
+  > {
     return request({
-      url: '/auth/permissions',
-      method: 'GET',
-      permission: 'auth:permissions:view'
-    })
+      url: "/auth/permissions",
+      method: "GET",
+      permission: "auth:permissions:view",
+    });
   },
 
   /**
@@ -163,10 +167,10 @@ export const authApi = {
    */
   getMyPermissions(): Promise<ApiResponse<MyPermissionsResponse>> {
     return request({
-      url: '/permissions/me',
-      method: 'GET',
-      permission: 'auth:permissions:view'
-    })
+      url: "/permissions/me",
+      method: "GET",
+      permission: "auth:permissions:view",
+    });
   },
 
   /**
@@ -174,10 +178,10 @@ export const authApi = {
    */
   refreshToken(): Promise<ApiResponse<{ token: string; expires_in: number }>> {
     return request({
-      url: '/auth/refresh',
-      method: 'POST',
-      permission: 'auth:token:refresh'
-    })
+      url: "/auth/refresh",
+      method: "POST",
+      permission: "auth:token:refresh",
+    });
   },
 
   /**
@@ -185,10 +189,10 @@ export const authApi = {
    */
   verifyToken(): Promise<ApiResponse<{ valid: boolean }>> {
     return request({
-      url: '/auth/verify',
-      method: 'GET',
-      permission: 'auth:token:verify'
-    })
+      url: "/auth/verify",
+      method: "GET",
+      permission: "auth:token:verify",
+    });
   },
 
   /**
@@ -196,10 +200,10 @@ export const authApi = {
    */
   getUserSessions(): Promise<ApiResponse<any[]>> {
     return request({
-      url: '/auth/sessions',
-      method: 'GET',
-      permission: 'auth:sessions:view'
-    })
+      url: "/auth/sessions",
+      method: "GET",
+      permission: "auth:sessions:view",
+    });
   },
 
   /**
@@ -209,9 +213,9 @@ export const authApi = {
   terminateSession(sessionId: string): Promise<ApiResponse<void>> {
     return request({
       url: `/auth/sessions/${sessionId}`,
-      method: 'DELETE',
-      permission: 'auth:sessions:terminate'
-    })
+      method: "DELETE",
+      permission: "auth:sessions:terminate",
+    });
   },
 
   /**
@@ -219,10 +223,10 @@ export const authApi = {
    */
   terminateOtherSessions(): Promise<ApiResponse<void>> {
     return request({
-      url: '/auth/sessions/others',
-      method: 'DELETE',
-      permission: 'auth:sessions:terminate_others'
-    })
+      url: "/auth/sessions/others",
+      method: "DELETE",
+      permission: "auth:sessions:terminate_others",
+    });
   },
 
   /**
@@ -230,18 +234,18 @@ export const authApi = {
    * @param params 查询参数
    */
   getUserActivities(params?: {
-    page?: number
-    page_size?: number
-    action?: string
-    start_date?: string
-    end_date?: string
+    page?: number;
+    page_size?: number;
+    action?: string;
+    start_date?: string;
+    end_date?: string;
   }): Promise<ApiResponse<any>> {
     return request({
-      url: '/auth/activities',
-      method: 'GET',
+      url: "/auth/activities",
+      method: "GET",
       params,
-      permission: 'auth:activities:view'
-    })
+      permission: "auth:activities:view",
+    });
   },
 
   /**
@@ -249,10 +253,10 @@ export const authApi = {
    */
   getUserPreferences(): Promise<ApiResponse<any>> {
     return request({
-      url: '/auth/preferences',
-      method: 'GET',
-      permission: 'auth:preferences:view'
-    })
+      url: "/auth/preferences",
+      method: "GET",
+      permission: "auth:preferences:view",
+    });
   },
 
   /**
@@ -261,11 +265,11 @@ export const authApi = {
    */
   updateUserPreferences(data: any): Promise<ApiResponse<any>> {
     return request({
-      url: '/auth/preferences',
-      method: 'PUT',
+      url: "/auth/preferences",
+      method: "PUT",
       data,
-      permission: 'auth:preferences:edit'
-    })
+      permission: "auth:preferences:edit",
+    });
   },
 
   /**
@@ -273,10 +277,10 @@ export const authApi = {
    */
   getUserStats(): Promise<ApiResponse<any>> {
     return request({
-      url: '/auth/stats',
-      method: 'GET',
-      permission: 'auth:stats:view'
-    })
+      url: "/auth/stats",
+      method: "GET",
+      permission: "auth:stats:view",
+    });
   },
 
   /**
@@ -284,23 +288,25 @@ export const authApi = {
    */
   enableTwoFactor(): Promise<ApiResponse<{ qr_code: string; secret: string }>> {
     return request({
-      url: '/auth/2fa/enable',
-      method: 'POST',
-      permission: 'auth:2fa:enable'
-    })
+      url: "/auth/2fa/enable",
+      method: "POST",
+      permission: "auth:2fa:enable",
+    });
   },
 
   /**
    * 确认两步验证
    * @param code 验证码
    */
-  confirmTwoFactor(code: string): Promise<ApiResponse<{ backup_codes: string[] }>> {
+  confirmTwoFactor(
+    code: string,
+  ): Promise<ApiResponse<{ backup_codes: string[] }>> {
     return request({
-      url: '/auth/2fa/confirm',
-      method: 'POST',
+      url: "/auth/2fa/confirm",
+      method: "POST",
       data: { code },
-      permission: 'auth:2fa:confirm'
-    })
+      permission: "auth:2fa:confirm",
+    });
   },
 
   /**
@@ -309,11 +315,11 @@ export const authApi = {
    */
   disableTwoFactor(code: string): Promise<ApiResponse<void>> {
     return request({
-      url: '/auth/2fa/disable',
-      method: 'POST',
+      url: "/auth/2fa/disable",
+      method: "POST",
       data: { code },
-      permission: 'auth:2fa:disable'
-    })
+      permission: "auth:2fa:disable",
+    });
   },
 
   /**
@@ -322,11 +328,11 @@ export const authApi = {
    */
   verifyTwoFactor(code: string): Promise<ApiResponse<{ valid: boolean }>> {
     return request({
-      url: '/auth/2fa/verify',
-      method: 'POST',
+      url: "/auth/2fa/verify",
+      method: "POST",
       data: { code },
-      permission: 'auth:2fa:verify'
-    })
+      permission: "auth:2fa:verify",
+    });
   },
 
   /**
@@ -334,14 +340,14 @@ export const authApi = {
    */
   generateBackupCodes(): Promise<ApiResponse<{ backup_codes: string[] }>> {
     return request({
-      url: '/auth/2fa/backup-codes',
-      method: 'POST',
-      permission: 'auth:2fa:backup_codes'
-    })
-  }
-}
+      url: "/auth/2fa/backup-codes",
+      method: "POST",
+      permission: "auth:2fa:backup_codes",
+    });
+  },
+};
 
 /**
  * 导出默认对象
  */
-export default authApi
+export default authApi;

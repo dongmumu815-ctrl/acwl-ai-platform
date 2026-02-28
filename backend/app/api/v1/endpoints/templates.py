@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/")
 async def get_template_list(
+    id: str = None,
     name: str = None,
     is_active: bool = None,
     file_type: str = None
@@ -16,6 +17,8 @@ async def get_template_list(
     获取模板列表
     """
     filters = {}
+    if id:
+        filters['id'] = id
     if name:
         filters['name'] = name
     if is_active is not None:

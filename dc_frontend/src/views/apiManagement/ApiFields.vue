@@ -4,7 +4,7 @@
     <div class="page-header">
       <div class="header-content">
         <div class="header-left">
-          <el-button @click="goBack" size="small">
+          <el-button size="small" @click="goBack">
             <el-icon><ArrowLeft /></el-icon>
             返回
           </el-button>
@@ -13,7 +13,7 @@
               <el-icon><Setting /></el-icon>
               API字段映射
             </h1>
-            <p class="page-description" v-if="apiInfo">
+            <p v-if="apiInfo" class="page-description">
               {{ apiInfo.api_name }} ({{ apiInfo.api_code }})
             </p>
           </div>
@@ -24,9 +24,7 @@
               <el-icon><Plus /></el-icon>
               添加字段
             </el-button>
-            <el-button @click="openCenterDrawer">
-              从资源类型添加
-            </el-button>
+            <el-button @click="openCenterDrawer"> 从资源类型添加 </el-button>
           </template>
           <el-button @click="loadFields()">
             <el-icon><Refresh /></el-icon>
@@ -37,7 +35,7 @@
     </div>
 
     <!-- 1. 数据详情 (API信息卡片) -->
-    <div class="page-card" v-if="apiInfo">
+    <div v-if="apiInfo" class="page-card">
       <div class="card-header">
         <h3>数据详情</h3>
       </div>
@@ -67,12 +65,12 @@
             <div class="info-item">
               <span class="label">状态:</span>
               <el-tag :type="apiInfo.is_active ? 'success' : 'danger'">
-                {{ apiInfo.is_active ? '激活' : '禁用' }}
+                {{ apiInfo.is_active ? "激活" : "禁用" }}
               </el-tag>
             </div>
           </el-col>
         </el-row>
-        <el-row :gutter="20" style="margin-top: 8px;">
+        <el-row :gutter="20" style="margin-top: 8px">
           <el-col :span="6">
             <div class="info-item">
               <span class="label">资源类型:</span>
@@ -80,9 +78,7 @@
                 <template v-if="resourceTypeName">
                   {{ resourceTypeName }}
                 </template>
-                <template v-else>
-                  未配置
-                </template>
+                <template v-else> 未配置 </template>
               </span>
             </div>
           </el-col>
@@ -97,69 +93,125 @@
         <div class="card-header">
           <h3>数据源配置</h3>
           <div class="header-actions">
-            <el-select v-model="selectedDatasourceId" placeholder="选择数据源" style="width: 220px" filterable @change="handleDatasourceChange">
-              <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
+            <el-select
+              v-model="selectedDatasourceId"
+              placeholder="选择数据源"
+              style="width: 220px"
+              filterable
+              @change="handleDatasourceChange"
+            >
+              <el-option
+                v-for="ds in datasources"
+                :key="ds.id"
+                :label="ds.name"
+                :value="ds.id"
+              />
             </el-select>
-            <el-select v-model="selectedSchema" placeholder="选择Schema" style="width: 180px" filterable clearable @change="handleSchemaChange" :disabled="!selectedDatasourceId">
-              <el-option v-for="sch in schemas" :key="sch.name" :label="sch.name" :value="sch.name" />
+            <el-select
+              v-model="selectedSchema"
+              placeholder="选择Schema"
+              style="width: 180px"
+              filterable
+              clearable
+              :disabled="!selectedDatasourceId"
+              @change="handleSchemaChange"
+            >
+              <el-option
+                v-for="sch in schemas"
+                :key="sch.name"
+                :label="sch.name"
+                :value="sch.name"
+              />
             </el-select>
-            <el-select v-model="selectedTable" placeholder="选择数据表" style="width: 220px" filterable @change="handleTableChange" :disabled="!selectedDatasourceId">
-              <el-option v-for="tb in tables" :key="tb.name" :label="tb.name" :value="tb.name" />
+            <el-select
+              v-model="selectedTable"
+              placeholder="选择数据表"
+              style="width: 220px"
+              filterable
+              :disabled="!selectedDatasourceId"
+              @change="handleTableChange"
+            >
+              <el-option
+                v-for="tb in tables"
+                :key="tb.name"
+                :label="tb.name"
+                :value="tb.name"
+              />
             </el-select>
-            
+
             <el-divider direction="vertical" />
-            
-            <el-button @click="clearMapping" :disabled="sourceFields.length===0 || targetFields.length===0">清空映射</el-button>
-            <el-button type="primary" @click="autoMapping" :disabled="sourceFields.length===0 || targetFields.length===0">自动映射</el-button>
-            <el-button @click="previewVisible = true" :disabled="mappingPairs.length===0">预览配置</el-button>
-            <el-button type="success" @click="saveMapping" :disabled="mappingPairs.length===0 || !canSave">保存映射</el-button>
+
+            <el-button
+              :disabled="sourceFields.length === 0 || targetFields.length === 0"
+              @click="clearMapping"
+              >清空映射</el-button
+            >
+            <el-button
+              type="primary"
+              :disabled="sourceFields.length === 0 || targetFields.length === 0"
+              @click="autoMapping"
+              >自动映射</el-button
+            >
+            <el-button
+              :disabled="mappingPairs.length === 0"
+              @click="previewVisible = true"
+              >预览配置</el-button
+            >
+            <el-button
+              type="success"
+              :disabled="mappingPairs.length === 0 || !canSave"
+              @click="saveMapping"
+              >保存映射</el-button
+            >
           </div>
         </div>
       </div>
 
       <!-- 3. 字段映射 (模仿 FieldMapping.vue) -->
-      <div class="page-card mapping-container" v-if="selectedTable">
-        <div class="mapping-board" ref="scrollArea">
+      <div v-if="selectedTable" class="page-card mapping-container">
+        <div ref="scrollArea" class="mapping-board">
           <div class="mapping-columns">
             <!-- 左侧：API字段 (源) -->
-            <div class="source-list" ref="sourceListRef">
+            <div ref="sourceListRef" class="source-list">
               <div class="list-header">
                 <h3>API 字段 (源)</h3>
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px">
                   <span class="count">{{ sourceFields.length }}</span>
-                  <el-button type="primary" link size="small" @click="addSourceField">
+                  <el-button
+                    type="primary"
+                    link
+                    size="small"
+                    @click="addSourceField"
+                  >
                     <el-icon><Plus /></el-icon>
                     自定义
                   </el-button>
                 </div>
               </div>
-              <div class="list-search">
-                <el-input
-                  v-model="sourceSearch"
-                  placeholder="搜索字段..."
-                  prefix-icon="Search"
-                  clearable
-                  size="small"
-                  @input="handleSourceSearch"
-                />
-              </div>
               <div class="fields-scroll-container">
                 <div
                   v-for="sf in sourceFields"
-                  :key="sf.field_name"
-                  :class="['field-item', selectedSource===sf.field_name ? 'active' : '', hasSourceMapping(sf.field_name) ? 'mapped' : '', highlightedField === sf.field_name ? 'highlighted' : '']"
-                  @click="handleSourceClick(sf.field_name)"
-                  :ref="el => setSourceRef(sf.field_name, el as HTMLElement)"
                   :id="'source-field-' + sf.field_name"
+                  :key="sf.field_name"
+                  :ref="(el) => setSourceRef(sf.field_name, el as HTMLElement)"
+                  :class="[
+                    'field-item',
+                    selectedSource === sf.field_name ? 'active' : '',
+                    hasSourceMapping(sf.field_name) ? 'mapped' : '',
+                    highlightedField === sf.field_name ? 'highlighted' : '',
+                  ]"
+                  @click="handleSourceClick(sf.field_name)"
                 >
                   <div class="field-content">
                     <div class="field-info">
                       <span class="field-name" :title="sf.field_name">
-                        <span v-html="highlightText(sf.field_name, sourceSearch)"></span>
+                        {{ sf.field_name }}
                       </span>
                       <span class="field-type">{{ sf.field_type }}</span>
                     </div>
-                    <div class="field-desc" v-if="sf.description">{{ sf.description }}</div>
+                    <div v-if="sf.description" class="field-desc">
+                      {{ sf.description }}
+                    </div>
                   </div>
                   <div class="field-status">
                     <el-tag size="small" type="warning" v-if="sf.is_custom">自定义</el-tag>
@@ -178,8 +230,12 @@
             </div>
 
             <!-- 中间：连线区域 -->
-            <div class="connector" ref="connectorRef">
-              <svg :width="connectorWidth" :height="connectorHeight" class="connection-svg">
+            <div ref="connectorRef" class="connector">
+              <svg
+                :width="connectorWidth"
+                :height="connectorHeight"
+                class="connection-svg"
+              >
                 <g v-for="ln in lines" :key="`${ln.source}-${ln.target}`">
                   <path
                     :d="ln.path"
@@ -189,7 +245,11 @@
                     class="connection-line"
                   />
                   <!-- 删除按钮 -->
-                  <g class="delete-btn-group" style="cursor: pointer" @click="removeMapping(ln.source)">
+                  <g
+                    class="delete-btn-group"
+                    style="cursor: pointer"
+                    @click="removeMapping(ln.source)"
+                  >
                     <circle
                       :cx="ln.mx"
                       :cy="ln.my"
@@ -207,48 +267,53 @@
                       fill="#ffffff"
                       font-weight="bold"
                       style="pointer-events: none"
-                    >×</text>
+                    >
+                      ×
+                    </text>
                   </g>
                 </g>
               </svg>
             </div>
 
             <!-- 右侧：表字段 (目标) -->
-            <div class="target-list" ref="targetListRef">
+            <div ref="targetListRef" class="target-list">
               <div class="list-header">
                 <h3>表字段 (目标)</h3>
                 <span class="count">{{ targetFields.length }}</span>
               </div>
-              <div class="list-search">
-                <el-input
-                  v-model="targetSearch"
-                  placeholder="搜索字段..."
-                  prefix-icon="Search"
-                  clearable
-                  size="small"
-                  @input="handleTargetSearch"
-                />
-              </div>
               <div class="fields-scroll-container">
                 <div
                   v-for="tf in targetFields"
-                  :key="tf.name"
-                  :class="['field-item', mappingLookup[tf.name] ? 'mapped' : selectedTarget===tf.name ? 'active' : '', highlightedField === tf.name ? 'highlighted' : '']"
-                  @click="handleTargetClick(tf.name)"
-                  :ref="el => setTargetRef(tf.name, el as HTMLElement)"
                   :id="'target-field-' + tf.name"
+                  :key="tf.name"
+                  :ref="(el) => setTargetRef(tf.name, el as HTMLElement)"
+                  :class="[
+                    'field-item',
+                    mappingLookup[tf.name]
+                      ? 'mapped'
+                      : selectedTarget === tf.name
+                        ? 'active'
+                        : '',
+                  ]"
+                  @click="handleTargetClick(tf.name)"
                 >
                   <div class="field-content">
                     <div class="field-info">
                       <span class="field-name" :title="tf.name">
-                        <span v-html="highlightText(tf.name, targetSearch)"></span>
+                        <span
+                          v-html="highlightText(tf.name, targetSearch)"
+                        ></span>
                       </span>
-                      <span class="field-type">{{ tf.type || '-' }}</span>
-                      <span v-if="!tf.nullable" class="required-badge">必填</span>
+                      <span class="field-type">{{ tf.type || "-" }}</span>
+                      <span v-if="!tf.nullable" class="required-badge"
+                        >必填</span
+                      >
                     </div>
-                    <div class="field-desc" v-if="tf.comment">{{ tf.comment }}</div>
+                    <div v-if="tf.comment" class="field-desc">
+                      {{ tf.comment }}
+                    </div>
                   </div>
-                  <div class="field-map-info" v-if="mappingLookup[tf.name]">
+                  <div v-if="mappingLookup[tf.name]" class="field-map-info">
                     <el-icon><Link /></el-icon> {{ mappingLookup[tf.name] }}
                   </div>
                 </div>
@@ -260,11 +325,11 @@
     </template>
 
     <!-- 字段列表模式 -->
-    <div class="page-card" v-else>
+    <div v-else class="page-card">
       <div class="card-header">
         <h3>字段列表</h3>
         <div class="header-actions">
-          <el-button size="small" @click="saveFieldsOrder" :loading="saving">
+          <el-button size="small" :loading="saving" @click="saveFieldsOrder">
             <el-icon><Check /></el-icon>
             保存排序
           </el-button>
@@ -272,8 +337,8 @@
       </div>
 
       <el-table
-        :data="fields"
         v-loading="loading"
+        :data="fields"
         style="width: 100%"
         row-key="id"
         @sort-change="handleSortChange"
@@ -283,7 +348,12 @@
             <span class="drag-handle">{{ $index + 1 }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="field_name" label="字段名称" width="150" sortable />
+        <el-table-column
+          prop="field_name"
+          label="字段名称"
+          width="150"
+          sortable
+        />
         <el-table-column prop="field_type" label="字段类型" width="120">
           <template #default="{ row }">
             <el-tag :type="getFieldTypeTagType(row.field_type)">
@@ -301,9 +371,24 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="default_value" label="默认值" width="100" show-overflow-tooltip />
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="validation_rules" label="验证规则" width="120" show-overflow-tooltip />
+        <el-table-column
+          prop="default_value"
+          label="默认值"
+          width="100"
+          show-overflow-tooltip
+        />
+        <el-table-column
+          prop="description"
+          label="描述"
+          min-width="200"
+          show-overflow-tooltip
+        />
+        <el-table-column
+          prop="validation_rules"
+          label="验证规则"
+          width="120"
+          show-overflow-tooltip
+        />
         <el-table-column prop="sort_order" label="排序" width="80" sortable />
         <el-table-column prop="created_at" label="创建时间" width="150">
           <template #default="{ row }">
@@ -311,7 +396,12 @@
           </template>
         </el-table-column>
         <!-- 是否上传勾选 -->
-        <el-table-column prop="is_upload" label="是否上传" width="120" fixed="right">
+        <el-table-column
+          prop="is_upload"
+          label="是否上传"
+          width="120"
+          fixed="right"
+        >
           <template #default="{ row }">
             <el-checkbox
               v-model="row.is_upload"
@@ -340,7 +430,10 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="字段名称" prop="field_name">
-              <el-input v-model="form.field_name" placeholder="请输入字段名称" />
+              <el-input
+                v-model="form.field_name"
+                placeholder="请输入字段名称"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -361,7 +454,7 @@
             </el-form-item>
           </el-col>
         </el-row>
-        
+
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="是否必填" prop="is_required">
@@ -383,11 +476,11 @@
             </el-form-item>
           </el-col>
         </el-row>
-        
+
         <el-form-item label="默认值" prop="default_value">
           <el-input v-model="form.default_value" placeholder="请输入默认值" />
         </el-form-item>
-        
+
         <el-form-item label="描述" prop="description">
           <el-input
             v-model="form.description"
@@ -396,7 +489,7 @@
             placeholder="请输入字段描述"
           />
         </el-form-item>
-        
+
         <el-form-item label="验证规则" prop="validation_rules">
           <el-input
             v-model="form.validation_rules"
@@ -410,8 +503,8 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitForm" :loading="submitting">
-            {{ isEdit ? '更新' : '创建' }}
+          <el-button type="primary" :loading="submitting" @click="submitForm">
+            {{ isEdit ? "更新" : "创建" }}
           </el-button>
         </div>
       </template>
@@ -426,30 +519,45 @@
     >
       <div class="panel-header">
         <h4>资源类型字段</h4>
-        <el-button @click="loadResourceTypeFields" :loading="centerFieldsLoading" size="small">
+        <el-button
+          :loading="centerFieldsLoading"
+          size="small"
+          @click="loadResourceTypeFields"
+        >
           <el-icon><Refresh /></el-icon>
           刷新字段
         </el-button>
       </div>
       <div class="center-fields-list">
         <el-table
-          :data="centerTableFields"
-          @selection-change="handleCenterFieldSelection"
           v-loading="centerFieldsLoading"
+          :data="centerTableFields"
           size="small"
+          @selection-change="handleCenterFieldSelection"
         >
-          <el-table-column type="selection" width="55" :selectable="selectableCenterField" />
+          <el-table-column
+            type="selection"
+            width="55"
+            :selectable="selectableCenterField"
+          />
           <el-table-column prop="column_name" label="字段名" width="150" />
           <el-table-column prop="data_type" label="数据类型" width="120" />
-          <el-table-column prop="column_comment" label="字段说明" show-overflow-tooltip>
+          <el-table-column
+            prop="column_comment"
+            label="字段说明"
+            show-overflow-tooltip
+          >
             <template #default="{ row }">
-              {{ row.column_comment || '-' }}
+              {{ row.column_comment || "-" }}
             </template>
           </el-table-column>
           <el-table-column label="状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="isExistingCenterField(row) ? 'info' : 'success'" size="small">
-                {{ isExistingCenterField(row) ? '已存在' : '可添加' }}
+              <el-tag
+                :type="isExistingCenterField(row) ? 'info' : 'success'"
+                size="small"
+              >
+                {{ isExistingCenterField(row) ? "已存在" : "可添加" }}
               </el-tag>
             </template>
           </el-table-column>
@@ -457,7 +565,12 @@
       </div>
       <template #footer>
         <el-button @click="centerDrawerVisible = false">取消</el-button>
-        <el-button type="primary" @click="addSelectedFields" :disabled="selectedCenterFields.length === 0" :loading="addingFromCenter">
+        <el-button
+          type="primary"
+          :disabled="selectedCenterFields.length === 0"
+          :loading="addingFromCenter"
+          @click="addSelectedFields"
+        >
           添加选中字段 ({{ selectedCenterFields.length }})
         </el-button>
       </template>
@@ -465,20 +578,25 @@
 
     <!-- 预览映射对话框 -->
     <el-dialog v-model="previewVisible" title="映射预览" width="600px">
-        <el-table :data="mappingPairs" style="width: 100%">
-          <el-table-column prop="source" label="源字段 (API)" />
-          <el-table-column prop="target" label="目标字段 (Table)" />
-          <el-table-column label="操作" width="120">
-            <template #default="{ row }">
-              <el-button type="danger" size="small" @click="removeMapping(row.source)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <template #footer>
-          <el-button @click="previewVisible=false">关闭</el-button>
-          <el-button type="success" @click="saveMapping">保存映射</el-button>
-        </template>
-      </el-dialog>
+      <el-table :data="mappingPairs" style="width: 100%">
+        <el-table-column prop="source" label="源字段 (API)" />
+        <el-table-column prop="target" label="目标字段 (Table)" />
+        <el-table-column label="操作" width="120">
+          <template #default="{ row }">
+            <el-button
+              type="danger"
+              size="small"
+              @click="removeMapping(row.source)"
+              >删除</el-button
+            >
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="previewVisible = false">关闭</el-button>
+        <el-button type="success" @click="saveMapping">保存映射</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 添加/编辑源字段对话框 -->
     <el-dialog
@@ -489,22 +607,31 @@
     >
       <el-form :model="sourceFieldForm" label-width="120px">
         <el-form-item label="字段名称" required>
-          <el-input v-model="sourceFieldForm.name" placeholder="请输入字段名称" />
+          <el-input
+            v-model="sourceFieldForm.name"
+            placeholder="请输入字段名称"
+          />
         </el-form-item>
-        
+
         <el-form-item label="字段类型" required>
-          <el-select v-model="sourceFieldForm.type" placeholder="请选择字段类型">
-            <el-option 
-              v-for="typeOption in fieldTypeOptions" 
-              :key="typeOption" 
-              :label="typeOption" 
-              :value="typeOption" 
+          <el-select
+            v-model="sourceFieldForm.type"
+            placeholder="请选择字段类型"
+          >
+            <el-option
+              v-for="typeOption in fieldTypeOptions"
+              :key="typeOption"
+              :label="typeOption"
+              :value="typeOption"
             />
           </el-select>
         </el-form-item>
-        
+
         <el-form-item label="生成类型" required>
-          <el-select v-model="sourceFieldForm.generateType" placeholder="请选择生成类型">
+          <el-select
+            v-model="sourceFieldForm.generateType"
+            placeholder="请选择生成类型"
+          >
             <el-option label="常量值" value="constant" />
             <el-option label="UUID" value="uuid" />
             <el-option label="雪花ID" value="snowflake" />
@@ -516,17 +643,31 @@
             <el-option label="外部参数" value="external_param" />
           </el-select>
         </el-form-item>
-        
+
         <!-- 参数名配置 -->
-        <el-form-item label="参数名" v-if="sourceFieldForm.generateType === 'external_param'" required>
-          <el-input v-model="sourceFieldForm.parameterName" placeholder="请输入参数名" />
+        <el-form-item
+          v-if="sourceFieldForm.generateType === 'external_param'"
+          label="参数名"
+          required
+        >
+          <el-input
+            v-model="sourceFieldForm.parameterName"
+            placeholder="请输入参数名"
+          />
         </el-form-item>
-        
+
         <!-- 常量值配置 -->
-        <el-form-item v-if="sourceFieldForm.generateType === 'constant'" label="常量值" required>
-          <el-input v-model="sourceFieldForm.constantValue" placeholder="请输入常量值" />
+        <el-form-item
+          v-if="sourceFieldForm.generateType === 'constant'"
+          label="常量值"
+          required
+        >
+          <el-input
+            v-model="sourceFieldForm.constantValue"
+            placeholder="请输入常量值"
+          />
         </el-form-item>
-        
+
         <!-- 字段拼接配置 -->
         <template v-if="sourceFieldForm.generateType === 'concat'">
           <el-form-item label="拼接字段" required>
@@ -545,14 +686,20 @@
             </el-select>
           </el-form-item>
           <el-form-item label="分隔符">
-            <el-input v-model="sourceFieldForm.separator" placeholder="请输入分隔符（可选）" />
+            <el-input
+              v-model="sourceFieldForm.separator"
+              placeholder="请输入分隔符（可选）"
+            />
           </el-form-item>
         </template>
-        
+
         <!-- 条件判断配置 -->
         <template v-if="sourceFieldForm.generateType === 'condition'">
           <el-form-item label="判断字段" required>
-            <el-select v-model="sourceFieldForm.conditionField" placeholder="请选择判断字段">
+            <el-select
+              v-model="sourceFieldForm.conditionField"
+              placeholder="请选择判断字段"
+            >
               <el-option
                 v-for="field in availableOriginalFields"
                 :key="getFieldName(field)"
@@ -562,7 +709,10 @@
             </el-select>
           </el-form-item>
           <el-form-item label="操作符" required>
-            <el-select v-model="sourceFieldForm.conditionOperator" placeholder="请选择操作符">
+            <el-select
+              v-model="sourceFieldForm.conditionOperator"
+              placeholder="请选择操作符"
+            >
               <el-option label="等于" value="=" />
               <el-option label="不等于" value="!=" />
               <el-option label="大于" value=">" />
@@ -575,20 +725,32 @@
             </el-select>
           </el-form-item>
           <el-form-item v-if="needsConditionValue" label="比较值" required>
-            <el-input v-model="sourceFieldForm.conditionValue" placeholder="请输入比较值" />
+            <el-input
+              v-model="sourceFieldForm.conditionValue"
+              placeholder="请输入比较值"
+            />
           </el-form-item>
           <el-form-item label="真值" required>
-            <el-input v-model="sourceFieldForm.trueValue" placeholder="条件为真时的值" />
+            <el-input
+              v-model="sourceFieldForm.trueValue"
+              placeholder="条件为真时的值"
+            />
           </el-form-item>
           <el-form-item label="假值" required>
-            <el-input v-model="sourceFieldForm.falseValue" placeholder="条件为假时的值" />
+            <el-input
+              v-model="sourceFieldForm.falseValue"
+              placeholder="条件为假时的值"
+            />
           </el-form-item>
         </template>
-        
+
         <!-- 多条件判断配置 -->
         <template v-if="sourceFieldForm.generateType === 'case_when'">
           <el-form-item label="判断字段" required>
-            <el-select v-model="sourceFieldForm.caseWhenField" placeholder="请选择判断字段">
+            <el-select
+              v-model="sourceFieldForm.caseWhenField"
+              placeholder="请选择判断字段"
+            >
               <el-option
                 v-for="field in availableOriginalFields"
                 :key="getFieldName(field)"
@@ -598,7 +760,12 @@
             </el-select>
           </el-form-item>
           <el-form-item label="条件分支">
-            <div v-for="(branch, index) in sourceFieldForm.caseBranches" :key="index" class="case-branch" style="margin-bottom: 10px;">
+            <div
+              v-for="(branch, index) in sourceFieldForm.caseBranches"
+              :key="index"
+              class="case-branch"
+              style="margin-bottom: 10px"
+            >
               <el-row :gutter="10">
                 <el-col :span="6">
                   <el-select v-model="branch.operator" placeholder="操作符">
@@ -624,7 +791,11 @@
                   <el-input v-model="branch.value" placeholder="结果值" />
                 </el-col>
                 <el-col :span="4">
-                  <el-button type="danger" size="small" @click="removeCaseBranch(index)">
+                  <el-button
+                    type="danger"
+                    size="small"
+                    @click="removeCaseBranch(index)"
+                  >
                     <el-icon><Delete /></el-icon>
                   </el-button>
                 </el-col>
@@ -636,51 +807,76 @@
             </el-button>
           </el-form-item>
           <el-form-item label="默认值" required>
-            <el-input v-model="sourceFieldForm.defaultValue" placeholder="所有条件都不满足时的默认值" />
+            <el-input
+              v-model="sourceFieldForm.defaultValue"
+              placeholder="所有条件都不满足时的默认值"
+            />
           </el-form-item>
         </template>
-        
+
         <!-- 数学运算配置 -->
-        <el-form-item v-if="sourceFieldForm.generateType === 'math'" label="数学表达式" required>
+        <el-form-item
+          v-if="sourceFieldForm.generateType === 'math'"
+          label="数学表达式"
+          required
+        >
           <el-input
             v-model="sourceFieldForm.mathExpression"
             type="textarea"
             placeholder="请输入数学表达式，如：field1 + field2 * 100"
           />
         </el-form-item>
-        
+
         <!-- 日期函数配置 -->
         <template v-if="sourceFieldForm.generateType === 'date'">
           <el-form-item label="日期函数" required>
-            <el-select v-model="sourceFieldForm.dateFunction" placeholder="请选择日期函数">
+            <el-select
+              v-model="sourceFieldForm.dateFunction"
+              placeholder="请选择日期函数"
+            >
               <el-option label="当前时间" value="NOW()" />
               <el-option label="当前日期" value="CURDATE()" />
               <el-option label="当前时间戳" value="UNIX_TIMESTAMP()" />
             </el-select>
           </el-form-item>
           <el-form-item label="日期格式">
-            <el-input v-model="sourceFieldForm.dateFormat" placeholder="日期格式，如：%Y-%m-%d %H:%i:%s" />
+            <el-input
+              v-model="sourceFieldForm.dateFormat"
+              placeholder="日期格式，如：%Y-%m-%d %H:%i:%s"
+            />
           </el-form-item>
           <el-form-item label="时间间隔">
-            <el-input v-model="sourceFieldForm.dateInterval" placeholder="时间间隔，如：1 DAY, -1 MONTH" />
+            <el-input
+              v-model="sourceFieldForm.dateInterval"
+              placeholder="时间间隔，如：1 DAY, -1 MONTH"
+            />
           </el-form-item>
         </template>
-        
+
         <!-- 预览 -->
         <el-form-item label="表达式预览">
-          <el-input :value="generateExpression()" readonly type="textarea" rows="2" />
+          <el-input
+            :value="generateExpression()"
+            readonly
+            type="textarea"
+            rows="2"
+          />
         </el-form-item>
-        
+
         <el-form-item label="样本结果">
           <el-input :value="generateSampleResult()" readonly />
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showSourceFieldDialog = false">取消</el-button>
-          <el-button type="primary" :disabled="!isSourceFieldFormValid" @click="saveSourceField">
-            {{ editingSourceField !== null ? '更新' : '添加' }}
+          <el-button
+            type="primary"
+            :disabled="!isSourceFieldFormValid"
+            @click="saveSourceField"
+          >
+            {{ editingSourceField !== null ? "更新" : "添加" }}
           </el-button>
         </span>
       </template>
@@ -689,95 +885,104 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
-import { formatDate } from '@/utils/date'
+import { ref, reactive, onMounted, computed, nextTick } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ElMessage, ElMessageBox } from "element-plus";
+import type { FormInstance, FormRules } from "element-plus";
+import { formatDate } from "@/utils/date";
 import {
   getApi,
   getApiFields,
   createApiField,
   updateApiField,
   deleteApiField,
-  updateApi
-} from '@/api/apiManagement'
-import type { CustomApi, ApiField, ApiFieldCreate, ApiFieldUpdate } from '@/types/apiManagement'
-import { getResourceType } from '@/api/resourceType'
-import { datasourceApi } from '@/api/datasource'
-import { templateApi } from '@/api/template'
+  updateApi,
+} from "@/api/apiManagement";
+import type {
+  CustomApi,
+  ApiField,
+  ApiFieldCreate,
+  ApiFieldUpdate,
+} from "@/types/apiManagement";
+import { getResourceType } from "@/api/resourceType";
+import { datasourceApi } from "@/api/datasource";
+import { templateApi } from "@/api/template";
 
 /**
  * 路由
  */
-const route = useRoute()
-const router = useRouter()
+const route = useRoute();
+const router = useRouter();
 
 /**
  * 响应式数据
  */
-const loading = ref(false)
-const saving = ref(false)
-const apiInfo = ref<CustomApi | null>(null)
-const resourceTypeName = ref('')
-const fields = ref<ApiField[]>([])
-const dialogVisible = ref(false)
-const isEdit = ref(false)
-const submitting = ref(false)
-const formRef = ref<FormInstance>()
+const loading = ref(false);
+const saving = ref(false);
+const apiInfo = ref<CustomApi | null>(null);
+const resourceTypeName = ref("");
+const fields = ref<ApiField[]>([]);
+const dialogVisible = ref(false);
+const isEdit = ref(false);
+const submitting = ref(false);
+const formRef = ref<FormInstance>();
 
 // 表单数据
 const form = reactive<ApiFieldCreate & { id?: number }>({
-  field_name: '',
-  field_type: 'string',
+  field_name: "",
+  field_type: "string",
   is_required: false,
-  default_value: '',
-  description: '',
-  validation_rules: '',
-  sort_order: 1
-})
+  default_value: "",
+  description: "",
+  validation_rules: "",
+  sort_order: 1,
+});
 
 // 表单验证规则
 const formRules: FormRules = {
   field_name: [
-    { required: true, message: '请输入字段名称', trigger: 'blur' },
-    { min: 1, max: 50, message: '长度在 1 到 50 个字符', trigger: 'blur' },
-    { pattern: /^[a-zA-Z][a-zA-Z0-9_]*$/, message: '必须以字母开头，只能包含字母、数字和下划线', trigger: 'blur' }
+    { required: true, message: "请输入字段名称", trigger: "blur" },
+    { min: 1, max: 50, message: "长度在 1 到 50 个字符", trigger: "blur" },
+    {
+      pattern: /^[a-zA-Z][a-zA-Z0-9_]*$/,
+      message: "必须以字母开头，只能包含字母、数字和下划线",
+      trigger: "blur",
+    },
   ],
   field_type: [
-    { required: true, message: '请选择字段类型', trigger: 'change' }
+    { required: true, message: "请选择字段类型", trigger: "change" },
   ],
-  sort_order: [
-    { required: true, message: '请输入排序', trigger: 'blur' }
-  ]
-}
+  sort_order: [{ required: true, message: "请输入排序", trigger: "blur" }],
+};
 
 // 新增：中心表字段选择相关
 interface CenterTableField {
-  column_name: string
-  data_type: string
-  column_comment: string
-  is_nullable: boolean
+  column_name: string;
+  data_type: string;
+  column_comment: string;
+  is_nullable: boolean;
 }
 
-const centerDrawerVisible = ref(false)
-const centerTableFields = ref<CenterTableField[]>([])
-const selectedCenterFields = ref<CenterTableField[]>([])
-const centerFieldsLoading = ref(false)
-const addingFromCenter = ref(false)
-const isMappingMode = ref(false)
+const centerDrawerVisible = ref(false);
+const centerTableFields = ref<CenterTableField[]>([]);
+const selectedCenterFields = ref<CenterTableField[]>([]);
+const centerFieldsLoading = ref(false);
+const addingFromCenter = ref(false);
+const isMappingMode = ref(false);
 // const currentStep = ref(0) // Removed steps
-const datasources = ref<any[]>([])
-const selectedDatasourceId = ref<number | null>(null)
-const schemas = ref<Array<{ name: string }>>([])
-const selectedSchema = ref<string | null>(null)
-const tables = ref<Array<{ name: string; type: string }>>([])
-const selectedTable = ref<string | null>(null)
-const tableFields = ref<Array<{ name: string; type?: string; nullable?: boolean; comment?: string }>>([])
-const previewVisible = ref(false)
-const selectedSource = ref<string | null>(null)
-const selectedTarget = ref<string | null>(null)
-const mappings = ref<Record<string, string>>({})
+const datasources = ref<any[]>([]);
+const selectedDatasourceId = ref<number | null>(null);
+const schemas = ref<Array<{ name: string }>>([]);
+const selectedSchema = ref<string | null>(null);
+const tables = ref<Array<{ name: string; type: string }>>([]);
+const selectedTable = ref<string | null>(null);
+const tableFields = ref<
+  Array<{ name: string; type?: string; nullable?: boolean; comment?: string }>
+>([]);
+const previewVisible = ref(false);
+const selectedSource = ref<string | null>(null);
+const selectedTarget = ref<string | null>(null);
+const mappings = ref<Record<string, string>>({});
 
 // 自定义字段状态
 const showSourceFieldDialog = ref(false)
@@ -789,168 +994,199 @@ const targetSearch = ref('')
 const highlightedField = ref<string | null>(null)
 
 const sourceFieldForm = reactive({
-  name: '',
-  type: 'VARCHAR',
-  generateType: 'external_param',
-  parameterName: '',
-  constantValue: '',
+  name: "",
+  type: "VARCHAR",
+  generateType: "external_param",
+  parameterName: "",
+  constantValue: "",
   concatFields: [] as string[],
-  separator: '',
-  conditionField: '',
-  conditionOperator: '=',
-  conditionValue: '',
-  trueValue: '',
-  falseValue: '',
-  caseWhenField: '',
+  separator: "",
+  conditionField: "",
+  conditionOperator: "=",
+  conditionValue: "",
+  trueValue: "",
+  falseValue: "",
+  caseWhenField: "",
   caseBranches: [] as any[],
-  defaultValue: '',
-  mathExpression: '',
-  dateFunction: 'NOW()',
-  dateFormat: '%Y-%m-%d %H:%i:%s',
-  dateInterval: ''
-})
+  defaultValue: "",
+  mathExpression: "",
+  dateFunction: "NOW()",
+  dateFormat: "%Y-%m-%d %H:%i:%s",
+  dateInterval: "",
+});
 
 const needsConditionValue = computed(() => {
-  return sourceFieldForm.conditionOperator && 
-         !['IS NULL', 'IS NOT NULL'].includes(sourceFieldForm.conditionOperator)
-})
+  return (
+    sourceFieldForm.conditionOperator &&
+    !["IS NULL", "IS NOT NULL"].includes(sourceFieldForm.conditionOperator)
+  );
+});
 
 const isSourceFieldFormValid = computed(() => {
-  if (!sourceFieldForm.name || !sourceFieldForm.type || !sourceFieldForm.generateType) {
-    return false
+  if (
+    !sourceFieldForm.name ||
+    !sourceFieldForm.type ||
+    !sourceFieldForm.generateType
+  ) {
+    return false;
   }
-  
+
   switch (sourceFieldForm.generateType) {
-    case 'constant':
-      return !!sourceFieldForm.constantValue
-    case 'snowflake':
-    case 'uuid':
-      return true
-    case 'concat':
-      return sourceFieldForm.concatFields.length > 0
-    case 'condition':
-      return sourceFieldForm.conditionField && 
-             sourceFieldForm.conditionOperator && 
-             (!needsConditionValue.value || sourceFieldForm.conditionValue) &&
-             sourceFieldForm.trueValue !== '' &&
-             sourceFieldForm.falseValue !== ''
-    case 'case_when':
-      return sourceFieldForm.caseWhenField && 
-             sourceFieldForm.caseBranches.length > 0 &&
-             sourceFieldForm.defaultValue !== ''
-    case 'math':
-      return !!sourceFieldForm.mathExpression
-    case 'date':
-      return !!sourceFieldForm.dateFunction
-    case 'external_param':
-      return !!sourceFieldForm.parameterName
+    case "constant":
+      return !!sourceFieldForm.constantValue;
+    case "snowflake":
+    case "uuid":
+      return true;
+    case "concat":
+      return sourceFieldForm.concatFields.length > 0;
+    case "condition":
+      return (
+        sourceFieldForm.conditionField &&
+        sourceFieldForm.conditionOperator &&
+        (!needsConditionValue.value || sourceFieldForm.conditionValue) &&
+        sourceFieldForm.trueValue !== "" &&
+        sourceFieldForm.falseValue !== ""
+      );
+    case "case_when":
+      return (
+        sourceFieldForm.caseWhenField &&
+        sourceFieldForm.caseBranches.length > 0 &&
+        sourceFieldForm.defaultValue !== ""
+      );
+    case "math":
+      return !!sourceFieldForm.mathExpression;
+    case "date":
+      return !!sourceFieldForm.dateFunction;
+    case "external_param":
+      return !!sourceFieldForm.parameterName;
     default:
-      return true
+      return true;
   }
-})
+});
 
 const availableOriginalFields = computed(() => {
   // Use all source fields (excluding current one if editing could be nice, but not strictly necessary for MVP)
   // Filtering out the field itself to prevent self-reference in complex logic
-  return sourceFields.value.filter(f => f.field_name !== sourceFieldForm.name)
-})
+  return sourceFields.value.filter(
+    (f) => f.field_name !== sourceFieldForm.name,
+  );
+});
 
-const sourceFieldRefs = ref<Record<string, HTMLElement | null>>({})
-const targetFieldRefs = ref<Record<string, HTMLElement | null>>({})
-const connectorRef = ref<HTMLElement | null>(null)
-const sourceListRef = ref<HTMLElement | null>(null)
-const targetListRef = ref<HTMLElement | null>(null)
-const connectorWidth = ref(150) // Increased width for better curve
-const connectorHeight = ref(600)
-const lines = ref<Array<{ source: string; target: string; path: string; mx: number; my: number }>>([])
-const originalFieldMappings = ref<any[]>([])
-const customFields = ref<any[]>([])
-const sortedMappedSourceNames = ref<string[]>([])
+const sourceFieldRefs = ref<Record<string, HTMLElement | null>>({});
+const targetFieldRefs = ref<Record<string, HTMLElement | null>>({});
+const connectorRef = ref<HTMLElement | null>(null);
+const sourceListRef = ref<HTMLElement | null>(null);
+const targetListRef = ref<HTMLElement | null>(null);
+const connectorWidth = ref(150); // Increased width for better curve
+const connectorHeight = ref(600);
+const lines = ref<
+  Array<{
+    source: string;
+    target: string;
+    path: string;
+    mx: number;
+    my: number;
+  }>
+>([]);
+const originalFieldMappings = ref<any[]>([]);
+const customFields = ref<any[]>([]);
+const sortedMappedSourceNames = ref<string[]>([]);
 
 const sourceFields = computed(() => {
   // 分离映射过的和未映射的字段
-  const mapped = [] as any[]
-  const unmapped = [] as any[]
-  
+  const mapped = [] as any[];
+  const unmapped = [] as any[];
+
   // 基础字段 + 自定义字段
   const allFields = [
-    ...fields.value.filter(f => Number(f.is_upload) === 1),
-    ...customFields.value
-  ]
-  
+    ...fields.value.filter((f) => Number(f.is_upload) === 1),
+    ...customFields.value,
+  ];
+
   // 按照映射关系的顺序进行排序
   // 1. 已经建立映射的字段，按照在mappings中出现的顺序（或者一个固定的逻辑顺序）
   // 2. 未建立映射的字段
-  
+
   // 我们需要一个稳定的排序，这里我们可以根据 mappingPairs 的顺序来排
   // 但 mappingPairs 是基于 mappings 对象的，顺序不一定保证
   // 更好的方式是：
   // 遍历所有已存在的映射关系（mappings），找到对应的源字段，按顺序加入 mapped 数组
   // 然后遍历所有字段，如果没在 mapped 中，加入 unmapped 数组
-  
+
   // 找出所有已映射的源字段名 (使用 sortedMappedSourceNames 而不是实时 mappings)
-  const mappedSourceNames = sortedMappedSourceNames.value
-  
+  const mappedSourceNames = sortedMappedSourceNames.value;
+
   // 按映射顺序添加源字段
-  mappedSourceNames.forEach(name => {
-    const field = allFields.find(f => f.field_name === name)
+  mappedSourceNames.forEach((name) => {
+    const field = allFields.find((f) => f.field_name === name);
     if (field) {
-      mapped.push(field)
+      mapped.push(field);
     }
-  })
-  
+  });
+
   // 添加剩余未映射的字段
-  allFields.forEach(f => {
+  allFields.forEach((f) => {
     if (!mappedSourceNames.includes(f.field_name)) {
-      unmapped.push(f)
+      unmapped.push(f);
     }
-  })
-  
-  return [...mapped, ...unmapped]
-})
+  });
+
+  return [...mapped, ...unmapped];
+});
 
 const targetFields = computed(() => {
-  const mapped = [] as any[]
-  const unmapped = [] as any[]
-  
+  const mapped = [] as any[];
+  const unmapped = [] as any[];
+
   // 这里的关键是：目标字段的排序必须与源字段的排序一致
   // 即：如果 sourceFields[0] 映射到了 targetA，那么 targetFields[0] 必须是 targetA
-  
+
   // 1. 根据 sourceFields 的顺序，找到对应的目标字段
-  sourceFields.value.forEach(sf => {
+  sourceFields.value.forEach((sf) => {
     // 只有当源字段在"已排序映射列表"中时，才将其目标字段放入 mapped 组
     if (sortedMappedSourceNames.value.includes(sf.field_name)) {
-      const targetName = mappings.value[sf.field_name]
+      const targetName = mappings.value[sf.field_name];
       if (targetName) {
-        const targetField = tableFields.value.find(tf => tf.name === targetName)
+        const targetField = tableFields.value.find(
+          (tf) => tf.name === targetName,
+        );
         if (targetField) {
-          mapped.push(targetField)
+          mapped.push(targetField);
         }
       }
     }
-  })
-  
+  });
+
   // 2. 找出未被映射的目标字段
-  const mappedTargetNames = mapped.map(f => f.name)
-  tableFields.value.forEach(f => {
+  const mappedTargetNames = mapped.map((f) => f.name);
+  tableFields.value.forEach((f) => {
     if (!mappedTargetNames.includes(f.name)) {
-      unmapped.push(f)
+      unmapped.push(f);
     }
-  })
-  
-  return [...mapped, ...unmapped]
-})
+  });
 
-const mappingPairs = computed(() => Object.entries(mappings.value).filter(([s, t]) => !!t).map(([source, target]) => ({ source, target })))
+  return [...mapped, ...unmapped];
+});
+
+const mappingPairs = computed(() =>
+  Object.entries(mappings.value)
+    .filter(([s, t]) => !!t)
+    .map(([source, target]) => ({ source, target })),
+);
 const mappingLookup = computed<Record<string, string>>(() => {
-  const rev: Record<string, string> = {}
+  const rev: Record<string, string> = {};
   for (const [s, t] of Object.entries(mappings.value)) {
-    if (t) rev[t] = s
+    if (t) rev[t] = s;
   }
-  return rev
-})
+  return rev;
+});
 
-const canSave = computed(() => mappingPairs.value.length > 0 && !!selectedDatasourceId.value && !!selectedTable.value)
+const canSave = computed(
+  () =>
+    mappingPairs.value.length > 0 &&
+    !!selectedDatasourceId.value &&
+    !!selectedTable.value,
+);
 
 // 资源类型字段选择依赖于当前 API 的 resource_type_id
 
@@ -958,92 +1194,96 @@ const canSave = computed(() => mappingPairs.value.length > 0 && !!selectedDataso
  * 生命周期钩子
  */
 onMounted(async () => {
-  const apiId = route.params.id as string
-  let apiInfoPromise = Promise.resolve()
-  
+  const apiId = route.params.id as string;
+  let apiInfoPromise = Promise.resolve();
+
   if (apiId) {
-    apiInfoPromise = loadApiInfo(parseInt(apiId))
-    loadFields(parseInt(apiId))
+    apiInfoPromise = loadApiInfo(parseInt(apiId));
+    loadFields(parseInt(apiId));
   }
-  isMappingMode.value = String(route.query.mode || '') === 'mapping'
+  isMappingMode.value = String(route.query.mode || "") === "mapping";
   if (isMappingMode.value) {
-    await loadDatasources()
-    
+    await loadDatasources();
+
     // 等待 API 信息加载完成
-    await apiInfoPromise
-    
+    await apiInfoPromise;
+
     // 如果有 templateId，加载模板配置
-    let tid = route.query.templateId as string
-    
+    let tid = route.query.templateId as string;
+
     // 如果 URL 中没有 templateId，但 API 信息中有 mapping_config_id，则使用它
     if (!tid && apiInfo.value?.mapping_config_id) {
-      tid = String(apiInfo.value.mapping_config_id)
-      console.log('Using mapping_config_id from API info:', tid)
+      tid = String(apiInfo.value.mapping_config_id);
+      console.log("Using mapping_config_id from API info:", tid);
+      router.replace({
+        query: { ...route.query, templateId: tid },
+      });
     }
-    
+
     if (tid) {
-      await loadTemplateConfig(tid)
+      await loadTemplateConfig(tid);
     } else {
-      restoreMapping()
+      restoreMapping();
     }
-    
-    await nextTick()
-    refreshLines()
-    window.addEventListener('resize', refreshLines)
+
+    await nextTick();
+    refreshLines();
+    window.addEventListener("resize", refreshLines);
   }
-})
+});
 
 const loadTemplateConfig = async (tid: string) => {
   try {
-    const res = await templateApi.get(Number(tid) || tid as any)
+    const res = await templateApi.get(Number(tid) || (tid as any));
     if (res.success && res.data) {
-      const t = res.data
-      const config = t.execution_config || {}
-      
+      const t = res.data;
+      const config = t.execution_config || {};
+
       // 恢复数据源
       if (config.datasource_id) {
-        selectedDatasourceId.value = config.datasource_id
-        await loadSchemas()
+        selectedDatasourceId.value = config.datasource_id;
+        await loadSchemas();
       }
       // 恢复Schema
       if (config.schema) {
-        selectedSchema.value = config.schema
-        await loadTables()
+        selectedSchema.value = config.schema;
+        await loadTables();
       }
       // 恢复表
       if (t.target_table) {
-        selectedTable.value = t.target_table
-        await loadTableFields()
+        selectedTable.value = t.target_table;
+        await loadTableFields();
       }
       // 恢复映射
       if (t.field_mappings) {
         if (Array.isArray(t.field_mappings)) {
-          originalFieldMappings.value = t.field_mappings
+          originalFieldMappings.value = t.field_mappings;
           // 转换为简单的 KV 映射供 UI 显示
-          const simpleMappings: Record<string, string> = {}
-          const restoredCustomFields: any[] = []
-          
+          const simpleMappings: Record<string, string> = {};
+          const restoredCustomFields: any[] = [];
+
           t.field_mappings.forEach((m: any) => {
             if (m.sourceName && m.targetName) {
-              simpleMappings[m.sourceName] = m.targetName
+              simpleMappings[m.sourceName] = m.targetName;
             }
             // 恢复自定义字段
             // 兼容逻辑：如果有 isCustom 标记，或者 generateType 不是 normal，或者有 expression 且不为空
-            const isCustomField = m.isCustom || 
-                                 (m.generateType && m.generateType !== 'normal') || 
-                                 (m.expression && m.expression.trim() !== '');
+            const isCustomField =
+              m.isCustom ||
+              (m.generateType && m.generateType !== "normal") ||
+              (m.expression && m.expression.trim() !== "");
 
             if (isCustomField) {
               restoredCustomFields.push({
                 field_name: m.sourceName,
                 field_type: m.sourceType,
-                description: `自定义字段: ${m.expression || ''}`,
+                description: `自定义字段: ${m.expression || ""}`,
                 is_custom: true,
                 is_upload: 1,
-                
+
                 // Restore all complex properties
                 expression: m.expression,
-                generateType: m.generateType || 'constant', // fallback
+                generateType: m.generateType || "constant", // fallback
                 parameterName: m.parameterName,
                 constantValue: m.constantValue,
                 concatFields: m.concatFields || [],
@@ -1058,25 +1298,25 @@ const loadTemplateConfig = async (tid: string) => {
                 mathExpression: m.mathExpression,
                 dateFunction: m.dateFunction,
                 dateFormat: m.dateFormat,
-                dateInterval: m.dateInterval
-              })
+                dateInterval: m.dateInterval,
+              });
             }
-          })
-          
-          mappings.value = simpleMappings
-          customFields.value = restoredCustomFields
-          sortedMappedSourceNames.value = Object.keys(simpleMappings)
+          });
+
+          mappings.value = simpleMappings;
+          customFields.value = restoredCustomFields;
+          sortedMappedSourceNames.value = Object.keys(simpleMappings);
         } else {
-          mappings.value = t.field_mappings
-          sortedMappedSourceNames.value = Object.keys(t.field_mappings || {})
-          originalFieldMappings.value = []
+          mappings.value = t.field_mappings;
+          sortedMappedSourceNames.value = Object.keys(t.field_mappings || {});
+          originalFieldMappings.value = [];
         }
       }
     }
   } catch (e) {
-    console.error('加载模板配置失败', e)
+    console.error("加载模板配置失败", e);
   }
-}
+};
 
 /**
  * 方法定义
@@ -1087,344 +1327,447 @@ const loadTemplateConfig = async (tid: string) => {
  */
 const loadApiInfo = async (apiId: number) => {
   try {
-    const response = await getApi(apiId)
+    const response = await getApi(apiId);
     if (response.success) {
-      apiInfo.value = response.data
+      apiInfo.value = response.data;
       // 加载资源类型名称
       try {
-        const rid = apiInfo.value?.resource_type_id
+        const rid = apiInfo.value?.resource_type_id;
         if (rid) {
-          const rtResp = await getResourceType(String(rid))
+          const rtResp = await getResourceType(String(rid));
           if (rtResp?.success && rtResp.data) {
-            resourceTypeName.value = rtResp.data.name || ''
+            resourceTypeName.value = rtResp.data.name || "";
           } else {
-            resourceTypeName.value = ''
+            resourceTypeName.value = "";
           }
         } else {
-          resourceTypeName.value = ''
+          resourceTypeName.value = "";
         }
       } catch (e) {
-        resourceTypeName.value = ''
+        resourceTypeName.value = "";
       }
     } else {
-      ElMessage.error(response.message || '加载API信息失败')
+      ElMessage.error(response.message || "加载API信息失败");
     }
   } catch (error) {
-    console.error('加载API信息失败:', error)
-    ElMessage.error('加载API信息失败')
+    console.error("加载API信息失败:", error);
+    ElMessage.error("加载API信息失败");
   }
-}
+};
 
 /**
  * 加载字段列表
  */
 const loadFields = async (apiId?: number) => {
-  const id = typeof apiId === 'number' ? apiId : parseInt(route.params.id as string)
-  
+  const id =
+    typeof apiId === "number" ? apiId : parseInt(route.params.id as string);
+
   try {
-    loading.value = true
-    const response = await getApiFields(id)
+    loading.value = true;
+    const response = await getApiFields(id);
 
     if (response.success) {
       // 处理分页响应结构，获取items数组
-      const items = response.data.items || response.data || []
+      const items = response.data.items || response.data || [];
       // 归一化 is_upload 类型，确保为数字 0/1，避免 '1'/'0' 导致复选框不勾选
       const normalized = items.map((item: any) => ({
         ...item,
-        field_type: typeof item.field_type === 'string' && item.field_type.toLowerCase() === 'integer' ? 'int' : item.field_type,
+        field_type:
+          typeof item.field_type === "string" &&
+          item.field_type.toLowerCase() === "integer"
+            ? "int"
+            : item.field_type,
         is_upload:
           item?.is_upload === undefined || item?.is_upload === null
             ? 0
-            : typeof item.is_upload === 'string'
+            : typeof item.is_upload === "string"
               ? Number(item.is_upload)
-              : item.is_upload
-      }))
+              : item.is_upload,
+      }));
       // 根据后端返回的 sort_order 排序
       const sortedFields = normalized.sort((a, b) => {
-        const orderA = a.sort_order || 0
-        const orderB = b.sort_order || 0
-        return orderA - orderB
-      })
-      fields.value = sortedFields
-      
+        const orderA = a.sort_order || 0;
+        const orderB = b.sort_order || 0;
+        return orderA - orderB;
+      });
+      fields.value = sortedFields;
+
       if (isMappingMode.value) {
-        nextTick(() => refreshLines())
+        nextTick(() => refreshLines());
       }
     } else {
-      ElMessage.error(response.message || '加载字段列表失败')
+      ElMessage.error(response.message || "加载字段列表失败");
     }
   } catch (error) {
-    console.error('加载字段列表失败:', error)
-    ElMessage.error('加载字段列表失败')
+    console.error("加载字段列表失败:", error);
+    ElMessage.error("加载字段列表失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 /**
  * 获取请求方法标签类型
  */
 const getMethodTagType = (method: string) => {
   const types: Record<string, string> = {
-    GET: 'success',
-    POST: 'primary',
-    PUT: 'warning',
-    DELETE: 'danger'
-  }
-  return types[method] || 'info'
-}
+    GET: "success",
+    POST: "primary",
+    PUT: "warning",
+    DELETE: "danger",
+  };
+  return types[method] || "info";
+};
 
 /**
  * 获取字段类型标签类型
  */
 const getFieldTypeTagType = (type: string) => {
   const types: Record<string, string> = {
-    string: 'primary',
-    number: 'success',
-    boolean: 'warning',
-    date: 'info',
-    array: 'danger',
-    object: ''
-  }
-  return types[type] || 'info'
-}
+    string: "primary",
+    number: "success",
+    boolean: "warning",
+    date: "info",
+    array: "danger",
+    object: "",
+  };
+  return types[type] || "info";
+};
 
 const handleDatasourceChange = async (val: number) => {
-  selectedDatasourceId.value = val
-  schemas.value = []
-  selectedSchema.value = null
-  tables.value = []
-  selectedTable.value = null
-  tableFields.value = []
-  await loadSchemas()
-}
+  selectedDatasourceId.value = val;
+  schemas.value = [];
+  selectedSchema.value = null;
+  tables.value = [];
+  selectedTable.value = null;
+  tableFields.value = [];
+  await loadSchemas();
+};
 
 const handleSchemaChange = async (val: string) => {
-  selectedSchema.value = val
-  tables.value = []
-  selectedTable.value = null
-  tableFields.value = []
-  await loadTables()
-}
+  selectedSchema.value = val;
+  tables.value = [];
+  selectedTable.value = null;
+  tableFields.value = [];
+  await loadTables();
+};
 
 const handleTableChange = async (val: string) => {
-  selectedTable.value = val
-  if (!val) return
-  await loadTableFields()
-}
+  selectedTable.value = val;
+  if (!val) return;
+  await loadTableFields();
+};
 
 const loadDatasources = async () => {
   try {
-    const resp = await datasourceApi.getDataSourceList({ page_size: 1000 })
-    datasources.value = resp.data?.items || []
+    const resp = await datasourceApi.getDataSourceList({ page_size: 1000 });
+    datasources.value = resp.data?.items || [];
   } catch (e) {
-    datasources.value = []
+    datasources.value = [];
   }
-}
+};
 
 const loadSchemas = async () => {
-  if (!selectedDatasourceId.value) return
+  if (!selectedDatasourceId.value) return;
   try {
-    const resp = await datasourceApi.getDataSourceSchemas(selectedDatasourceId.value)
-    schemas.value = resp.data || []
+    const resp = await datasourceApi.getDataSourceSchemas(
+      selectedDatasourceId.value,
+    );
+    schemas.value = resp.data || [];
   } catch (e) {
-    schemas.value = []
+    schemas.value = [];
   }
-}
+};
 
 const loadTables = async () => {
-  if (!selectedDatasourceId.value) return
+  if (!selectedDatasourceId.value) return;
   try {
     if (selectedSchema.value) {
-      const resp = await datasourceApi.getDataSourceTablesWithSchema(selectedDatasourceId.value, selectedSchema.value)
-      tables.value = resp.data || []
+      const resp = await datasourceApi.getDataSourceTablesWithSchema(
+        selectedDatasourceId.value,
+        selectedSchema.value,
+      );
+      tables.value = resp.data || [];
     } else {
-      const resp = await datasourceApi.getDataSourceTables(selectedDatasourceId.value)
-      tables.value = resp.data || []
+      const resp = await datasourceApi.getDataSourceTables(
+        selectedDatasourceId.value,
+      );
+      tables.value = resp.data || [];
     }
   } catch (e) {
-    tables.value = []
+    tables.value = [];
   }
-}
+};
 
 const loadTableFields = async () => {
-  if (!selectedDatasourceId.value || !selectedTable.value) return
+  if (!selectedDatasourceId.value || !selectedTable.value) return;
   try {
-    const resp = await datasourceApi.getDataSourceTableFields(selectedDatasourceId.value, selectedSchema.value || '', selectedTable.value)
-    tableFields.value = resp.data || []
-    await nextTick()
-    refreshLines()
+    const resp = await datasourceApi.getDataSourceTableFields(
+      selectedDatasourceId.value,
+      selectedSchema.value || "",
+      selectedTable.value,
+    );
+    tableFields.value = resp.data || [];
+    await nextTick();
+    refreshLines();
   } catch (e) {
-    tableFields.value = []
+    tableFields.value = [];
   }
-}
+};
 
 const clearMapping = () => {
-  mappings.value = {}
-  refreshLines()
-}
+  mappings.value = {};
+  refreshLines();
+};
 
 const autoMapping = () => {
-  if (sourceFields.value.length === 0 || targetFields.value.length === 0) return
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const targetIndex = new Map<string, string>()
-  targetFields.value.forEach(tf => targetIndex.set(norm(tf.name), tf.name))
-  const tmp: Record<string, string> = {}
-  sourceFields.value.forEach(sf => {
-    const k = norm(sf.field_name)
-    const hit = targetIndex.get(k)
-    if (hit) tmp[sf.field_name] = hit
-  })
-  mappings.value = tmp
-  refreshLines()
-}
+  if (sourceFields.value.length === 0 || targetFields.value.length === 0)
+    return;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const targetIndex = new Map<string, string>();
+  targetFields.value.forEach((tf) => targetIndex.set(norm(tf.name), tf.name));
+  const tmp: Record<string, string> = {};
+  sourceFields.value.forEach((sf) => {
+    const k = norm(sf.field_name);
+    const hit = targetIndex.get(k);
+    if (hit) tmp[sf.field_name] = hit;
+  });
+  mappings.value = tmp;
+  refreshLines();
+};
 
 const saveMapping = async () => {
-  const apiId = parseInt(route.params.id as string)
+  const apiId = parseInt(route.params.id as string);
   // 优先从 URL 参数获取 templateId
-  let templateId = route.query.templateId as string
-  
+  let templateId = route.query.templateId as string;
+
   // 构造模板数据
   const executionConfig = {
     datasource_id: selectedDatasourceId.value,
-    schema: selectedSchema.value || '',
-    batchSize: 1000 // 默认批量大小
-  }
-  
+    schema: selectedSchema.value || "",
+    batchSize: 1000, // 默认批量大小
+  };
+
   // 构建复杂的 field_mappings 数组
-  const complexMappings: any[] = []
+  const complexMappings: any[] = [];
   // 查找选中的数据源信息
-  const selectedDs = datasources.value.find(d => d.id === selectedDatasourceId.value)
+  const selectedDs = datasources.value.find(
+    (d) => d.id === selectedDatasourceId.value,
+  );
 
   for (const [source, target] of Object.entries(mappings.value)) {
-    if (!target) continue
-    
+    if (!target) continue;
+
     // 尝试从原始配置中查找现有配置
-    const existing = originalFieldMappings.value.find((m: any) => m.sourceName === source && m.targetName === target)
-    
+    const existing = originalFieldMappings.value.find(
+      (m: any) => m.sourceName === source && m.targetName === target,
+    );
+
     // 获取最新的源字段和目标字段信息
-    const sField = sourceFields.value.find(f => f.field_name === source)
-    const tField = targetFields.value.find(f => f.name === target)
-    
+    const sField = sourceFields.value.find((f) => f.field_name === source);
+    const tField = targetFields.value.find((f) => f.name === target);
+
     // 构建最新的映射对象
-    const currentMapping = {
+    let currentMapping: any = {
       sourceName: source,
       targetName: target,
-      sourceType: sField?.field_type || 'string',
-      targetType: tField?.type || 'VARCHAR',
-      isCustom: !!sField?.is_custom,
-      generateType: sField?.generateType || 'normal',
-      expression: sField?.expression || '',
-      
-      // Complex properties for custom fields
-      parameterName: sField?.parameterName,
-      constantValue: sField?.constantValue,
-      concatFields: sField?.concatFields,
-      separator: sField?.separator,
-      conditionField: sField?.conditionField,
-      conditionOperator: sField?.conditionOperator,
-      conditionValue: sField?.conditionValue,
-      trueValue: sField?.trueValue,
-      falseValue: sField?.falseValue,
-      caseBranches: sField?.caseBranches,
-      defaultValue: sField?.defaultValue,
-      mathExpression: sField?.mathExpression,
-      dateFunction: sField?.dateFunction,
-      dateFormat: sField?.dateFormat,
-      dateInterval: sField?.dateInterval
+      sourceType: sField?.field_type || "string",
+      targetType: tField?.type || "VARCHAR",
+      sourceIndex: sourceFields.value.findIndex((f) => f.field_name === source),
+      targetIndex: targetFields.value.findIndex((f) => f.name === target),
+    };
+
+    // 只有自定义字段才包含额外属性
+    if (sField?.is_custom) {
+      currentMapping = {
+        ...currentMapping,
+        isCustom: true,
+        generateType: sField?.generateType || "normal",
+        expression: sField?.expression || "",
+        sample: sField?.sample || "",
+
+        // Complex properties for custom fields
+        parameterName: sField?.parameterName,
+        constantValue: sField?.constantValue,
+        concatFields: sField?.concatFields,
+        separator: sField?.separator,
+        conditionField: sField?.conditionField,
+        conditionOperator: sField?.conditionOperator,
+        conditionValue: sField?.conditionValue,
+        trueValue: sField?.trueValue,
+        falseValue: sField?.falseValue,
+        caseBranches: sField?.caseBranches,
+        defaultValue: sField?.defaultValue,
+        mathExpression: sField?.mathExpression,
+        dateFunction: sField?.dateFunction,
+        dateFormat: sField?.dateFormat,
+        dateInterval: sField?.dateInterval,
+      };
     }
 
     if (existing) {
       // 合并现有配置和最新配置，确保自定义字段属性被更新
-      complexMappings.push({
-        ...existing,
-        ...currentMapping
-      })
+      // 关键修正：如果是普通字段，我们必须强制覆盖 existing 中的旧属性，
+      // 因为 existing 可能包含以前保存的冗余字段（如 isCustom: false, generateType: normal 等）
+      // 如果我们只是 ...existing, ...currentMapping，而 currentMapping 中没有这些 key（为了精简），
+      // 那么 existing 中的旧 key 依然会保留下来。
+
+      if (!sField?.is_custom) {
+        // 对于普通字段，我们只保留核心字段，完全丢弃 existing 中的其他垃圾属性
+        // 但我们需要保留 existing 中的一些可能不在 currentMapping 中的有用属性吗？
+        // 根据需求，普通字段只需要那 6 个属性。
+        // 所以直接使用 currentMapping 即可，不需要合并 existing 的垃圾。
+        complexMappings.push(currentMapping);
+      } else {
+        // 对于自定义字段，可能需要保留一些状态，或者直接覆盖
+        // 为了安全起见，自定义字段还是合并一下，但 currentMapping 已经包含了所有必要信息
+        complexMappings.push({
+          ...existing,
+          ...currentMapping,
+        });
+      }
     } else {
-      complexMappings.push(currentMapping)
+      complexMappings.push(currentMapping);
     }
   }
 
+  // 提取自定义字段到单独的 custom_fields 数组
+  const customFieldsToSave = complexMappings
+    .filter((m) => m.isCustom)
+    .map((m) => ({
+      field_name: m.sourceName,
+      field_type: m.sourceType,
+      description: m.expression || "自定义字段",
+      expression: m.expression,
+      generateType: m.generateType,
+      // Copy other custom properties if needed
+      ...m,
+    }));
+
+  const targetDbConfig = { datasource_id: selectedDatasourceId.value };
+
   const templateData: any = {
-    name: apiInfo.value ? `API映射-${apiInfo.value.api_name}` : `API映射-${apiId}`,
-    description: '自动生成的API字段映射配置',
+    name: apiInfo.value
+      ? `API映射-${apiInfo.value.api_name}`
+      : `API映射-${apiId}`,
+    description: "自动生成的API字段映射配置",
+    batch_id:
+      (apiInfo.value as any)?.link_read_id ||
+      (apiInfo.value as any)?.resource_type_id ||
+      `API-${apiId}`,
+    api_code: (apiInfo.value as any)?.api_code,
+    api_id: apiId,
+    request_id: null,
+    customer_id: (apiInfo.value as any)?.customer_id,
     target_table: selectedTable.value,
     field_mappings: complexMappings, // 发送复杂数组结构
-    target_database: selectedDs, // 发送完整的数据源配置
+    custom_fields: customFieldsToSave, // 保存一份到 custom_fields
+    target_database: targetDbConfig,
     executionConfig: executionConfig,
-    // file_type: 'json', // API通常是JSON数据，但数据库enum不支持，暂时不传
-    import_mode: 'upsert', // 默认模式
-    is_active: true
-  }
+
+    // 设置 file_type 为 minio
+    file_type: "minio",
+    // 设置 sheet_name 为 data.data_list
+    sheet_name: "data.data_list",
+
+    import_mode: "insert", // 默认模式
+    is_active: true,
+  };
 
   try {
-    saving.value = true
-    let resp
-    
+    saving.value = true;
+    let resp;
+
     if (templateId) {
       // 更新现有模板
-      resp = await templateApi.update(Number(templateId) || templateId as any, templateData)
+      resp = await templateApi.update(
+        Number(templateId) || (templateId as any),
+        templateData,
+      );
     } else {
       // 创建新模板
-      resp = await templateApi.create(templateData)
+      resp = await templateApi.create(templateData);
     }
 
     if (resp.success) {
-      const data = resp.data
-      const newTemplateId = data.id
-      
+      const data = resp.data;
+      const newTemplateId = data.id;
+
+      // 更新 mapping_config_id 到 CustomApi
+      if (newTemplateId) {
+        try {
+          console.log("Updating API with mapping_config_id:", newTemplateId);
+          // 移除 Number() 转换，因为 newTemplateId 可能是 UUID 字符串
+          const updateResult = await updateApi(apiId, {
+            mapping_config_id: newTemplateId,
+          });
+          console.log("API update result:", updateResult);
+        } catch (err) {
+          console.error("更新API mapping_config_id失败:", err);
+        }
+      }
+
       // 更新 URL，加上 templateId
       if (!templateId && newTemplateId) {
         router.replace({
-          query: { ...route.query, templateId: newTemplateId }
-        })
-        templateId = newTemplateId
+          query: { ...route.query, templateId: newTemplateId },
+        });
+        templateId = newTemplateId;
       }
-      
-      // 保存到本地存储作为备份（可选）
-      const key = `api_field_mapping:${apiId}:${selectedDatasourceId.value || ''}:${selectedSchema.value || ''}:${selectedTable.value || ''}`
-      localStorage.setItem(key, JSON.stringify({ template_id: newTemplateId, ...executionConfig, mappings: mappings.value }))
-      
-      // 保存成功后，更新已排序的映射列表，使映射字段移动到前面
-      sortedMappedSourceNames.value = Object.keys(mappings.value).filter(k => !!mappings.value[k])
-      await nextTick()
-      refreshLines()
 
-      ElMessage.success(templateId ? '映射配置更新成功' : '映射配置创建成功')
+      // 保存到本地存储作为备份（可选）
+      const key = `api_field_mapping:${apiId}:${selectedDatasourceId.value || ""}:${selectedSchema.value || ""}:${selectedTable.value || ""}`;
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          template_id: newTemplateId,
+          ...executionConfig,
+          mappings: mappings.value,
+        }),
+      );
+
+      // 保存成功后，更新已排序的映射列表，使映射字段移动到前面
+      sortedMappedSourceNames.value = Object.keys(mappings.value).filter(
+        (k) => !!mappings.value[k],
+      );
+      await nextTick();
+      refreshLines();
+
+      ElMessage.success(templateId ? "映射配置更新成功" : "映射配置创建成功");
     } else {
-      ElMessage.error(resp.message || '保存失败')
+      ElMessage.error(resp.message || "保存失败");
     }
   } catch (e: any) {
-    console.error('保存映射失败:', e)
-    ElMessage.error(e?.message || '保存映射失败')
+    console.error("保存映射失败:", e);
+    ElMessage.error(e?.message || "保存映射失败");
   } finally {
-    saving.value = false
+    saving.value = false;
   }
-}
+};
 
 const restoreMapping = () => {
-  const prefix = `api_field_mapping:${route.params.id}:`
+  const prefix = `api_field_mapping:${route.params.id}:`;
   for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i) || ''
+    const k = localStorage.key(i) || "";
     if (k.startsWith(prefix)) {
       try {
-        const parsed = JSON.parse(localStorage.getItem(k) || '{}')
+        const parsed = JSON.parse(localStorage.getItem(k) || "{}");
         if (parsed && parsed.mappings) {
-          mappings.value = parsed.mappings
-          sortedMappedSourceNames.value = Object.keys(parsed.mappings)
-          break
+          mappings.value = parsed.mappings;
+          sortedMappedSourceNames.value = Object.keys(parsed.mappings);
+          break;
         }
       } catch {}
     }
   }
-}
+};
 
 const setSourceRef = (name: string, el: HTMLElement | null) => {
-  sourceFieldRefs.value[name] = el
-}
+  sourceFieldRefs.value[name] = el;
+};
 const setTargetRef = (name: string, el: HTMLElement | null) => {
-  targetFieldRefs.value[name] = el
-}
+  targetFieldRefs.value[name] = el;
+};
 
 const addSourceField = () => {
   editingSourceField.value = null
@@ -1510,99 +1853,107 @@ const removeCustomSourceField = async (fieldName: string) => {
 
 const addCaseBranch = () => {
   sourceFieldForm.caseBranches.push({
-    operator: '=',
-    condition: '',
-    value: ''
-  })
-}
+    operator: "=",
+    condition: "",
+    value: "",
+  });
+};
 
 const removeCaseBranch = (index: number) => {
-  sourceFieldForm.caseBranches.splice(index, 1)
-}
+  sourceFieldForm.caseBranches.splice(index, 1);
+};
 
-const getFieldName = (field: any) => field.field_name || field.name || ''
+const getFieldName = (field: any) => field.field_name || field.name || "";
 
 const generateExpression = () => {
   switch (sourceFieldForm.generateType) {
-    case 'constant':
-      return `'${sourceFieldForm.constantValue}'`
-    case 'uuid':
-      return 'UUID()'
-    case 'snowflake':
-      return 'snowid()'
-    case 'concat': {
-      const fields = sourceFieldForm.concatFields.map(field => `COALESCE(${field}, '')`).join(', ')
-      const separator = sourceFieldForm.separator ? `'${sourceFieldForm.separator}'` : "''"
-      return `CONCAT(${fields.split(', ').join(`, ${separator}, `)})`
+    case "constant":
+      return `'${sourceFieldForm.constantValue}'`;
+    case "uuid":
+      return "UUID()";
+    case "snowflake":
+      return "snowid()";
+    case "concat": {
+      const fields = sourceFieldForm.concatFields
+        .map((field) => `COALESCE(${field}, '')`)
+        .join(", ");
+      const separator = sourceFieldForm.separator
+        ? `'${sourceFieldForm.separator}'`
+        : "''";
+      return `CONCAT(${fields.split(", ").join(`, ${separator}, `)})`;
     }
-    case 'condition': {
-      const condition = sourceFieldForm.conditionOperator === 'IS NULL' || sourceFieldForm.conditionOperator === 'IS NOT NULL'
-        ? `${sourceFieldForm.conditionField} ${sourceFieldForm.conditionOperator}`
-        : `${sourceFieldForm.conditionField} ${sourceFieldForm.conditionOperator} '${sourceFieldForm.conditionValue}'`
-      return `IF(${condition}, '${sourceFieldForm.trueValue}', '${sourceFieldForm.falseValue}')`
+    case "condition": {
+      const condition =
+        sourceFieldForm.conditionOperator === "IS NULL" ||
+        sourceFieldForm.conditionOperator === "IS NOT NULL"
+          ? `${sourceFieldForm.conditionField} ${sourceFieldForm.conditionOperator}`
+          : `${sourceFieldForm.conditionField} ${sourceFieldForm.conditionOperator} '${sourceFieldForm.conditionValue}'`;
+      return `IF(${condition}, '${sourceFieldForm.trueValue}', '${sourceFieldForm.falseValue}')`;
     }
-    case 'case_when': {
-      let expression = 'CASE'
-      sourceFieldForm.caseBranches.forEach(branch => {
-        const condition = ['IS NULL', 'IS NOT NULL'].includes(branch.operator)
+    case "case_when": {
+      let expression = "CASE";
+      sourceFieldForm.caseBranches.forEach((branch) => {
+        const condition = ["IS NULL", "IS NOT NULL"].includes(branch.operator)
           ? `${sourceFieldForm.caseWhenField} ${branch.operator}`
-          : `${sourceFieldForm.caseWhenField} ${branch.operator} '${branch.condition}'`
-        expression += ` WHEN ${condition} THEN '${branch.value}'`
-      })
-      expression += ` ELSE '${sourceFieldForm.defaultValue}' END`
-      return expression
+          : `${sourceFieldForm.caseWhenField} ${branch.operator} '${branch.condition}'`;
+        expression += ` WHEN ${condition} THEN '${branch.value}'`;
+      });
+      expression += ` ELSE '${sourceFieldForm.defaultValue}' END`;
+      return expression;
     }
-    case 'math':
-      return sourceFieldForm.mathExpression
-    case 'date': {
-      let expr = sourceFieldForm.dateFunction
+    case "math":
+      return sourceFieldForm.mathExpression;
+    case "date": {
+      let expr = sourceFieldForm.dateFunction;
       if (sourceFieldForm.dateInterval) {
-        expr = `DATE_ADD(${expr}, INTERVAL ${sourceFieldForm.dateInterval})`
+        expr = `DATE_ADD(${expr}, INTERVAL ${sourceFieldForm.dateInterval})`;
       }
       if (sourceFieldForm.dateFormat) {
-        expr = `DATE_FORMAT(${expr}, '${sourceFieldForm.dateFormat}')`
+        expr = `DATE_FORMAT(${expr}, '${sourceFieldForm.dateFormat}')`;
       }
-      return expr
+      return expr;
     }
-    case 'external_param':
+    case "external_param":
       // 只有当parameterName不为空时才生成表达式
-      return sourceFieldForm.parameterName ? `\${${sourceFieldForm.parameterName}}` : ''
+      return sourceFieldForm.parameterName
+        ? `\${${sourceFieldForm.parameterName}}`
+        : "";
     default:
-      return ''
+      return "";
   }
-}
+};
 
 const generateSampleResult = () => {
   // Simple mock implementation
-  return '预览结果'
-}
+  return "预览结果";
+};
 
 const saveSourceField = () => {
   if (!isSourceFieldFormValid.value) {
-    ElMessage.warning('请填写完整信息')
-    return
+    ElMessage.warning("请填写完整信息");
+    return;
   }
-  
+
   // Check duplicates
   const originalName = editingSourceFieldOriginalName.value
   const exists = sourceFields.value.find(
     f => f.field_name === sourceFieldForm.name && f.field_name !== originalName
   )
   if (exists && editingSourceField.value === null) {
-    ElMessage.warning('字段名称已存在')
-    return
+    ElMessage.warning("字段名称已存在");
+    return;
   }
-  
-  const expression = generateExpression()
-  const sample = generateSampleResult()
-  
+
+  const expression = generateExpression();
+  const sample = generateSampleResult();
+
   const fieldData = {
     field_name: sourceFieldForm.name,
     field_type: sourceFieldForm.type,
     description: `自定义字段: ${expression}`,
     is_custom: true,
     is_upload: 1,
-    
+
     // Complex properties
     expression,
     sample,
@@ -1621,9 +1972,9 @@ const saveSourceField = () => {
     mathExpression: sourceFieldForm.mathExpression,
     dateFunction: sourceFieldForm.dateFunction,
     dateFormat: sourceFieldForm.dateFormat,
-    dateInterval: sourceFieldForm.dateInterval
-  }
-  
+    dateInterval: sourceFieldForm.dateInterval,
+  };
+
   // 更新或添加
   if (editingSourceField.value !== null) {
     customFields.value[editingSourceField.value] = fieldData
@@ -1646,163 +1997,173 @@ const saveSourceField = () => {
   
   // 自动映射：如果是外部参数，且参数名与源字段名相同，或者其他逻辑
   // 这里不强制自动映射，由用户手动连线
-  
-  showSourceFieldDialog.value = false
-  
+
+  showSourceFieldDialog.value = false;
+
   // 强制刷新视图和连接线
   nextTick(() => {
     // 触发重新计算 sourceFields
     // 并且刷新连接线
-    refreshLines()
-  })
-}
+    refreshLines();
+  });
+};
 
 const hasSourceMapping = (name: string) => {
-  return !!mappings.value[name]
-}
+  return !!mappings.value[name];
+};
 
 const refreshLines = () => {
-  const cont = connectorRef.value
-  const srcCont = sourceListRef.value
-  const tgtCont = targetListRef.value
-  if (!cont || !srcCont || !tgtCont) return
-  
-  // Update height to match content
-  connectorHeight.value = Math.max(srcCont.scrollHeight, tgtCont.scrollHeight, 600)
-  
-  const rectCont = cont.getBoundingClientRect()
-  const res: Array<{ source: string; target: string; path: string; mx: number; my: number }> = []
-  
-  const width = rectCont.width
-  
-  for (const [s, t] of Object.entries(mappings.value)) {
-    if (!t) continue
-    const sEl = sourceFieldRefs.value[s]
-    const tEl = targetFieldRefs.value[t]
-    if (!sEl || !tEl) continue
-    
-    // Check if elements are visible
-    if (sEl.offsetParent === null || tEl.offsetParent === null) continue
+  const cont = connectorRef.value;
+  const srcCont = sourceListRef.value;
+  const tgtCont = targetListRef.value;
+  if (!cont || !srcCont || !tgtCont) return;
 
-    const sRect = sEl.getBoundingClientRect()
-    const tRect = tEl.getBoundingClientRect()
-    
+  // Update height to match content
+  connectorHeight.value = Math.max(
+    srcCont.scrollHeight,
+    tgtCont.scrollHeight,
+    600,
+  );
+
+  const rectCont = cont.getBoundingClientRect();
+  const res: Array<{
+    source: string;
+    target: string;
+    path: string;
+    mx: number;
+    my: number;
+  }> = [];
+
+  const width = rectCont.width;
+
+  for (const [s, t] of Object.entries(mappings.value)) {
+    if (!t) continue;
+    const sEl = sourceFieldRefs.value[s];
+    const tEl = targetFieldRefs.value[t];
+    if (!sEl || !tEl) continue;
+
+    // Check if elements are visible
+    if (sEl.offsetParent === null || tEl.offsetParent === null) continue;
+
+    const sRect = sEl.getBoundingClientRect();
+    const tRect = tEl.getBoundingClientRect();
+
     // Relative coordinates in SVG
-    const y1 = sRect.top - rectCont.top + sRect.height / 2
-    const y2 = tRect.top - rectCont.top + tRect.height / 2
-    
+    const y1 = sRect.top - rectCont.top + sRect.height / 2;
+    const y2 = tRect.top - rectCont.top + tRect.height / 2;
+
     // Bezier Curve: M 0 y1 Q width/2 y1, width/2 y2, width y2 (Simplified Cubic or Quadratic)
     // Using Cubic Bezier for smoother curve: C cp1x cp1y, cp2x cp2y, x y
     // M 0 y1 C width/2 y1, width/2 y2, width y2
-    
-    const path = `M 0 ${y1} C ${width/2} ${y1}, ${width/2} ${y2}, ${width} ${y2}`
-    
-    const mx = width / 2
-    const my = (y1 + y2) / 2
-    
-    res.push({ source: s, target: t, path, mx, my })
+
+    const path = `M 0 ${y1} C ${width / 2} ${y1}, ${width / 2} ${y2}, ${width} ${y2}`;
+
+    const mx = width / 2;
+    const my = (y1 + y2) / 2;
+
+    res.push({ source: s, target: t, path, mx, my });
   }
-  lines.value = res
-}
+  lines.value = res;
+};
 
 const handleSourceClick = (sourceName: string) => {
-  selectedSource.value = sourceName
+  selectedSource.value = sourceName;
   if (selectedTarget.value) {
-    mappings.value[sourceName] = selectedTarget.value
-    selectedSource.value = null
-    selectedTarget.value = null
-    refreshLines()
+    mappings.value[sourceName] = selectedTarget.value;
+    selectedSource.value = null;
+    selectedTarget.value = null;
+    refreshLines();
   }
-}
+};
 
 const handleTargetClick = (targetName: string) => {
-  selectedTarget.value = targetName
+  selectedTarget.value = targetName;
   if (selectedSource.value) {
-    mappings.value[selectedSource.value] = targetName
-    selectedSource.value = null
-    selectedTarget.value = null
-    refreshLines()
+    mappings.value[selectedSource.value] = targetName;
+    selectedSource.value = null;
+    selectedTarget.value = null;
+    refreshLines();
   }
-}
+};
 
 const removeMapping = (sourceName: string) => {
-  delete mappings.value[sourceName]
-  refreshLines()
-}
+  delete mappings.value[sourceName];
+  refreshLines();
+};
 
 /**
  * 获取字段类型标签
  */
 const getFieldTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
-    string: '字符串',
-    number: '数字',
-    boolean: '布尔值',
-    date: '日期',
-    array: '数组',
-    object: '对象'
-  }
-  return labels[type] || type
-}
+    string: "字符串",
+    number: "数字",
+    boolean: "布尔值",
+    date: "日期",
+    array: "数组",
+    object: "对象",
+  };
+  return labels[type] || type;
+};
 
 /**
  * 返回上一页
  */
 const goBack = () => {
-  router.back()
-}
+  router.back();
+};
 
 /**
  * 显示创建对话框
  */
 const showCreateDialog = () => {
-  isEdit.value = false
-  dialogVisible.value = true
-  resetForm()
-  
+  isEdit.value = false;
+  dialogVisible.value = true;
+  resetForm();
+
   // 设置默认排序为最大值+1
-  const maxOrder = Math.max(...fields.value.map(f => f.sort_order || 0), 0)
-  form.sort_order = maxOrder + 1
-}
+  const maxOrder = Math.max(...fields.value.map((f) => f.sort_order || 0), 0);
+  form.sort_order = maxOrder + 1;
+};
 
 const resetForm = () => {
-  formRef.value?.resetFields()
-  form.field_name = ''
-  form.field_type = 'string'
-  form.is_required = false
-  form.default_value = ''
-  form.description = ''
-  form.validation_rules = ''
-  form.sort_order = 1
-}
+  formRef.value?.resetFields();
+  form.field_name = "";
+  form.field_type = "string";
+  form.is_required = false;
+  form.default_value = "";
+  form.description = "";
+  form.validation_rules = "";
+  form.sort_order = 1;
+};
 
 const submitForm = async () => {
-  if (!formRef.value) return
+  if (!formRef.value) return;
   await formRef.value.validate(async (valid) => {
     if (valid) {
-      submitting.value = true
+      submitting.value = true;
       try {
-        const apiId = parseInt(route.params.id as string)
+        const apiId = parseInt(route.params.id as string);
         if (isEdit.value) {
           // Update logic if needed
         } else {
-          const resp = await createApiField(apiId, form)
+          const resp = await createApiField(apiId, form);
           if (resp.success) {
-            ElMessage.success('创建字段成功')
-            dialogVisible.value = false
-            loadFields(apiId)
+            ElMessage.success("创建字段成功");
+            dialogVisible.value = false;
+            loadFields(apiId);
           } else {
-            ElMessage.error(resp.message || '创建字段失败')
+            ElMessage.error(resp.message || "创建字段失败");
           }
         }
       } catch (e) {
-        ElMessage.error('操作失败')
+        ElMessage.error("操作失败");
       } finally {
-        submitting.value = false
+        submitting.value = false;
       }
     }
-  })
-}
+  });
+};
 
 const onRequiredChange = async (row: ApiField, val: any) => {
   if (!row?.id) return
@@ -1845,175 +2206,200 @@ const onUploadChange = async (row: ApiField, val: any) => {
 }
 
 const saveFieldsOrder = async () => {
-    saving.value = true
-    // Implementation
-    saving.value = false
-}
+  saving.value = true;
+  // Implementation
+  saving.value = false;
+};
 
-const handleSortChange = () => {}
+const handleSortChange = () => {};
 
 // 打开资源类型字段选择抽屉
 const openCenterDrawer = () => {
   if (!apiInfo.value?.resource_type_id) {
-    ElMessage.warning('请先在 API 基础信息中选择资源类型')
-    return
+    ElMessage.warning("请先在 API 基础信息中选择资源类型");
+    return;
   }
-  centerDrawerVisible.value = true
+  centerDrawerVisible.value = true;
   if (centerTableFields.value.length === 0) {
-    loadResourceTypeFields()
+    loadResourceTypeFields();
   }
-}
+};
 
 // 加载资源类型字段（基于当前API的 resource_type_id）
 const loadResourceTypeFields = async () => {
   try {
-    centerFieldsLoading.value = true
-    const rtid = apiInfo.value?.resource_type_id
+    centerFieldsLoading.value = true;
+    const rtid = apiInfo.value?.resource_type_id;
     if (!rtid) {
-      ElMessage.warning('当前 API 未配置资源类型，无法加载字段')
-      return
+      ElMessage.warning("当前 API 未配置资源类型，无法加载字段");
+      return;
     }
-    const response = await getResourceType(String(rtid))
+    const response = await getResourceType(String(rtid));
     if (response?.success && response.data) {
-      const meta = (response.data.metadata || []) as any[]
+      const meta = (response.data.metadata || []) as any[];
       centerTableFields.value = meta.map((m: any) => ({
         column_name: m.key,
-        data_type: ((m.type || 'string') as string).toLowerCase() === 'integer' ? 'int' : m.type || 'string',
-        column_comment: m.description || '',
-        is_nullable: !(m.required === true)
-      }))
+        data_type:
+          ((m.type || "string") as string).toLowerCase() === "integer"
+            ? "int"
+            : m.type || "string",
+        column_comment: m.description || "",
+        is_nullable: !(m.required === true),
+      }));
     } else {
-      centerTableFields.value = []
-      ElMessage.warning(response?.message || '资源类型未包含字段元数据')
+      centerTableFields.value = [];
+      ElMessage.warning(response?.message || "资源类型未包含字段元数据");
     }
   } catch (e: any) {
-    console.error('加载资源类型字段失败:', e)
-    ElMessage.error(e?.message || '加载资源类型字段失败')
+    console.error("加载资源类型字段失败:", e);
+    ElMessage.error(e?.message || "加载资源类型字段失败");
   } finally {
-    centerFieldsLoading.value = false
+    centerFieldsLoading.value = false;
   }
-}
+};
 
 // 新增：处理中心表字段选择
 const handleCenterFieldSelection = (selection: CenterTableField[]) => {
-  selectedCenterFields.value = selection
-}
+  selectedCenterFields.value = selection;
+};
 
 // 新增：中心表字段是否可选择（已存在则禁选）
 const selectableCenterField = (row: CenterTableField) => {
-  return !fields.value.some(f => f.field_name === row.column_name)
-}
+  return !fields.value.some((f) => f.field_name === row.column_name);
+};
 
 // 新增：判断中心表字段在当前API中是否已存在
 const isExistingCenterField = (row: CenterTableField) => {
-  return fields.value.some(f => f.field_name === row.column_name)
-}
+  return fields.value.some((f) => f.field_name === row.column_name);
+};
 // 将资源类型字段的类型映射为 API 字段类型
-const mapDataTypeToApiFieldType = (dataType: string): ApiFieldCreate['field_type'] => {
-  const t = (dataType || '').toLowerCase()
-  if (t === 'int' || t.includes('bigint') || t.includes('smallint') || t.includes('int')) {
-    return 'int'
+const mapDataTypeToApiFieldType = (
+  dataType: string,
+): ApiFieldCreate["field_type"] => {
+  const t = (dataType || "").toLowerCase();
+  if (
+    t === "int" ||
+    t.includes("bigint") ||
+    t.includes("smallint") ||
+    t.includes("int")
+  ) {
+    return "int";
   }
-  if (t.includes('decimal') || t.includes('float') || t.includes('double') || t.includes('numeric')) {
-    return 'float'
+  if (
+    t.includes("decimal") ||
+    t.includes("float") ||
+    t.includes("double") ||
+    t.includes("numeric")
+  ) {
+    return "float";
   }
-  if (t === 'boolean' || t.includes('bool')) {
-    return 'boolean'
+  if (t === "boolean" || t.includes("bool")) {
+    return "boolean";
   }
-  if (t === 'date') {
-    return 'date'
+  if (t === "date") {
+    return "date";
   }
-  if (t.includes('timestamp') || t.includes('datetime') || t.includes('time')) {
-    return 'datetime'
+  if (t.includes("timestamp") || t.includes("datetime") || t.includes("time")) {
+    return "datetime";
   }
-  if (t.includes('json')) {
-    return 'json'
+  if (t.includes("json")) {
+    return "json";
   }
-  if (t.includes('text') || t.includes('char')) {
-    return 'text'
+  if (t.includes("text") || t.includes("char")) {
+    return "text";
   }
-  return 'string'
-}
+  return "string";
+};
 
 // 新增：批量添加选中中心表字段到当前API
 const addSelectedFields = async () => {
   if (selectedCenterFields.value.length === 0) {
-    ElMessage.warning('请先选择要添加的字段')
-    return
+    ElMessage.warning("请先选择要添加的字段");
+    return;
   }
-  const existingNames = new Set(fields.value.map(f => f.field_name))
-  const unique = selectedCenterFields.value.filter(f => !existingNames.has(f.column_name))
+  const existingNames = new Set(fields.value.map((f) => f.field_name));
+  const unique = selectedCenterFields.value.filter(
+    (f) => !existingNames.has(f.column_name),
+  );
   if (unique.length === 0) {
-    ElMessage.warning('所选字段已存在，无需重复添加')
-    return
+    ElMessage.warning("所选字段已存在，无需重复添加");
+    return;
   }
 
-  const apiId = parseInt(route.params.id as string)
-  let order = Math.max(...fields.value.map(f => f.sort_order || 0), 0)
+  const apiId = parseInt(route.params.id as string);
+  let order = Math.max(...fields.value.map((f) => f.sort_order || 0), 0);
 
   try {
-    addingFromCenter.value = true
+    addingFromCenter.value = true;
     for (const f of unique) {
       const createData: ApiFieldCreate = {
         field_name: f.column_name,
         field_type: mapDataTypeToApiFieldType(f.data_type),
         is_required: !f.is_nullable,
         is_upload: 1,
-        description: f.column_comment || '',
-        sort_order: ++order
-      }
-      const resp = await createApiField(apiId, createData)
+        description: f.column_comment || "",
+        sort_order: ++order,
+      };
+      const resp = await createApiField(apiId, createData);
       if (!resp.success) {
-        ElMessage.error(resp.message || `添加字段失败：${f.column_name}`)
+        ElMessage.error(resp.message || `添加字段失败：${f.column_name}`);
       }
     }
-    ElMessage.success(`成功添加 ${unique.length} 个字段`)
-    centerDrawerVisible.value = false
-    loadFields(apiId)
+    ElMessage.success(`成功添加 ${unique.length} 个字段`);
+    centerDrawerVisible.value = false;
+    loadFields(apiId);
   } catch (e: any) {
-    ElMessage.error(e?.message || '添加字段失败')
+    ElMessage.error(e?.message || "添加字段失败");
   } finally {
-    addingFromCenter.value = false
+    addingFromCenter.value = false;
   }
-}
+};
 
 // 搜索和高亮逻辑
 const handleSourceSearch = (val: string) => {
-  if (!val) return
-  const match = sourceFields.value.find(f => f.field_name.toLowerCase().includes(val.toLowerCase()))
+  if (!val) return;
+  const match = sourceFields.value.find((f) =>
+    f.field_name.toLowerCase().includes(val.toLowerCase()),
+  );
   if (match) {
-    scrollToField(match.field_name, 'source')
+    scrollToField(match.field_name, "source");
   }
-}
+};
 
 const handleTargetSearch = (val: string) => {
-  if (!val) return
-  const match = targetFields.value.find(f => f.name.toLowerCase().includes(val.toLowerCase()))
+  if (!val) return;
+  const match = targetFields.value.find((f) =>
+    f.name.toLowerCase().includes(val.toLowerCase()),
+  );
   if (match) {
-    scrollToField(match.name, 'target')
+    scrollToField(match.name, "target");
   }
-}
+};
 
 const scrollToField = (fieldName: string, type: 'source' | 'target') => {
   // 此时需要通过id获取DOM，因为ref是基于v-for的函数引用，查找起来稍微麻烦点，虽然也可以用 sourceFieldRefs
   // 这里尝试用 sourceFieldRefs / targetFieldRefs
-  const refs = type === 'source' ? sourceFieldRefs.value : targetFieldRefs.value
-  const el = refs[fieldName]
-  
+  const refs =
+    type === "source" ? sourceFieldRefs.value : targetFieldRefs.value;
+  const el = refs[fieldName];
+
   if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    highlightedField.value = fieldName
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    highlightedField.value = fieldName;
     setTimeout(() => {
-      highlightedField.value = null
-    }, 2000)
+      highlightedField.value = null;
+    }, 2000);
   }
-}
+};
 
 const highlightText = (text: string, query: string) => {
-  if (!query) return text
-  const regex = new RegExp(`(${query})`, 'gi')
-  return text.replace(regex, '<span style="color: #e6a23c; font-weight: bold;">$1</span>')
-}
+  if (!query) return text;
+  const regex = new RegExp(`(${query})`, "gi");
+  return text.replace(
+    regex,
+    '<span style="color: #e6a23c; font-weight: bold;">$1</span>',
+  );
+};
 </script>
 
 <style scoped>
@@ -2026,7 +2412,7 @@ const highlightText = (text: string, query: string) => {
   background: #fff;
   padding: 16px 24px;
   border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
@@ -2063,7 +2449,7 @@ const highlightText = (text: string, query: string) => {
 .page-card {
   background: #fff;
   border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
   padding: 20px;
 }
@@ -2113,11 +2499,12 @@ const highlightText = (text: string, query: string) => {
   gap: 0; /* Gap handled by connector width */
 }
 
-.source-list, .target-list {
+.source-list,
+.target-list {
   flex: 1;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
   padding: 16px;
   min-height: 500px;
   display: flex;
@@ -2154,6 +2541,9 @@ const highlightText = (text: string, query: string) => {
   justify-content: space-between;
   align-items: center;
   background: #fff;
+  height: 64px;
+  box-sizing: border-box;
+  margin-bottom: 12px;
 }
 
 .field-item:hover {
@@ -2164,7 +2554,7 @@ const highlightText = (text: string, query: string) => {
 .field-item.active {
   border-color: #409eff;
   background-color: #ecf5ff;
-  box-shadow: 0 0 0 2px rgba(64,158,255,0.2);
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
 }
 
 .field-item.mapped {
@@ -2305,9 +2695,15 @@ const highlightText = (text: string, query: string) => {
 }
 
 @keyframes highlight-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(230, 162, 60, 0.7); }
-  70% { box-shadow: 0 0 0 6px rgba(230, 162, 60, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(230, 162, 60, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(230, 162, 60, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(230, 162, 60, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(230, 162, 60, 0);
+  }
 }
 
 .header-actions {

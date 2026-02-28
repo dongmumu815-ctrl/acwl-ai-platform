@@ -4,54 +4,54 @@
 
 export interface SQLTemplateCondition {
   /** 字段名 */
-  field: string
+  field: string;
   /** 字段显示名称 */
-  label: string
+  label: string;
   /** 字段类型 */
-  type: 'string' | 'number' | 'date' | 'datetime' | 'boolean' | 'select'
+  type: "string" | "number" | "date" | "datetime" | "boolean" | "select";
   /** 是否必填 */
-  required: boolean
+  required: boolean;
   /** 默认值 */
-  defaultValue?: any
+  defaultValue?: any;
   /** 占位符文本 */
-  placeholder?: string
+  placeholder?: string;
   /** 选项列表（当type为select时） */
-  options?: Array<{ label: string; value: any }>
+  options?: Array<{ label: string; value: any }>;
   /** 验证规则 */
   validation?: {
-    min?: number
-    max?: number
-    pattern?: string
-    message?: string
-  }
+    min?: number;
+    max?: number;
+    pattern?: string;
+    message?: string;
+  };
 }
 
 export interface SQLTemplateLockedCondition {
   /** 字段名 */
-  field: string
+  field: string;
   /** 字段显示名称 */
-  label: string
+  label: string;
   /** 字段类型 */
-  type: 'string' | 'number' | 'date' | 'datetime' | 'boolean' | 'select'
+  type: "string" | "number" | "date" | "datetime" | "boolean" | "select";
   /** 锁定的值 */
-  lockedValue: any
+  lockedValue: any;
   /** 锁定原因说明 */
-  reason?: string
+  reason?: string;
   /** 选项列表（当type为select时，用于显示锁定值的标签） */
-  options?: Array<{ label: string; value: any }>
+  options?: Array<{ label: string; value: any }>;
 }
 
 export interface SQLTemplateConfig {
   /** 必填条件列表 */
-  requiredConditions: SQLTemplateCondition[]
+  requiredConditions: SQLTemplateCondition[];
   /** 可选条件列表 */
-  optionalConditions: SQLTemplateCondition[]
+  optionalConditions: SQLTemplateCondition[];
   /** 锁定条件列表（显示但不可修改） */
-  lockedConditions?: SQLTemplateLockedCondition[]
+  lockedConditions?: SQLTemplateLockedCondition[];
   /** 预设条件（固定值，不显示在UI中） */
-  presetConditions?: Record<string, any>
+  presetConditions?: Record<string, any>;
   /** 模板描述 */
-  description?: string
+  description?: string;
 }
 
 /**

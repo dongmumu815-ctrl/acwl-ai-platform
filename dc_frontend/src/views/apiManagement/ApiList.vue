@@ -149,7 +149,7 @@
     </div>
 
     <!-- 列表/卡片视图 -->
-    <div class="page-card" v-if="viewMode === 'list'">
+    <div v-if="viewMode === 'list'" class="page-card">
       <el-card shadow="never">
         <template #header>
           <div class="card-header">
@@ -175,12 +175,12 @@
         </template>
 
         <el-table
-          :data="filteredApis"
           v-loading="loading"
+          :data="filteredApis"
           style="width: 100%"
-          @sort-change="handleSortChange"
           stripe
           :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
+          @sort-change="handleSortChange"
         >
           <el-table-column prop="id" label="ID" min-width="80" sortable />
           <el-table-column
@@ -282,7 +282,11 @@
                   <el-icon><Setting /></el-icon>
                   字段
                 </el-button>
-                <el-button size="small" type="warning" @click="manageFieldMapping(row)">
+                <el-button
+                  size="small"
+                  type="warning"
+                  @click="manageFieldMapping(row)"
+                >
                   <el-icon><Link /></el-icon>
                   字段映射
                 </el-button>
@@ -290,7 +294,11 @@
                   <el-icon><VideoPlay /></el-icon>
                   测试
                 </el-button> -->
-                 <el-button size="small" type="success" @click="handleDocumentCommand('markdown', row)">
+                <el-button
+                  size="small"
+                  type="success"
+                  @click="handleDocumentCommand('markdown', row)"
+                >
                   <el-icon><Document /></el-icon>
                   文档
                 </el-button>
@@ -349,7 +357,7 @@
       </el-card>
     </div>
 
-    <div class="page-card" v-else>
+    <div v-else class="page-card">
       <el-card shadow="never">
         <template #header>
           <div class="card-header">
@@ -409,7 +417,7 @@
                 <div class="api-card-content">
                   <h3 class="api-name">{{ api.api_name }}</h3>
                   <p class="api-code">{{ api.api_code }}</p>
-                  <p class="api-endpoint" v-if="api.endpoint_url">
+                  <p v-if="api.endpoint_url" class="api-endpoint">
                     {{ api.endpoint_url }}
                   </p>
 
@@ -433,7 +441,7 @@
                         >{{ formatNumber(api.total_calls || 0) }} 次调用</span
                       >
                     </div>
-                    <div class="meta-item" v-if="api.last_called_at">
+                    <div v-if="api.last_called_at" class="meta-item">
                       <el-icon><Clock /></el-icon>
                       <span
                         >最后调用: {{ formatDate(api.last_called_at) }}</span
@@ -465,7 +473,9 @@
                           <el-icon><Link /></el-icon>
                           字段映射
                         </el-dropdown-item>
-                        <el-dropdown-item @click="handleDocumentCommand('markdown', api)">
+                        <el-dropdown-item
+                          @click="handleDocumentCommand('markdown', api)"
+                        >
                           <el-icon><Document /></el-icon>
                           文档
                         </el-dropdown-item>
@@ -643,7 +653,7 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitForm" :loading="submitting">
+          <el-button type="primary" :loading="submitting" @click="submitForm">
             {{ isEdit ? "更新" : "创建" }}
           </el-button>
         </div>
@@ -713,7 +723,7 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="copyDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitCopy" :loading="copying">
+          <el-button type="primary" :loading="copying" @click="submitCopy">
             {{ copying ? "复制中..." : "确定复制" }}
           </el-button>
         </div>
@@ -744,7 +754,7 @@
               downloadDocument(
                 markdownContent,
                 `${currentApiItem?.api_code || 'api'}_doc.md`,
-                'markdown'
+                'markdown',
               )
             "
           >
@@ -795,7 +805,7 @@
               downloadDocument(
                 jsonContent,
                 `${currentApiItem?.api_code || 'api'}_openapi.json`,
-                'json'
+                'json',
               )
             "
           >
@@ -834,7 +844,7 @@ import {
   copyApi as copyApiRequest,
   testApiConnection,
   getResourceTypes,
-  getLinkTypes
+  getLinkTypes,
 } from "@/api/apiManagement";
 import { getCustomers } from "@/api/apiManagement";
 import type {
@@ -842,7 +852,7 @@ import type {
   CustomApiCreate,
   CustomApiUpdate,
   Customer,
-  ResourceType
+  ResourceType,
 } from "@/types/apiManagement";
 
 /**
@@ -877,7 +887,7 @@ const copyFormRef = ref<FormInstance>();
 const pagination = reactive({
   page: 1,
   pageSize: 20,
-  total: 0
+  total: 0,
 });
 
 // 表单数据
@@ -890,7 +900,7 @@ const form = reactive<CustomApiCreate & { is_active?: boolean; id?: number }>({
   response_format: "json",
   resource_type_id: undefined as any,
   link_read_id: undefined as any,
-  is_active: true
+  is_active: true,
 });
 
 // 复制表单数据
@@ -898,14 +908,14 @@ const copyForm = reactive({
   target_customer_id: "",
   new_api_code: "",
   new_api_name: "",
-  sourceId: 0
+  sourceId: 0,
 });
 
 // 表单验证规则
 const formRules: FormRules = {
   api_name: [
     { required: true, message: "请输入API名称", trigger: "blur" },
-    { min: 2, max: 50, message: "长度在 2 到 50 个字符", trigger: "blur" }
+    { min: 2, max: 50, message: "长度在 2 到 50 个字符", trigger: "blur" },
   ],
   api_code: [
     { required: true, message: "请输入API代码", trigger: "blur" },
@@ -913,8 +923,8 @@ const formRules: FormRules = {
     {
       pattern: /^[a-zA-Z0-9_]+$/,
       message: "只能包含字母、数字和下划线",
-      trigger: "blur"
-    }
+      trigger: "blur",
+    },
   ],
   customer_id: [
     { required: true, message: "请选择客户", trigger: "change" },
@@ -931,18 +941,18 @@ const formRules: FormRules = {
           callback();
         }
       },
-      trigger: "change"
-    }
+      trigger: "change",
+    },
   ],
   http_method: [
-    { required: true, message: "请选择请求方法", trigger: "change" }
-  ]
+    { required: true, message: "请选择请求方法", trigger: "change" },
+  ],
 };
 
 // 复制表单验证规则
 const copyFormRules: FormRules = {
   target_customer_id: [
-    { required: true, message: "请选择目标客户", trigger: "change" }
+    { required: true, message: "请选择目标客户", trigger: "change" },
   ],
   new_api_code: [
     { required: true, message: "请输入新API代码", trigger: "blur" },
@@ -950,12 +960,12 @@ const copyFormRules: FormRules = {
       pattern: /^[a-zA-Z][a-zA-Z0-9_]{2,49}$/,
       message:
         "API代码必须以字母开头，只能包含字母、数字、下划线，长度3-50字符",
-      trigger: "blur"
-    }
+      trigger: "blur",
+    },
   ],
   new_api_name: [
-    { required: true, message: "请输入新API名称", trigger: "blur" }
-  ]
+    { required: true, message: "请输入新API名称", trigger: "blur" },
+  ],
 };
 
 /**
@@ -970,7 +980,7 @@ const filteredApis = computed(() => {
     result = result.filter(
       (api) =>
         api.api_name.toLowerCase().includes(query) ||
-        api.api_code.toLowerCase().includes(query)
+        api.api_code.toLowerCase().includes(query),
     );
   }
 
@@ -999,12 +1009,12 @@ const apiStats = computed(() => {
   const active = apis.value.filter((a) => a.is_active).length;
   const totalCalls = apis.value.reduce(
     (sum, a) => sum + (a.total_calls || 0),
-    0
+    0,
   );
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const recentActive = apis.value.filter(
-    (a) => a.last_called_at && new Date(a.last_called_at) > thirtyDaysAgo
+    (a) => a.last_called_at && new Date(a.last_called_at) > thirtyDaysAgo,
   ).length;
   return { total, active, totalCalls, recentActive };
 });
@@ -1031,7 +1041,7 @@ const loadApis = async () => {
     loading.value = true;
     const response = await getApis({
       page: pagination.page,
-      page_size: pagination.pageSize
+      page_size: pagination.pageSize,
     });
 
     if (response.success) {
@@ -1097,7 +1107,7 @@ const loadLinkTypes = async () => {
  * 获取请求方法标签类型
  */
 const getMethodTagType = (
-  method: string
+  method: string,
 ): "success" | "primary" | "warning" | "danger" | "info" => {
   const types: Record<
     string,
@@ -1106,7 +1116,7 @@ const getMethodTagType = (
     GET: "success",
     POST: "primary",
     PUT: "warning",
-    DELETE: "danger"
+    DELETE: "danger",
   };
   return types[method] || "info";
 };
@@ -1149,7 +1159,7 @@ const showEditDialog = (api: CustomApi) => {
       api.resource_type_id != null ? String(api.resource_type_id) : undefined,
     link_read_id:
       api.link_read_id != null ? Number(api.link_read_id) : undefined,
-    is_active: api.is_active
+    is_active: api.is_active,
   });
 
   form.id = api.id;
@@ -1172,7 +1182,7 @@ const resetForm = () => {
     response_format: "json",
     resource_type_id: undefined as any,
     link_read_id: undefined as any,
-    is_active: true
+    is_active: true,
   });
 
   delete form.id;
@@ -1197,7 +1207,7 @@ const submitForm = async () => {
         response_format: form.response_format,
         resource_type_id: form.resource_type_id,
         link_read_id: form.link_read_id,
-        is_active: form.is_active
+        is_active: form.is_active,
       };
 
       const response = await updateApi(form.id, updateData);
@@ -1223,7 +1233,7 @@ const submitForm = async () => {
         http_method: form.http_method,
         response_format: form.response_format,
         resource_type_id: form.resource_type_id,
-        link_read_id: form.link_read_id
+        link_read_id: form.link_read_id,
       };
 
       console.log("创建API数据:", createData);
@@ -1254,7 +1264,10 @@ const manageFields = (api: CustomApi) => {
  * 管理API字段映射
  */
 const manageFieldMapping = (api: CustomApi) => {
-  router.push({ path: `/api-management/apis/${api.id}/fields`, query: { mode: 'mapping' } });
+  router.push({
+    path: `/api-management/apis/${api.id}/fields`,
+    query: { mode: "mapping" },
+  });
 };
 
 const viewLogs = (api: CustomApi) => {
@@ -1309,7 +1322,7 @@ const submitCopy = async () => {
     const response = await copyApiRequest(copyForm.sourceId, {
       target_customer_id: copyForm.target_customer_id,
       new_api_code: copyForm.new_api_code,
-      new_api_name: copyForm.new_api_name
+      new_api_name: copyForm.new_api_name,
     });
 
     ElMessage.success("API复制成功");
@@ -1335,8 +1348,8 @@ const deleteApi = async (api: CustomApi) => {
       {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        type: "warning"
-      }
+        type: "warning",
+      },
     );
 
     const response = await deleteApiRequest(api.id);
@@ -1421,9 +1434,9 @@ const generateMarkdownDoc = async (apiItem: CustomApi) => {
       `/api/v1/admin/apis/${apiItem.id}/documentation?format=markdown`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        }
-      }
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
 
     if (!response.ok) {
@@ -1452,9 +1465,9 @@ const generateJsonDoc = async (apiItem: CustomApi) => {
       `/api/v1/admin/apis/${apiItem.id}/documentation?format=json`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        }
-      }
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     );
 
     if (!response.ok) {
@@ -1466,7 +1479,7 @@ const generateJsonDoc = async (apiItem: CustomApi) => {
       jsonContent.value = JSON.stringify(
         JSON.parse(result.data.documentation),
         null,
-        2
+        2,
       );
       jsonDialogVisible.value = true;
     } else {

@@ -1,4 +1,4 @@
-import { request } from '@/utils/request'
+import { request } from "@/utils/request";
 import type {
   DataResource,
   DataResourceCategory,
@@ -20,8 +20,8 @@ import type {
   DataResourceSyncStatus,
   DataResourceHealthCheck,
   ApiResponse,
-  PaginatedResponse
-} from '@/types/dataResource'
+  PaginatedResponse,
+} from "@/types/dataResource";
 
 /**
  * 数据资源相关API接口
@@ -31,22 +31,27 @@ export const dataResourceApi = {
    * 获取数据资源列表
    * @param params 查询参数
    */
-  getResourceList(params?: DataResourceListQuery): Promise<ApiResponse<PaginatedResponse<DataResource>>> {
+  getResourceList(
+    params?: DataResourceListQuery,
+  ): Promise<ApiResponse<PaginatedResponse<DataResource>>> {
     // 统一参数名为后端期望的 page_size
-    const pageSizeParam = (params as any)?.page_size ?? (params as any)?.pageSize
-    const apiParams = params ? {
-      ...params,
-      page_size: pageSizeParam,
-      pageSize: undefined,
-      size: undefined
-    } : undefined
+    const pageSizeParam =
+      (params as any)?.page_size ?? (params as any)?.pageSize;
+    const apiParams = params
+      ? {
+          ...params,
+          page_size: pageSizeParam,
+          pageSize: undefined,
+          size: undefined,
+        }
+      : undefined;
 
     return request({
-      url: '/data-resources/',
-      method: 'GET',
+      url: "/data-resources/",
+      method: "GET",
       params: apiParams,
-      permission: 'data:resource:view'
-    })
+      permission: "data:resource:view",
+    });
   },
 
   /**
@@ -56,22 +61,24 @@ export const dataResourceApi = {
   getResourceDetail(id: number): Promise<ApiResponse<DataResource>> {
     return request({
       url: `/data-resources/${id}`,
-      method: 'GET',
-      permission: 'data:resource:view'
-    })
+      method: "GET",
+      permission: "data:resource:view",
+    });
   },
 
   /**
    * 创建数据资源
    * @param data 创建数据
    */
-  createResource(data: DataResourceCreateRequest): Promise<ApiResponse<DataResource>> {
+  createResource(
+    data: DataResourceCreateRequest,
+  ): Promise<ApiResponse<DataResource>> {
     return request({
-      url: '/data-resources/',
-      method: 'POST',
+      url: "/data-resources/",
+      method: "POST",
       data,
-      permission: 'data:resource:create'
-    })
+      permission: "data:resource:create",
+    });
   },
 
   /**
@@ -79,13 +86,16 @@ export const dataResourceApi = {
    * @param id 资源ID
    * @param data 更新数据
    */
-  updateResource(id: number, data: DataResourceUpdateRequest): Promise<ApiResponse<DataResource>> {
+  updateResource(
+    id: number,
+    data: DataResourceUpdateRequest,
+  ): Promise<ApiResponse<DataResource>> {
     return request({
       url: `/data-resources/${id}`,
-      method: 'PUT',
+      method: "PUT",
       data,
-      permission: 'data:resource:edit'
-    })
+      permission: "data:resource:edit",
+    });
   },
 
   /**
@@ -95,9 +105,9 @@ export const dataResourceApi = {
   deleteResource(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/data-resources/${id}`,
-      method: 'DELETE',
-      permission: 'data:resource:delete'
-    })
+      method: "DELETE",
+      permission: "data:resource:delete",
+    });
   },
 
   /**
@@ -105,33 +115,35 @@ export const dataResourceApi = {
    * @param params 搜索参数
    */
   searchResources(params: {
-    q: string
-    page?: number
-    page_size?: number
-    filters?: Record<string, any>
+    q: string;
+    page?: number;
+    page_size?: number;
+    filters?: Record<string, any>;
   }): Promise<ApiResponse<PaginatedResponse<DataResource>>> {
     return request({
-      url: '/data-resources/search',
-      method: 'GET',
+      url: "/data-resources/search",
+      method: "GET",
       params,
-      permission: 'data:resource:search'
-    })
+      permission: "data:resource:search",
+    });
   },
 
   /**
    * 获取资源结构信息
    * @param id 资源ID
    */
-  getResourceSchema(id: number): Promise<ApiResponse<{
-    fields: any[]
-    indexes: any[]
-    constraints: any[]
-  }>> {
+  getResourceSchema(id: number): Promise<
+    ApiResponse<{
+      fields: any[];
+      indexes: any[];
+      constraints: any[];
+    }>
+  > {
     return request({
       url: `/data-resources/${id}/schema`,
-      method: 'GET',
-      permission: 'data:resource:fields:view'
-    })
+      method: "GET",
+      permission: "data:resource:fields:view",
+    });
   },
 
   /**
@@ -139,16 +151,19 @@ export const dataResourceApi = {
    * @param id 资源ID
    * @param params 预览参数
    */
-  getResourcePreview(id: number, params?: {
-    limit?: number
-    offset?: number
-  }): Promise<ApiResponse<DataResourcePreview>> {
+  getResourcePreview(
+    id: number,
+    params?: {
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<ApiResponse<DataResourcePreview>> {
     return request({
       url: `/data-resources/${id}/preview`,
-      method: 'GET',
+      method: "GET",
       params,
-      permission: 'data:resource:preview'
-    })
+      permission: "data:resource:preview",
+    });
   },
 
   /**
@@ -156,13 +171,16 @@ export const dataResourceApi = {
    * @param id 资源ID
    * @param data 查询数据
    */
-  queryResource(id: number, data: DataResourceQueryRequest): Promise<ApiResponse<DataResourceQueryResponse>> {
+  queryResource(
+    id: number,
+    data: DataResourceQueryRequest,
+  ): Promise<ApiResponse<DataResourceQueryResponse>> {
     return request({
       url: `/data-resources/${id}/query`,
-      method: 'POST',
+      method: "POST",
       data,
-      permission: 'data:resource:query'
-    })
+      permission: "data:resource:query",
+    });
   },
 
   /**
@@ -170,16 +188,19 @@ export const dataResourceApi = {
    * @param id 资源ID
    * @param params 查询参数
    */
-  getQueryHistory(id: number, params?: {
-    page?: number
-    page_size?: number
-  }): Promise<ApiResponse<PaginatedResponse<DataResourceQueryHistory>>> {
+  getQueryHistory(
+    id: number,
+    params?: {
+      page?: number;
+      page_size?: number;
+    },
+  ): Promise<ApiResponse<PaginatedResponse<DataResourceQueryHistory>>> {
     return request({
       url: `/data-resources/${id}/query-history`,
-      method: 'GET',
+      method: "GET",
       params,
-      permission: 'data:resource:query_history:view'
-    })
+      permission: "data:resource:query_history:view",
+    });
   },
 
   /**
@@ -189,9 +210,9 @@ export const dataResourceApi = {
   toggleFavorite(id: number): Promise<ApiResponse<{ is_favorited: boolean }>> {
     return request({
       url: `/data-resources/${id}/favorite`,
-      method: 'POST',
-      permission: 'data:resource:favorite'
-    })
+      method: "POST",
+      permission: "data:resource:favorite",
+    });
   },
 
   /**
@@ -199,15 +220,15 @@ export const dataResourceApi = {
    * @param params 查询参数
    */
   getFavorites(params?: {
-    page?: number
-    page_size?: number
+    page?: number;
+    page_size?: number;
   }): Promise<ApiResponse<PaginatedResponse<DataResource>>> {
     return request({
-      url: '/data-resources/favorites',
-      method: 'GET',
+      url: "/data-resources/favorites",
+      method: "GET",
       params,
-      permission: 'data:resource:favorite:view'
-    })
+      permission: "data:resource:favorite:view",
+    });
   },
 
   /**
@@ -217,68 +238,74 @@ export const dataResourceApi = {
   syncResourceSchema(id: number): Promise<ApiResponse<DataResourceSyncStatus>> {
     return request({
       url: `/data-resources/${id}/sync`,
-      method: 'POST',
-      permission: 'data:resource:sync'
-    })
+      method: "POST",
+      permission: "data:resource:sync",
+    });
   },
 
   /**
    * 检查资源健康状态
    * @param id 资源ID
    */
-  checkResourceHealth(id: number): Promise<ApiResponse<DataResourceHealthCheck>> {
+  checkResourceHealth(
+    id: number,
+  ): Promise<ApiResponse<DataResourceHealthCheck>> {
     return request({
       url: `/data-resources/${id}/health`,
-      method: 'GET',
-      permission: 'data:resource:health:view'
-    })
+      method: "GET",
+      permission: "data:resource:health:view",
+    });
   },
 
   /**
    * 批量操作
    * @param data 批量操作数据
    */
-  batchOperation(data: BatchOperationRequest): Promise<ApiResponse<{
-    success_count: number
-    failed_count: number
-    errors: string[]
-  }>> {
+  batchOperation(data: BatchOperationRequest): Promise<
+    ApiResponse<{
+      success_count: number;
+      failed_count: number;
+      errors: string[];
+    }>
+  > {
     return request({
-      url: '/data-resources/batch',
-      method: 'POST',
+      url: "/data-resources/batch",
+      method: "POST",
       data,
-      permission: 'data:resource:batch'
-    })
+      permission: "data:resource:batch",
+    });
   },
 
   /**
    * 导入资源
    * @param data 导入数据
    */
-  importResources(data: DataResourceImportRequest): Promise<ApiResponse<{
-    imported_count: number
-    failed_count: number
-    errors: string[]
-  }>> {
-    const formData = new FormData()
-    formData.append('file', data.file)
-    formData.append('category_id', data.category_id.toString())
+  importResources(data: DataResourceImportRequest): Promise<
+    ApiResponse<{
+      imported_count: number;
+      failed_count: number;
+      errors: string[];
+    }>
+  > {
+    const formData = new FormData();
+    formData.append("file", data.file);
+    formData.append("category_id", data.category_id.toString());
     if (data.tag_ids) {
-      formData.append('tag_ids', JSON.stringify(data.tag_ids))
+      formData.append("tag_ids", JSON.stringify(data.tag_ids));
     }
     if (data.is_public !== undefined) {
-      formData.append('is_public', data.is_public.toString())
+      formData.append("is_public", data.is_public.toString());
     }
 
     return request({
-      url: '/data-resources/import',
-      method: 'POST',
+      url: "/data-resources/import",
+      method: "POST",
       data: formData,
       headers: {
-        'Content-Type': 'multipart/form-data'
+        "Content-Type": "multipart/form-data",
       },
-      permission: 'data:resource:import'
-    })
+      permission: "data:resource:import",
+    });
   },
 
   /**
@@ -287,14 +314,14 @@ export const dataResourceApi = {
    */
   exportResources(data: DataResourceExportRequest): Promise<Blob> {
     return request({
-      url: '/data-resources/export',
-      method: 'POST',
+      url: "/data-resources/export",
+      method: "POST",
       data,
-      responseType: 'blob',
-      permission: 'data:resource:export'
-    })
-  }
-}
+      responseType: "blob",
+      permission: "data:resource:export",
+    });
+  },
+};
 
 /**
  * 数据资源分类相关API
@@ -305,15 +332,15 @@ export const categoryApi = {
    * @param params 查询参数
    */
   getCategoryList(params?: {
-    parent_id?: number
-    include_children?: boolean
+    parent_id?: number;
+    include_children?: boolean;
   }): Promise<ApiResponse<DataResourceCategory[]>> {
     return request({
-      url: '/categories',
-      method: 'GET',
+      url: "/categories",
+      method: "GET",
       params,
-      permission: 'data:category:view'
-    })
+      permission: "data:category:view",
+    });
   },
 
   /**
@@ -321,10 +348,10 @@ export const categoryApi = {
    */
   getCategoryTree(): Promise<ApiResponse<DataResourceCategory[]>> {
     return request({
-      url: '/categories/tree',
-      method: 'GET',
-      permission: 'data:category:tree:view'
-    })
+      url: "/categories/tree",
+      method: "GET",
+      permission: "data:category:tree:view",
+    });
   },
 
   /**
@@ -334,9 +361,9 @@ export const categoryApi = {
   getCategoryDetail(id: number): Promise<ApiResponse<DataResourceCategory>> {
     return request({
       url: `/categories/${id}`,
-      method: 'GET',
-      permission: 'data:category:view'
-    })
+      method: "GET",
+      permission: "data:category:view",
+    });
   },
 
   /**
@@ -344,17 +371,17 @@ export const categoryApi = {
    * @param data 分类数据
    */
   createCategory(data: {
-    name: string
-    description?: string
-    parent_id?: number
-    sort_order?: number
+    name: string;
+    description?: string;
+    parent_id?: number;
+    sort_order?: number;
   }): Promise<ApiResponse<DataResourceCategory>> {
     return request({
-      url: '/categories',
-      method: 'POST',
+      url: "/categories",
+      method: "POST",
       data,
-      permission: 'data:category:create'
-    })
+      permission: "data:category:create",
+    });
   },
 
   /**
@@ -362,19 +389,22 @@ export const categoryApi = {
    * @param id 分类ID
    * @param data 更新数据
    */
-  updateCategory(id: number, data: {
-    name?: string
-    description?: string
-    parent_id?: number
-    sort_order?: number
-    is_active?: boolean
-  }): Promise<ApiResponse<DataResourceCategory>> {
+  updateCategory(
+    id: number,
+    data: {
+      name?: string;
+      description?: string;
+      parent_id?: number;
+      sort_order?: number;
+      is_active?: boolean;
+    },
+  ): Promise<ApiResponse<DataResourceCategory>> {
     return request({
       url: `/categories/${id}`,
-      method: 'PUT',
+      method: "PUT",
       data,
-      permission: 'data:category:edit'
-    })
+      permission: "data:category:edit",
+    });
   },
 
   /**
@@ -384,9 +414,9 @@ export const categoryApi = {
   deleteCategory(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/categories/${id}`,
-      method: 'DELETE',
-      permission: 'data:category:delete'
-    })
+      method: "DELETE",
+      permission: "data:category:delete",
+    });
   },
 
   /**
@@ -394,18 +424,21 @@ export const categoryApi = {
    * @param id 分类ID
    * @param data 移动数据
    */
-  moveCategory(id: number, data: {
-    parent_id?: number
-    sort_order?: number
-  }): Promise<ApiResponse<DataResourceCategory>> {
+  moveCategory(
+    id: number,
+    data: {
+      parent_id?: number;
+      sort_order?: number;
+    },
+  ): Promise<ApiResponse<DataResourceCategory>> {
     return request({
       url: `/categories/${id}/move`,
-      method: 'POST',
+      method: "POST",
       data,
-      permission: 'data:category:move'
-    })
-  }
-}
+      permission: "data:category:move",
+    });
+  },
+};
 
 /**
  * 数据资源标签相关API
@@ -416,17 +449,17 @@ export const tagApi = {
    * @param params 查询参数
    */
   getTagList(params?: {
-    search?: string
-    page?: number
-    page_size?: number
-    status?: string
+    search?: string;
+    page?: number;
+    page_size?: number;
+    status?: string;
   }): Promise<ApiResponse<PaginatedResponse<DataResourceTag>>> {
     return request({
-      url: '/data-resources/tags/',
-      method: 'GET',
+      url: "/data-resources/tags/",
+      method: "GET",
       params,
-      permission: 'data:tags:view'
-    })
+      permission: "data:tags:view",
+    });
   },
 
   /**
@@ -434,23 +467,23 @@ export const tagApi = {
    */
   getAllTags(): Promise<ApiResponse<DataResourceTag[]>> {
     return request({
-      url: '/data-resources/tags/',
-      method: 'GET',
+      url: "/data-resources/tags/",
+      method: "GET",
       params: {
         page: 1,
-        page_size: 1000 // 设置大的page_size来获取所有标签
+        page_size: 1000, // 设置大的page_size来获取所有标签
       },
-      permission: 'data:tags:view'
-    }).then(response => {
+      permission: "data:tags:view",
+    }).then((response) => {
       // 转换分页响应为简单数组响应
       if (response.success && response.data && response.data.list) {
         return {
           ...response,
-          data: response.data.list
-        }
+          data: response.data.list,
+        };
       }
-      return response
-    })
+      return response;
+    });
   },
 
   /**
@@ -460,9 +493,9 @@ export const tagApi = {
   getTagDetail(id: number): Promise<ApiResponse<DataResourceTag>> {
     return request({
       url: `/data-resources/tags/${id}`,
-      method: 'GET',
-      permission: 'data:tags:view'
-    })
+      method: "GET",
+      permission: "data:tags:view",
+    });
   },
 
   /**
@@ -470,16 +503,16 @@ export const tagApi = {
    * @param data 标签数据
    */
   createTag(data: {
-    name: string
-    color: string
-    description?: string
+    name: string;
+    color: string;
+    description?: string;
   }): Promise<ApiResponse<DataResourceTag>> {
     return request({
-      url: '/data-resources/tags/',
-      method: 'POST',
+      url: "/data-resources/tags/",
+      method: "POST",
       data,
-      permission: 'data:tags:create'
-    })
+      permission: "data:tags:create",
+    });
   },
 
   /**
@@ -487,17 +520,20 @@ export const tagApi = {
    * @param id 标签ID
    * @param data 更新数据
    */
-  updateTag(id: number, data: {
-    name?: string
-    color?: string
-    description?: string
-  }): Promise<ApiResponse<DataResourceTag>> {
+  updateTag(
+    id: number,
+    data: {
+      name?: string;
+      color?: string;
+      description?: string;
+    },
+  ): Promise<ApiResponse<DataResourceTag>> {
     return request({
       url: `/data-resources/tags/${id}`,
-      method: 'PUT',
+      method: "PUT",
       data,
-      permission: 'data:tags:edit'
-    })
+      permission: "data:tags:edit",
+    });
   },
 
   /**
@@ -507,9 +543,9 @@ export const tagApi = {
   deleteTag(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/data-resources/tags/${id}`,
-      method: 'DELETE',
-      permission: 'data:tags:delete'
-    })
+      method: "DELETE",
+      permission: "data:tags:delete",
+    });
   },
 
   /**
@@ -519,44 +555,48 @@ export const tagApi = {
   toggleTagStatus(id: number): Promise<ApiResponse<DataResourceTag>> {
     return request({
       url: `/data-resources/tags/${id}/toggle-status`,
-      method: 'POST',
-      permission: 'data:tags:toggle'
-    })
+      method: "POST",
+      permission: "data:tags:toggle",
+    });
   },
 
   /**
    * 批量删除标签
    * @param ids 标签ID数组
    */
-  batchDeleteTags(ids: number[]): Promise<ApiResponse<{
-    success_count: number
-    failed_count: number
-    errors: string[]
-  }>> {
+  batchDeleteTags(ids: number[]): Promise<
+    ApiResponse<{
+      success_count: number;
+      failed_count: number;
+      errors: string[];
+    }>
+  > {
     return request({
-      url: '/data-resources/tags/batch-delete',
-      method: 'POST',
+      url: "/data-resources/tags/batch-delete",
+      method: "POST",
       data: { tag_ids: ids },
-      permission: 'data:tags:batch_delete'
-    })
+      permission: "data:tags:batch_delete",
+    });
   },
 
   /**
    * 获取标签使用统计
    * @param id 标签ID
    */
-  getTagUsageStats(id: number): Promise<ApiResponse<{
-    tag_id: number
-    tag_name: string
-    resource_count: number
-  }>> {
+  getTagUsageStats(id: number): Promise<
+    ApiResponse<{
+      tag_id: number;
+      tag_name: string;
+      resource_count: number;
+    }>
+  > {
     return request({
       url: `/data-resources/tags/${id}/usage-stats`,
-      method: 'GET',
-      permission: 'data:tags:usage:view'
-    })
-  }
-}
+      method: "GET",
+      permission: "data:tags:usage:view",
+    });
+  },
+};
 
 /**
  * 数据资源权限相关API
@@ -567,16 +607,19 @@ export const permissionApi = {
    * @param resourceId 资源ID
    * @param params 查询参数
    */
-  getResourcePermissions(resourceId: number, params?: {
-    page?: number
-    page_size?: number
-  }): Promise<ApiResponse<PaginatedResponse<DataResourcePermission>>> {
+  getResourcePermissions(
+    resourceId: number,
+    params?: {
+      page?: number;
+      page_size?: number;
+    },
+  ): Promise<ApiResponse<PaginatedResponse<DataResourcePermission>>> {
     return request({
       url: `/data-resources/${resourceId}/permissions`,
-      method: 'GET',
+      method: "GET",
       params,
-      permission: 'data:resource:permission:view'
-    })
+      permission: "data:resource:permission:view",
+    });
   },
 
   /**
@@ -584,13 +627,16 @@ export const permissionApi = {
    * @param resourceId 资源ID
    * @param data 权限数据
    */
-  grantPermission(resourceId: number, data: PermissionGrantRequest): Promise<ApiResponse<DataResourcePermission>> {
+  grantPermission(
+    resourceId: number,
+    data: PermissionGrantRequest,
+  ): Promise<ApiResponse<DataResourcePermission>> {
     return request({
       url: `/data-resources/${resourceId}/permissions`,
-      method: 'POST',
+      method: "POST",
       data,
-      permission: 'data:resource:permission:grant'
-    })
+      permission: "data:resource:permission:grant",
+    });
   },
 
   /**
@@ -598,12 +644,15 @@ export const permissionApi = {
    * @param resourceId 资源ID
    * @param permissionId 权限ID
    */
-  revokePermission(resourceId: number, permissionId: number): Promise<ApiResponse<void>> {
+  revokePermission(
+    resourceId: number,
+    permissionId: number,
+  ): Promise<ApiResponse<void>> {
     return request({
       url: `/data-resources/${resourceId}/permissions/${permissionId}`,
-      method: 'DELETE',
-      permission: 'data:resource:permission:revoke'
-    })
+      method: "DELETE",
+      permission: "data:resource:permission:revoke",
+    });
   },
 
   /**
@@ -612,17 +661,21 @@ export const permissionApi = {
    * @param permissionId 权限ID
    * @param data 更新数据
    */
-  updatePermission(resourceId: number, permissionId: number, data: {
-    permission_type?: string
-    expires_at?: string
-    is_active?: boolean
-  }): Promise<ApiResponse<DataResourcePermission>> {
+  updatePermission(
+    resourceId: number,
+    permissionId: number,
+    data: {
+      permission_type?: string;
+      expires_at?: string;
+      is_active?: boolean;
+    },
+  ): Promise<ApiResponse<DataResourcePermission>> {
     return request({
       url: `/data-resources/${resourceId}/permissions/${permissionId}`,
-      method: 'PUT',
+      method: "PUT",
       data,
-      permission: 'data:resource:permission:edit'
-    })
+      permission: "data:resource:permission:edit",
+    });
   },
 
   /**
@@ -630,18 +683,18 @@ export const permissionApi = {
    * @param params 查询参数
    */
   getUserPermissions(params?: {
-    page?: number
-    page_size?: number
-    resource_type?: string
+    page?: number;
+    page_size?: number;
+    resource_type?: string;
   }): Promise<ApiResponse<PaginatedResponse<DataResourcePermission>>> {
     return request({
-      url: '/permissions/my',
-      method: 'GET',
+      url: "/permissions/my",
+      method: "GET",
       params,
-      permission: 'auth:permissions:view'
-    })
-  }
-}
+      permission: "auth:permissions:view",
+    });
+  },
+};
 
 /**
  * 统计相关API
@@ -652,10 +705,10 @@ export const statisticsApi = {
    */
   getResourceStats(): Promise<ApiResponse<DataResourceStats>> {
     return request({
-      url: '/statistics/resources',
-      method: 'GET',
-      permission: 'data:statistics:view'
-    })
+      url: "/statistics/resources",
+      method: "GET",
+      permission: "data:statistics:view",
+    });
   },
 
   /**
@@ -663,17 +716,17 @@ export const statisticsApi = {
    * @param params 查询参数
    */
   getAccessStats(params?: {
-    start_date?: string
-    end_date?: string
-    resource_id?: number
-    group_by?: 'day' | 'week' | 'month'
+    start_date?: string;
+    end_date?: string;
+    resource_id?: number;
+    group_by?: "day" | "week" | "month";
   }): Promise<ApiResponse<any[]>> {
     return request({
-      url: '/statistics/access',
-      method: 'GET',
+      url: "/statistics/access",
+      method: "GET",
       params,
-      permission: 'data:statistics:access:view'
-    })
+      permission: "data:statistics:access:view",
+    });
   },
 
   /**
@@ -681,16 +734,16 @@ export const statisticsApi = {
    * @param params 查询参数
    */
   getUserActivityStats(params?: {
-    start_date?: string
-    end_date?: string
-    group_by?: 'day' | 'week' | 'month'
+    start_date?: string;
+    end_date?: string;
+    group_by?: "day" | "week" | "month";
   }): Promise<ApiResponse<any[]>> {
     return request({
-      url: '/statistics/user-activity',
-      method: 'GET',
+      url: "/statistics/user-activity",
+      method: "GET",
       params,
-      permission: 'data:statistics:user_activity:view'
-    })
+      permission: "data:statistics:user_activity:view",
+    });
   },
 
   /**
@@ -698,17 +751,17 @@ export const statisticsApi = {
    * @param params 查询参数
    */
   getPopularResources(params?: {
-    limit?: number
-    period?: 'day' | 'week' | 'month' | 'year'
+    limit?: number;
+    period?: "day" | "week" | "month" | "year";
   }): Promise<ApiResponse<any[]>> {
     return request({
-      url: '/statistics/popular-resources',
-      method: 'GET',
+      url: "/statistics/popular-resources",
+      method: "GET",
       params,
-      permission: 'data:statistics:popular:view'
-    })
-  }
-}
+      permission: "data:statistics:popular:view",
+    });
+  },
+};
 
 /**
  * 导出所有API
@@ -718,5 +771,5 @@ export default {
   category: categoryApi,
   tag: tagApi,
   permission: permissionApi,
-  statistics: statisticsApi
-}
+  statistics: statisticsApi,
+};

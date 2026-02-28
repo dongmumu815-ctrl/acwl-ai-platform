@@ -39,7 +39,9 @@
                 :value="template.datasource_type"
               >
                 <div class="template-option">
-                  <span>{{ getDatasourceTypeLabel(template.datasource_type) }}</span>
+                  <span>{{
+                    getDatasourceTypeLabel(template.datasource_type)
+                  }}</span>
                   <span class="template-desc">{{ template.description }}</span>
                 </div>
               </el-option>
@@ -64,10 +66,7 @@
       <el-row :gutter="20">
         <el-col :span="14">
           <el-form-item label="主机地址" prop="host">
-            <el-input
-              v-model="form.host"
-              placeholder="请输入主机地址或IP"
-            />
+            <el-input v-model="form.host" placeholder="请输入主机地址或IP" />
           </el-form-item>
         </el-col>
         <el-col :span="10">
@@ -86,18 +85,12 @@
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="数据库名称">
-            <el-input
-              v-model="form.database"
-              placeholder="请输入数据库名称"
-            />
+            <el-input v-model="form.database" placeholder="请输入数据库名称" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="用户名">
-            <el-input
-              v-model="form.username"
-              placeholder="请输入用户名"
-            />
+            <el-input v-model="form.username" placeholder="请输入用户名" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -134,16 +127,11 @@
             <el-button
               type="danger"
               size="small"
-              @click="removeParam(index)"
               :icon="Delete"
+              @click="removeParam(index)"
             />
           </div>
-          <el-button
-            type="primary"
-            size="small"
-            @click="addParam"
-            :icon="Plus"
-          >
+          <el-button type="primary" size="small" :icon="Plus" @click="addParam">
             添加参数
           </el-button>
         </div>
@@ -211,35 +199,28 @@
         <el-button @click="handleClose">取消</el-button>
         <el-button
           type="info"
-          @click="handleTest"
           :loading="testing"
           :disabled="!canTest"
+          @click="handleTest"
         >
           测试连接
         </el-button>
-        <el-button
-          type="primary"
-          @click="handleSubmit"
-          :loading="submitting"
-        >
-          {{ mode === 'create' ? '创建' : '更新' }}
+        <el-button type="primary" :loading="submitting" @click="handleSubmit">
+          {{ mode === "create" ? "创建" : "更新" }}
         </el-button>
       </div>
     </template>
 
     <!-- 测试结果对话框 -->
-    <TestResultDialog
-      v-model="testDialogVisible"
-      :test-result="testResult"
-    />
+    <TestResultDialog v-model="testDialogVisible" :test-result="testResult" />
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Plus, Delete } from '@element-plus/icons-vue'
-import TestResultDialog from './TestResultDialog.vue'
+import { ref, reactive, computed, watch, nextTick } from "vue";
+import { ElMessage } from "element-plus";
+import { Plus, Delete } from "@element-plus/icons-vue";
+import TestResultDialog from "./TestResultDialog.vue";
 import {
   getDatasourceTemplates,
   createDatasource,
@@ -249,97 +230,104 @@ import {
   DatasourceType,
   getDatasourceTypeLabel as getTypeLabel,
   DATASOURCE_TYPES,
-  getDefaultPort
-} from '@/api/datasourceV2'
+  getDefaultPort,
+} from "@/api/datasourceV2";
 
 // Props
 const props = defineProps({
   modelValue: {
     type: Boolean,
-    default: false
+    default: false,
   },
   datasource: {
     type: Object,
-    default: null
+    default: null,
   },
   mode: {
     type: String,
-    default: 'create' // create | edit
-  }
-})
+    default: "create", // create | edit
+  },
+});
 
 // Emits
-const emit = defineEmits(['update:modelValue', 'success'])
+const emit = defineEmits(["update:modelValue", "success"]);
 
 // 响应式数据
-const formRef = ref()
-const visible = ref(false)
-const submitting = ref(false)
-const testing = ref(false)
-const testDialogVisible = ref(false)
-const testResult = ref(null)
-const templates = ref([])
-const connectionParams = ref([])
+const formRef = ref();
+const visible = ref(false);
+const submitting = ref(false);
+const testing = ref(false);
+const testDialogVisible = ref(false);
+const testResult = ref(null);
+const templates = ref([]);
+const connectionParams = ref([]);
 
 // 表单数据
 const form = reactive({
-  name: '',
-  description: '',
-  datasource_type: '',
-  host: '',
+  name: "",
+  description: "",
+  datasource_type: "",
+  host: "",
   port: 3306,
-  database: '',
-  username: '',
-  password: '',
+  database: "",
+  username: "",
+  password: "",
   connection_params: {},
   pool_config: {
     pool_size: 5,
     max_overflow: 10,
     pool_timeout: 30,
-    pool_recycle: 3600
+    pool_recycle: 3600,
   },
-  is_enabled: true
-})
+  is_enabled: true,
+});
 
 // 表单验证规则
 const rules = {
   name: [
-    { required: true, message: '请输入数据源名称', trigger: 'blur' },
-    { min: 1, max: 100, message: '长度在 1 到 100 个字符', trigger: 'blur' }
+    { required: true, message: "请输入数据源名称", trigger: "blur" },
+    { min: 1, max: 100, message: "长度在 1 到 100 个字符", trigger: "blur" },
   ],
   datasource_type: [
-    { required: true, message: '请选择数据源类型', trigger: 'change' }
+    { required: true, message: "请选择数据源类型", trigger: "change" },
   ],
-  host: [
-    { required: true, message: '请输入主机地址', trigger: 'blur' }
-  ],
+  host: [{ required: true, message: "请输入主机地址", trigger: "blur" }],
   port: [
-    { required: true, message: '请输入端口号', trigger: 'blur' },
-    { type: 'number', min: 1, max: 65535, message: '端口号范围 1-65535', trigger: 'blur' }
-  ]
-}
+    { required: true, message: "请输入端口号", trigger: "blur" },
+    {
+      type: "number",
+      min: 1,
+      max: 65535,
+      message: "端口号范围 1-65535",
+      trigger: "blur",
+    },
+  ],
+};
 
 // 计算属性
 const dialogTitle = computed(() => {
-  return props.mode === 'create' ? '新建数据源' : '编辑数据源'
-})
+  return props.mode === "create" ? "新建数据源" : "编辑数据源";
+});
 
 const canTest = computed(() => {
-  return form.host && form.port && form.datasource_type
-})
+  return form.host && form.port && form.datasource_type;
+});
 
 // 监听器
-watch(() => props.modelValue, (val) => {
-  visible.value = val
-  if (val) {
-    loadTemplates()
-    initForm()
-  }
-})
+watch(
+  () => props.modelValue,
+  (val) => {
+    visible.value = val;
+    if (val) {
+      loadTemplates();
+      initForm();
+    }
+  },
+);
 
 watch(visible, (val) => {
-  emit('update:modelValue', val)
-})
+  emit("update:modelValue", val);
+});
 
 // 方法
 /**
@@ -348,182 +336,185 @@ watch(visible, (val) => {
  */
 const loadTemplates = async () => {
   try {
-    const response = await getDatasourceTemplates()
-    templates.value = response
+    const response = await getDatasourceTemplates();
+    templates.value = response;
   } catch (error) {
-    console.error('Load templates error:', error)
+    console.error("Load templates error:", error);
     // 如果API调用失败，使用前端定义的数据源类型作为备选
-    templates.value = DATASOURCE_TYPES.map(type => ({
+    templates.value = DATASOURCE_TYPES.map((type) => ({
       datasource_type: type.value,
       description: `${type.label} 数据库连接`,
       default_port: getDefaultPort(type.value),
-      default_params: {}
-    }))
+      default_params: {},
+    }));
   }
-}
+};
 
 const initForm = () => {
-  if (props.mode === 'edit' && props.datasource) {
+  if (props.mode === "edit" && props.datasource) {
     // 编辑模式，填充表单
     Object.assign(form, {
       ...props.datasource,
       database: props.datasource.database_name,
-      password: '' // 密码不回显
-    })
-    
+      password: "", // 密码不回显
+    });
+
     // 初始化连接参数
-    connectionParams.value = Object.entries(props.datasource.connection_params || {}).map(
-      ([key, value]) => ({ key, value })
-    )
+    connectionParams.value = Object.entries(
+      props.datasource.connection_params || {},
+    ).map(([key, value]) => ({ key, value }));
   } else {
     // 创建模式，重置表单
     Object.assign(form, {
-      name: '',
-      description: '',
-      datasource_type: '',
-      host: '',
+      name: "",
+      description: "",
+      datasource_type: "",
+      host: "",
       port: 3306,
-      database: '',
-      username: '',
-      password: '',
+      database: "",
+      username: "",
+      password: "",
       connection_params: {},
       pool_config: {
         pool_size: 5,
         max_overflow: 10,
         pool_timeout: 30,
-        pool_recycle: 3600
+        pool_recycle: 3600,
       },
-      is_enabled: true
-    })
-    connectionParams.value = []
+      is_enabled: true,
+    });
+    connectionParams.value = [];
   }
-  
+
   // 清除验证
   nextTick(() => {
-    formRef.value?.clearValidate()
-  })
-}
+    formRef.value?.clearValidate();
+  });
+};
 
 const handleTypeChange = (type) => {
   // 根据数据源类型设置默认端口
-  const template = templates.value.find(t => t.datasource_type === type)
+  const template = templates.value.find((t) => t.datasource_type === type);
   if (template && template.default_port) {
-    form.port = template.default_port
+    form.port = template.default_port;
   }
-  
+
   // 设置默认连接参数
   if (template && template.default_params) {
     connectionParams.value = Object.entries(template.default_params).map(
-      ([key, value]) => ({ key, value })
-    )
+      ([key, value]) => ({ key, value }),
+    );
   }
-}
+};
 
 const addParam = () => {
-  connectionParams.value.push({ key: '', value: '' })
-}
+  connectionParams.value.push({ key: "", value: "" });
+};
 
 const removeParam = (index) => {
-  connectionParams.value.splice(index, 1)
-}
+  connectionParams.value.splice(index, 1);
+};
 
 const buildConnectionParams = () => {
-  const params = {}
-  connectionParams.value.forEach(param => {
+  const params = {};
+  connectionParams.value.forEach((param) => {
     if (param.key && param.value) {
-      params[param.key] = param.value
+      params[param.key] = param.value;
     }
-  })
-  return params
-}
+  });
+  return params;
+};
 
 const handleTest = async () => {
   try {
     // 先验证必填字段
-    await formRef.value.validateField(['host', 'port', 'datasource_type'])
-    
-    testing.value = true
-    
+    await formRef.value.validateField(["host", "port", "datasource_type"]);
+
+    testing.value = true;
+
     // 构建测试数据
     const testData = {
       ...form,
-      connection_params: buildConnectionParams()
-    }
-    
+      connection_params: buildConnectionParams(),
+    };
+
     // 如果是编辑模式，使用现有数据源ID测试
-    if (props.mode === 'edit' && props.datasource) {
+    if (props.mode === "edit" && props.datasource) {
       const response = await testDatasourceConnection(props.datasource.id, {
-        timeout: 10
-      })
-      testResult.value = response
+        timeout: 10,
+      });
+      testResult.value = response;
     } else {
       // 创建模式，使用临时测试API
-      const response = await testTempDatasourceConnection({
-        name: form.name,
-        datasource_type: form.datasource_type,
-        host: form.host,
-        port: form.port,
-        database: form.database,
-        username: form.username,
-        password: form.password,
-        description: form.description,
-        connection_params: buildConnectionParams(),
-        pool_config: form.pool_config,
-        is_enabled: true
-      }, {
-        timeout: 10
-      })
-      testResult.value = response
+      const response = await testTempDatasourceConnection(
+        {
+          name: form.name,
+          datasource_type: form.datasource_type,
+          host: form.host,
+          port: form.port,
+          database: form.database,
+          username: form.username,
+          password: form.password,
+          description: form.description,
+          connection_params: buildConnectionParams(),
+          pool_config: form.pool_config,
+          is_enabled: true,
+        },
+        {
+          timeout: 10,
+        },
+      );
+      testResult.value = response;
     }
-    
-    testDialogVisible.value = true
+
+    testDialogVisible.value = true;
   } catch (error) {
     if (error.errors) {
       // 验证错误
-      return
+      return;
     }
-    ElMessage.error('测试连接失败')
-    console.error('Test connection error:', error)
+    ElMessage.error("测试连接失败");
+    console.error("Test connection error:", error);
   } finally {
-    testing.value = false
+    testing.value = false;
   }
-}
+};
 
 const handleSubmit = async () => {
   try {
-    await formRef.value.validate()
-    
-    submitting.value = true
-    
+    await formRef.value.validate();
+
+    submitting.value = true;
+
     const submitData = {
       ...form,
-      connection_params: buildConnectionParams()
-    }
-    
-    if (props.mode === 'create') {
-      await createDatasource(submitData)
-      ElMessage.success('创建成功')
+      connection_params: buildConnectionParams(),
+    };
+
+    if (props.mode === "create") {
+      await createDatasource(submitData);
+      ElMessage.success("创建成功");
     } else {
-      await updateDatasource(props.datasource.id, submitData)
-      ElMessage.success('更新成功')
+      await updateDatasource(props.datasource.id, submitData);
+      ElMessage.success("更新成功");
     }
-    
-    emit('success')
-    handleClose()
+
+    emit("success");
+    handleClose();
   } catch (error) {
-    ElMessage.error(props.mode === 'create' ? '创建失败' : '更新失败')
-    console.error('Submit error:', error)
+    ElMessage.error(props.mode === "create" ? "创建失败" : "更新失败");
+    console.error("Submit error:", error);
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
-}
+};
 
 const handleClose = () => {
-  visible.value = false
-}
+  visible.value = false;
+};
 
 // 工具方法
-const getDatasourceTypeLabel = getTypeLabel
+const getDatasourceTypeLabel = getTypeLabel;
 </script>
 
 <style scoped>

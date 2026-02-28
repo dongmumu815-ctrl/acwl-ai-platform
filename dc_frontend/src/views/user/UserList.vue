@@ -118,18 +118,14 @@
         <el-table
           v-loading="loading"
           :data="users"
-          @selection-change="handleSelectionChange"
           stripe
           style="width: 100%"
+          @selection-change="handleSelectionChange"
         >
           <el-table-column type="selection" width="55" />
           <el-table-column prop="avatar" label="头像" width="80">
             <template #default="{ row }">
-              <el-avatar
-                :src="row.avatar"
-                :alt="row.full_name"
-                size="small"
-              >
+              <el-avatar :src="row.avatar" :alt="row.full_name" size="small">
                 {{ row.full_name?.charAt(0) }}
               </el-avatar>
             </template>
@@ -142,7 +138,7 @@
           <el-table-column prop="is_active" label="状态" width="80">
             <template #default="{ row }">
               <el-tag :type="row.is_active ? 'success' : 'danger'">
-                {{ row.is_active ? '启用' : '禁用' }}
+                {{ row.is_active ? "启用" : "禁用" }}
               </el-tag>
             </template>
           </el-table-column>
@@ -153,18 +149,10 @@
           </el-table-column>
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
-              <el-button
-                type="primary"
-                size="small"
-                @click="handleView(row)"
-              >
+              <el-button type="primary" size="small" @click="handleView(row)">
                 查看
               </el-button>
-              <el-button
-                type="warning"
-                size="small"
-                @click="handleEdit(row)"
-              >
+              <el-button type="warning" size="small" @click="handleEdit(row)">
                 编辑
               </el-button>
               <el-popconfirm
@@ -172,9 +160,7 @@
                 @confirm="handleDelete(row)"
               >
                 <template #reference>
-                  <el-button type="danger" size="small">
-                    删除
-                  </el-button>
+                  <el-button type="danger" size="small"> 删除 </el-button>
                 </template>
               </el-popconfirm>
             </template>
@@ -194,11 +180,7 @@
         >
           <el-card shadow="hover">
             <div class="card-header">
-              <el-avatar
-                :src="user.avatar"
-                :alt="user.full_name"
-                size="large"
-              >
+              <el-avatar :src="user.avatar" :alt="user.full_name" size="large">
                 {{ user.full_name?.charAt(0) }}
               </el-avatar>
               <div class="user-info">
@@ -206,7 +188,7 @@
                 <p>{{ user.username }}</p>
               </div>
               <el-tag :type="user.is_active ? 'success' : 'danger'">
-                {{ user.is_active ? '启用' : '禁用' }}
+                {{ user.is_active ? "启用" : "禁用" }}
               </el-tag>
             </div>
             <div class="card-content">
@@ -216,11 +198,11 @@
               </div>
               <div class="info-item">
                 <span class="label">部门：</span>
-                <span class="value">{{ user.department || '-' }}</span>
+                <span class="value">{{ user.department || "-" }}</span>
               </div>
               <div class="info-item">
                 <span class="label">职位：</span>
-                <span class="value">{{ user.position || '-' }}</span>
+                <span class="value">{{ user.position || "-" }}</span>
               </div>
               <div class="info-item">
                 <span class="label">最后登录：</span>
@@ -261,11 +243,7 @@
     </div>
 
     <!-- 用户详情对话框 -->
-    <el-dialog
-      v-model="detailDialogVisible"
-      title="用户详情"
-      width="800px"
-    >
+    <el-dialog v-model="detailDialogVisible" title="用户详情" width="800px">
       <UserDetail
         v-if="selectedUser"
         :user="selectedUser"
@@ -274,11 +252,7 @@
     </el-dialog>
 
     <!-- 导入对话框 -->
-    <el-dialog
-      v-model="importDialogVisible"
-      title="导入用户"
-      width="600px"
-    >
+    <el-dialog v-model="importDialogVisible" title="导入用户" width="600px">
       <UserImport
         @success="handleImportSuccess"
         @close="importDialogVisible = false"
@@ -288,9 +262,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, onMounted, computed } from "vue";
+import { useRouter } from "vue-router";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Plus,
   Search,
@@ -299,155 +273,161 @@ import {
   Download,
   Upload,
   List,
-  Grid
-} from '@element-plus/icons-vue'
-import type { User, UserListQuery } from '@/types/user'
-import { getUsers, deleteUser, batchDeleteUsers, exportUsers, toggleUser } from '@/api/user'
-import { formatDateTime } from '@/utils/format'
-import UserDetail from './components/UserDetail.vue'
-import UserImport from './components/UserImport.vue'
+  Grid,
+} from "@element-plus/icons-vue";
+import type { User, UserListQuery } from "@/types/user";
+import {
+  getUsers,
+  deleteUser,
+  batchDeleteUsers,
+  exportUsers,
+  toggleUser,
+} from "@/api/user";
+import { formatDateTime } from "@/utils/format";
+import UserDetail from "./components/UserDetail.vue";
+import UserImport from "./components/UserImport.vue";
 
-const router = useRouter()
+const router = useRouter();
 
 // 响应式数据
-const loading = ref(false)
-const users = ref<User[]>([])
-const selectedUsers = ref<User[]>([])
-const selectedUser = ref<User | null>(null)
-const viewMode = ref<'table' | 'card'>('table')
-const detailDialogVisible = ref(false)
-const importDialogVisible = ref(false)
+const loading = ref(false);
+const users = ref<User[]>([]);
+const selectedUsers = ref<User[]>([]);
+const selectedUser = ref<User | null>(null);
+const viewMode = ref<"table" | "card">("table");
+const detailDialogVisible = ref(false);
+const importDialogVisible = ref(false);
 
 // 搜索表单
 const searchForm = reactive<UserListQuery>({
-  search: '',
-  department: '',
+  search: "",
+  department: "",
   is_active: undefined,
-  sort_by: 'created_at',
-  sort_order: 'desc'
-})
+  sort_by: "created_at",
+  sort_order: "desc",
+});
 
 // 分页数据
 const pagination = reactive({
   page: 1,
   page_size: 20,
-  total: 0
-})
+  total: 0,
+});
 
 // 部门列表
 const departments = ref<string[]>([
-  '技术部',
-  '产品部',
-  '运营部',
-  '市场部',
-  '人事部',
-  '财务部'
-])
+  "技术部",
+  "产品部",
+  "运营部",
+  "市场部",
+  "人事部",
+  "财务部",
+]);
 
 /**
  * 加载用户列表
  */
 const loadUsers = async () => {
   try {
-    loading.value = true
+    loading.value = true;
     const params = {
       ...searchForm,
       page: pagination.page,
-      size: pagination.page_size  // 修正参数名
-    }
-    const response = await getUsers(params)  // 使用正确的API函数
-    users.value = response.data.items || response.data.users || []
-    pagination.total = response.data.total || 0
+      size: pagination.page_size, // 修正参数名
+    };
+    const response = await getUsers(params); // 使用正确的API函数
+    users.value = response.data.items || response.data.users || [];
+    pagination.total = response.data.total || 0;
   } catch (error) {
-    console.error('加载用户列表失败:', error)
-    ElMessage.error('加载用户列表失败')
+    console.error("加载用户列表失败:", error);
+    ElMessage.error("加载用户列表失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 /**
  * 处理搜索
  */
 const handleSearch = () => {
-  pagination.page = 1
-  loadUsers()
-}
+  pagination.page = 1;
+  loadUsers();
+};
 
 /**
  * 处理重置
  */
 const handleReset = () => {
   Object.assign(searchForm, {
-    search: '',
-    department: '',
+    search: "",
+    department: "",
     is_active: undefined,
-    sort_by: 'created_at',
-    sort_order: 'desc'
-  })
-  pagination.page = 1
-  loadUsers()
-}
+    sort_by: "created_at",
+    sort_order: "desc",
+  });
+  pagination.page = 1;
+  loadUsers();
+};
 
 /**
  * 处理选择变化
  */
 const handleSelectionChange = (selection: User[]) => {
-  selectedUsers.value = selection
-}
+  selectedUsers.value = selection;
+};
 
 /**
  * 处理页面大小变化
  */
 const handleSizeChange = (size: number) => {
-  pagination.page_size = size
-  pagination.page = 1
-  loadUsers()
-}
+  pagination.page_size = size;
+  pagination.page = 1;
+  loadUsers();
+};
 
 /**
  * 处理当前页变化
  */
 const handleCurrentChange = (page: number) => {
-  pagination.page = page
-  loadUsers()
-}
+  pagination.page = page;
+  loadUsers();
+};
 
 /**
  * 处理新建用户
  */
 const handleCreate = () => {
-  router.push('/user/create')
-}
+  router.push("/user/create");
+};
 
 /**
  * 处理查看用户
  */
 const handleView = (user: User) => {
-  selectedUser.value = user
-  detailDialogVisible.value = true
-}
+  selectedUser.value = user;
+  detailDialogVisible.value = true;
+};
 
 /**
  * 处理编辑用户
  */
 const handleEdit = (user: User) => {
-  router.push(`/user/edit/${user.id}`)
-}
+  router.push(`/user/edit/${user.id}`);
+};
 
 /**
  * 处理删除用户
  */
 const handleDelete = async (user: User) => {
   try {
-    await deleteUser(user.id.toString())
-    ElMessage.success('删除用户成功')
-    loadUsers()
+    await deleteUser(user.id.toString());
+    ElMessage.success("删除用户成功");
+    loadUsers();
   } catch (error) {
-    console.error('删除用户失败:', error)
-    ElMessage.error('删除用户失败')
+    console.error("删除用户失败:", error);
+    ElMessage.error("删除用户失败");
   }
-}
+};
 
 /**
  * 处理批量删除
@@ -456,23 +436,23 @@ const handleBatchDelete = async () => {
   try {
     await ElMessageBox.confirm(
       `确定要删除选中的 ${selectedUsers.value.length} 个用户吗？`,
-      '批量删除',
+      "批量删除",
       {
-        type: 'warning'
-      }
-    )
-    
-    const userIds = selectedUsers.value.map(user => user.id)
-    await batchDeleteUsers(userIds)
-    ElMessage.success('批量删除成功')
-    selectedUsers.value = []
-    loadUsers()
+        type: "warning",
+      },
+    );
+
+    const userIds = selectedUsers.value.map((user) => user.id);
+    await batchDeleteUsers(userIds);
+    ElMessage.success("批量删除成功");
+    selectedUsers.value = [];
+    loadUsers();
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('批量删除失败')
+    if (error !== "cancel") {
+      ElMessage.error("批量删除失败");
     }
   }
-}
+};
 
 /**
  * 处理导出
@@ -481,34 +461,34 @@ const handleExport = async () => {
   try {
     const params = {
       ...searchForm,
-      export_all: true
-    }
-    await exportUsers(params)
-    ElMessage.success('导出成功')
+      export_all: true,
+    };
+    await exportUsers(params);
+    ElMessage.success("导出成功");
   } catch (error) {
-    ElMessage.error('导出失败')
+    ElMessage.error("导出失败");
   }
-}
+};
 
 /**
  * 处理导入
  */
 const handleImport = () => {
-  importDialogVisible.value = true
-}
+  importDialogVisible.value = true;
+};
 
 /**
  * 处理导入成功
  */
 const handleImportSuccess = () => {
-  importDialogVisible.value = false
-  loadUsers()
-}
+  importDialogVisible.value = false;
+  loadUsers();
+};
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadUsers()
-})
+  loadUsers();
+});
 </script>
 
 <style lang="scss" scoped>
