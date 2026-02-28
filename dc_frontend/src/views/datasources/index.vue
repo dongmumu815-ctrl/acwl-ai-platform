@@ -1,13 +1,18 @@
 <template>
   <div class="datasource-container">
     <!-- 页面标题和操作栏 -->
-  <div class="page-header">
+    <div class="page-header">
       <div class="header-left">
         <h2>数据源管理</h2>
         <p class="page-description">管理和配置多种数据源连接</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" @click="showCreateDialog" :icon="Plus" :disabled="!canCreate">
+        <el-button
+          type="primary"
+          :icon="Plus"
+          :disabled="!canCreate"
+          @click="showCreateDialog"
+        >
           新建数据源
         </el-button>
       </div>
@@ -62,7 +67,9 @@
                 <el-icon><TrendCharts /></el-icon>
               </div>
               <div class="stats-info">
-                <div class="stats-number">{{ stats.recent_test_success_rate }}%</div>
+                <div class="stats-number">
+                  {{ stats.recent_test_success_rate }}%
+                </div>
                 <div class="stats-label">测试成功率</div>
               </div>
             </div>
@@ -75,7 +82,12 @@
     <el-card class="filter-card">
       <el-form :model="filters" inline>
         <el-form-item label="数据源类型">
-          <el-select v-model="filters.datasource_type" placeholder="选择类型" clearable style="width: 150px">
+          <el-select
+            v-model="filters.datasource_type"
+            placeholder="选择类型"
+            clearable
+            style="width: 150px"
+          >
             <el-option
               v-for="template in datasourceTemplates"
               :key="template.datasource_type"
@@ -85,7 +97,12 @@
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="filters.status" placeholder="选择状态" clearable style="width: 120px">
+          <el-select
+            v-model="filters.status"
+            placeholder="选择状态"
+            clearable
+            style="width: 120px"
+          >
             <el-option label="正常" value="active" />
             <el-option label="停用" value="inactive" />
             <el-option label="测试中" value="testing" />
@@ -93,7 +110,12 @@
           </el-select>
         </el-form-item>
         <el-form-item label="启用状态">
-          <el-select v-model="filters.is_enabled" placeholder="选择启用状态" clearable style="width: 120px">
+          <el-select
+            v-model="filters.is_enabled"
+            placeholder="选择启用状态"
+            clearable
+            style="width: 120px"
+          >
             <el-option label="启用" :value="true" />
             <el-option label="禁用" :value="false" />
           </el-select>
@@ -108,12 +130,10 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch" :icon="Search">
+          <el-button type="primary" :icon="Search" @click="handleSearch">
             搜索
           </el-button>
-          <el-button @click="handleReset" :icon="Refresh">
-            重置
-          </el-button>
+          <el-button :icon="Refresh" @click="handleReset"> 重置 </el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -126,16 +146,16 @@
           <div class="header-actions">
             <el-radio-group v-model="viewMode" size="small">
               <el-radio-button value="grid">
-                  <el-icon><Grid /></el-icon>
-                </el-radio-button>
-                <el-radio-button value="list">
-                  <el-icon><List /></el-icon>
-                </el-radio-button>
+                <el-icon><Grid /></el-icon>
+              </el-radio-button>
+              <el-radio-button value="list">
+                <el-icon><List /></el-icon>
+              </el-radio-button>
             </el-radio-group>
           </div>
         </div>
       </template>
-      
+
       <!-- 网格视图 -->
       <div v-if="viewMode === 'grid'" class="grid-view">
         <div class="datasources-grid">
@@ -147,10 +167,14 @@
             <div class="datasource-header">
               <div class="datasource-info">
                 <div class="datasource-name">
-                  <el-icon class="datasource-icon">{{ getDatasourceIcon(datasource.datasource_type) }}</el-icon>
+                  <el-icon class="datasource-icon">{{
+                    getDatasourceIcon(datasource.datasource_type)
+                  }}</el-icon>
                   {{ datasource.name }}
                 </div>
-                <div class="datasource-host">{{ datasource.host }}:{{ datasource.port }}</div>
+                <div class="datasource-host">
+                  {{ datasource.host }}:{{ datasource.port }}
+                </div>
               </div>
               <div class="datasource-status" :class="datasource.status">
                 <el-icon><Connection /></el-icon>
@@ -166,17 +190,22 @@
               </div>
               <div class="detail-item">
                 <span class="label">数据库:</span>
-                <span class="value">{{ datasource.database || '-' }}</span>
+                <span class="value">{{ datasource.database || "-" }}</span>
               </div>
               <div class="detail-item">
                 <span class="label">启用状态:</span>
-                <el-tag :type="datasource.enabled ? 'success' : 'danger'" size="small">
-                  {{ datasource.enabled ? '启用' : '禁用' }}
+                <el-tag
+                  :type="datasource.enabled ? 'success' : 'danger'"
+                  size="small"
+                >
+                  {{ datasource.enabled ? "启用" : "禁用" }}
                 </el-tag>
               </div>
               <div class="detail-item">
                 <span class="label">最后测试:</span>
-                <span class="value">{{ datasource.last_test_time || '未测试' }}</span>
+                <span class="value">{{
+                  datasource.last_test_time || "未测试"
+                }}</span>
               </div>
               <div class="detail-item">
                 <span class="label">创建时间:</span>
@@ -188,21 +217,34 @@
               <el-button
                 type="primary"
                 size="small"
-                @click="testConnection(datasource)"
                 :loading="datasource.testing"
                 :icon="Connection"
                 :disabled="!canTest"
+                @click="testConnection(datasource)"
               >
                 测试连接
               </el-button>
-              <el-dropdown @command="(command) => handleDatasourceAction(command, datasource)">
+              <el-dropdown
+                @command="
+                  (command) => handleDatasourceAction(command, datasource)
+                "
+              >
                 <el-button size="small" :icon="MoreFilled" />
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="edit" :icon="Edit" :disabled="!canEdit">
+                    <el-dropdown-item
+                      command="edit"
+                      :icon="Edit"
+                      :disabled="!canEdit"
+                    >
                       编辑
                     </el-dropdown-item>
-                    <el-dropdown-item command="delete" :icon="Delete" divided :disabled="!canDelete">
+                    <el-dropdown-item
+                      command="delete"
+                      :icon="Delete"
+                      divided
+                      :disabled="!canDelete"
+                    >
                       删除
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -212,7 +254,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 列表视图 -->
       <div v-else class="list-view">
         <el-table
@@ -225,7 +267,9 @@
           <el-table-column prop="name" label="数据源名称" min-width="200">
             <template #default="{ row }">
               <div class="datasource-name">
-                <el-icon class="datasource-icon">{{ getDatasourceIcon(row.type) }}</el-icon>
+                <el-icon class="datasource-icon">{{
+                  getDatasourceIcon(row.type)
+                }}</el-icon>
                 <span>{{ row.name }}</span>
               </div>
             </template>
@@ -254,39 +298,43 @@
             <template #default="{ row }">
               <el-switch
                 v-model="row.enabled"
-                @change="toggleEnabled(row)"
                 :disabled="!canToggle"
+                @change="toggleEnabled(row)"
               />
             </template>
           </el-table-column>
-          <el-table-column prop="last_test_time" label="最后测试时间" width="180" />
+          <el-table-column
+            prop="last_test_time"
+            label="最后测试时间"
+            width="180"
+          />
           <el-table-column prop="created_at" label="创建时间" width="180" />
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
               <el-button
                 type="primary"
                 size="small"
-                @click="testConnection(row)"
                 :loading="row.testing"
                 :icon="Connection"
                 :disabled="!canTest"
+                @click="testConnection(row)"
               >
                 测试
               </el-button>
               <el-button
                 size="small"
-                @click="editDatasource(row)"
                 :icon="Edit"
                 :disabled="!canEdit"
+                @click="editDatasource(row)"
               >
                 编辑
               </el-button>
               <el-button
                 type="danger"
                 size="small"
-                @click="deleteDatasource(row)"
                 :icon="Delete"
                 :disabled="!canDelete"
+                @click="deleteDatasource(row)"
               >
                 删除
               </el-button>
@@ -318,170 +366,202 @@
     />
 
     <!-- 测试结果对话框 -->
-    <TestResultDialog
-      v-model="testDialogVisible"
-      :test-result="testResult"
-    />
+    <TestResultDialog v-model="testDialogVisible" :test-result="testResult" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, onMounted, computed } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
-  Plus, Search, Refresh, DataBoard, CircleCheck, CircleClose,
-  TrendCharts, Connection, Edit, Delete, Grid, List, MoreFilled
-} from '@element-plus/icons-vue'
-import DatasourceDialog from './components/DatasourceDialog.vue'
-import TestResultDialog from './components/TestResultDialog.vue'
-import { datasourceApi } from '@/api/datasourceV2'
-import { useUserStore } from '@/stores/user'
+  Plus,
+  Search,
+  Refresh,
+  DataBoard,
+  CircleCheck,
+  CircleClose,
+  TrendCharts,
+  Connection,
+  Edit,
+  Delete,
+  Grid,
+  List,
+  MoreFilled,
+} from "@element-plus/icons-vue";
+import DatasourceDialog from "./components/DatasourceDialog.vue";
+import TestResultDialog from "./components/TestResultDialog.vue";
+import { datasourceApi } from "@/api/datasourceV2";
+import { useUserStore } from "@/stores/user";
 
 // 响应式数据
-const loading = ref(false)
-const datasources = ref([])
-const selectedDatasources = ref([])
-const dialogVisible = ref(false)
-const testDialogVisible = ref(false)
-const dialogMode = ref('create')
-const currentDatasource = ref(null)
-const testResult = ref(null)
-const viewMode = ref('grid')
-const datasourceTemplates = ref([])
+const loading = ref(false);
+const datasources = ref([]);
+const selectedDatasources = ref([]);
+const dialogVisible = ref(false);
+const testDialogVisible = ref(false);
+const dialogMode = ref("create");
+const currentDatasource = ref(null);
+const testResult = ref(null);
+const viewMode = ref("grid");
+const datasourceTemplates = ref([]);
 // 用户与权限
-const userStore = useUserStore()
-const canView = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:view'))
-const canCreate = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:create'))
-const canEdit = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:edit'))
-const canDelete = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:delete'))
-const canTest = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:test'))
-const canToggle = computed(() => userStore.hasRole('admin') || userStore.hasPermission('data:datasource:toggle'))
+const userStore = useUserStore();
+const canView = computed(
+  () =>
+    userStore.hasRole("admin") ||
+    userStore.hasPermission("data:datasource:view"),
+);
+const canCreate = computed(
+  () =>
+    userStore.hasRole("admin") ||
+    userStore.hasPermission("data:datasource:create"),
+);
+const canEdit = computed(
+  () =>
+    userStore.hasRole("admin") ||
+    userStore.hasPermission("data:datasource:edit"),
+);
+const canDelete = computed(
+  () =>
+    userStore.hasRole("admin") ||
+    userStore.hasPermission("data:datasource:delete"),
+);
+const canTest = computed(
+  () =>
+    userStore.hasRole("admin") ||
+    userStore.hasPermission("data:datasource:test"),
+);
+const canToggle = computed(
+  () =>
+    userStore.hasRole("admin") ||
+    userStore.hasPermission("data:datasource:toggle"),
+);
 
 // 统计数据
 const stats = ref({
   total_count: 0,
   active_count: 0,
   error_count: 0,
-  recent_test_success_rate: 0
-})
+  recent_test_success_rate: 0,
+});
 
 // 筛选条件
 const filters = reactive({
-  search: '',
-  datasource_type: '',
-  status: '',
-  is_enabled: null
-})
+  search: "",
+  datasource_type: "",
+  status: "",
+  is_enabled: null,
+});
 
 // 分页
 const pagination = reactive({
   page: 1,
   size: 20,
-  total: 0
-})
+  total: 0,
+});
 
 // 计算属性
-const hasSelection = computed(() => selectedDatasources.value.length > 0)
+const hasSelection = computed(() => selectedDatasources.value.length > 0);
 
 // 方法
 const loadDatasourceTemplates = async () => {
   try {
-    const response = await datasourceApi.getDatasourceTemplates()
-    datasourceTemplates.value = response
+    const response = await datasourceApi.getDatasourceTemplates();
+    datasourceTemplates.value = response;
   } catch (error) {
-    console.error('加载数据源模板失败:', error)
-    ElMessage.error('加载数据源模板失败')
+    console.error("加载数据源模板失败:", error);
+    ElMessage.error("加载数据源模板失败");
   }
-}
+};
 
 const loadDatasources = async () => {
   try {
-    loading.value = true
+    loading.value = true;
     const params = {
       page: pagination.page,
       size: pagination.size,
-      ...filters
-    }
-    
+      ...filters,
+    };
+
     // 过滤空值
-    Object.keys(params).forEach(key => {
-      if (params[key] === '' || params[key] === null) {
-        delete params[key]
+    Object.keys(params).forEach((key) => {
+      if (params[key] === "" || params[key] === null) {
+        delete params[key];
       }
-    })
-    
-    const response = await datasourceApi.getDatasources(params)
+    });
+
+    const response = await datasourceApi.getDatasources(params);
     // 防护代码：确保response和response.items存在
     if (response && Array.isArray(response.data.items)) {
-      datasources.value = response.data.items.map(item => ({
+      datasources.value = response.data.items.map((item) => ({
         ...item,
         type: item.datasource_type,
         database: item.database_name,
         enabled: item.is_enabled,
-        testing: false
-      }))
-      pagination.total = response.total || 0
+        testing: false,
+      }));
+      pagination.total = response.total || 0;
     } else if (response && Array.isArray(response)) {
       // 如果API直接返回数组而不是包含items的对象
-      datasources.value = response.map(item => ({
+      datasources.value = response.map((item) => ({
         ...item,
         type: item.datasource_type,
         database: item.database_name,
         enabled: item.is_enabled,
-        testing: false
-      }))
-      pagination.total = response.length
+        testing: false,
+      }));
+      pagination.total = response.length;
     } else {
-      console.warn('Unexpected API response structure:', response)
-      datasources.value = []
-      pagination.total = 0
+      console.warn("Unexpected API response structure:", response);
+      datasources.value = [];
+      pagination.total = 0;
     }
   } catch (error) {
-    ElMessage.error('加载数据源列表失败')
-    console.error('Load datasources error:', error)
+    ElMessage.error("加载数据源列表失败");
+    console.error("Load datasources error:", error);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const loadStats = async () => {
   try {
-    const response = await datasourceApi.getDatasourceStats()
-    stats.value = response
+    const response = await datasourceApi.getDatasourceStats();
+    stats.value = response;
   } catch (error) {
-    console.error('Load stats error:', error)
+    console.error("Load stats error:", error);
   }
-}
+};
 
 const handleSearch = () => {
-  pagination.page = 1
-  loadDatasources()
-}
+  pagination.page = 1;
+  loadDatasources();
+};
 
 const handleReset = () => {
   Object.assign(filters, {
-    search: '',
-    datasource_type: '',
-    status: '',
-    is_enabled: null
-  })
-  handleSearch()
-}
+    search: "",
+    datasource_type: "",
+    status: "",
+    is_enabled: null,
+  });
+  handleSearch();
+};
 
 const handleSizeChange = (size) => {
-  pagination.size = size
-  pagination.page = 1
-  loadDatasources()
-}
+  pagination.size = size;
+  pagination.page = 1;
+  loadDatasources();
+};
 
 const handleCurrentChange = (page) => {
-  pagination.page = page
-  loadDatasources()
-}
+  pagination.page = page;
+  loadDatasources();
+};
 
 const handleSelectionChange = (selection) => {
-  selectedDatasources.value = selection
-}
+  selectedDatasources.value = selection;
+};
 
 /**
  * 显示新建数据源弹窗
@@ -489,13 +569,13 @@ const handleSelectionChange = (selection) => {
  */
 const showCreateDialog = () => {
   if (!canCreate.value) {
-    ElMessage.warning('您没有新建数据源的权限')
-    return
+    ElMessage.warning("您没有新建数据源的权限");
+    return;
   }
-  dialogMode.value = 'create'
-  currentDatasource.value = null
-  dialogVisible.value = true
-}
+  dialogMode.value = "create";
+  currentDatasource.value = null;
+  dialogVisible.value = true;
+};
 
 /**
  * 打开编辑数据源弹窗
@@ -503,13 +583,13 @@ const showCreateDialog = () => {
  */
 const editDatasource = (row) => {
   if (!canEdit.value) {
-    ElMessage.warning('您没有编辑数据源的权限')
-    return
+    ElMessage.warning("您没有编辑数据源的权限");
+    return;
   }
-  dialogMode.value = 'edit'
-  currentDatasource.value = { ...row }
-  dialogVisible.value = true
-}
+  dialogMode.value = "edit";
+  currentDatasource.value = { ...row };
+  dialogVisible.value = true;
+};
 
 /**
  * 测试数据源连接
@@ -517,26 +597,26 @@ const editDatasource = (row) => {
  */
 const testConnection = async (row) => {
   if (!canTest.value) {
-    ElMessage.warning('您没有测试连接的权限')
-    return
+    ElMessage.warning("您没有测试连接的权限");
+    return;
   }
   try {
-    row.testing = true
+    row.testing = true;
     const response = await datasourceApi.testDatasourceConnection(row.id, {
-      timeout: 10
-    })
-    testResult.value = response
-    testDialogVisible.value = true
-    
+      timeout: 10,
+    });
+    testResult.value = response;
+    testDialogVisible.value = true;
+
     // 刷新列表以更新状态
-    await loadDatasources()
+    await loadDatasources();
   } catch (error) {
-    ElMessage.error('测试连接失败')
-    console.error('Test connection error:', error)
+    ElMessage.error("测试连接失败");
+    console.error("Test connection error:", error);
   } finally {
-    row.testing = false
+    row.testing = false;
   }
-}
+};
 
 /**
  * 切换数据源启用状态
@@ -544,26 +624,26 @@ const testConnection = async (row) => {
  */
 const toggleEnabled = async (row) => {
   if (!canToggle.value) {
-    ElMessage.warning('您没有启用/禁用数据源的权限')
+    ElMessage.warning("您没有启用/禁用数据源的权限");
     // 恢复UI显示为原状态
-    row.enabled = !row.enabled
-    return
+    row.enabled = !row.enabled;
+    return;
   }
   try {
     if (row.enabled) {
-      await datasourceApi.enableDatasource(row.id)
-      ElMessage.success('数据源已启用')
+      await datasourceApi.enableDatasource(row.id);
+      ElMessage.success("数据源已启用");
     } else {
-      await datasourceApi.disableDatasource(row.id)
-      ElMessage.success('数据源已禁用')
+      await datasourceApi.disableDatasource(row.id);
+      ElMessage.success("数据源已禁用");
     }
   } catch (error) {
     // 恢复开关状态
-    row.enabled = !row.enabled
-    ElMessage.error('操作失败')
-    console.error('Toggle enable error:', error)
+    row.enabled = !row.enabled;
+    ElMessage.error("操作失败");
+    console.error("Toggle enable error:", error);
   }
-}
+};
 
 /**
  * 删除数据源
@@ -571,122 +651,122 @@ const toggleEnabled = async (row) => {
  */
 const deleteDatasource = async (row) => {
   if (!canDelete.value) {
-    ElMessage.warning('您没有删除数据源的权限')
-    return
+    ElMessage.warning("您没有删除数据源的权限");
+    return;
   }
   try {
     await ElMessageBox.confirm(
       `确定要删除数据源 "${row.name}" 吗？此操作不可恢复。`,
-      '确认删除',
+      "确认删除",
       {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    await datasourceApi.deleteDatasource(row.id)
-    ElMessage.success('删除成功')
-    await loadDatasources()
-    await loadStats()
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    );
+
+    await datasourceApi.deleteDatasource(row.id);
+    ElMessage.success("删除成功");
+    await loadDatasources();
+    await loadStats();
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error('Delete datasource error:', error)
+    if (error !== "cancel") {
+      ElMessage.error("删除失败");
+      console.error("Delete datasource error:", error);
     }
   }
-}
+};
 
 const handleDialogSuccess = () => {
-  loadDatasources()
-  loadStats()
-}
+  loadDatasources();
+  loadStats();
+};
 
 const handleDatasourceAction = (command, datasource) => {
   switch (command) {
-    case 'edit':
-      editDatasource(datasource)
-      break
-    case 'delete':
-      deleteDatasource(datasource)
-      break
+    case "edit":
+      editDatasource(datasource);
+      break;
+    case "delete":
+      deleteDatasource(datasource);
+      break;
     default:
-      console.warn('未知操作:', command)
+      console.warn("未知操作:", command);
   }
-}
+};
 
 // 工具方法
 const getDatasourceIcon = (type) => {
   const icons = {
-    mysql: 'Db',
-    postgresql: 'Db',
-    mongodb: 'Doc',
-    redis: 'Key',
-    clickhouse: 'Db',
-    elasticsearch: 'Search',
-    doris: 'Db',
-    oracle: 'Db',
-    sqlserver: 'Db'
-  }
-  return icons[type] || 'Db'
-}
+    mysql: "Db",
+    postgresql: "Db",
+    mongodb: "Doc",
+    redis: "Key",
+    clickhouse: "Db",
+    elasticsearch: "Search",
+    doris: "Db",
+    oracle: "Db",
+    sqlserver: "Db",
+  };
+  return icons[type] || "Db";
+};
 
 const getTypeColor = (type) => {
   const colors = {
-    mysql: 'primary',
-    postgresql: 'info',
-    mongodb: 'success',
-    redis: 'warning',
-    clickhouse: 'primary',
-    elasticsearch: 'info',
-    doris: 'success',
-    oracle: 'warning',
-    sqlserver: 'primary'
-  }
-  return colors[type] || 'info'
-}
+    mysql: "primary",
+    postgresql: "info",
+    mongodb: "success",
+    redis: "warning",
+    clickhouse: "primary",
+    elasticsearch: "info",
+    doris: "success",
+    oracle: "warning",
+    sqlserver: "primary",
+  };
+  return colors[type] || "info";
+};
 
 const getTypeLabel = (type) => {
   const labels = {
-    mysql: 'MySQL',
-    postgresql: 'PostgreSQL',
-    mongodb: 'MongoDB',
-    redis: 'Redis',
-    clickhouse: 'ClickHouse',
-    elasticsearch: 'Elasticsearch',
-    doris: 'Apache Doris',
-    oracle: 'Oracle',
-    sqlserver: 'SQL Server'
-  }
-  return labels[type] || type
-}
+    mysql: "MySQL",
+    postgresql: "PostgreSQL",
+    mongodb: "MongoDB",
+    redis: "Redis",
+    clickhouse: "ClickHouse",
+    elasticsearch: "Elasticsearch",
+    doris: "Apache Doris",
+    oracle: "Oracle",
+    sqlserver: "SQL Server",
+  };
+  return labels[type] || type;
+};
 
 const getStatusColor = (status) => {
   const colors = {
-    active: 'success',
-    inactive: 'info',
-    testing: 'warning',
-    error: 'danger'
-  }
-  return colors[status] || 'info'
-}
+    active: "success",
+    inactive: "info",
+    testing: "warning",
+    error: "danger",
+  };
+  return colors[status] || "info";
+};
 
 const getStatusLabel = (status) => {
   const labels = {
-    active: '正常',
-    inactive: '停用',
-    testing: '测试中',
-    error: '异常'
-  }
-  return labels[status] || status
-}
+    active: "正常",
+    inactive: "停用",
+    testing: "测试中",
+    error: "异常",
+  };
+  return labels[status] || status;
+};
 
 // 生命周期
 onMounted(() => {
-  loadDatasourceTemplates()
-  loadDatasources()
-  loadStats()
-})
+  loadDatasourceTemplates();
+  loadDatasources();
+  loadStats();
+});
 </script>
 
 <style scoped>
@@ -924,15 +1004,15 @@ onMounted(() => {
   .datasources-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .datasource-card {
     padding: 16px;
   }
-  
+
   .datasource-actions {
     flex-direction: column;
   }
-  
+
   .datasource-actions .el-button {
     width: 100%;
   }

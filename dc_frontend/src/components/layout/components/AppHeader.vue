@@ -3,8 +3,8 @@
     <div class="header-left">
       <el-button
         type="text"
-        @click="$emit('toggle-sidebar')"
         class="sidebar-toggle"
+        @click="$emit('toggle-sidebar')"
       >
         <el-icon><Expand v-if="collapsed" /><Fold v-else /></el-icon>
       </el-button>
@@ -16,7 +16,7 @@
         </el-breadcrumb>
       </div> -->
       <!-- 面包屑导航 -->
-      <div class="breadcrumb-container" v-if="showBreadcrumb">
+      <div v-if="showBreadcrumb" class="breadcrumb-container">
         <Breadcrumb />
       </div>
     </div>
@@ -84,11 +84,7 @@ const userStore = useUserStore();
 const userInfo = computed(() => userStore.userInfo);
 const userName = computed(() => {
   if (userInfo.value) {
-    return (
-      userInfo.value.username ||
-      userInfo.value.email ||
-      "用户"
-    );
+    return userInfo.value.username || userInfo.value.email || "用户";
   }
   return "未登录";
 });
@@ -105,7 +101,7 @@ const handleLogout = async () => {
     await ElMessageBox.confirm("确定要退出登录吗？", "提示", {
       confirmButtonText: "确定",
       cancelButtonText: "取消",
-      type: "warning"
+      type: "warning",
     });
 
     await userStore.logout();

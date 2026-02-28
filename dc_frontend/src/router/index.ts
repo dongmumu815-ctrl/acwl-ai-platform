@@ -1,13 +1,13 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteRecordRaw } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { ElMessage } from 'element-plus'
+import { createRouter, createWebHistory } from "vue-router";
+import type { RouteRecordRaw } from "vue-router";
+import { useUserStore } from "@/stores/user";
+import { ElMessage } from "element-plus";
 
 // 导入布局组件
-import Layout from '@/components/layout/Layout.vue'
+import Layout from "@/components/layout/Layout.vue";
 
 // 导入页面组件
-import Login from '@/views/auth/Login.vue'
+import Login from "@/views/auth/Login.vue";
 // Dashboard组件改为动态导入
 
 /**
@@ -16,26 +16,26 @@ import Login from '@/views/auth/Login.vue'
  */
 const publicRoutes: RouteRecordRaw[] = [
   {
-    path: '/login',
-    name: 'Login',
+    path: "/login",
+    name: "Login",
     component: Login,
     meta: {
-      title: '登录',
+      title: "登录",
       requiresAuth: false,
-      hideInMenu: true
-    }
+      hideInMenu: true,
+    },
   },
   {
-    path: '/404',
-    name: 'NotFound',
-    component: () => import('@/views/error/404.vue'),
+    path: "/404",
+    name: "NotFound",
+    component: () => import("@/views/error/404.vue"),
     meta: {
-      title: '页面不存在',
+      title: "页面不存在",
       requiresAuth: false,
-      hideInMenu: true
-    }
-  }
-]
+      hideInMenu: true,
+    },
+  },
+];
 
 /**
  * 需要认证的路由
@@ -43,31 +43,31 @@ const publicRoutes: RouteRecordRaw[] = [
  */
 const authRoutes: RouteRecordRaw[] = [
   {
-    path: '/',
+    path: "/",
     component: Layout,
-    redirect: '/dashboard',
+    redirect: "/dashboard",
     meta: {
-      title: '数据中心概览',
-      icon: 'DataBoard',
+      title: "数据中心概览",
+      icon: "DataBoard",
       requiresAuth: true,
       // 分组访问权限：概览访问
-      permission: 'data:overview:view',
-      strictPermission: true
+      permission: "data:overview:view",
+      strictPermission: true,
     },
     children: [
       {
-        path: 'dashboard',
-        name: 'Dashboard',
-        component: () => import('@/views/dashboard/Dashboard.vue'),
+        path: "dashboard",
+        name: "Dashboard",
+        component: () => import("@/views/dashboard/Dashboard.vue"),
         meta: {
-          title: '仪表盘',
-          icon: 'Monitor',
+          title: "仪表盘",
+          icon: "Monitor",
           requiresAuth: true,
           // 页面访问权限：仪表盘查看
-          permission: 'data:dashboard:view',
+          permission: "data:dashboard:view",
           strictPermission: true,
-          keepAlive: true
-        }
+          keepAlive: true,
+        },
       },
       // {
       //   path: 'statistics',
@@ -79,76 +79,76 @@ const authRoutes: RouteRecordRaw[] = [
       //     requiresAuth: true
       //   }
       // }
-    ]
+    ],
   },
   {
-    path: '/data-resources',
+    path: "/data-resources",
     component: Layout,
-    redirect: '/data-resources/list',
+    redirect: "/data-resources/list",
     meta: {
-      title: '数据资源管理',
-      icon: 'FolderOpened',
+      title: "数据资源管理",
+      icon: "FolderOpened",
       requiresAuth: true,
       // 分组访问权限：数据资源查看
-      permission: 'data:resource:view',
-      strictPermission: true
+      permission: "data:resource:view",
+      strictPermission: true,
     },
     children: [
       {
-        path: 'list',
-        name: 'ResourceList',
-        component: () => import('@/views/dataResource/ResourceList.vue'),
+        path: "list",
+        name: "ResourceList",
+        component: () => import("@/views/dataResource/ResourceList.vue"),
         meta: {
-          title: '资源列表',
-          icon: 'List',
+          title: "资源列表",
+          icon: "List",
           requiresAuth: true,
           // 访问资源列表需要查看权限
-          permission: 'data:resource:view',
+          permission: "data:resource:view",
           strictPermission: true,
-          keepAlive: true
-        }
+          keepAlive: true,
+        },
       },
       {
-        path: 'create',
-        name: 'ResourceCreate',
-        component: () => import('@/views/dataResource/ResourceCreate.vue'),
+        path: "create",
+        name: "ResourceCreate",
+        component: () => import("@/views/dataResource/ResourceCreate.vue"),
         meta: {
-          title: '创建资源',
-          icon: 'Plus',
+          title: "创建资源",
+          icon: "Plus",
           requiresAuth: true,
           // 创建资源需要创建权限
-          permission: 'data:resource:create',
+          permission: "data:resource:create",
           strictPermission: true,
-          hideInMenu: true
-        }
+          hideInMenu: true,
+        },
       },
       {
-        path: 'detail/:id',
-        name: 'ResourceDetail',
-        component: () => import('@/views/dataResource/ResourceDetail.vue'),
+        path: "detail/:id",
+        name: "ResourceDetail",
+        component: () => import("@/views/dataResource/ResourceDetail.vue"),
         meta: {
-          title: '资源详情',
+          title: "资源详情",
           requiresAuth: true,
           // 查看资源详情需要查看权限
-          permission: 'data:resource:view',
+          permission: "data:resource:view",
           strictPermission: true,
           hideInMenu: true,
-          activeMenu: '/data-resources/list'
-        }
+          activeMenu: "/data-resources/list",
+        },
       },
       {
-        path: 'query/:id',
-        name: 'ResourceQuery',
-        component: () => import('@/views/dataResource/ResourceQuery.vue'),
+        path: "query/:id",
+        name: "ResourceQuery",
+        component: () => import("@/views/dataResource/ResourceQuery.vue"),
         meta: {
-          title: '数据查询',
+          title: "数据查询",
           requiresAuth: true,
           // 数据查询页需要查询权限
-          permission: 'data:resource:query',
+          permission: "data:resource:query",
           strictPermission: true,
           hideInMenu: true,
-          activeMenu: '/data-resources/list'
-        }
+          activeMenu: "/data-resources/list",
+        },
       },
       // {
       //   path: 'categories',
@@ -171,59 +171,61 @@ const authRoutes: RouteRecordRaw[] = [
       //   }
       // },
       {
-        path: 'packages',
-        name: 'ResourcePackageList',
-        component: () => import('@/views/resourcePackage/ResourcePackageList.vue'),
+        path: "packages",
+        name: "ResourcePackageList",
+        component: () =>
+          import("@/views/resourcePackage/ResourcePackageList.vue"),
         meta: {
-          title: '资源包管理',
-          icon: 'Box',
+          title: "资源包管理",
+          icon: "Box",
           requiresAuth: true,
           // 资源包列表页至少需要查询权限
-          permission: 'data:resource:query'
-        }
+          permission: "data:resource:query",
+        },
       },
       {
-        path: 'packages/:id/query',
-        name: 'ResourcePackageQuery',
-        component: () => import('@/views/resourcePackage/ResourcePackageQueryPage.vue'),
+        path: "packages/:id/query",
+        name: "ResourcePackageQuery",
+        component: () =>
+          import("@/views/resourcePackage/ResourcePackageQueryPage.vue"),
         meta: {
-          title: '资源包查询',
+          title: "资源包查询",
           requiresAuth: true,
           // 资源包查询页需要查询权限
-          permission: 'data:resource:query',
+          permission: "data:resource:query",
           hideInMenu: true,
-          activeMenu: '/data-resources/packages'
-        }
-      }
-    ]
+          activeMenu: "/data-resources/packages",
+        },
+      },
+    ],
   },
   {
-    path: '/datasources',
+    path: "/datasources",
     component: Layout,
-    redirect: '/datasources/list',
+    redirect: "/datasources/list",
     meta: {
-      title: '数据源管理',
-      icon: 'Connection',
+      title: "数据源管理",
+      icon: "Connection",
       requiresAuth: true,
       // 分组访问权限：数据源查看
-      permission: 'data:datasource:view',
-      strictPermission: true
+      permission: "data:datasource:view",
+      strictPermission: true,
     },
     children: [
       {
-        path: 'list',
-        name: 'DatasourceList',
-        component: () => import('@/views/datasources/index.vue'),
+        path: "list",
+        name: "DatasourceList",
+        component: () => import("@/views/datasources/index.vue"),
         meta: {
-          title: '数据源列表',
-          icon: 'List',
+          title: "数据源列表",
+          icon: "List",
           requiresAuth: true,
           // 查看数据源列表需要查看权限
-          permission: 'data:datasource:view',
-          strictPermission: true
-        }
-      }
-    ]
+          permission: "data:datasource:view",
+          strictPermission: true,
+        },
+      },
+    ],
   },
   // {
   //   path: '/users',
@@ -380,127 +382,129 @@ const authRoutes: RouteRecordRaw[] = [
   //   ]
   // },
   {
-    path: '/resource-center',
+    path: "/resource-center",
     component: Layout,
-    redirect: '/resource-center/table-management',
+    redirect: "/resource-center/table-management",
     meta: {
-      title: '资源中心管理',
-      icon: 'Setting',
+      title: "资源中心管理",
+      icon: "Setting",
       requiresAuth: true,
       // 分组访问权限：资源中心查看
-      permission: 'data:resource_center:view',
-      strictPermission: true
+      permission: "data:resource_center:view",
+      strictPermission: true,
     },
     children: [
       {
-        path: 'table-management',
-        name: 'CenterTableManagement',
-        component: () => import('@/views/resourceCenter/CenterTableManagement.vue'),
+        path: "table-management",
+        name: "CenterTableManagement",
+        component: () =>
+          import("@/views/resourceCenter/CenterTableManagement.vue"),
         meta: {
-          title: '中心表管理',
-          icon: 'Grid',
+          title: "中心表管理",
+          icon: "Grid",
           requiresAuth: true,
           // 页面访问权限：资源中心-表管理查看
-          permission: 'data:resource_center:manage',
+          permission: "data:resource_center:manage",
           strictPermission: true,
-          hideFooter: true
-        }
+          hideFooter: true,
+        },
       },
       {
-        path: 'table-query',
-        name: 'CenterTableQuery',
-        component: () => import('@/views/resourceCenter/CenterTableQuery.vue'),
+        path: "table-query",
+        name: "CenterTableQuery",
+        component: () => import("@/views/resourceCenter/CenterTableQuery.vue"),
         meta: {
-          title: '资源中心',
-          icon: 'Search',
+          title: "资源中心",
+          icon: "Search",
           requiresAuth: true,
           // 页面访问权限：资源中心查询
-          permission: 'data:resource_center:query',
+          permission: "data:resource_center:query",
           strictPermission: true,
-          hideFooter: true
-        }
+          hideFooter: true,
+        },
       },
       {
-        path: 'type-management',
-        name: 'ResourceTypeManagement',
-        component: () => import('@/views/resourceCenter/ResourceTypeManagement.vue'),
+        path: "type-management",
+        name: "ResourceTypeManagement",
+        component: () =>
+          import("@/views/resourceCenter/ResourceTypeManagement.vue"),
         meta: {
-          title: '资源类型管理',
-          icon: 'Collection',
+          title: "资源类型管理",
+          icon: "Collection",
           requiresAuth: true,
           // 页面访问权限：资源中心-类型查看
-          permission: 'data:resource_center:type',
-          strictPermission: true
-        }
-      }
-    ]
+          permission: "data:resource_center:type",
+          strictPermission: true,
+        },
+      },
+    ],
   },
   {
-    path: '/api-management',
+    path: "/api-management",
     component: Layout,
-    redirect: '/api-management/customers',
+    redirect: "/api-management/customers",
     meta: {
-      title: 'API接口管理',
-      icon: 'Connection',
+      title: "API接口管理",
+      icon: "Connection",
       requiresAuth: true,
       // 分组访问权限：API查看
-      permission: 'data:api:view',
-      strictPermission: true
+      permission: "data:api:view",
+      strictPermission: true,
     },
     children: [
       {
-        path: 'customers',
-        name: 'CustomerManagement',
-        component: () => import('@/views/apiManagement/CustomerList.vue'),
+        path: "customers",
+        name: "CustomerManagement",
+        component: () => import("@/views/apiManagement/CustomerList.vue"),
         meta: {
-          title: '平台管理',
-          icon: 'UserFilled',
+          title: "平台管理",
+          icon: "UserFilled",
           requiresAuth: true,
           // 页面访问权限：客户平台查看
-          permission: 'data:customer:view',
-          strictPermission: true
-        }
+          permission: "data:customer:view",
+          strictPermission: true,
+        },
       },
       {
-        path: 'apis',
-        name: 'ApiManagement',
-        component: () => import('@/views/apiManagement/ApiList.vue'),
+        path: "apis",
+        name: "ApiManagement",
+        component: () => import("@/views/apiManagement/ApiList.vue"),
         meta: {
-          title: 'API管理',
-          icon: 'Connection',
+          title: "API管理",
+          icon: "Connection",
           requiresAuth: true,
           // 页面访问权限：API列表查看
-          permission: 'data:api:view',
-          strictPermission: true
-        }
+          permission: "data:api:view",
+          strictPermission: true,
+        },
       },
       {
-        path: 'apis/:id/fields',
-        name: 'ApiFields',
-        component: () => import('@/views/apiManagement/ApiFields.vue'),
+        path: "apis/:id/fields",
+        name: "ApiFields",
+        component: () => import("@/views/apiManagement/ApiFields.vue"),
         meta: {
-          title: 'API字段配置',
+          title: "API字段配置",
           requiresAuth: true,
           // API字段配置页需要查询权限（用于编辑字段前校验）
-          permission: 'data:resource:query',
+          permission: "data:resource:query",
           strictPermission: true,
           hideInMenu: true,
-          activeMenu: '/api-management/apis'
-        }
+          activeMenu: "/api-management/apis",
+        },
       },
       {
-        path: 'apis/:id/logs',
-        name: 'ApiUsageLogs',
-        component: () => import('@/views/apiManagement/ApiUsageLogs.vue'),
+        path: "apis/:id/logs",
+        name: "ApiUsageLogs",
+        component: () => import("@/views/apiManagement/ApiUsageLogs.vue"),
         meta: {
-          title: 'API日志',
+          title: "API日志",
           requiresAuth: true,
           // API日志页需要查询权限（用于查看调用记录）
-          permission: 'data:resource:query',
+          permission: "data:resource:query",
           strictPermission: true,
           hideInMenu: true,
-          activeMenu: '/api-management/apis'
-        }
+          activeMenu: "/api-management/apis",
+        },
       },
       // {
       //   path: 'batches',
@@ -533,84 +537,84 @@ const authRoutes: RouteRecordRaw[] = [
       //     requiresAuth: true
       //   }
       // }
-    ]
+    ],
   },
   {
-    path: '/user',
+    path: "/user",
     component: Layout,
-    redirect: '/user/profile',
+    redirect: "/user/profile",
     meta: {
-      title: '用户中心',
-      icon: 'User',
+      title: "用户中心",
+      icon: "User",
       requiresAuth: true,
       // 分组访问权限：用户中心查看
-      permission: 'data:user:view',
+      permission: "data:user:view",
       strictPermission: true,
-      hideInMenu: true
+      hideInMenu: true,
     },
     children: [
       {
-        path: 'profile',
-        name: 'Profile',
-        component: () => import('@/views/user/Profile.vue'),
+        path: "profile",
+        name: "Profile",
+        component: () => import("@/views/user/Profile.vue"),
         meta: {
-          title: '个人资料',
+          title: "个人资料",
           requiresAuth: true,
           // 页面访问权限：用户资料查看
-          permission: 'data:user:profile:view',
+          permission: "data:user:profile:view",
           strictPermission: true,
-          hideInMenu: true
-        }
-      }
-    ]
-  }
-]
+          hideInMenu: true,
+        },
+      },
+    ],
+  },
+];
 
 /**
  * 创建路由实例
  */
 // 添加日志管理 - 用户操作日志菜单
 authRoutes.push({
-  path: '/logs',
+  path: "/logs",
   component: Layout,
-  redirect: '/logs/user-operation-logs',
+  redirect: "/logs/user-operation-logs",
   meta: {
-    title: '日志管理',
-    icon: 'Document',
+    title: "日志管理",
+    icon: "Document",
     requiresAuth: true,
     // 分组访问权限：日志查看
-    permission: 'data:logs:view',
-    strictPermission: true
+    permission: "data:logs:view",
+    strictPermission: true,
   },
   children: [
     {
-      path: 'user-operation-logs',
-      name: 'UserOperationLogs',
-      component: () => import('@/views/userOperationLogs/index.vue'),
+      path: "user-operation-logs",
+      name: "UserOperationLogs",
+      component: () => import("@/views/userOperationLogs/index.vue"),
       meta: {
-        title: '用户操作日志',
-        icon: 'List',
+        title: "用户操作日志",
+        icon: "List",
         requiresAuth: true,
         // 页面访问权限：用户操作日志查看
-        permission: 'data:logs:user_operation:view',
-        strictPermission: true
-      }
+        permission: "data:logs:user_operation:view",
+        strictPermission: true,
+      },
     },
     {
-      path: 'data-upload-logs',
-      name: 'DataUploadLogs',
-      component: () => import('@/views/dataUploadLogs/index.vue'),
+      path: "data-upload-logs",
+      name: "DataUploadLogs",
+      component: () => import("@/views/dataUploadLogs/index.vue"),
       meta: {
-        title: '数据上传日志',
-        icon: 'UploadFilled',
+        title: "数据上传日志",
+        icon: "UploadFilled",
         requiresAuth: true,
         // 页面访问权限：数据上传日志查看
-        permission: 'data:logs:data_upload:view',
-        strictPermission: true
-      }
-    }
-  ]
-})
+        permission: "data:logs:data_upload:view",
+        strictPermission: true,
+      },
+    },
+  ],
+});
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -618,18 +622,18 @@ const router = createRouter({
     ...publicRoutes,
     ...authRoutes,
     {
-      path: '/:pathMatch(.*)*',
-      redirect: '/404'
-    }
+      path: "/:pathMatch(.*)*",
+      redirect: "/404",
+    },
   ],
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) {
-      return savedPosition
+      return savedPosition;
     } else {
-      return { top: 0 }
+      return { top: 0 };
     }
-  }
-})
+  },
+});
 
 /**
  * 路由守卫
@@ -643,98 +647,100 @@ const router = createRouter({
  * - meta.requiresAuth: boolean，需要登录
  */
 router.beforeEach(async (to, from, next) => {
-  const userStore = useUserStore()
-  
+  const userStore = useUserStore();
+
   // 如果访问登录页面且已登录，跳转到仪表盘
-  if (to.path === '/login' && userStore.isLoggedIn) {
-    next('/dashboard')
-    return
+  if (to.path === "/login" && userStore.isLoggedIn) {
+    next("/dashboard");
+    return;
   }
-  
+
   // 检查是否需要认证
   if (to.meta.requiresAuth) {
     if (!userStore.isLoggedIn) {
-      ElMessage.warning('请先登录')
-      next('/login')
-      return
+      ElMessage.warning("请先登录");
+      next("/login");
+      return;
     }
 
     // 首次进入时初始化权限：避免本地存储为空导致权限误判
     try {
       if ((userStore.userPermissions?.length ?? 0) === 0) {
-        await userStore.loadPermissions()
+        await userStore.loadPermissions();
       }
     } catch (e) {
-      console.warn('初始化权限失败，继续使用现有权限')
+      console.warn("初始化权限失败，继续使用现有权限");
     }
-    
+
     // 检查角色权限（任一匹配）
     if (to.meta.roles) {
-      const roles = to.meta.roles as string[]
-      if (!roles.some(role => userStore.hasRole(role))) {
-        ElMessage.error('没有访问权限')
-        next('/404')
-        return
+      const roles = to.meta.roles as string[];
+      if (!roles.some((role) => userStore.hasRole(role))) {
+        ElMessage.error("没有访问权限");
+        next("/404");
+        return;
       }
     }
 
     // 检查单个权限码（支持 strictPermission 忽略管理员直通）
     if (to.meta.permission) {
-      const perm = to.meta.permission as string
-      const useStrict = Boolean((to.meta as any)?.strictPermission)
-      const ok = useStrict ? userStore.hasPermissionStrict(perm) : userStore.hasPermission(perm)
+      const perm = to.meta.permission as string;
+      const useStrict = Boolean((to.meta as any)?.strictPermission);
+      const ok = useStrict
+        ? userStore.hasPermissionStrict(perm)
+        : userStore.hasPermission(perm);
       if (!ok) {
-        ElMessage.error('没有访问权限')
-        next('/404')
-        return
+        ElMessage.error("没有访问权限");
+        next("/404");
+        return;
       }
     }
 
     // 检查任一权限满足（支持 strictPermission）
     if (to.meta.permissionsAny) {
-      const permsAny = to.meta.permissionsAny as string[]
-      const useStrict = Boolean((to.meta as any)?.strictPermission)
+      const permsAny = to.meta.permissionsAny as string[];
+      const useStrict = Boolean((to.meta as any)?.strictPermission);
       const ok = useStrict
-        ? permsAny.some(p => userStore.hasPermissionStrict(p))
-        : userStore.hasAnyPermission(permsAny)
+        ? permsAny.some((p) => userStore.hasPermissionStrict(p))
+        : userStore.hasAnyPermission(permsAny);
       if (!ok) {
-        ElMessage.error('没有访问权限')
-        next('/404')
-        return
+        ElMessage.error("没有访问权限");
+        next("/404");
+        return;
       }
     }
 
     // 检查所有权限满足（支持 strictPermission）
     if (to.meta.permissionsAll) {
-      const permsAll = to.meta.permissionsAll as string[]
-      const useStrict = Boolean((to.meta as any)?.strictPermission)
+      const permsAll = to.meta.permissionsAll as string[];
+      const useStrict = Boolean((to.meta as any)?.strictPermission);
       const ok = useStrict
-        ? permsAll.every(p => userStore.hasPermissionStrict(p))
-        : userStore.hasAllPermissions(permsAll)
+        ? permsAll.every((p) => userStore.hasPermissionStrict(p))
+        : userStore.hasAllPermissions(permsAll);
       if (!ok) {
-        ElMessage.error('没有访问权限')
-        next('/404')
-        return
+        ElMessage.error("没有访问权限");
+        next("/404");
+        return;
       }
     }
   }
-  
-  next()
-})
+
+  next();
+});
 
 /**
  * 路由错误处理
  */
 router.onError((error) => {
-  console.error('路由错误:', error)
-})
+  console.error("路由错误:", error);
+});
 
-export default router
+export default router;
 
 /**
  * 导出认证路由供菜单组件使用
  */
-export { authRoutes }
+export { authRoutes };
 
 /**
  * 获取扁平化路由列表
@@ -742,21 +748,21 @@ export { authRoutes }
  * @returns 扁平化的路由列表
  */
 export function getFlatRoutes(routes: RouteRecordRaw[]): RouteRecordRaw[] {
-  const flatRoutes: RouteRecordRaw[] = []
-  
-  function flatten(routes: RouteRecordRaw[], parentPath = '') {
-    routes.forEach(route => {
-      const fullPath = parentPath + route.path
-      flatRoutes.push({ ...route, path: fullPath })
-      
+  const flatRoutes: RouteRecordRaw[] = [];
+
+  function flatten(routes: RouteRecordRaw[], parentPath = "") {
+    routes.forEach((route) => {
+      const fullPath = parentPath + route.path;
+      flatRoutes.push({ ...route, path: fullPath });
+
       if (route.children) {
-        flatten(route.children, fullPath + '/')
+        flatten(route.children, fullPath + "/");
       }
-    })
+    });
   }
-  
-  flatten(routes)
-  return flatRoutes
+
+  flatten(routes);
+  return flatRoutes;
 }
 
 /**
@@ -764,13 +770,15 @@ export function getFlatRoutes(routes: RouteRecordRaw[]): RouteRecordRaw[] {
  * @param routeName 路由名称
  * @returns 面包屑数组
  */
-export function getBreadcrumbs(routeName: string): Array<{ title: string; path?: string }> {
-  const flatRoutes = getFlatRoutes(authRoutes)
-  const route = flatRoutes.find(r => r.name === routeName)
-  
+export function getBreadcrumbs(
+  routeName: string,
+): Array<{ title: string; path?: string }> {
+  const flatRoutes = getFlatRoutes(authRoutes);
+  const route = flatRoutes.find((r) => r.name === routeName);
+
   if (!route || !route.meta?.breadcrumb) {
-    return []
+    return [];
   }
-  
-  return route.meta.breadcrumb as Array<{ title: string; path?: string }>
+
+  return route.meta.breadcrumb as Array<{ title: string; path?: string }>;
 }

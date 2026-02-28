@@ -37,7 +37,7 @@
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon active">
@@ -49,19 +49,21 @@
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon api-calls">
               <el-icon><DataLine /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ formatNumber(customerStats.totalApiCalls) }}</div>
+              <div class="stat-value">
+                {{ formatNumber(customerStats.totalApiCalls) }}
+              </div>
               <div class="stat-label">总API调用</div>
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon recent">
@@ -93,7 +95,7 @@
               </template>
             </el-input>
           </el-form-item>
-          
+
           <el-form-item label="状态">
             <el-select
               v-model="statusFilter"
@@ -107,7 +109,7 @@
               <el-option label="禁用" value="false" />
             </el-select>
           </el-form-item>
-          
+
           <el-form-item label="公司">
             <el-select
               v-model="companyFilter"
@@ -117,15 +119,15 @@
               @change="handleSearch"
             >
               <el-option label="全部" value="" />
-              <el-option 
-                v-for="company in uniqueCompanies" 
-                :key="company" 
-                :label="company" 
-                :value="company" 
+              <el-option
+                v-for="company in uniqueCompanies"
+                :key="company"
+                :label="company"
+                :value="company"
               />
             </el-select>
           </el-form-item>
-          
+
           <el-form-item>
             <el-button @click="resetFilters">
               <el-icon><RefreshLeft /></el-icon>
@@ -143,8 +145,14 @@
           <div class="card-header">
             <span>客户列表</span>
             <div class="header-actions">
-              <span class="total-count">共 {{ filteredCustomers.length }} 条记录</span>
-              <el-radio-group v-model="viewMode" size="small" style="margin-left: 20px">
+              <span class="total-count"
+                >共 {{ filteredCustomers.length }} 条记录</span
+              >
+              <el-radio-group
+                v-model="viewMode"
+                size="small"
+                style="margin-left: 20px"
+              >
                 <el-radio-button value="grid">
                   <el-icon><Grid /></el-icon>
                 </el-radio-button>
@@ -155,7 +163,7 @@
             </div>
           </div>
         </template>
-        
+
         <!-- 卡片视图 -->
         <div v-if="viewMode === 'grid'" class="grid-view">
           <el-row :gutter="20">
@@ -173,25 +181,27 @@
                     <el-icon><UserFilled /></el-icon>
                   </div>
                   <div class="customer-status">
-                    <el-tag 
-                      :type="customer.is_active ? 'success' : 'danger'" 
+                    <el-tag
+                      :type="customer.is_active ? 'success' : 'danger'"
                       size="small"
                       effect="light"
                     >
-                      {{ customer.is_active ? '激活' : '禁用' }}
+                      {{ customer.is_active ? "激活" : "禁用" }}
                     </el-tag>
                   </div>
                 </div>
-                
+
                 <div class="customer-card-content">
                   <h3 class="customer-name">{{ customer.name }}</h3>
                   <p class="customer-email">{{ customer.email }}</p>
-                  <p class="customer-company" v-if="customer.company">{{ customer.company }}</p>
-                  
+                  <p v-if="customer.company" class="customer-company">
+                    {{ customer.company }}
+                  </p>
+
                   <div class="customer-meta">
                     <div class="meta-item">
                       <el-icon><Phone /></el-icon>
-                      <span>{{ customer.phone || '未设置' }}</span>
+                      <span>{{ customer.phone || "未设置" }}</span>
                     </div>
                     <div class="meta-item">
                       <el-icon><Calendar /></el-icon>
@@ -199,15 +209,24 @@
                     </div>
                     <div class="meta-item">
                       <el-icon><DataLine /></el-icon>
-                      <span>{{ formatNumber(customer.total_api_calls) }} 次调用</span>
+                      <span
+                        >{{
+                          formatNumber(customer.total_api_calls)
+                        }}
+                        次调用</span
+                      >
                     </div>
                   </div>
-                  
+
                   <div class="customer-config">
                     <div class="config-row">
                       <div class="config-item">
                         <span class="config-label">App ID:</span>
-                        <el-text class="app-id" @click="copyToClipboard(customer.app_id)" type="primary">
+                        <el-text
+                          class="app-id"
+                          type="primary"
+                          @click="copyToClipboard(customer.app_id)"
+                        >
                           {{ customer.app_id.substring(0, 8) }}...
                         </el-text>
                       </div>
@@ -215,23 +234,36 @@
                     <div class="config-row">
                       <div class="config-item">
                         <span class="config-label">限制:</span>
-                        <el-tag size="small" type="info">{{ customer.rate_limit }}/分钟</el-tag>
+                        <el-tag size="small" type="info"
+                          >{{ customer.rate_limit }}/分钟</el-tag
+                        >
                       </div>
                       <div class="config-item">
                         <span class="config-label">最大:</span>
-                        <el-tag size="small" type="warning">{{ customer.max_apis }} APIs</el-tag>
+                        <el-tag size="small" type="warning"
+                          >{{ customer.max_apis }} APIs</el-tag
+                        >
                       </div>
                     </div>
                   </div>
-                  
-                  <div class="customer-activity" v-if="customer.last_api_call_at">
+
+                  <div
+                    v-if="customer.last_api_call_at"
+                    class="customer-activity"
+                  >
                     <div class="activity-label">最后活跃:</div>
-                    <div class="activity-time">{{ getRelativeTime(customer.last_api_call_at) }}</div>
+                    <div class="activity-time">
+                      {{ getRelativeTime(customer.last_api_call_at) }}
+                    </div>
                   </div>
                 </div>
-                
+
                 <div class="customer-card-actions">
-                  <el-button size="small" type="primary" @click="showEditDialog(customer)">
+                  <el-button
+                    size="small"
+                    type="primary"
+                    @click="showEditDialog(customer)"
+                  >
                     <el-icon><Edit /></el-icon>
                     编辑
                   </el-button>
@@ -243,15 +275,15 @@
                       <el-dropdown-menu>
                         <el-dropdown-item @click="resetSecret(customer)">
                           <el-icon><Key /></el-icon>
-                        重置密钥
-                      </el-dropdown-item>
-                      <el-dropdown-item @click="resetPassword(customer)">
-                        <el-icon><Lock /></el-icon>
-                        重置密码
-                      </el-dropdown-item>
-                      <el-dropdown-item
-                        divided
-                        @click="deleteCustomer(customer)"
+                          重置密钥
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="resetPassword(customer)">
+                          <el-icon><Lock /></el-icon>
+                          重置密码
+                        </el-dropdown-item>
+                        <el-dropdown-item
+                          divided
+                          @click="deleteCustomer(customer)"
                         >
                           <el-icon><Delete /></el-icon>
                           删除
@@ -264,152 +296,209 @@
             </el-col>
           </el-row>
         </div>
-        
+
         <!-- 列表视图 -->
         <div v-else class="list-view">
           <el-table
-          :data="paginatedCustomers"
-          v-loading="loading"
-          style="width: 100%"
-          @sort-change="handleSortChange"
-          stripe
-          :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
-        >
-          <el-table-column prop="id" label="ID" min-width="80" sortable />
-          
-          <el-table-column prop="name" label="平台信息" min-width="250" sortable>
-            <template #default="{ row }">
-              <div class="customer-info">
-                <div class="customer-avatar">
-                  <el-icon><UserFilled /></el-icon>
+            v-loading="loading"
+            :data="paginatedCustomers"
+            style="width: 100%"
+            stripe
+            :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
+            @sort-change="handleSortChange"
+          >
+            <el-table-column prop="id" label="ID" min-width="80" sortable />
+
+            <el-table-column
+              prop="name"
+              label="平台信息"
+              min-width="250"
+              sortable
+            >
+              <template #default="{ row }">
+                <div class="customer-info">
+                  <div class="customer-avatar">
+                    <el-icon><UserFilled /></el-icon>
+                  </div>
+                  <div class="customer-details">
+                    <div class="customer-name">{{ row.name }}</div>
+                    <div class="customer-email">{{ row.email }}</div>
+                    <div v-if="row.company" class="customer-company">
+                      {{ row.company }}
+                    </div>
+                  </div>
                 </div>
-                <div class="customer-details">
-                  <div class="customer-name">{{ row.name }}</div>
-                  <div class="customer-email">{{ row.email }}</div>
-                  <div class="customer-company" v-if="row.company">{{ row.company }}</div>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="phone" label="联系方式" min-width="130">
+              <template #default="{ row }">
+                <div v-if="row.phone" class="contact-info">
+                  <el-icon><Phone /></el-icon>
+                  {{ row.phone }}
                 </div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="phone" label="联系方式" min-width="130">
-            <template #default="{ row }">
-              <div v-if="row.phone" class="contact-info">
-                <el-icon><Phone /></el-icon>
-                {{ row.phone }}
-              </div>
-              <span v-else class="no-data">-</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="app_id" label="App ID" min-width="140">
-            <template #default="{ row }">
-              <div class="app-id-cell">
-                <el-text class="app-id" @click="copyToClipboard(row.app_id)" type="primary">
-                  {{ row.app_id }}
-                </el-text>
-                <el-icon class="copy-icon" @click="copyToClipboard(row.app_id)">
-                  <CopyDocument />
-                </el-icon>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <el-table-column label="API配置" min-width="180">
-            <template #default="{ row }">
-              <div class="api-config">
-                <div class="config-item">
-                  <span class="config-label">限制:</span>
-                  <el-tag size="small" type="info">{{ row.rate_limit }}/分钟</el-tag>
+                <span v-else class="no-data">-</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="app_id" label="App ID" min-width="140">
+              <template #default="{ row }">
+                <div class="app-id-cell">
+                  <el-text
+                    class="app-id"
+                    type="primary"
+                    @click="copyToClipboard(row.app_id)"
+                  >
+                    {{ row.app_id }}
+                  </el-text>
+                  <el-icon
+                    class="copy-icon"
+                    @click="copyToClipboard(row.app_id)"
+                  >
+                    <CopyDocument />
+                  </el-icon>
                 </div>
-                <div class="config-item">
-                  <span class="config-label">最大:</span>
-                  <el-tag size="small" type="warning">{{ row.max_apis }} APIs</el-tag>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="API配置" min-width="180">
+              <template #default="{ row }">
+                <div class="api-config">
+                  <div class="config-item">
+                    <span class="config-label">限制:</span>
+                    <el-tag size="small" type="info"
+                      >{{ row.rate_limit }}/分钟</el-tag
+                    >
+                  </div>
+                  <div class="config-item">
+                    <span class="config-label">最大:</span>
+                    <el-tag size="small" type="warning"
+                      >{{ row.max_apis }} APIs</el-tag
+                    >
+                  </div>
                 </div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="total_api_calls" label="调用统计" min-width="120" sortable>
-            <template #default="{ row }">
-              <div class="api-stats">
-                <div class="stats-number">{{ formatNumber(row.total_api_calls) }}</div>
-                <div class="stats-label">总调用</div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="last_api_call_at" label="最后活跃" min-width="150" sortable>
-            <template #default="{ row }">
-              <div v-if="row.last_api_call_at" class="last-active">
-                <div class="active-time">{{ formatDate(row.last_api_call_at) }}</div>
-                <div class="active-label">{{ getRelativeTime(row.last_api_call_at) }}</div>
-              </div>
-              <span v-else class="no-data">从未调用</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="is_active" label="状态" min-width="100">
-            <template #default="{ row }">
-              <el-tag 
-                :type="row.is_active ? 'success' : 'danger'" 
-                effect="light"
-                size="small"
-              >
-                <el-icon>
-                  <CircleCheck v-if="row.is_active" />
-                  <CircleClose v-else />
-                </el-icon>
-                {{ row.is_active ? '激活' : '禁用' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="created_at" label="创建时间" min-width="150" sortable>
-            <template #default="{ row }">
-              <div class="create-time">
-                <div class="time-date">{{ formatDate(row.created_at) }}</div>
-                <div class="time-relative">{{ getRelativeTime(row.created_at) }}</div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <el-table-column label="操作" min-width="350" fixed="right">
-            <template #default="{ row }">
-              <div class="action-buttons">
-                <el-button size="small" type="primary" @click="showEditDialog(row)">
-                  <el-icon><Edit /></el-icon>
-                  编辑
-                </el-button>
-                <el-button size="small" type="warning" @click="resetSecret(row)">
-                  <el-icon><Key /></el-icon>
-                  重置密钥
-                </el-button>
-                <el-button size="small" type="info" @click="resetPassword(row)">
-                  <el-icon><Lock /></el-icon>
-                  重置密码
-                </el-button>
-                <el-button size="small" type="danger" @click="deleteCustomer(row)">
-                  <el-icon><Delete /></el-icon>
-                  删除
-                </el-button>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-        
-        <!-- 分页 -->
-        <div class="pagination-wrapper">
-          <el-pagination
-             v-model:current-page="pagination.page"
-             v-model:page-size="pagination.pageSize"
-             :total="filteredCustomers.length"
-             :page-sizes="[10, 20, 50, 100]"
-             layout="total, sizes, prev, pager, next, jumper"
-             @size-change="handleSizeChange"
-             @current-change="handleCurrentChange"
-           />
-        </div>
+              </template>
+            </el-table-column>
+
+            <el-table-column
+              prop="total_api_calls"
+              label="调用统计"
+              min-width="120"
+              sortable
+            >
+              <template #default="{ row }">
+                <div class="api-stats">
+                  <div class="stats-number">
+                    {{ formatNumber(row.total_api_calls) }}
+                  </div>
+                  <div class="stats-label">总调用</div>
+                </div>
+              </template>
+            </el-table-column>
+
+            <el-table-column
+              prop="last_api_call_at"
+              label="最后活跃"
+              min-width="150"
+              sortable
+            >
+              <template #default="{ row }">
+                <div v-if="row.last_api_call_at" class="last-active">
+                  <div class="active-time">
+                    {{ formatDate(row.last_api_call_at) }}
+                  </div>
+                  <div class="active-label">
+                    {{ getRelativeTime(row.last_api_call_at) }}
+                  </div>
+                </div>
+                <span v-else class="no-data">从未调用</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="is_active" label="状态" min-width="100">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row.is_active ? 'success' : 'danger'"
+                  effect="light"
+                  size="small"
+                >
+                  <el-icon>
+                    <CircleCheck v-if="row.is_active" />
+                    <CircleClose v-else />
+                  </el-icon>
+                  {{ row.is_active ? "激活" : "禁用" }}
+                </el-tag>
+              </template>
+            </el-table-column>
+
+            <el-table-column
+              prop="created_at"
+              label="创建时间"
+              min-width="150"
+              sortable
+            >
+              <template #default="{ row }">
+                <div class="create-time">
+                  <div class="time-date">{{ formatDate(row.created_at) }}</div>
+                  <div class="time-relative">
+                    {{ getRelativeTime(row.created_at) }}
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="操作" min-width="350" fixed="right">
+              <template #default="{ row }">
+                <div class="action-buttons">
+                  <el-button
+                    size="small"
+                    type="primary"
+                    @click="showEditDialog(row)"
+                  >
+                    <el-icon><Edit /></el-icon>
+                    编辑
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="warning"
+                    @click="resetSecret(row)"
+                  >
+                    <el-icon><Key /></el-icon>
+                    重置密钥
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="info"
+                    @click="resetPassword(row)"
+                  >
+                    <el-icon><Lock /></el-icon>
+                    重置密码
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="danger"
+                    @click="deleteCustomer(row)"
+                  >
+                    <el-icon><Delete /></el-icon>
+                    删除
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <!-- 分页 -->
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="pagination.page"
+              v-model:page-size="pagination.pageSize"
+              :total="filteredCustomers.length"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+            />
+          </div>
         </div>
       </el-card>
     </div>
@@ -469,19 +558,15 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitForm" :loading="submitting">
-            {{ isEdit ? '更新' : '创建' }}
+          <el-button type="primary" :loading="submitting" @click="submitForm">
+            {{ isEdit ? "更新" : "创建" }}
           </el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- 密钥显示对话框 -->
-    <el-dialog
-      v-model="secretDialogVisible"
-      title="客户密钥信息"
-      width="500px"
-    >
+    <el-dialog v-model="secretDialogVisible" title="客户密钥信息" width="500px">
       <div class="secret-info">
         <el-alert
           title="请妥善保管密钥信息"
@@ -521,7 +606,9 @@
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="secretDialogVisible = false">确定</el-button>
+          <el-button type="primary" @click="secretDialogVisible = false"
+            >确定</el-button
+          >
         </div>
       </template>
     </el-dialog>
@@ -541,11 +628,7 @@
         />
         <el-form label-width="100px">
           <el-form-item label="密码:">
-            <el-input
-              :value="currentPassword"
-              readonly
-              style="width: 300px"
-            >
+            <el-input :value="currentPassword" readonly style="width: 300px">
               <template #append>
                 <el-button @click="copyToClipboard(String(currentPassword))">
                   <el-icon><CopyDocument /></el-icon>
@@ -557,7 +640,9 @@
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="passwordDialogVisible = false">确定</el-button>
+          <el-button type="primary" @click="passwordDialogVisible = false"
+            >确定</el-button
+          >
         </div>
       </template>
     </el-dialog>
@@ -565,173 +650,179 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
-import { 
-  UserFilled, 
-  Plus, 
-  Refresh, 
-  Search, 
+import { ref, reactive, computed, onMounted } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import type { FormInstance, FormRules } from "element-plus";
+import {
+  UserFilled,
+  Plus,
+  Refresh,
+  Search,
   RefreshLeft,
-  CircleCheck, 
+  CircleCheck,
   CircleClose,
-  DataLine, 
-  Clock, 
+  DataLine,
+  Clock,
   Phone,
   CopyDocument,
-  Edit, 
-  Key, 
+  Edit,
+  Key,
   Delete,
   Grid,
   List,
   Calendar,
   Setting,
   MoreFilled,
-  Lock
-} from '@element-plus/icons-vue'
-import { formatDate } from '@/utils/date'
+  Lock,
+} from "@element-plus/icons-vue";
+import { formatDate } from "@/utils/date";
 import {
   getCustomers,
   createCustomer,
   updateCustomer,
   deleteCustomer as deleteCustomerApi,
-  resetCustomerSecret
-  , resetCustomerPassword
-} from '@/api/apiManagement'
-import type { Customer, CustomerCreate, CustomerUpdate } from '@/types/apiManagement'
+  resetCustomerSecret,
+  resetCustomerPassword,
+} from "@/api/apiManagement";
+import type {
+  Customer,
+  CustomerCreate,
+  CustomerUpdate,
+} from "@/types/apiManagement";
 
 /**
  * 响应式数据
  */
-const loading = ref(false)
-const customers = ref<Customer[]>([])
-const searchQuery = ref('')
-const statusFilter = ref('')
-const companyFilter = ref('')
-const dialogVisible = ref(false)
-const secretDialogVisible = ref(false)
-const passwordDialogVisible = ref(false)
-const isEdit = ref(false)
-const submitting = ref(false)
-const formRef = ref<FormInstance>()
-const viewMode = ref('list')
+const loading = ref(false);
+const customers = ref<Customer[]>([]);
+const searchQuery = ref("");
+const statusFilter = ref("");
+const companyFilter = ref("");
+const dialogVisible = ref(false);
+const secretDialogVisible = ref(false);
+const passwordDialogVisible = ref(false);
+const isEdit = ref(false);
+const submitting = ref(false);
+const formRef = ref<FormInstance>();
+const viewMode = ref("list");
 
 // 筛选数据
 const filters = reactive({
-  search: '',
-  status: '',
-  company: ''
-})
+  search: "",
+  status: "",
+  company: "",
+});
 
 // 分页数据
 const pagination = reactive({
   page: 1,
-  pageSize: 20
-})
+  pageSize: 20,
+});
 
 // 表单数据
 const form = reactive<CustomerCreate & { is_active?: boolean; id?: number }>({
-  name: '',
-  email: '',
-  phone: '',
-  company: '',
+  name: "",
+  email: "",
+  phone: "",
+  company: "",
   rate_limit: 100,
   max_apis: 10,
-  is_active: true
-})
+  is_active: true,
+});
 
 // 统计数据
 const customerStats = computed(() => {
-  const total = customers.value.length
-  const active = customers.value.filter(c => c.is_active).length
-  const totalApiCalls = customers.value.reduce((sum, c) => sum + (c.total_api_calls || 0), 0)
-  
+  const total = customers.value.length;
+  const active = customers.value.filter((c) => c.is_active).length;
+  const totalApiCalls = customers.value.reduce(
+    (sum, c) => sum + (c.total_api_calls || 0),
+    0,
+  );
+
   // 计算近期活跃平台（最近30天有API调用）
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const recentActive = customers.value.filter(c => 
-    c.last_api_call_at && new Date(c.last_api_call_at) > thirtyDaysAgo
-  ).length
-  
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const recentActive = customers.value.filter(
+    (c) => c.last_api_call_at && new Date(c.last_api_call_at) > thirtyDaysAgo,
+  ).length;
+
   return {
     total,
     active,
     totalApiCalls,
-    recentActive
-  }
-})
+    recentActive,
+  };
+});
 
 // 获取唯一公司列表
 const uniqueCompanies = computed(() => {
   const companies = customers.value
-    .map(c => c.company)
+    .map((c) => c.company)
     .filter(Boolean)
-    .filter((company, index, arr) => arr.indexOf(company) === index)
-  return companies.sort()
-})
+    .filter((company, index, arr) => arr.indexOf(company) === index);
+  return companies.sort();
+});
 
 // 当前密钥信息
 const currentSecret = reactive({
-  app_id: '',
-  app_secret: ''
-})
-const currentPassword = ref('')
+  app_id: "",
+  app_secret: "",
+});
+const currentPassword = ref("");
 
 // 表单验证规则
 const formRules: FormRules = {
   name: [
-    { required: true, message: '请输入客户名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+    { required: true, message: "请输入客户名称", trigger: "blur" },
+    { min: 2, max: 50, message: "长度在 2 到 50 个字符", trigger: "blur" },
   ],
   email: [
-    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+    { required: true, message: "请输入邮箱地址", trigger: "blur" },
+    { type: "email", message: "请输入正确的邮箱地址", trigger: "blur" },
   ],
-  rate_limit: [
-    { required: true, message: '请设置调用限制', trigger: 'blur' }
-  ],
-  max_apis: [
-    { required: true, message: '请设置最大API数', trigger: 'blur' }
-  ]
-}
+  rate_limit: [{ required: true, message: "请设置调用限制", trigger: "blur" }],
+  max_apis: [{ required: true, message: "请设置最大API数", trigger: "blur" }],
+};
 
 /**
  * 计算属性
  */
 const filteredCustomers = computed(() => {
-  let result = customers.value
+  let result = customers.value;
 
   // 搜索过滤
   if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    result = result.filter(customer =>
-      customer.name.toLowerCase().includes(query) ||
-      customer.email.toLowerCase().includes(query) ||
-      (customer.company && customer.company.toLowerCase().includes(query))
-    )
+    const query = searchQuery.value.toLowerCase();
+    result = result.filter(
+      (customer) =>
+        customer.name.toLowerCase().includes(query) ||
+        customer.email.toLowerCase().includes(query) ||
+        (customer.company && customer.company.toLowerCase().includes(query)),
+    );
   }
 
   // 状态过滤
-  if (statusFilter.value !== '') {
-    const isActive = statusFilter.value === 'true'
-    result = result.filter(customer => customer.is_active === isActive)
+  if (statusFilter.value !== "") {
+    const isActive = statusFilter.value === "true";
+    result = result.filter((customer) => customer.is_active === isActive);
   }
 
   // 公司过滤
   if (companyFilter.value) {
-    result = result.filter(customer => customer.company === companyFilter.value)
+    result = result.filter(
+      (customer) => customer.company === companyFilter.value,
+    );
   }
 
-  return result
-})
+  return result;
+});
 
 // 分页后的客户数据
 const paginatedCustomers = computed(() => {
-  const start = (pagination.page - 1) * pagination.pageSize
-  const end = start + pagination.pageSize
-  return filteredCustomers.value.slice(start, end)
-})
+  const start = (pagination.page - 1) * pagination.pageSize;
+  const end = start + pagination.pageSize;
+  return filteredCustomers.value.slice(start, end);
+});
 
 /**
  * 工具函数
@@ -742,40 +833,40 @@ const paginatedCustomers = computed(() => {
  */
 const formatNumber = (num: number): string => {
   if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
+    return (num / 1000000).toFixed(1) + "M";
   } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
+    return (num / 1000).toFixed(1) + "K";
   }
-  return num.toString()
-}
+  return num.toString();
+};
 
 /**
  * 获取相对时间
  */
 const getRelativeTime = (dateString: string): string => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
   if (diffInSeconds < 60) {
-    return '刚刚'
+    return "刚刚";
   } else if (diffInSeconds < 3600) {
-    return `${Math.floor(diffInSeconds / 60)}分钟前`
+    return `${Math.floor(diffInSeconds / 60)}分钟前`;
   } else if (diffInSeconds < 86400) {
-    return `${Math.floor(diffInSeconds / 3600)}小时前`
+    return `${Math.floor(diffInSeconds / 3600)}小时前`;
   } else if (diffInSeconds < 2592000) {
-    return `${Math.floor(diffInSeconds / 86400)}天前`
+    return `${Math.floor(diffInSeconds / 86400)}天前`;
   } else {
-    return `${Math.floor(diffInSeconds / 2592000)}个月前`
+    return `${Math.floor(diffInSeconds / 2592000)}个月前`;
   }
-}
+};
 
 /**
  * 生命周期钩子
  */
 onMounted(() => {
-  loadCustomers()
-})
+  loadCustomers();
+});
 
 /**
  * 方法定义
@@ -786,63 +877,63 @@ onMounted(() => {
  */
 const loadCustomers = async () => {
   try {
-    loading.value = true
-    const response = await getCustomers()
+    loading.value = true;
+    const response = await getCustomers();
 
     if (response.success) {
-      customers.value = response.data.items || response.data
+      customers.value = response.data.items || response.data;
     } else {
-      ElMessage.error(response.message || '加载客户列表失败')
+      ElMessage.error(response.message || "加载客户列表失败");
     }
   } catch (error) {
-    console.error('加载客户列表失败:', error)
-    ElMessage.error('加载客户列表失败')
+    console.error("加载客户列表失败:", error);
+    ElMessage.error("加载客户列表失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 /**
  * 重置筛选条件
  */
 const resetFilters = () => {
-  searchQuery.value = ''
-  statusFilter.value = ''
-  companyFilter.value = ''
-  pagination.page = 1
-}
+  searchQuery.value = "";
+  statusFilter.value = "";
+  companyFilter.value = "";
+  pagination.page = 1;
+};
 
 /**
  * 分页大小改变处理
  */
 const handleSizeChange = (size: number) => {
-  pagination.pageSize = size
-  pagination.page = 1
-}
+  pagination.pageSize = size;
+  pagination.page = 1;
+};
 
 /**
  * 当前页改变处理
  */
 const handleCurrentChange = (page: number) => {
-  pagination.page = page
-}
+  pagination.page = page;
+};
 
 /**
  * 显示创建对话框
  */
 const showCreateDialog = () => {
-  isEdit.value = false
-  dialogVisible.value = true
-  resetForm()
-}
+  isEdit.value = false;
+  dialogVisible.value = true;
+  resetForm();
+};
 
 /**
  * 显示编辑对话框
  */
 const showEditDialog = (customer: Customer) => {
-  isEdit.value = true
-  dialogVisible.value = true
-  
+  isEdit.value = true;
+  dialogVisible.value = true;
+
   // 填充表单数据
   Object.assign(form, {
     name: customer.name,
@@ -851,42 +942,42 @@ const showEditDialog = (customer: Customer) => {
     company: customer.company,
     rate_limit: customer.rate_limit,
     max_apis: customer.max_apis,
-    is_active: customer.is_active
-  })
-  
-  form.id = customer.id
-}
+    is_active: customer.is_active,
+  });
+
+  form.id = customer.id;
+};
 
 /**
  * 重置表单
  */
 const resetForm = () => {
   if (formRef.value) {
-    formRef.value.resetFields()
+    formRef.value.resetFields();
   }
-  
+
   Object.assign(form, {
-    name: '',
-    email: '',
-    phone: '',
-    company: '',
+    name: "",
+    email: "",
+    phone: "",
+    company: "",
     rate_limit: 100,
     max_apis: 10,
-    is_active: true
-  })
-  
-  delete form.id
-}
+    is_active: true,
+  });
+
+  delete form.id;
+};
 
 /**
  * 提交表单
  */
 const submitForm = async () => {
-  if (!formRef.value) return
+  if (!formRef.value) return;
 
   try {
-    await formRef.value.validate()
-    submitting.value = true
+    await formRef.value.validate();
+    submitting.value = true;
 
     if (isEdit.value && form.id) {
       // 更新客户
@@ -897,16 +988,16 @@ const submitForm = async () => {
         company: form.company,
         rate_limit: form.rate_limit,
         max_apis: form.max_apis,
-        is_active: form.is_active
-      }
+        is_active: form.is_active,
+      };
 
-      const response = await updateCustomer(form.id, updateData)
+      const response = await updateCustomer(form.id, updateData);
       if (response.success) {
-        ElMessage.success('客户更新成功')
-        dialogVisible.value = false
-        loadCustomers()
+        ElMessage.success("客户更新成功");
+        dialogVisible.value = false;
+        loadCustomers();
       } else {
-        ElMessage.error(response.message || '客户更新失败')
+        ElMessage.error(response.message || "客户更新失败");
       }
     } else {
       // 创建客户
@@ -916,24 +1007,24 @@ const submitForm = async () => {
         phone: form.phone,
         company: form.company,
         rate_limit: form.rate_limit,
-        max_apis: form.max_apis
-      }
+        max_apis: form.max_apis,
+      };
 
-      const response = await createCustomer(createData)
+      const response = await createCustomer(createData);
       if (response.success) {
-        ElMessage.success('客户创建成功')
-        dialogVisible.value = false
-        loadCustomers()
+        ElMessage.success("客户创建成功");
+        dialogVisible.value = false;
+        loadCustomers();
       } else {
-        ElMessage.error(response.message || '客户创建失败')
+        ElMessage.error(response.message || "客户创建失败");
       }
     }
   } catch (error) {
-    console.error('提交表单失败:', error)
+    console.error("提交表单失败:", error);
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
-}
+};
 
 /**
  * 删除客户
@@ -942,28 +1033,28 @@ const deleteCustomer = async (customer: Customer) => {
   try {
     await ElMessageBox.confirm(
       `确定要删除客户 "${customer.name}" 吗？此操作不可恢复。`,
-      '确认删除',
+      "确认删除",
       {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    );
 
-    const response = await deleteCustomerApi(customer.id)
+    const response = await deleteCustomerApi(customer.id);
     if (response.success) {
-      ElMessage.success('客户删除成功')
-      loadCustomers()
+      ElMessage.success("客户删除成功");
+      loadCustomers();
     } else {
-      ElMessage.error(response.message || '客户删除失败')
+      ElMessage.error(response.message || "客户删除失败");
     }
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除客户失败:', error)
-      ElMessage.error('客户删除失败')
+    if (error !== "cancel") {
+      console.error("删除客户失败:", error);
+      ElMessage.error("客户删除失败");
     }
   }
-}
+};
 
 /**
  * 重置客户密钥
@@ -972,78 +1063,81 @@ const resetSecret = async (customer: Customer) => {
   try {
     await ElMessageBox.confirm(
       `确定要重置客户 "${customer.name}" 的密钥吗？旧密钥将失效。`,
-      '确认重置密钥',
+      "确认重置密钥",
       {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    );
 
-    const response = await resetCustomerSecret(customer.id)
+    const response = await resetCustomerSecret(customer.id);
     if (response.success) {
-      currentSecret.app_id = customer.app_id
-      currentSecret.app_secret = response.data.app_secret
-      secretDialogVisible.value = true
-      ElMessage.success('密钥重置成功')
+      currentSecret.app_id = customer.app_id;
+      currentSecret.app_secret = response.data.app_secret;
+      secretDialogVisible.value = true;
+      ElMessage.success("密钥重置成功");
     } else {
-      ElMessage.error(response.message || '密钥重置失败')
+      ElMessage.error(response.message || "密钥重置失败");
     }
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('重置密钥失败:', error)
-      ElMessage.error('密钥重置失败')
+    if (error !== "cancel") {
+      console.error("重置密钥失败:", error);
+      ElMessage.error("密钥重置失败");
     }
   }
-}
+};
 
 // 生成强密码
 const generateRandomPassword = (length = 12) => {
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-  const lower = 'abcdefghijklmnopqrstuvwxyz'
-  const digits = '0123456789'
-  const symbols = '!@#$%^&*()-_=+[]{};:,.<>?'
-  const all = upper + lower + digits + symbols
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const symbols = "!@#$%^&*()-_=+[]{};:,.<>?";
+  const all = upper + lower + digits + symbols;
 
-  let password = ''
-  password += upper[Math.floor(Math.random() * upper.length)]
-  password += lower[Math.floor(Math.random() * lower.length)]
-  password += digits[Math.floor(Math.random() * digits.length)]
-  password += symbols[Math.floor(Math.random() * symbols.length)]
+  let password = "";
+  password += upper[Math.floor(Math.random() * upper.length)];
+  password += lower[Math.floor(Math.random() * lower.length)];
+  password += digits[Math.floor(Math.random() * digits.length)];
+  password += symbols[Math.floor(Math.random() * symbols.length)];
   for (let i = password.length; i < length; i++) {
-    password += all[Math.floor(Math.random() * all.length)]
+    password += all[Math.floor(Math.random() * all.length)];
   }
-  return password.split('').sort(() => Math.random() - 0.5).join('')
-}
+  return password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+};
 
 // 重置客户密码（调用服务端并展示一次性密码）
 const resetPassword = async (customer: Customer) => {
   try {
     await ElMessageBox.confirm(
       `确定要为客户 "${customer.name}" 重置密码吗？`,
-      '确认重置密码',
+      "确认重置密码",
       {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    );
 
-    const response = await resetCustomerPassword(customer.id)
+    const response = await resetCustomerPassword(customer.id);
     if (response.success) {
-      currentPassword.value = response.data.password
-      passwordDialogVisible.value = true
-      ElMessage.success('密码重置成功')
+      currentPassword.value = response.data.password;
+      passwordDialogVisible.value = true;
+      ElMessage.success("密码重置成功");
     } else {
-      ElMessage.error(response.message || '密码重置失败')
+      ElMessage.error(response.message || "密码重置失败");
     }
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('重置密码失败:', error)
-      ElMessage.error('重置密码失败')
+    if (error !== "cancel") {
+      console.error("重置密码失败:", error);
+      ElMessage.error("重置密码失败");
     }
   }
-}
+};
 
 /**
  * 复制到剪贴板
@@ -1051,47 +1145,45 @@ const resetPassword = async (customer: Customer) => {
 const copyToClipboard = async (text: string) => {
   try {
     if (navigator.clipboard && (window as any).isSecureContext) {
-      await navigator.clipboard.writeText(text)
-      ElMessage.success('已复制到剪贴板')
-      return
+      await navigator.clipboard.writeText(text);
+      ElMessage.success("已复制到剪贴板");
+      return;
     }
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.setAttribute('readonly', '')
-    textarea.style.position = 'absolute'
-    textarea.style.left = '-9999px'
-    document.body.appendChild(textarea)
-    textarea.focus()
-    textarea.select()
-    const succeeded = document.execCommand('copy')
-    document.body.removeChild(textarea)
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const succeeded = document.execCommand("copy");
+    document.body.removeChild(textarea);
     if (succeeded) {
-      ElMessage.success('已复制到剪贴板')
+      ElMessage.success("已复制到剪贴板");
     } else {
-      throw new Error('execCommand copy failed')
+      throw new Error("execCommand copy failed");
     }
   } catch (error) {
-    console.error('复制失败:', error)
-    ElMessage.error('复制失败')
+    console.error("复制失败:", error);
+    ElMessage.error("复制失败");
   }
-}
+};
 
 /**
  * 搜索处理
  */
 const handleSearch = () => {
   // 搜索逻辑已在计算属性中处理
-}
+};
 
 /**
  * 排序处理
  */
 const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
   // 这里可以实现服务端排序
-  console.log('排序:', prop, order)
-}
-
-
+  console.log("排序:", prop, order);
+};
 </script>
 
 <style scoped lang="scss">
@@ -1104,12 +1196,12 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
 /* 页面头部 */
 .page-header {
   margin-bottom: 24px;
-  
+
   .header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    
+
     .header-left {
       .page-title {
         display: flex;
@@ -1119,13 +1211,13 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
         font-size: 28px;
         font-weight: 700;
         color: #303133;
-        
+
         .el-icon {
           font-size: 32px;
           color: #409eff;
         }
       }
-      
+
       .page-description {
         margin: 0;
         font-size: 16px;
@@ -1133,7 +1225,7 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
         line-height: 1.5;
       }
     }
-    
+
     .header-right {
       display: flex;
       gap: 12px;
@@ -1300,11 +1392,11 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
   .customer-card {
     padding: 16px;
   }
-  
+
   .customer-name {
     font-size: 16px;
   }
-  
+
   .config-row {
     flex-direction: column;
     align-items: flex-start;
@@ -1315,7 +1407,7 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
 /* 统计卡片 */
 .stats-cards {
   margin-bottom: 24px;
-  
+
   .stat-card {
     background: white;
     border-radius: 12px;
@@ -1326,13 +1418,13 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
     align-items: center;
     gap: 16px;
     transition: all 0.3s ease;
-    
+
     &:hover {
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
       transform: translateY(-2px);
     }
   }
-  
+
   .stat-icon {
     width: 56px;
     height: 56px;
@@ -1342,28 +1434,28 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
     justify-content: center;
     font-size: 24px;
     color: white;
-    
+
     &.total {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
-    
+
     &.active {
       background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     }
-    
+
     &.api-calls {
       background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     }
-    
+
     &.recent {
       background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
     }
   }
-  
+
   .stat-content {
     flex: 1;
   }
-  
+
   .stat-value {
     font-size: 32px;
     font-weight: 700;
@@ -1371,7 +1463,7 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
     line-height: 1;
     margin-bottom: 4px;
   }
-  
+
   .stat-label {
     font-size: 14px;
     color: #909399;
@@ -1465,9 +1557,9 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
 
 .app-id {
   cursor: pointer;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 12px;
-  
+
   &:hover {
     text-decoration: underline;
   }
@@ -1477,7 +1569,7 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
   cursor: pointer;
   color: #909399;
   font-size: 14px;
-  
+
   &:hover {
     color: #409eff;
   }
@@ -1517,17 +1609,20 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
   color: #909399;
 }
 
-.last-active, .create-time {
+.last-active,
+.create-time {
   text-align: center;
 }
 
-.active-time, .time-date {
+.active-time,
+.time-date {
   font-size: 13px;
   color: #606266;
   margin-bottom: 2px;
 }
 
-.active-label, .time-relative {
+.active-label,
+.time-relative {
   font-size: 12px;
   color: #c0c4cc;
 }
@@ -1561,25 +1656,25 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
   .customer-management {
     padding: 16px;
   }
-  
+
   .header-content {
     flex-direction: column;
     gap: 16px;
   }
-  
+
   .header-right {
     width: 100%;
     justify-content: flex-start;
   }
-  
+
   .page-title {
     font-size: 24px;
   }
-  
+
   .stat-card {
     padding: 16px;
   }
-  
+
   .stat-value {
     font-size: 24px;
   }

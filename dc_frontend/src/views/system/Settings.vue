@@ -11,11 +11,7 @@
           <el-icon><Refresh /></el-icon>
           重置
         </el-button>
-        <el-button
-          type="primary"
-          :loading="saving"
-          @click="handleSave"
-        >
+        <el-button type="primary" :loading="saving" @click="handleSave">
           <el-icon><Check /></el-icon>
           保存设置
         </el-button>
@@ -105,14 +101,20 @@
                 </el-form-item>
 
                 <el-form-item label="默认语言">
-                  <el-select v-model="settings.basic.default_language" style="width: 200px">
+                  <el-select
+                    v-model="settings.basic.default_language"
+                    style="width: 200px"
+                  >
                     <el-option label="中文" value="zh-CN" />
                     <el-option label="English" value="en-US" />
                   </el-select>
                 </el-form-item>
 
                 <el-form-item label="默认时区">
-                  <el-select v-model="settings.basic.default_timezone" style="width: 200px">
+                  <el-select
+                    v-model="settings.basic.default_timezone"
+                    style="width: 200px"
+                  >
                     <el-option label="北京时间" value="Asia/Shanghai" />
                     <el-option label="UTC" value="UTC" />
                     <el-option label="纽约时间" value="America/New_York" />
@@ -161,16 +163,32 @@
               >
                 <el-form-item label="密码策略">
                   <div class="password-policy">
-                    <el-checkbox v-model="settings.security.password_policy.require_uppercase">
+                    <el-checkbox
+                      v-model="
+                        settings.security.password_policy.require_uppercase
+                      "
+                    >
                       要求大写字母
                     </el-checkbox>
-                    <el-checkbox v-model="settings.security.password_policy.require_lowercase">
+                    <el-checkbox
+                      v-model="
+                        settings.security.password_policy.require_lowercase
+                      "
+                    >
                       要求小写字母
                     </el-checkbox>
-                    <el-checkbox v-model="settings.security.password_policy.require_numbers">
+                    <el-checkbox
+                      v-model="
+                        settings.security.password_policy.require_numbers
+                      "
+                    >
                       要求数字
                     </el-checkbox>
-                    <el-checkbox v-model="settings.security.password_policy.require_symbols">
+                    <el-checkbox
+                      v-model="
+                        settings.security.password_policy.require_symbols
+                      "
+                    >
                       要求特殊字符
                     </el-checkbox>
                   </div>
@@ -301,7 +319,10 @@
                 </el-form-item>
 
                 <el-form-item label="加密方式">
-                  <el-select v-model="settings.email.smtp_encryption" style="width: 200px">
+                  <el-select
+                    v-model="settings.email.smtp_encryption"
+                    style="width: 200px"
+                  >
                     <el-option label="无" value="none" />
                     <el-option label="SSL" value="ssl" />
                     <el-option label="TLS" value="tls" />
@@ -326,7 +347,10 @@
                 label-width="120px"
               >
                 <el-form-item label="存储类型">
-                  <el-select v-model="settings.storage.storage_type" style="width: 200px">
+                  <el-select
+                    v-model="settings.storage.storage_type"
+                    style="width: 200px"
+                  >
                     <el-option label="本地存储" value="local" />
                     <el-option label="阿里云OSS" value="aliyun_oss" />
                     <el-option label="腾讯云COS" value="tencent_cos" />
@@ -386,7 +410,10 @@
                 </el-form-item>
 
                 <el-form-item label="备份频率">
-                  <el-select v-model="settings.backup.backup_frequency" style="width: 200px">
+                  <el-select
+                    v-model="settings.backup.backup_frequency"
+                    style="width: 200px"
+                  >
                     <el-option label="每天" value="daily" />
                     <el-option label="每周" value="weekly" />
                     <el-option label="每月" value="monthly" />
@@ -445,7 +472,10 @@
                 label-width="120px"
               >
                 <el-form-item label="日志级别">
-                  <el-select v-model="settings.logs.log_level" style="width: 200px">
+                  <el-select
+                    v-model="settings.logs.log_level"
+                    style="width: 200px"
+                  >
                     <el-option label="DEBUG" value="debug" />
                     <el-option label="INFO" value="info" />
                     <el-option label="WARNING" value="warning" />
@@ -570,9 +600,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
+import { ref, reactive, onMounted } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import type { FormInstance, FormRules } from "element-plus";
 import {
   Refresh,
   Check,
@@ -583,37 +613,37 @@ import {
   Download,
   Document,
   TrendCharts,
-  Connection
-} from '@element-plus/icons-vue'
+  Connection,
+} from "@element-plus/icons-vue";
 import {
   getSystemSettings,
   updateSystemSettings,
   testEmailConnection as testEmail,
-  createSystemBackup
-} from '@/api/system'
+  createSystemBackup,
+} from "@/api/system";
 
 // 响应式数据
-const activeTab = ref('basic')
-const saving = ref(false)
-const basicFormRef = ref<FormInstance>()
-const securityFormRef = ref<FormInstance>()
-const emailFormRef = ref<FormInstance>()
-const storageFormRef = ref<FormInstance>()
-const backupFormRef = ref<FormInstance>()
-const logsFormRef = ref<FormInstance>()
-const performanceFormRef = ref<FormInstance>()
+const activeTab = ref("basic");
+const saving = ref(false);
+const basicFormRef = ref<FormInstance>();
+const securityFormRef = ref<FormInstance>();
+const emailFormRef = ref<FormInstance>();
+const storageFormRef = ref<FormInstance>();
+const backupFormRef = ref<FormInstance>();
+const logsFormRef = ref<FormInstance>();
+const performanceFormRef = ref<FormInstance>();
 
 // 设置数据
 const settings = reactive({
   basic: {
-    system_name: '',
-    system_description: '',
-    system_version: '',
-    default_language: 'zh-CN',
-    default_timezone: 'Asia/Shanghai',
+    system_name: "",
+    system_description: "",
+    system_version: "",
+    default_language: "zh-CN",
+    default_timezone: "Asia/Shanghai",
     default_page_size: 20,
     maintenance_mode: false,
-    allow_registration: true
+    allow_registration: true,
   },
   security: {
     password_policy: {
@@ -621,46 +651,46 @@ const settings = reactive({
       require_uppercase: true,
       require_lowercase: true,
       require_numbers: true,
-      require_symbols: true
+      require_symbols: true,
     },
     password_expiry_days: 90,
     max_login_attempts: 5,
     lockout_duration: 30,
     session_timeout: 120,
     enable_2fa: false,
-    ip_whitelist: ''
+    ip_whitelist: "",
   },
   email: {
-    smtp_host: '',
+    smtp_host: "",
     smtp_port: 587,
-    from_email: '',
-    from_name: '',
-    smtp_username: '',
-    smtp_password: '',
-    smtp_encryption: 'tls'
+    from_email: "",
+    from_name: "",
+    smtp_username: "",
+    smtp_password: "",
+    smtp_encryption: "tls",
   },
   storage: {
-    storage_type: 'local',
-    storage_path: '/uploads',
+    storage_type: "local",
+    storage_path: "/uploads",
     max_file_size: 100,
-    allowed_file_types: 'jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx',
-    storage_config: '{}'
+    allowed_file_types: "jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx",
+    storage_config: "{}",
   },
   backup: {
     auto_backup: true,
-    backup_frequency: 'daily',
-    backup_time: '02:00',
+    backup_frequency: "daily",
+    backup_time: "02:00",
     retention_days: 30,
-    backup_path: '/backups',
-    compress_backup: true
+    backup_path: "/backups",
+    compress_backup: true,
   },
   logs: {
-    log_level: 'info',
+    log_level: "info",
     log_retention_days: 30,
     max_log_file_size: 100,
     log_user_actions: true,
     log_api_calls: true,
-    log_database_queries: false
+    log_database_queries: false,
   },
   performance: {
     enable_cache: true,
@@ -668,63 +698,59 @@ const settings = reactive({
     db_pool_size: 20,
     enable_rate_limit: true,
     rate_limit_per_minute: 100,
-    enable_compression: true
-  }
-})
+    enable_compression: true,
+  },
+});
 
 // 表单验证规则
 const basicRules: FormRules = {
-  system_name: [
-    { required: true, message: '请输入系统名称', trigger: 'blur' }
-  ]
-}
+  system_name: [{ required: true, message: "请输入系统名称", trigger: "blur" }],
+};
 
 const emailRules: FormRules = {
   smtp_host: [
-    { required: true, message: '请输入SMTP服务器地址', trigger: 'blur' }
+    { required: true, message: "请输入SMTP服务器地址", trigger: "blur" },
   ],
-  smtp_port: [
-    { required: true, message: '请输入SMTP端口', trigger: 'blur' }
-  ],
+  smtp_port: [{ required: true, message: "请输入SMTP端口", trigger: "blur" }],
   from_email: [
-    { required: true, message: '请输入发件人邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
-  ]
-}
+    { required: true, message: "请输入发件人邮箱", trigger: "blur" },
+    { type: "email", message: "请输入正确的邮箱格式", trigger: "blur" },
+  ],
+};
 
 /**
  * 加载系统设置
  */
 const loadSettings = async () => {
   try {
-    const response = await getSystemSettings()
-    Object.assign(settings, response.data)
+    const response = await getSystemSettings();
+    Object.assign(settings, response.data);
   } catch (error) {
-    ElMessage.error('加载系统设置失败')
+    ElMessage.error("加载系统设置失败");
   }
-}
+};
 
 /**
  * 处理标签页切换
  */
 const handleTabChange = (key: string) => {
-  activeTab.value = key
-}
+  activeTab.value = key;
+};
 
 /**
  * 处理保存设置
  */
 const handleSave = async () => {
   try {
-    saving.value = true
-    await updateSystemSettings(settings)
-    ElMessage.success('设置保存成功')
+    saving.value = true;
+    await updateSystemSettings(settings);
+    ElMessage.success("设置保存成功");
   } catch (error) {
-    ElMessage.error('设置保存失败')
+    ElMessage.error("设置保存失败");
   } finally {
-    saving.value = false
+    saving.value = false;
   }
-}
+};
 
 /**
  * 处理重置设置
@@ -732,50 +758,50 @@ const handleSave = async () => {
 const handleReset = async () => {
   try {
     await ElMessageBox.confirm(
-      '确定要重置所有设置吗？此操作不可撤销。',
-      '重置设置',
+      "确定要重置所有设置吗？此操作不可撤销。",
+      "重置设置",
       {
-        type: 'warning'
-      }
-    )
-    
-    await loadSettings()
-    ElMessage.success('设置已重置')
+        type: "warning",
+      },
+    );
+
+    await loadSettings();
+    ElMessage.success("设置已重置");
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('重置设置失败')
+    if (error !== "cancel") {
+      ElMessage.error("重置设置失败");
     }
   }
-}
+};
 
 /**
  * 测试邮件连接
  */
 const testEmailConnection = async () => {
   try {
-    await testEmail(settings.email)
-    ElMessage.success('邮件连接测试成功')
+    await testEmail(settings.email);
+    ElMessage.success("邮件连接测试成功");
   } catch (error) {
-    ElMessage.error('邮件连接测试失败')
+    ElMessage.error("邮件连接测试失败");
   }
-}
+};
 
 /**
  * 创建备份
  */
 const createBackup = async () => {
   try {
-    await createSystemBackup()
-    ElMessage.success('备份创建成功')
+    await createSystemBackup();
+    ElMessage.success("备份创建成功");
   } catch (error) {
-    ElMessage.error('备份创建失败')
+    ElMessage.error("备份创建失败");
   }
-}
+};
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadSettings()
-})
+  loadSettings();
+});
 </script>
 
 <style lang="scss" scoped>

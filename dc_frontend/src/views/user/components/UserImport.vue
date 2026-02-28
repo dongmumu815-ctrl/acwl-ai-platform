@@ -11,12 +11,7 @@
     <!-- 步骤1：下载模板 -->
     <div v-if="currentStep === 0" class="step-content">
       <div class="template-section">
-        <el-alert
-          title="导入说明"
-          type="info"
-          :closable="false"
-          show-icon
-        >
+        <el-alert title="导入说明" type="info" :closable="false" show-icon>
           <template #default>
             <ul class="import-rules">
               <li>请先下载用户导入模板，按照模板格式填写用户信息</li>
@@ -42,9 +37,7 @@
         </div>
 
         <div class="step-actions">
-          <el-button type="primary" @click="nextStep">
-            下一步
-          </el-button>
+          <el-button type="primary" @click="nextStep"> 下一步 </el-button>
         </div>
       </div>
     </div>
@@ -63,9 +56,7 @@
           :on-exceed="handleExceed"
         >
           <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-          <div class="el-upload__text">
-            将文件拖到此处，或<em>点击上传</em>
-          </div>
+          <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
           <template #tip>
             <div class="el-upload__tip">
               支持 .xlsx, .xls, .csv 格式文件，文件大小不超过 10MB
@@ -78,13 +69,10 @@
             <div class="file-details">
               <el-icon><Document /></el-icon>
               <span class="file-name">{{ uploadFile.name }}</span>
-              <span class="file-size">({{ formatFileSize(uploadFile.size) }})</span>
-              <el-button
-                type="danger"
-                size="small"
-                text
-                @click="removeFile"
+              <span class="file-size"
+                >({{ formatFileSize(uploadFile.size) }})</span
               >
+              <el-button type="danger" size="small" text @click="removeFile">
                 <el-icon><Delete /></el-icon>
               </el-button>
             </div>
@@ -108,8 +96,13 @@
     <!-- 步骤3：数据验证 -->
     <div v-if="currentStep === 2" class="step-content">
       <div class="validation-section">
-        <div v-if="validating" class="validation-loading" v-loading="validating" element-loading-text="正在验证数据，请稍候...">
-          <div class="loading-placeholder" style="height: 200px;"></div>
+        <div
+          v-if="validating"
+          v-loading="validating"
+          class="validation-loading"
+          element-loading-text="正在验证数据，请稍候..."
+        >
+          <div class="loading-placeholder" style="height: 200px"></div>
         </div>
 
         <div v-else-if="validationResult" class="validation-result">
@@ -117,7 +110,10 @@
           <div class="validation-stats">
             <el-row :gutter="20">
               <el-col :span="6">
-                <el-statistic title="总记录数" :value="validationResult.total" />
+                <el-statistic
+                  title="总记录数"
+                  :value="validationResult.total"
+                />
               </el-col>
               <el-col :span="6">
                 <el-statistic
@@ -154,12 +150,19 @@
               <el-table-column prop="row" label="行号" width="80" />
               <el-table-column prop="field" label="字段" width="120" />
               <el-table-column prop="value" label="值" width="150" />
-              <el-table-column prop="message" label="错误信息" min-width="200" />
+              <el-table-column
+                prop="message"
+                label="错误信息"
+                min-width="200"
+              />
             </el-table>
           </div>
 
           <!-- 警告列表 -->
-          <div v-if="validationResult.warning_details?.length" class="warning-list">
+          <div
+            v-if="validationResult.warning_details?.length"
+            class="warning-list"
+          >
             <h4>警告详情</h4>
             <el-table
               :data="validationResult.warning_details"
@@ -169,12 +172,19 @@
               <el-table-column prop="row" label="行号" width="80" />
               <el-table-column prop="field" label="字段" width="120" />
               <el-table-column prop="value" label="值" width="150" />
-              <el-table-column prop="message" label="警告信息" min-width="200" />
+              <el-table-column
+                prop="message"
+                label="警告信息"
+                min-width="200"
+              />
             </el-table>
           </div>
 
           <!-- 预览数据 -->
-          <div v-if="validationResult.preview_data?.length" class="preview-data">
+          <div
+            v-if="validationResult.preview_data?.length"
+            class="preview-data"
+          >
             <h4>数据预览（前10条）</h4>
             <el-table
               :data="validationResult.preview_data"
@@ -193,11 +203,7 @@
 
         <div class="step-actions">
           <el-button @click="prevStep">上一步</el-button>
-          <el-button
-            type="primary"
-            :disabled="!canImport"
-            @click="nextStep"
-          >
+          <el-button type="primary" :disabled="!canImport" @click="nextStep">
             开始导入
           </el-button>
         </div>
@@ -241,27 +247,22 @@
               </div>
 
               <div class="result-actions">
-                <el-button v-if="importResult.success" type="primary" @click="handleSuccess">
+                <el-button
+                  v-if="importResult.success"
+                  type="primary"
+                  @click="handleSuccess"
+                >
                   完成
                 </el-button>
-                <el-button v-else @click="resetImport">
-                  重新导入
-                </el-button>
-                <el-button @click="$emit('close')">
-                  关闭
-                </el-button>
+                <el-button v-else @click="resetImport"> 重新导入 </el-button>
+                <el-button @click="$emit('close')"> 关闭 </el-button>
               </div>
             </template>
           </el-result>
         </div>
 
         <div v-else class="import-confirm">
-          <el-alert
-            title="确认导入"
-            type="warning"
-            :closable="false"
-            show-icon
-          >
+          <el-alert title="确认导入" type="warning" :closable="false" show-icon>
             <template #default>
               <p>即将导入 {{ validationResult?.valid }} 个有效用户记录。</p>
               <p v-if="validationResult?.errors > 0">
@@ -273,10 +274,7 @@
 
           <div class="step-actions">
             <el-button @click="prevStep">上一步</el-button>
-            <el-button
-              type="primary"
-              @click="startImport"
-            >
+            <el-button type="primary" @click="startImport">
               确认导入
             </el-button>
           </div>
@@ -287,234 +285,236 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed } from "vue";
+import { ElMessage } from "element-plus";
 import {
   Download,
   UploadFilled,
   Document,
-  Delete
-} from '@element-plus/icons-vue'
-import type { UploadFile, UploadFiles, UploadInstance } from 'element-plus'
+  Delete,
+} from "@element-plus/icons-vue";
+import type { UploadFile, UploadFiles, UploadInstance } from "element-plus";
 import {
   downloadUserTemplate,
   validateUserImport,
-  importUsers
-} from '@/api/user'
+  importUsers,
+} from "@/api/user";
 
 interface ValidationResult {
-  total: number
-  valid: number
-  errors: number
-  warnings: number
+  total: number;
+  valid: number;
+  errors: number;
+  warnings: number;
   error_details?: Array<{
-    row: number
-    field: string
-    value: string
-    message: string
-  }>
+    row: number;
+    field: string;
+    value: string;
+    message: string;
+  }>;
   warning_details?: Array<{
-    row: number
-    field: string
-    value: string
-    message: string
-  }>
+    row: number;
+    field: string;
+    value: string;
+    message: string;
+  }>;
   preview_data?: Array<{
-    username: string
-    email: string
-    full_name: string
-    department?: string
-    position?: string
-    phone?: string
-  }>
+    username: string;
+    email: string;
+    full_name: string;
+    department?: string;
+    position?: string;
+    phone?: string;
+  }>;
 }
 
 interface ImportResult {
-  success: boolean
-  message: string
-  imported: number
-  skipped: number
-  failed: number
-  duration: number
+  success: boolean;
+  message: string;
+  imported: number;
+  skipped: number;
+  failed: number;
+  duration: number;
 }
 
 const emit = defineEmits<{
-  success: []
-  close: []
-}>()
+  success: [];
+  close: [];
+}>();
 
 // 响应式数据
-const currentStep = ref(0)
-const uploadRef = ref<UploadInstance>()
-const uploadFile = ref<File | null>(null)
-const validating = ref(false)
-const validationResult = ref<ValidationResult | null>(null)
-const importing = ref(false)
-const importProgress = ref(0)
-const importStatus = ref<'success' | 'exception' | undefined>()
-const importProgressText = ref('')
-const importResult = ref<ImportResult | null>(null)
+const currentStep = ref(0);
+const uploadRef = ref<UploadInstance>();
+const uploadFile = ref<File | null>(null);
+const validating = ref(false);
+const validationResult = ref<ValidationResult | null>(null);
+const importing = ref(false);
+const importProgress = ref(0);
+const importStatus = ref<"success" | "exception" | undefined>();
+const importProgressText = ref("");
+const importResult = ref<ImportResult | null>(null);
 
 // 计算属性
 const canImport = computed(() => {
-  return validationResult.value && validationResult.value.valid > 0
-})
+  return validationResult.value && validationResult.value.valid > 0;
+});
 
 /**
  * 下载模板文件
  */
-const downloadTemplate = async (format: 'excel' | 'csv') => {
+const downloadTemplate = async (format: "excel" | "csv") => {
   try {
-    await downloadUserTemplate(format)
-    ElMessage.success('模板下载成功')
+    await downloadUserTemplate(format);
+    ElMessage.success("模板下载成功");
   } catch (error) {
-    ElMessage.error('模板下载失败')
+    ElMessage.error("模板下载失败");
   }
-}
+};
 
 /**
  * 处理文件变化
  */
 const handleFileChange = (file: UploadFile, files: UploadFiles) => {
-  uploadFile.value = file.raw || null
-}
+  uploadFile.value = file.raw || null;
+};
 
 /**
  * 处理文件超出限制
  */
 const handleExceed = () => {
-  ElMessage.warning('只能上传一个文件')
-}
+  ElMessage.warning("只能上传一个文件");
+};
 
 /**
  * 移除文件
  */
 const removeFile = () => {
-  uploadFile.value = null
-  uploadRef.value?.clearFiles()
-}
+  uploadFile.value = null;
+  uploadRef.value?.clearFiles();
+};
 
 /**
  * 格式化文件大小
  */
 const formatFileSize = (size: number): string => {
   if (size < 1024) {
-    return `${size} B`
+    return `${size} B`;
   } else if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`
+    return `${(size / 1024).toFixed(1)} KB`;
   } else {
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   }
-}
+};
 
 /**
  * 验证文件
  */
 const validateFile = async () => {
   if (!uploadFile.value) {
-    ElMessage.error('请先上传文件')
-    return
+    ElMessage.error("请先上传文件");
+    return;
   }
 
   try {
-    validating.value = true
-    const formData = new FormData()
-    formData.append('file', uploadFile.value)
-    
-    const response = await validateUserImport(formData)
-    validationResult.value = response.data
-    
+    validating.value = true;
+    const formData = new FormData();
+    formData.append("file", uploadFile.value);
+
+    const response = await validateUserImport(formData);
+    validationResult.value = response.data;
+
     if (validationResult.value.errors === 0) {
-      ElMessage.success('数据验证通过')
+      ElMessage.success("数据验证通过");
     } else {
-      ElMessage.warning(`发现 ${validationResult.value.errors} 个错误，请检查后重新上传`)
+      ElMessage.warning(
+        `发现 ${validationResult.value.errors} 个错误，请检查后重新上传`,
+      );
     }
-    
-    nextStep()
+
+    nextStep();
   } catch (error) {
-    ElMessage.error('文件验证失败')
+    ElMessage.error("文件验证失败");
   } finally {
-    validating.value = false
+    validating.value = false;
   }
-}
+};
 
 /**
  * 开始导入
  */
 const startImport = async () => {
   if (!uploadFile.value || !validationResult.value) {
-    return
+    return;
   }
 
   try {
-    importing.value = true
-    importProgress.value = 0
-    importProgressText.value = '正在导入用户数据...'
-    
-    const formData = new FormData()
-    formData.append('file', uploadFile.value)
-    
+    importing.value = true;
+    importProgress.value = 0;
+    importProgressText.value = "正在导入用户数据...";
+
+    const formData = new FormData();
+    formData.append("file", uploadFile.value);
+
     // 模拟进度更新
     const progressInterval = setInterval(() => {
       if (importProgress.value < 90) {
-        importProgress.value += Math.random() * 10
-        importProgressText.value = `正在导入用户数据... ${Math.floor(importProgress.value)}%`
+        importProgress.value += Math.random() * 10;
+        importProgressText.value = `正在导入用户数据... ${Math.floor(importProgress.value)}%`;
       }
-    }, 500)
-    
-    const response = await importUsers(formData)
-    
-    clearInterval(progressInterval)
-    importProgress.value = 100
-    importStatus.value = response.data.success ? 'success' : 'exception'
-    importProgressText.value = response.data.success ? '导入完成' : '导入失败'
-    
+    }, 500);
+
+    const response = await importUsers(formData);
+
+    clearInterval(progressInterval);
+    importProgress.value = 100;
+    importStatus.value = response.data.success ? "success" : "exception";
+    importProgressText.value = response.data.success ? "导入完成" : "导入失败";
+
     setTimeout(() => {
-      importResult.value = response.data
-      importing.value = false
-    }, 1000)
+      importResult.value = response.data;
+      importing.value = false;
+    }, 1000);
   } catch (error) {
-    importing.value = false
-    importStatus.value = 'exception'
-    ElMessage.error('导入失败')
+    importing.value = false;
+    importStatus.value = "exception";
+    ElMessage.error("导入失败");
   }
-}
+};
 
 /**
  * 处理导入成功
  */
 const handleSuccess = () => {
-  emit('success')
-}
+  emit("success");
+};
 
 /**
  * 重置导入
  */
 const resetImport = () => {
-  currentStep.value = 1
-  uploadFile.value = null
-  validationResult.value = null
-  importResult.value = null
-  uploadRef.value?.clearFiles()
-}
+  currentStep.value = 1;
+  uploadFile.value = null;
+  validationResult.value = null;
+  importResult.value = null;
+  uploadRef.value?.clearFiles();
+};
 
 /**
  * 下一步
  */
 const nextStep = () => {
   if (currentStep.value < 3) {
-    currentStep.value++
+    currentStep.value++;
   }
-}
+};
 
 /**
  * 上一步
  */
 const prevStep = () => {
   if (currentStep.value > 0) {
-    currentStep.value--
+    currentStep.value--;
   }
-}
+};
 </script>
 
 <style lang="scss" scoped>
@@ -533,7 +533,7 @@ const prevStep = () => {
     .import-rules {
       margin: 0;
       padding-left: $spacing-lg;
-      
+
       li {
         margin-bottom: $spacing-xs;
         color: var(--el-text-color-regular);

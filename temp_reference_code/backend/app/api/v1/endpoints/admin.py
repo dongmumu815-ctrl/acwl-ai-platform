@@ -185,9 +185,10 @@ def _generate_complete_markdown_documentation(api: CustomApi) -> str:
     doc.append("- [📤 2. 数据上传接口](#2-数据上传接口)")
     doc.append("- [✅ 3. 批次完成接口](#3-批次完成接口)")
     doc.append("- [📥 4. 结果查询接口](#4-结果查询接口)")
-    doc.append("- [🔄 5. 完整调用流程](#5-完整调用流程)")
-    doc.append("- [📋 6. 业务状态码说明](#6-业务状态码说明)")
-    doc.append("- [⚠️ 7. 注意事项](#7-注意事项)")
+    doc.append("- [� 5. 结果接收确认接口](#5-结果接收确认接口)")
+    doc.append("- [�🔄 6. 完整调用流程](#6-完整调用流程)")
+    doc.append("- [📋 7. 业务状态码说明](#7-业务状态码说明)")
+    doc.append("- [⚠️ 8. 注意事项](#8-注意事项)")
     doc.append("")
     
     # 1. 认证接口
@@ -550,8 +551,68 @@ def _generate_complete_markdown_documentation(api: CustomApi) -> str:
     doc.append("```")
     doc.append("")
     
-    # 5. 完整调用流程
-    doc.append("## 🔄 5. 完整调用流程")
+    # 5. 结果接收确认接口
+    doc.append("## 📬 5. 结果接收确认接口")
+    doc.append("")
+    doc.append("### 接口信息")
+    doc.append(f"- **接口地址**: `/api/v1/results/{api.api_code}/{{batch_id}}/confirm`")
+    doc.append("- **请求方法**: `POST`")
+    doc.append("- **功能说明**: 客户端确认已接收并校验处理结果，系统记录确认状态")
+    doc.append("- **认证方式**: Bearer Token")
+    doc.append("- **数据加密**: 支持AES-256-GCM加密")
+    doc.append("- **数据签名**: 支持HMAC-SHA256签名验证")
+    doc.append("")
+    doc.append("### 请求头")
+    doc.append("")
+    doc.append("| 字段名 | 类型 | 必填 | 描述 |")
+    doc.append("|--------|------|------|------|")
+    doc.append("| Authorization | String | 是 | Bearer {access_token} |")
+    doc.append("| X-Data-Encrypted | String | 是 | true |")
+    doc.append("| X-Data-Signature | String | 否 | 数据签名（推荐使用） |")
+    doc.append("")
+    doc.append("### 路径参数")
+    doc.append("")
+    doc.append("| 参数名 | 类型 | 必填 | 描述 |")
+    doc.append("|--------|------|------|------|")
+    doc.append("| batch_id | String | 是 | 批次唯一标识 |")
+    doc.append("")
+    doc.append("### 请求体参数")
+    doc.append("")
+    doc.append("| 字段名 | 类型 | 必填 | 描述 |")
+    doc.append("|--------|------|------|------|")
+    doc.append("| timestamp | Long | 是 | 当前时间戳（秒） |")
+    doc.append("| nonce | String | 是 | 随机字符串（8-16位） |")
+    doc.append("| data | String | 是 | AES-GCM加密后的确认数据（Base64编码） |")
+    doc.append("| iv | String | 是 | 初始化向量（Base64编码） |")
+    doc.append("| signature | String | 否 | 数据签名（HMAC-SHA256） |")
+    doc.append("")
+    doc.append("### 确认数据结构（加密前）")
+    doc.append("")
+    doc.append("```json")
+    doc.append("{")
+    doc.append('    "ack_time": "2024-01-01T12:00:00Z",')
+    doc.append('    "result_sign": "客户端已验证的结果签名",')
+    doc.append('    "remark": "确认无误"')
+    doc.append("}")
+    doc.append("```")
+    doc.append("")
+    doc.append("### 响应示例")
+    doc.append("")
+    doc.append("```json")
+    doc.append("{")
+    doc.append('    "code": 0,')
+    doc.append('    "message": "确认接收成功",')
+    doc.append('    "data": {')
+    doc.append('        "batch_id": "batch_123",')
+    doc.append('        "status": "acknowledged",')
+    doc.append('        "confirmed_at": "2024-01-01T12:05:00Z"')
+    doc.append('    }')
+    doc.append("}")
+    doc.append("```")
+    doc.append("")
+    
+    # 6. 完整调用流程
+    doc.append("## 🔄 6. 完整调用流程")
     doc.append("")
     doc.append("### 步骤说明")
     doc.append("")
@@ -572,6 +633,10 @@ def _generate_complete_markdown_documentation(api: CustomApi) -> str:
     doc.append("   - 调用结果查询接口获取处理结果")
     doc.append("   - 可轮询查询直到处理完成")
     doc.append("")
+    doc.append("5. **确认结果已接收**")
+    doc.append("   - 客户端在成功获取并校验结果后，调用确认接口")
+    doc.append("   - 系统记录确认状态用于对账与重发控制")
+    doc.append("")
     
     doc.append("### 流程图")
     doc.append("")
@@ -589,11 +654,14 @@ def _generate_complete_markdown_documentation(api: CustomApi) -> str:
     doc.append("  |                         |")
     doc.append("  |-- 4. 查询结果 --------->|")
     doc.append("  |<-- 处理结果 ------------|")
+    doc.append("  |                         |")
+    doc.append("  |-- 5. 确认接收 --------->|")
+    doc.append("  |<-- 确认成功 ------------|")
     doc.append("```")
     doc.append("")
     
-    # 6. 业务状态码说明
-    doc.append("## 📋 6. 业务状态码说明")
+    # 7. 业务状态码说明
+    doc.append("## 📋 7. 业务状态码说明")
     doc.append("")
     doc.append("所有接口都使用统一的响应格式，包含业务状态码(code)、消息(message)和数据(data)三个字段：")
     doc.append("")
@@ -635,8 +703,8 @@ def _generate_complete_markdown_documentation(api: CustomApi) -> str:
     doc.append("```")
     doc.append("")
     
-    # 7. 注意事项
-    doc.append("## ⚠️ 7. 注意事项")
+    # 8. 注意事项
+    doc.append("## ⚠️ 8. 注意事项")
     doc.append("")
     doc.append("### 安全要求")
     doc.append("- 所有接口调用必须使用HTTPS")
@@ -796,8 +864,9 @@ def _generate_complete_html_documentation(api: CustomApi) -> str:
                 <li><a href="#upload">📤 2. 数据上传接口</a></li>
                 <li><a href="#complete">✅ 3. 批次完成接口</a></li>
                 <li><a href="#results">📥 4. 结果查询接口</a></li>
-                <li><a href="#flow">🔄 5. 完整调用流程</a></li>
-                <li><a href="#notes">⚠️ 6. 注意事项</a></li>
+                <li><a href="#confirm">📬 5. 结果接收确认接口</a></li>
+                <li><a href="#flow">🔄 6. 完整调用流程</a></li>
+                <li><a href="#notes">⚠️ 7. 注意事项</a></li>
             </ul>
         </div>
         
@@ -911,7 +980,48 @@ signature = HMAC_SHA256(secret, signature_data).hexdigest().upper()</pre>
         <h3>功能说明</h3>
         <p>查询批次处理结果，支持加密返回数据。</p>
         
-        <h2 id="flow">🔄 5. 完整调用流程</h2>
+        <h2 id="confirm">📬 5. 结果接收确认接口</h2>
+        
+        <div class="endpoint">
+            <span class="method method-post">POST</span> /api/v1/results/{api_code}/{{batch_id}}/confirm
+        </div>
+        
+        <h3>功能说明</h3>
+        <p>客户端确认已接收并校验处理结果，系统记录确认状态。</p>
+        
+        <h3>请求头</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>字段名</th>
+                    <th>类型</th>
+                    <th>必填</th>
+                    <th>描述</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Authorization</td>
+                    <td>String</td>
+                    <td>是</td>
+                    <td>Bearer {{access_token}}</td>
+                </tr>
+                <tr>
+                    <td>X-Data-Encrypted</td>
+                    <td>String</td>
+                    <td>是</td>
+                    <td>true</td>
+                </tr>
+                <tr>
+                    <td>X-Data-Signature</td>
+                    <td>String</td>
+                    <td>否</td>
+                    <td>数据签名（推荐使用）</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h2 id="flow">🔄 6. 完整调用流程</h2>
         
         <div class="flow-diagram">
 客户端                    API服务
@@ -927,9 +1037,12 @@ signature = HMAC_SHA256(secret, signature_data).hexdigest().upper()</pre>
   |                         |
   |-- 4. 查询结果 --------->|
   |<-- 处理结果 ------------|
+  |                         |
+  |-- 5. 确认接收 --------->|
+  |<-- 确认成功 ------------|
         </div>
         
-        <h2 id="notes">⚠️ 6. 注意事项</h2>
+        <h2 id="notes">⚠️ 7. 注意事项</h2>
         
         <h3>安全要求</h3>
         <ul>
@@ -1165,6 +1278,47 @@ def _generate_complete_json_documentation(api: CustomApi) -> str:
                         }
                     }
                 }
+            },
+            f"/results/{api.api_code}/{{{"batch_id"}}}/confirm": {
+                "post": {
+                    "summary": "确认结果已接收",
+                    "description": "客户端确认已接收并校验处理结果",
+                    "tags": ["结果确认"],
+                    "parameters": [
+                        {
+                            "name": "batch_id",
+                            "in": "path",
+                            "required": True,
+                            "description": "批次唯一标识",
+                            "schema": {"type": "string"}
+                        }
+                    ],
+                    "security": [{"bearerAuth": []}],
+                    "responses": {
+                        "200": {
+                            "description": "确认成功",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "code": {"type": "integer"},
+                                            "message": {"type": "string"},
+                                            "data": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "batch_id": {"type": "string"},
+                                                    "status": {"type": "string"},
+                                                    "confirmed_at": {"type": "string"}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "components": {
@@ -1180,7 +1334,8 @@ def _generate_complete_json_documentation(api: CustomApi) -> str:
             {"name": "认证", "description": "身份认证相关接口"},
             {"name": "数据上传", "description": "数据上传相关接口"},
             {"name": "批次管理", "description": "批次管理相关接口"},
-            {"name": "结果查询", "description": "结果查询相关接口"}
+            {"name": "结果查询", "description": "结果查询相关接口"},
+            {"name": "结果确认", "description": "结果接收确认接口"}
         ]
     }
     

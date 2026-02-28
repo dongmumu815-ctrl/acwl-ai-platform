@@ -70,7 +70,11 @@ class MinIOService:
         self.timeout = settings.MINIO_TIMEOUT
         
         # 确保存储桶存在
-        self._ensure_bucket_exists()
+        try:
+            self._ensure_bucket_exists()
+        except Exception as e:
+            self.logger.warning(f"MinIO初始化警告: 无法连接到MinIO服务器或存储桶不可用. 错误: {e}")
+            # 不抛出异常，允许应用启动
 
     def _ensure_bucket_exists(self):
         """确保存储桶存在，如果不存在则创建"""
@@ -104,6 +108,38 @@ class MinIOService:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
+
+    def upload_json_data(self, data: Dict[str, Any], object_path: str) -> str:
+        """
+        直接上传JSON数据到MinIO (同步方法)
+        
+        Args:
+            data: JSON数据字典
+            object_path: MinIO对象路径
+            
+        Returns:
+            str: MinIO对象路径
+        """
+        try:
+            json_bytes = json.dumps(data, ensure_ascii=False).encode('utf-8')
+            data_stream = BytesIO(json_bytes)
+            
+            self.logger.info(f"📤 正在上传JSON配置到: {object_path}")
+            
+            self.client.put_object(
+                self.bucket_name,
+                object_path,
+                data_stream,
+                len(json_bytes),
+                content_type='application/json'
+            )
+            
+            self.logger.info(f"✅ JSON配置上传成功: {object_path}")
+            return object_path
+            
+        except Exception as e:
+            self.logger.error(f"JSON配置上传失败: {str(e)}")
+            raise
 
     async def upload_model_file(
         self,

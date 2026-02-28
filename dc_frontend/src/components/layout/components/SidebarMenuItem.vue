@@ -12,7 +12,7 @@
         </el-icon>
         <span v-if="!collapsed">{{ route.meta?.title }}</span>
       </template>
-      
+
       <SidebarMenuItem
         v-for="child in route.children"
         :key="child.path"
@@ -21,7 +21,7 @@
         :collapsed="collapsed"
       />
     </el-sub-menu>
-    
+
     <!-- 没有子菜单的情况 -->
     <el-menu-item
       v-else
@@ -33,7 +33,10 @@
       </el-icon>
       <template #title>
         <span>{{ route.meta?.title }}</span>
-        <el-icon v-if="isExternalLink(resolvePath(route.path))" class="external-link-icon">
+        <el-icon
+          v-if="isExternalLink(resolvePath(route.path))"
+          class="external-link-icon"
+        >
           <Link />
         </el-icon>
       </template>
@@ -42,10 +45,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { isExternal } from '@/utils/validate'
-import type { RouteRecordRaw } from 'vue-router'
-import { Link } from '@element-plus/icons-vue'
+import { computed } from "vue";
+import { isExternal } from "@/utils/validate";
+import type { RouteRecordRaw } from "vue-router";
+import { Link } from "@element-plus/icons-vue";
 
 /**
  * 侧边栏菜单项组件
@@ -53,27 +56,27 @@ import { Link } from '@element-plus/icons-vue'
  */
 
 interface Props {
-  route: RouteRecordRaw
-  basePath: string
-  collapsed: boolean
+  route: RouteRecordRaw;
+  basePath: string;
+  collapsed: boolean;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 // 计算是否有子菜单
 const hasChildren = computed(() => {
-  const children = props.route.children
+  const children = props.route.children;
   if (!children || children.length === 0) {
-    return false
+    return false;
   }
-  
+
   // 过滤掉隐藏的子菜单
-  const visibleChildren = children.filter(child => {
-    return !child.meta?.hideInMenu && child.meta?.title
-  })
-  
-  return visibleChildren.length > 0
-})
+  const visibleChildren = children.filter((child) => {
+    return !child.meta?.hideInMenu && child.meta?.title;
+  });
+
+  return visibleChildren.length > 0;
+});
 
 /**
  * 解析路径
@@ -82,29 +85,29 @@ const hasChildren = computed(() => {
  */
 function resolvePath(routePath: string): string {
   if (isExternalLink(routePath)) {
-    return routePath
+    return routePath;
   }
-  
+
   if (isExternalLink(props.basePath)) {
-    return props.basePath
+    return props.basePath;
   }
-  
+
   // 如果是绝对路径，直接返回
-  if (routePath.startsWith('/')) {
-    return routePath
+  if (routePath.startsWith("/")) {
+    return routePath;
   }
-  
+
   // 如果basePath为空（根路径情况），直接返回子路径
-  if (!props.basePath || props.basePath === '') {
-    return `/${routePath}`
+  if (!props.basePath || props.basePath === "") {
+    return `/${routePath}`;
   }
-  
+
   // 拼接基础路径
-  const basePath = props.basePath.endsWith('/') 
-    ? props.basePath.slice(0, -1) 
-    : props.basePath
-  
-  return `${basePath}/${routePath}`.replace(/\/+/g, '/')
+  const basePath = props.basePath.endsWith("/")
+    ? props.basePath.slice(0, -1)
+    : props.basePath;
+
+  return `${basePath}/${routePath}`.replace(/\/+/g, "/");
 }
 
 /**
@@ -112,7 +115,7 @@ function resolvePath(routePath: string): string {
  * @param path 路径
  */
 function isExternalLink(path: string): boolean {
-  return isExternal(path)
+  return isExternal(path);
 }
 </script>
 
@@ -126,14 +129,14 @@ function isExternalLink(path: string): boolean {
     font-size: 12px;
     opacity: 0.6;
   }
-  
+
   // 菜单项悬停效果
   :deep(.el-menu-item) {
     position: relative;
     overflow: hidden;
-    
+
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       left: -100%;
       top: 0;
@@ -147,19 +150,19 @@ function isExternalLink(path: string): boolean {
       );
       transition: left 0.5s ease;
     }
-    
+
     &:hover::before {
       left: 100%;
     }
   }
-  
+
   // 子菜单标题样式
   :deep(.el-sub-menu__title) {
     position: relative;
     overflow: hidden;
-    
+
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       left: -100%;
       top: 0;
@@ -173,7 +176,7 @@ function isExternalLink(path: string): boolean {
       );
       transition: left 0.5s ease;
     }
-    
+
     &:hover::before {
       left: 100%;
     }
@@ -187,22 +190,22 @@ function isExternalLink(path: string): boolean {
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     border: 1px solid var(--el-border-color-light);
-    
+
     .el-menu {
       background-color: var(--el-bg-color-overlay);
       border-radius: 8px;
-      
+
       .el-menu-item {
         height: 40px;
         line-height: 40px;
         padding: 0 16px;
         margin: 2px 4px;
         border-radius: 4px;
-        
+
         &:hover {
           background-color: var(--el-color-primary-light-9);
         }
-        
+
         &.is-active {
           background-color: var(--el-color-primary-light-9);
           color: var(--el-color-primary);
@@ -218,15 +221,15 @@ function isExternalLink(path: string): boolean {
     &.is-collapsed {
       background-color: var(--el-bg-color-overlay);
       border-color: var(--el-border-color);
-      
+
       .el-menu {
         background-color: var(--el-bg-color-overlay);
-        
+
         .el-menu-item {
           &:hover {
             background-color: rgba(255, 255, 255, 0.1);
           }
-          
+
           &.is-active {
             background-color: rgba(255, 255, 255, 0.1);
           }
@@ -241,12 +244,12 @@ function isExternalLink(path: string): boolean {
   :deep(.el-menu-item),
   :deep(.el-sub-menu__title) {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    
+
     &:hover {
       transform: translateX(2px);
     }
   }
-  
+
   :deep(.el-sub-menu) {
     .el-menu {
       .el-menu-item {

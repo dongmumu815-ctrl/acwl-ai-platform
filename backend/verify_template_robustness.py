@@ -29,7 +29,7 @@ def test_create_and_update():
     
     print("\n--- Creating Template 1 ---")
     result_1 = service.create_template(data_1)
-    print("Result 1:", json.dumps(result_1, indent=2, ensure_ascii=False))
+    print("Result 1:", json.dumps(result_1, indent=2, ensure_ascii=False, default=str))
     
     # Test Data 2: Using 'header_row_index' alias
     data_2 = {
@@ -45,7 +45,7 @@ def test_create_and_update():
     
     print("\n--- Creating Template 2 ---")
     result_2 = service.create_template(data_2)
-    print("Result 2:", json.dumps(result_2, indent=2, ensure_ascii=False))
+    print("Result 2:", json.dumps(result_2, indent=2, ensure_ascii=False, default=str))
 
     if result_1.get("success"):
         tid = result_1["data"]["id"]
@@ -55,7 +55,7 @@ def test_create_and_update():
             "file_type": "csv"      # Updating direct field
         }
         update_res = service.update_template(tid, update_data)
-        print("Update Result:", json.dumps(update_res, indent=2, ensure_ascii=False))
+        print("Update Result:", json.dumps(update_res, indent=2, ensure_ascii=False, default=str))
 
 if __name__ == "__main__":
     test_create_and_update()

@@ -1,4 +1,4 @@
-import { request } from '@/utils/request'
+import { request } from "@/utils/request";
 import type {
   DataSource,
   DataSourceCreateRequest,
@@ -8,8 +8,8 @@ import type {
   DataSourceConnectionStatus,
   DataSourceStats,
   ApiResponse,
-  PaginatedResponse
-} from '@/types/datasource'
+  PaginatedResponse,
+} from "@/types/datasource";
 
 /**
  * 数据源管理相关API接口
@@ -19,13 +19,15 @@ export const datasourceApi = {
    * 获取数据源列表
    * @param params 查询参数
    */
-  getDataSourceList(params?: DataSourceListQuery): Promise<ApiResponse<PaginatedResponse<DataSource>>> {
+  getDataSourceList(
+    params?: DataSourceListQuery,
+  ): Promise<ApiResponse<PaginatedResponse<DataSource>>> {
     return request({
-      url: '/datasources/',
-      method: 'GET',
+      url: "/datasources/",
+      method: "GET",
       params,
-      permission: 'data:datasource:view'
-    })
+      permission: "data:datasource:view",
+    });
   },
 
   /**
@@ -35,22 +37,24 @@ export const datasourceApi = {
   getDataSourceDetail(id: number): Promise<ApiResponse<DataSource>> {
     return request({
       url: `/datasources/${id}`,
-      method: 'GET',
-      permission: 'data:datasource:view'
-    })
+      method: "GET",
+      permission: "data:datasource:view",
+    });
   },
 
   /**
    * 创建数据源
    * @param data 创建数据
    */
-  createDataSource(data: DataSourceCreateRequest): Promise<ApiResponse<DataSource>> {
+  createDataSource(
+    data: DataSourceCreateRequest,
+  ): Promise<ApiResponse<DataSource>> {
     return request({
-      url: '/datasources/',
-      method: 'POST',
+      url: "/datasources/",
+      method: "POST",
       data,
-      permission: 'data:datasource:create'
-    })
+      permission: "data:datasource:create",
+    });
   },
 
   /**
@@ -58,13 +62,16 @@ export const datasourceApi = {
    * @param id 数据源ID
    * @param data 更新数据
    */
-  updateDataSource(id: number, data: DataSourceUpdateRequest): Promise<ApiResponse<DataSource>> {
+  updateDataSource(
+    id: number,
+    data: DataSourceUpdateRequest,
+  ): Promise<ApiResponse<DataSource>> {
     return request({
       url: `/datasources/${id}`,
-      method: 'PUT',
+      method: "PUT",
       data,
-      permission: 'data:datasource:update'
-    })
+      permission: "data:datasource:update",
+    });
   },
 
   /**
@@ -74,34 +81,38 @@ export const datasourceApi = {
   deleteDataSource(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/datasources/${id}`,
-      method: 'DELETE',
-      permission: 'data:datasource:delete'
-    })
+      method: "DELETE",
+      permission: "data:datasource:delete",
+    });
   },
 
   /**
    * 测试数据源连接
    * @param data 测试连接数据
    */
-  testConnection(data: DataSourceTestRequest): Promise<ApiResponse<DataSourceConnectionStatus>> {
+  testConnection(
+    data: DataSourceTestRequest,
+  ): Promise<ApiResponse<DataSourceConnectionStatus>> {
     return request({
-      url: '/datasources/test-connection/',
-      method: 'POST',
+      url: "/datasources/test-connection/",
+      method: "POST",
       data,
-      permission: 'data:datasource:test'
-    })
+      permission: "data:datasource:test",
+    });
   },
 
   /**
    * 测试现有数据源连接
    * @param id 数据源ID
    */
-  testDataSourceConnection(id: number): Promise<ApiResponse<DataSourceConnectionStatus>> {
+  testDataSourceConnection(
+    id: number,
+  ): Promise<ApiResponse<DataSourceConnectionStatus>> {
     return request({
       url: `/datasources/${id}/test-connection`,
-      method: 'POST',
-      permission: 'data:datasource:test'
-    })
+      method: "POST",
+      permission: "data:datasource:test",
+    });
   },
 
   /**
@@ -109,10 +120,10 @@ export const datasourceApi = {
    */
   getDataSourceStats(): Promise<ApiResponse<DataSourceStats>> {
     return request({
-      url: '/datasources/stats/',
-      method: 'GET',
-      permission: 'data:datasource:stats:view'
-    })
+      url: "/datasources/stats/",
+      method: "GET",
+      permission: "data:datasource:stats:view",
+    });
   },
 
   /**
@@ -120,10 +131,10 @@ export const datasourceApi = {
    */
   getDataSourceTypes(): Promise<ApiResponse<string[]>> {
     return request({
-      url: '/datasources/types/',
-      method: 'GET',
-      permission: 'data:datasource:type:view'
-    })
+      url: "/datasources/types/",
+      method: "GET",
+      permission: "data:datasource:type:view",
+    });
   },
 
   /**
@@ -132,11 +143,11 @@ export const datasourceApi = {
    */
   batchDeleteDataSources(ids: number[]): Promise<ApiResponse<void>> {
     return request({
-      url: '/datasources/batch-delete/',
-      method: 'POST',
+      url: "/datasources/batch-delete/",
+      method: "POST",
       data: { ids },
-      permission: 'data:datasource:delete'
-    })
+      permission: "data:datasource:delete",
+    });
   },
 
   /**
@@ -147,10 +158,10 @@ export const datasourceApi = {
   toggleDataSource(id: number, enabled: boolean): Promise<ApiResponse<void>> {
     return request({
       url: `/datasources/${id}/toggle`,
-      method: 'PATCH',
+      method: "PATCH",
       data: { enabled },
-      permission: 'data:datasource:update'
-    })
+      permission: "data:datasource:update",
+    });
   },
 
   /**
@@ -160,45 +171,53 @@ export const datasourceApi = {
   syncMetadata(id: number): Promise<ApiResponse<void>> {
     return request({
       url: `/datasources/${id}/sync-metadata`,
-      method: 'POST',
-      permission: 'data:datasource:sync'
-    })
+      method: "POST",
+      permission: "data:datasource:sync",
+    });
   },
 
   /**
    * 获取数据源健康状态
    * @param id 数据源ID
    */
-  getHealthStatus(id: number): Promise<ApiResponse<DataSourceConnectionStatus>> {
+  getHealthStatus(
+    id: number,
+  ): Promise<ApiResponse<DataSourceConnectionStatus>> {
     return request({
       url: `/datasources/${id}/health`,
-      method: 'GET',
-      permission: 'data:datasource:health:view'
-    })
+      method: "GET",
+      permission: "data:datasource:health:view",
+    });
   },
 
   /**
    * 获取数据源的表/视图/索引列表
    * @param id 数据源ID
    */
-  getDataSourceTables(id: number): Promise<ApiResponse<Array<{name: string, type: string, schema?: string}>>> {
+  getDataSourceTables(
+    id: number,
+  ): Promise<
+    ApiResponse<Array<{ name: string; type: string; schema?: string }>>
+  > {
     return request({
       url: `/datasources/${id}/tables/`,
-      method: 'GET',
-      permission: 'data:datasource:tables:view'
-    })
+      method: "GET",
+      permission: "data:datasource:tables:view",
+    });
   },
 
   /**
    * 获取数据源的Schema列表
    * @param id 数据源ID
    */
-  getDataSourceSchemas(id: number): Promise<ApiResponse<Array<{name: string}>>> {
+  getDataSourceSchemas(
+    id: number,
+  ): Promise<ApiResponse<Array<{ name: string }>>> {
     return request({
       url: `/datasources/${id}/schemas/`,
-      method: 'GET',
-      permission: 'data:datasource:schemas:view'
-    })
+      method: "GET",
+      permission: "data:datasource:schemas:view",
+    });
   },
 
   /**
@@ -206,12 +225,15 @@ export const datasourceApi = {
    * @param id 数据源ID
    * @param schema Schema名称
    */
-  getDataSourceTablesWithSchema(id: number, schema: string): Promise<ApiResponse<Array<{name: string, type: string}>>> {
+  getDataSourceTablesWithSchema(
+    id: number,
+    schema: string,
+  ): Promise<ApiResponse<Array<{ name: string; type: string }>>> {
     return request({
       url: `/datasources/${id}/schemas/${schema}/tables/`,
-      method: 'GET',
-      permission: 'data:datasource:tables:view'
-    })
+      method: "GET",
+      permission: "data:datasource:tables:view",
+    });
   },
 
   /**
@@ -220,22 +242,35 @@ export const datasourceApi = {
    * @param schema Schema名称
    * @param table 表名称
    */
-  getDataSourceTableFields(id: number, schema: string, table: string): Promise<ApiResponse<Array<{name: string, type: string, nullable?: boolean, comment?: string}>>> {
+  getDataSourceTableFields(
+    id: number,
+    schema: string,
+    table: string,
+  ): Promise<
+    ApiResponse<
+      Array<{
+        name: string;
+        type: string;
+        nullable?: boolean;
+        comment?: string;
+      }>
+    >
+  > {
     return request({
       url: `/datasources/${id}/schemas/${schema}/tables/${table}/fields/`,
-      method: 'GET',
-      permission: 'data:datasource:fields:view'
-    })
-  }
-}
+      method: "GET",
+      permission: "data:datasource:fields:view",
+    });
+  },
+};
 
 /**
  * 获取数据源列表的简化函数
  * @returns Promise<DataSource[]>
  */
 export const getDatasources = async (): Promise<DataSource[]> => {
-  const response = await datasourceApi.getDataSourceList()
-  return response.data?.items || []
-}
+  const response = await datasourceApi.getDataSourceList();
+  return response.data?.items || [];
+};
 
-export default datasourceApi
+export default datasourceApi;

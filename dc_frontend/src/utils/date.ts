@@ -8,14 +8,14 @@
  * @returns 格式化后的日期字符串
  */
 export function formatDate(date: string | Date | null | undefined): string {
-  if (!date) return '-'
-  
+  if (!date) return "-";
+
   try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    return dateObj.toLocaleString('zh-CN')
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    return dateObj.toLocaleString("zh-CN");
   } catch (error) {
-    console.error('日期格式化错误:', error)
-    return '-'
+    console.error("日期格式化错误:", error);
+    return "-";
   }
 }
 
@@ -25,14 +25,14 @@ export function formatDate(date: string | Date | null | undefined): string {
  * @returns 格式化后的日期字符串
  */
 export function formatDateOnly(date: string | Date | null | undefined): string {
-  if (!date) return '-'
-  
+  if (!date) return "-";
+
   try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    return dateObj.toLocaleDateString('zh-CN')
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    return dateObj.toLocaleDateString("zh-CN");
   } catch (error) {
-    console.error('日期格式化错误:', error)
-    return '-'
+    console.error("日期格式化错误:", error);
+    return "-";
   }
 }
 
@@ -42,21 +42,21 @@ export function formatDateOnly(date: string | Date | null | undefined): string {
  * @returns 格式化后的日期时间字符串
  */
 export function formatDateTime(date: string | Date | null | undefined): string {
-  if (!date) return '-'
-  
+  if (!date) return "-";
+
   try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    const year = dateObj.getFullYear()
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-    const day = String(dateObj.getDate()).padStart(2, '0')
-    const hours = String(dateObj.getHours()).padStart(2, '0')
-    const minutes = String(dateObj.getMinutes()).padStart(2, '0')
-    const seconds = String(dateObj.getSeconds()).padStart(2, '0')
-    
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    const hours = String(dateObj.getHours()).padStart(2, "0");
+    const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+    const seconds = String(dateObj.getSeconds()).padStart(2, "0");
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   } catch (error) {
-    console.error('日期时间格式化错误:', error)
-    return '-'
+    console.error("日期时间格式化错误:", error);
+    return "-";
   }
 }
 
@@ -65,32 +65,34 @@ export function formatDateTime(date: string | Date | null | undefined): string {
  * @param date - 日期字符串或Date对象
  * @returns 相对时间描述
  */
-export function getRelativeTime(date: string | Date | null | undefined): string {
-  if (!date) return '-'
-  
+export function getRelativeTime(
+  date: string | Date | null | undefined,
+): string {
+  if (!date) return "-";
+
   try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    const now = new Date()
-    const diff = now.getTime() - dateObj.getTime()
-    
-    const seconds = Math.floor(diff / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-    const days = Math.floor(hours / 24)
-    
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    const now = new Date();
+    const diff = now.getTime() - dateObj.getTime();
+
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
     if (seconds < 60) {
-      return '刚刚'
+      return "刚刚";
     } else if (minutes < 60) {
-      return `${minutes}分钟前`
+      return `${minutes}分钟前`;
     } else if (hours < 24) {
-      return `${hours}小时前`
+      return `${hours}小时前`;
     } else if (days < 7) {
-      return `${days}天前`
+      return `${days}天前`;
     } else {
-      return formatDateOnly(dateObj)
+      return formatDateOnly(dateObj);
     }
   } catch (error) {
-    console.error('相对时间计算错误:', error)
-    return '-'
+    console.error("相对时间计算错误:", error);
+    return "-";
   }
 }

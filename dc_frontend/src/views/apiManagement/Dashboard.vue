@@ -30,11 +30,13 @@
             <div class="stat-content">
               <div class="stat-value">{{ stats.totalCustomers }}</div>
               <div class="stat-label">总平台数</div>
-              <div class="stat-change positive">+{{ stats.activeCustomers }} 活跃</div>
+              <div class="stat-change positive">
+                +{{ stats.activeCustomers }} 活跃
+              </div>
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon apis">
@@ -47,7 +49,7 @@
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon batches">
@@ -60,14 +62,16 @@
             </div>
           </div>
         </el-col>
-        
+
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon calls">
               <el-icon><TrendCharts /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ formatNumber(stats.totalApiCalls) }}</div>
+              <div class="stat-value">
+                {{ formatNumber(stats.totalApiCalls) }}
+              </div>
               <div class="stat-label">总调用次数</div>
               <div class="stat-change positive">+15.2% 较上月</div>
             </div>
@@ -83,7 +87,11 @@
         <div class="page-card">
           <div class="card-header">
             <h3>API调用趋势</h3>
-            <el-select v-model="callsTimeRange" size="small" @change="loadApiCallStats">
+            <el-select
+              v-model="callsTimeRange"
+              size="small"
+              @change="loadApiCallStats"
+            >
               <el-option label="最近7天" value="7d" />
               <el-option label="最近30天" value="30d" />
               <el-option label="最近90天" value="90d" />
@@ -116,15 +124,17 @@
             <h3>客户活跃度排行</h3>
           </div>
           <div class="activity-list">
-            <div 
-              v-for="(customer, index) in customerActivity" 
+            <div
+              v-for="(customer, index) in customerActivity"
               :key="customer.customer_name"
               class="activity-item"
             >
               <div class="rank">{{ index + 1 }}</div>
               <div class="customer-info">
                 <div class="customer-name">{{ customer.customer_name }}</div>
-                <div class="last-call">最后调用: {{ formatDate(customer.last_call_date) }}</div>
+                <div class="last-call">
+                  最后调用: {{ formatDate(customer.last_call_date) }}
+                </div>
               </div>
               <div class="call-count">{{ customer.api_calls }} 次</div>
             </div>
@@ -189,25 +199,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
-import { formatDate } from '@/utils/date'
+import { ref, reactive, onMounted, nextTick } from "vue";
+import { ElMessage } from "element-plus";
+import { formatDate } from "@/utils/date";
 import {
   getSystemStats,
   getBatchStatusStats,
   getApiCallStats,
-  getCustomerActivityStats
-} from '@/api/apiManagement'
-import type { SystemStats, ApiCallStats, CustomerActivityStats } from '@/types/apiManagement'
-import * as echarts from 'echarts'
+  getCustomerActivityStats,
+} from "@/api/apiManagement";
+import type {
+  SystemStats,
+  ApiCallStats,
+  CustomerActivityStats,
+} from "@/types/apiManagement";
+import * as echarts from "echarts";
 
 /**
  * 响应式数据
  */
-const loading = ref(false)
-const callsChartRef = ref<HTMLElement>()
-const batchChartRef = ref<HTMLElement>()
-const callsTimeRange = ref('7d')
+const loading = ref(false);
+const callsChartRef = ref<HTMLElement>();
+const batchChartRef = ref<HTMLElement>();
+const callsTimeRange = ref("7d");
 
 // 统计数据
 const stats = reactive<SystemStats>({
@@ -220,32 +234,34 @@ const stats = reactive<SystemStats>({
   pendingBatches: 0,
   processingBatches: 0,
   completedBatches: 0,
-  failedBatches: 0
-})
+  failedBatches: 0,
+});
 
 // 客户活跃度数据
-const customerActivity = ref<CustomerActivityStats[]>([])
+const customerActivity = ref<CustomerActivityStats[]>([]);
 
 // 最近活动数据
-const recentActivity = ref<Array<{
-  id: string
-  type: string
-  title: string
-  description: string
-  timestamp: string
-}>>([])
+const recentActivity = ref<
+  Array<{
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    timestamp: string;
+  }>
+>([]);
 
 // 图表实例
-let callsChart: echarts.ECharts | null = null
-let batchChart: echarts.ECharts | null = null
+let callsChart: echarts.ECharts | null = null;
+let batchChart: echarts.ECharts | null = null;
 
 /**
  * 生命周期钩子
  */
 onMounted(() => {
-  loadDashboardData()
-  initCharts()
-})
+  loadDashboardData();
+  initCharts();
+});
 
 /**
  * 方法定义
@@ -256,180 +272,191 @@ onMounted(() => {
  */
 const loadDashboardData = async () => {
   try {
-    loading.value = true
-    
+    loading.value = true;
+
     // 并行加载所有数据
     const [
       systemStatsRes,
       batchStatsRes,
       apiCallStatsRes,
-      customerActivityRes
+      customerActivityRes,
     ] = await Promise.all([
       getSystemStats(),
       getBatchStatusStats(),
       getApiCallStats({ start_date: getDateBefore(7) }),
-      getCustomerActivityStats({ limit: 10 })
-    ])
+      getCustomerActivityStats({ limit: 10 }),
+    ]);
 
     // 更新统计数据
     if (systemStatsRes.success) {
-      Object.assign(stats, systemStatsRes.data)
+      Object.assign(stats, systemStatsRes.data);
     }
 
     // 更新客户活跃度
     if (customerActivityRes.success) {
-      customerActivity.value = customerActivityRes.data
+      customerActivity.value = customerActivityRes.data;
     }
 
     // 更新图表数据
     if (apiCallStatsRes.success) {
-      updateCallsChart(apiCallStatsRes.data)
+      updateCallsChart(apiCallStatsRes.data);
     }
 
     if (batchStatsRes.success) {
-      updateBatchChart(batchStatsRes.data)
+      updateBatchChart(batchStatsRes.data);
     }
 
     // 加载最近活动
-    loadRecentActivity()
-
+    loadRecentActivity();
   } catch (error) {
-    console.error('加载仪表板数据失败:', error)
-    ElMessage.error('加载仪表板数据失败')
+    console.error("加载仪表板数据失败:", error);
+    ElMessage.error("加载仪表板数据失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 /**
  * 初始化图表
  */
 const initCharts = async () => {
-  await nextTick()
-  
+  await nextTick();
+
   if (callsChartRef.value) {
-    callsChart = echarts.init(callsChartRef.value)
+    callsChart = echarts.init(callsChartRef.value);
   }
-  
+
   if (batchChartRef.value) {
-    batchChart = echarts.init(batchChartRef.value)
+    batchChart = echarts.init(batchChartRef.value);
   }
 
   // 监听窗口大小变化
-  window.addEventListener('resize', () => {
-    callsChart?.resize()
-    batchChart?.resize()
-  })
-}
+  window.addEventListener("resize", () => {
+    callsChart?.resize();
+    batchChart?.resize();
+  });
+};
 
 /**
  * 更新API调用趋势图表
  */
 const updateCallsChart = (data: ApiCallStats[]) => {
-  if (!callsChart) return
+  if (!callsChart) return;
 
   const option = {
     tooltip: {
-      trigger: 'axis',
+      trigger: "axis",
       axisPointer: {
-        type: 'cross'
-      }
+        type: "cross",
+      },
     },
     legend: {
-      data: ['总调用', '成功调用', '失败调用']
+      data: ["总调用", "成功调用", "失败调用"],
     },
     xAxis: {
-      type: 'category',
-      data: data.map(item => item.date)
+      type: "category",
+      data: data.map((item) => item.date),
     },
     yAxis: {
-      type: 'value'
+      type: "value",
     },
     series: [
       {
-        name: '总调用',
-        type: 'line',
-        data: data.map(item => item.calls),
+        name: "总调用",
+        type: "line",
+        data: data.map((item) => item.calls),
         smooth: true,
-        itemStyle: { color: '#409EFF' }
+        itemStyle: { color: "#409EFF" },
       },
       {
-        name: '成功调用',
-        type: 'line',
-        data: data.map(item => item.success_calls),
+        name: "成功调用",
+        type: "line",
+        data: data.map((item) => item.success_calls),
         smooth: true,
-        itemStyle: { color: '#67C23A' }
+        itemStyle: { color: "#67C23A" },
       },
       {
-        name: '失败调用',
-        type: 'line',
-        data: data.map(item => item.failed_calls),
+        name: "失败调用",
+        type: "line",
+        data: data.map((item) => item.failed_calls),
         smooth: true,
-        itemStyle: { color: '#F56C6C' }
-      }
-    ]
-  }
+        itemStyle: { color: "#F56C6C" },
+      },
+    ],
+  };
 
-  callsChart.setOption(option)
-}
+  callsChart.setOption(option);
+};
 
 /**
  * 更新批次状态分布图表
  */
 const updateBatchChart = (data: any) => {
-  if (!batchChart) return
+  if (!batchChart) return;
 
   const option = {
     tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
+      trigger: "item",
+      formatter: "{a} <br/>{b}: {c} ({d}%)",
     },
     legend: {
-      orient: 'vertical',
-      left: 'left'
+      orient: "vertical",
+      left: "left",
     },
     series: [
       {
-        name: '批次状态',
-        type: 'pie',
-        radius: '50%',
+        name: "批次状态",
+        type: "pie",
+        radius: "50%",
         data: [
-          { value: data.pending, name: '待处理', itemStyle: { color: '#909399' } },
-          { value: data.processing, name: '处理中', itemStyle: { color: '#E6A23C' } },
-          { value: data.completed, name: '已完成', itemStyle: { color: '#67C23A' } },
-          { value: data.failed, name: '失败', itemStyle: { color: '#F56C6C' } }
+          {
+            value: data.pending,
+            name: "待处理",
+            itemStyle: { color: "#909399" },
+          },
+          {
+            value: data.processing,
+            name: "处理中",
+            itemStyle: { color: "#E6A23C" },
+          },
+          {
+            value: data.completed,
+            name: "已完成",
+            itemStyle: { color: "#67C23A" },
+          },
+          { value: data.failed, name: "失败", itemStyle: { color: "#F56C6C" } },
         ],
         emphasis: {
           itemStyle: {
             shadowBlur: 10,
             shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
-        }
-      }
-    ]
-  }
+            shadowColor: "rgba(0, 0, 0, 0.5)",
+          },
+        },
+      },
+    ],
+  };
 
-  batchChart.setOption(option)
-}
+  batchChart.setOption(option);
+};
 
 /**
  * 加载API调用统计
  */
 const loadApiCallStats = async () => {
   try {
-    const days = parseInt(callsTimeRange.value.replace('d', ''))
-    const response = await getApiCallStats({ 
-      start_date: getDateBefore(days) 
-    })
-    
+    const days = parseInt(callsTimeRange.value.replace("d", ""));
+    const response = await getApiCallStats({
+      start_date: getDateBefore(days),
+    });
+
     if (response.success) {
-      updateCallsChart(response.data)
+      updateCallsChart(response.data);
     }
   } catch (error) {
-    console.error('加载API调用统计失败:', error)
+    console.error("加载API调用统计失败:", error);
   }
-}
+};
 
 /**
  * 加载最近活动
@@ -438,88 +465,88 @@ const loadRecentActivity = () => {
   // 模拟最近活动数据
   recentActivity.value = [
     {
-      id: '1',
-      type: 'api_created',
-      title: '新建API接口',
+      id: "1",
+      type: "api_created",
+      title: "新建API接口",
       description: '客户"测试公司"创建了API接口"用户查询"',
-      timestamp: new Date(Date.now() - 300000).toISOString()
+      timestamp: new Date(Date.now() - 300000).toISOString(),
     },
     {
-      id: '2',
-      type: 'batch_completed',
-      title: '批次处理完成',
+      id: "2",
+      type: "batch_completed",
+      title: "批次处理完成",
       description: '批次"数据导入_20241009"处理完成，成功处理1000条记录',
-      timestamp: new Date(Date.now() - 600000).toISOString()
+      timestamp: new Date(Date.now() - 600000).toISOString(),
     },
     {
-      id: '3',
-      type: 'customer_registered',
-      title: '新客户注册',
+      id: "3",
+      type: "customer_registered",
+      title: "新客户注册",
       description: '新客户"科技有限公司"完成注册',
-      timestamp: new Date(Date.now() - 900000).toISOString()
+      timestamp: new Date(Date.now() - 900000).toISOString(),
     },
     {
-      id: '4',
-      type: 'api_called',
-      title: 'API调用异常',
+      id: "4",
+      type: "api_called",
+      title: "API调用异常",
       description: 'API"数据查询"调用失败，错误码500',
-      timestamp: new Date(Date.now() - 1200000).toISOString()
-    }
-  ]
-}
+      timestamp: new Date(Date.now() - 1200000).toISOString(),
+    },
+  ];
+};
 
 /**
  * 获取指定天数前的日期
  */
 const getDateBefore = (days: number) => {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().split('T')[0]
-}
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().split("T")[0];
+};
 
 /**
  * 格式化数字
  */
 const formatNumber = (num: number) => {
   if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
+    return (num / 1000000).toFixed(1) + "M";
   } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
+    return (num / 1000).toFixed(1) + "K";
   }
-  return num.toString()
-}
+  return num.toString();
+};
 
 /**
  * 获取活动类型
  */
 const getActivityType = (type: string) => {
   const types: Record<string, string> = {
-    api_created: 'success',
-    batch_completed: 'primary',
-    customer_registered: 'info',
-    api_called: 'warning'
-  }
-  return types[type] || 'primary'
-}
+    api_created: "success",
+    batch_completed: "primary",
+    customer_registered: "info",
+    api_called: "warning",
+  };
+  return types[type] || "primary";
+};
 
 /**
  * 刷新数据
  */
 const refreshData = () => {
-  loadDashboardData()
-}
+  loadDashboardData();
+};
 </script>
 
 <style scoped lang="scss">
 .api-dashboard {
   .page-header {
     margin-bottom: 20px;
-    
+
     .header-content {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      
+
       .header-left {
         .page-title {
           display: flex;
@@ -530,7 +557,7 @@ const refreshData = () => {
           font-weight: 600;
           color: var(--el-text-color-primary);
         }
-        
+
         .page-description {
           margin: 0;
           color: var(--el-text-color-regular);
@@ -538,10 +565,10 @@ const refreshData = () => {
       }
     }
   }
-  
+
   .stats-section {
     margin-bottom: 20px;
-    
+
     .stat-card {
       display: flex;
       align-items: center;
@@ -549,7 +576,7 @@ const refreshData = () => {
       background: white;
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      
+
       .stat-icon {
         width: 56px;
         height: 56px;
@@ -559,48 +586,48 @@ const refreshData = () => {
         justify-content: center;
         margin-right: 20px;
         font-size: 28px;
-        
+
         &.customers {
           background: #e3f2fd;
           color: #1976d2;
         }
-        
+
         &.apis {
           background: #f3e5f5;
           color: #7b1fa2;
         }
-        
+
         &.batches {
           background: #fff3e0;
           color: #f57c00;
         }
-        
+
         &.calls {
           background: #e8f5e8;
           color: #388e3c;
         }
       }
-      
+
       .stat-content {
         flex: 1;
-        
+
         .stat-value {
           font-size: 28px;
           font-weight: 600;
           color: var(--el-text-color-primary);
           margin-bottom: 4px;
         }
-        
+
         .stat-label {
           font-size: 14px;
           color: var(--el-text-color-regular);
           margin-bottom: 4px;
         }
-        
+
         .stat-change {
           font-size: 12px;
           color: var(--el-text-color-secondary);
-          
+
           &.positive {
             color: var(--el-color-success);
           }
@@ -608,42 +635,42 @@ const refreshData = () => {
       }
     }
   }
-  
+
   .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 20px 20px 0 20px;
-    
+
     h3 {
       margin: 0;
       font-size: 16px;
       font-weight: 600;
     }
   }
-  
+
   .chart-container {
     padding: 20px;
-    
+
     .chart {
       width: 100%;
       height: 300px;
     }
   }
-  
+
   .activity-list {
     padding: 20px;
-    
+
     .activity-item {
       display: flex;
       align-items: center;
       padding: 12px 0;
       border-bottom: 1px solid var(--el-border-color-lighter);
-      
+
       &:last-child {
         border-bottom: none;
       }
-      
+
       .rank {
         width: 32px;
         height: 32px;
@@ -656,72 +683,72 @@ const refreshData = () => {
         font-weight: 600;
         margin-right: 16px;
       }
-      
+
       .customer-info {
         flex: 1;
-        
+
         .customer-name {
           font-weight: 500;
           color: var(--el-text-color-primary);
           margin-bottom: 4px;
         }
-        
+
         .last-call {
           font-size: 12px;
           color: var(--el-text-color-secondary);
         }
       }
-      
+
       .call-count {
         font-weight: 600;
         color: var(--el-color-primary);
       }
     }
   }
-  
+
   .system-status {
     padding: 20px;
-    
+
     .status-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 12px 0;
       border-bottom: 1px solid var(--el-border-color-lighter);
-      
+
       &:last-child {
         border-bottom: none;
       }
-      
+
       .status-label {
         color: var(--el-text-color-regular);
       }
-      
+
       .status-value {
         font-weight: 600;
         color: var(--el-text-color-primary);
-        
+
         &.success {
           color: var(--el-color-success);
         }
-        
+
         &.danger {
           color: var(--el-color-danger);
         }
       }
     }
   }
-  
+
   .recent-activity {
     padding: 20px;
-    
+
     .activity-content {
       .activity-title {
         font-weight: 500;
         color: var(--el-text-color-primary);
         margin-bottom: 4px;
       }
-      
+
       .activity-description {
         font-size: 14px;
         color: var(--el-text-color-regular);

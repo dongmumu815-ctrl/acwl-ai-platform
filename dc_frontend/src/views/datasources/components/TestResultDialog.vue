@@ -17,8 +17,13 @@
             <CircleClose v-else />
           </el-icon>
           <div class="status-text">
-            <h3 :class="['status-title', testResult.success ? 'success' : 'error']">
-              {{ testResult.success ? '连接成功' : '连接失败' }}
+            <h3
+              :class="[
+                'status-title',
+                testResult.success ? 'success' : 'error',
+              ]"
+            >
+              {{ testResult.success ? "连接成功" : "连接失败" }}
             </h3>
             <p class="status-message">{{ testResult.message }}</p>
           </div>
@@ -57,7 +62,9 @@
             :label="formatLabel(key)"
           >
             <template v-if="typeof value === 'object'">
-              <pre class="json-content">{{ JSON.stringify(value, null, 2) }}</pre>
+              <pre class="json-content">{{
+                JSON.stringify(value, null, 2)
+              }}</pre>
             </template>
             <template v-else>
               {{ value }}
@@ -67,7 +74,10 @@
       </div>
 
       <!-- 错误详情 -->
-      <div v-if="!testResult.success && testResult.error_details" class="error-details">
+      <div
+        v-if="!testResult.success && testResult.error_details"
+        class="error-details"
+      >
         <h4>错误详情</h4>
         <el-alert
           :title="testResult.error_details"
@@ -81,7 +91,12 @@
               <div class="error-suggestions">
                 <p><strong>可能的解决方案：</strong></p>
                 <ul>
-                  <li v-for="suggestion in getErrorSuggestions(testResult.error_details)" :key="suggestion">
+                  <li
+                    v-for="suggestion in getErrorSuggestions(
+                      testResult.error_details,
+                    )"
+                    :key="suggestion"
+                  >
                     {{ suggestion }}
                   </li>
                 </ul>
@@ -92,7 +107,10 @@
       </div>
 
       <!-- 性能指标 -->
-      <div v-if="testResult.success && testResult.response_time" class="performance-metrics">
+      <div
+        v-if="testResult.success && testResult.response_time"
+        class="performance-metrics"
+      >
         <h4>性能指标</h4>
         <div class="metrics-grid">
           <div class="metric-item">
@@ -117,14 +135,13 @@
       <!-- 建议 -->
       <div v-if="testResult.success" class="recommendations">
         <h4>优化建议</h4>
-        <el-alert
-          type="info"
-          :closable="false"
-          show-icon
-        >
+        <el-alert type="info" :closable="false" show-icon>
           <template #default>
             <ul class="recommendation-list">
-              <li v-for="recommendation in getRecommendations(testResult)" :key="recommendation">
+              <li
+                v-for="recommendation in getRecommendations(testResult)"
+                :key="recommendation"
+              >
                 {{ recommendation }}
               </li>
             </ul>
@@ -149,134 +166,141 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
-import { formatDateTime } from '@/utils/date'
+import { ref, computed, watch } from "vue";
+import { CircleCheck, CircleClose } from "@element-plus/icons-vue";
+import { formatDateTime } from "@/utils/date";
 
 // Props
 const props = defineProps({
   modelValue: {
     type: Boolean,
-    default: false
+    default: false,
   },
   testResult: {
     type: Object,
-    default: null
-  }
-})
+    default: null,
+  },
+});
 
 // Emits
-const emit = defineEmits(['update:modelValue', 'retry'])
+const emit = defineEmits(["update:modelValue", "retry"]);
 
 // 响应式数据
-const visible = ref(false)
+const visible = ref(false);
 
 // 监听器
-watch(() => props.modelValue, (val) => {
-  visible.value = val
-})
+watch(
+  () => props.modelValue,
+  (val) => {
+    visible.value = val;
+  },
+);
 
 watch(visible, (val) => {
-  emit('update:modelValue', val)
-})
+  emit("update:modelValue", val);
+});
 
 // 方法
 const handleClose = () => {
-  visible.value = false
-}
+  visible.value = false;
+};
 
 const handleRetry = () => {
-  emit('retry')
-  handleClose()
-}
+  emit("retry");
+  handleClose();
+};
 
 // 工具方法
 const formatLabel = (key) => {
   const labelMap = {
-    connection_type: '连接类型',
-    server_version: '服务器版本',
-    test_query_result: '测试查询结果',
-    connection_params: '连接参数',
-    datasource_type: '数据源类型',
-    host: '主机地址',
-    port: '端口',
-    database: '数据库'
-  }
-  return labelMap[key] || key
-}
+    connection_type: "连接类型",
+    server_version: "服务器版本",
+    test_query_result: "测试查询结果",
+    connection_params: "连接参数",
+    datasource_type: "数据源类型",
+    host: "主机地址",
+    port: "端口",
+    database: "数据库",
+  };
+  return labelMap[key] || key;
+};
 
 const getResponseTimeType = (responseTime) => {
-  if (responseTime < 100) return 'success'
-  if (responseTime < 500) return 'warning'
-  return 'danger'
-}
+  if (responseTime < 100) return "success";
+  if (responseTime < 500) return "warning";
+  return "danger";
+};
 
 const getResponseTimeLabel = (responseTime) => {
-  if (responseTime < 100) return '优秀'
-  if (responseTime < 500) return '良好'
-  if (responseTime < 1000) return '一般'
-  return '较慢'
-}
+  if (responseTime < 100) return "优秀";
+  if (responseTime < 500) return "良好";
+  if (responseTime < 1000) return "一般";
+  return "较慢";
+};
 
 const getConnectionQuality = (responseTime) => {
-  if (responseTime < 50) return '优秀'
-  if (responseTime < 100) return '良好'
-  if (responseTime < 300) return '一般'
-  if (responseTime < 1000) return '较差'
-  return '很差'
-}
+  if (responseTime < 50) return "优秀";
+  if (responseTime < 100) return "良好";
+  if (responseTime < 300) return "一般";
+  if (responseTime < 1000) return "较差";
+  return "很差";
+};
 
 const getNetworkLatency = (responseTime) => {
-  if (responseTime < 50) return '低延迟'
-  if (responseTime < 200) return '中等延迟'
-  return '高延迟'
-}
+  if (responseTime < 50) return "低延迟";
+  if (responseTime < 200) return "中等延迟";
+  return "高延迟";
+};
 
 const getErrorSuggestions = (errorDetails) => {
-  const suggestions = []
-  const error = errorDetails.toLowerCase()
-  
-  if (error.includes('connection refused') || error.includes('连接被拒绝')) {
-    suggestions.push('检查主机地址和端口是否正确')
-    suggestions.push('确认目标服务是否正在运行')
-    suggestions.push('检查防火墙设置')
-  } else if (error.includes('timeout') || error.includes('超时')) {
-    suggestions.push('检查网络连接是否稳定')
-    suggestions.push('增加连接超时时间')
-    suggestions.push('确认目标服务响应正常')
-  } else if (error.includes('authentication') || error.includes('认证') || error.includes('密码')) {
-    suggestions.push('检查用户名和密码是否正确')
-    suggestions.push('确认用户是否有相应权限')
-    suggestions.push('检查数据库用户配置')
-  } else if (error.includes('database') || error.includes('数据库')) {
-    suggestions.push('检查数据库名称是否正确')
-    suggestions.push('确认数据库是否存在')
-    suggestions.push('检查用户是否有访问该数据库的权限')
+  const suggestions = [];
+  const error = errorDetails.toLowerCase();
+
+  if (error.includes("connection refused") || error.includes("连接被拒绝")) {
+    suggestions.push("检查主机地址和端口是否正确");
+    suggestions.push("确认目标服务是否正在运行");
+    suggestions.push("检查防火墙设置");
+  } else if (error.includes("timeout") || error.includes("超时")) {
+    suggestions.push("检查网络连接是否稳定");
+    suggestions.push("增加连接超时时间");
+    suggestions.push("确认目标服务响应正常");
+  } else if (
+    error.includes("authentication") ||
+    error.includes("认证") ||
+    error.includes("密码")
+  ) {
+    suggestions.push("检查用户名和密码是否正确");
+    suggestions.push("确认用户是否有相应权限");
+    suggestions.push("检查数据库用户配置");
+  } else if (error.includes("database") || error.includes("数据库")) {
+    suggestions.push("检查数据库名称是否正确");
+    suggestions.push("确认数据库是否存在");
+    suggestions.push("检查用户是否有访问该数据库的权限");
   } else {
-    suggestions.push('检查所有连接参数是否正确')
-    suggestions.push('确认网络连接正常')
-    suggestions.push('联系系统管理员获取帮助')
+    suggestions.push("检查所有连接参数是否正确");
+    suggestions.push("确认网络连接正常");
+    suggestions.push("联系系统管理员获取帮助");
   }
-  
-  return suggestions
-}
+
+  return suggestions;
+};
 
 const getRecommendations = (testResult) => {
-  const recommendations = []
-  
+  const recommendations = [];
+
   if (testResult.response_time > 1000) {
-    recommendations.push('响应时间较长，建议检查网络连接或优化数据库配置')
+    recommendations.push("响应时间较长，建议检查网络连接或优化数据库配置");
   }
-  
+
   if (testResult.response_time < 50) {
-    recommendations.push('连接性能优秀，可以正常使用')
+    recommendations.push("连接性能优秀，可以正常使用");
   }
-  
-  recommendations.push('建议定期测试连接以确保数据源稳定性')
-  recommendations.push('可以配置连接池参数以优化性能')
-  
-  return recommendations
-}
+
+  recommendations.push("建议定期测试连接以确保数据源稳定性");
+  recommendations.push("可以配置连接池参数以优化性能");
+
+  return recommendations;
+};
 </script>
 
 <style scoped>
@@ -366,7 +390,7 @@ const getRecommendations = (testResult) => {
   background-color: #f5f7fa;
   padding: 8px 12px;
   border-radius: 4px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 12px;
   color: #606266;
   white-space: pre-wrap;

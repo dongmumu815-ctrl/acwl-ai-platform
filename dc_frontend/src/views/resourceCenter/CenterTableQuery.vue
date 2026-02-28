@@ -59,12 +59,12 @@
       <SqlPackageQueryPanel
         v-if="packageData?.type === 'sql' && packageData"
         ref="panelRef"
-        :packageData="packageData"
+        :package-data="packageData"
       />
       <EsPackageQueryPanel
         v-else-if="packageData?.type === 'elasticsearch' && packageData"
         ref="panelRef"
-        :packageData="packageData"
+        :package-data="packageData"
       />
     </div>
   </div>
@@ -75,7 +75,7 @@ import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import {
   resourcePackageApi,
-  type ResourcePackage
+  type ResourcePackage,
 } from "@/api/resourcePackage";
 import { datasourceApi } from "@/api/datasource";
 import type { DataSource } from "@/types/datasource";
@@ -105,7 +105,7 @@ const getDatasourceName = computed(() => {
 
 const getTagStyle = (bg: string) => {
   const hexToRgb = (
-    hex: string
+    hex: string,
   ): { r: number; g: number; b: number } | null => {
     try {
       let h = hex.trim();
@@ -161,14 +161,14 @@ const loadTemplateParams = async () => {
     } else if (packageData.value.template_type === "elasticsearch") {
       const response = await templateApi.getByType(
         packageData.value.template_id,
-        "es"
+        "es",
       );
       templateData = (response as any)?.data || response;
     }
     if (templateData && templateData.config) {
       const conditions = templateData.config.conditions || [];
       const unlockedConditions = conditions.filter(
-        (condition: any) => !condition.locked
+        (condition: any) => !condition.locked,
       );
       const dynamicParams: Record<string, any> = {};
       unlockedConditions.forEach((condition: any) => {
@@ -222,7 +222,7 @@ watch(packageData, async (val) => {
                 unwatch();
               }
             },
-            { immediate: false }
+            { immediate: false },
           );
         }
       }
@@ -234,7 +234,6 @@ watch(packageData, async (val) => {
 </script>
 
 <style scoped>
-
 .center-table-query-page {
   padding: 10px;
   /* min-height: 100vh; */

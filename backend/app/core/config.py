@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str = Field(default="acwl", description="MinIO访问密钥")
     MINIO_SECRET_KEY: str = Field(default="1qaz2WSXaczt", description="MinIO秘密密钥")
     MINIO_SECURE: bool = Field(default=False, description="是否使用HTTPS")
-    MINIO_BUCKET_NAME: str = Field(default="cepiec-ai-data", description="存储桶名称")
+    MINIO_BUCKET_NAME: str = Field(default="cepiec-read-data", description="存储桶名称")
     MINIO_REGION: str = Field(default="us-east-1", description="区域设置")
     
     # MinIO分片上传配置
