@@ -197,34 +197,34 @@ const authRoutes: RouteRecordRaw[] = [
       }
     ]
   },
-  {
-    path: '/datasources',
-    component: Layout,
-    redirect: '/datasources/list',
-    meta: {
-      title: '数据源管理',
-      icon: 'Connection',
-      requiresAuth: true,
-      // 分组访问权限：数据源查看
-      permission: 'data:datasource:view',
-      strictPermission: true
-    },
-    children: [
-      {
-        path: 'list',
-        name: 'DatasourceList',
-        component: () => import('@/views/datasources/index.vue'),
-        meta: {
-          title: '数据源列表',
-          icon: 'List',
-          requiresAuth: true,
-          // 查看数据源列表需要查看权限
-          permission: 'data:datasource:view',
-          strictPermission: true
-        }
-      }
-    ]
-  },
+  // {
+  //   path: '/datasources',
+  //   component: Layout,
+  //   redirect: '/datasources/list',
+  //   meta: {
+  //     title: '数据源管理',
+  //     icon: 'Connection',
+  //     requiresAuth: true,
+  //     // 分组访问权限：数据源查看
+  //     permission: 'data:datasource:view',
+  //     strictPermission: true
+  //   },
+  //   children: [
+  //     {
+  //       path: 'list',
+  //       name: 'DatasourceList',
+  //       component: () => import('@/views/datasources/index.vue'),
+  //       meta: {
+  //         title: '数据源列表',
+  //         icon: 'List',
+  //         requiresAuth: true,
+  //         // 查看数据源列表需要查看权限
+  //         permission: 'data:datasource:view',
+  //         strictPermission: true
+  //       }
+  //     }
+  //   ]
+  // },
   // {
   //   path: '/users',
   //   component: Layout,

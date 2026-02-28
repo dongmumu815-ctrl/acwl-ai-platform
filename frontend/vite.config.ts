@@ -49,15 +49,6 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     open: true,
-    // 允许跨项目读取文件以支持权限同步从 dc_frontend 导入
-    fs: {
-      // 添加工作区根目录，确保可以通过 /@fs 访问 dc_frontend
-      allow: [
-        // Windows 路径需使用盘符形式
-        'd:/works/codes/acwl-ai-data',
-        'D:/works/codes/acwl-ai-data'
-      ]
-    },
     // 只在开发环境使用代理，生产环境直接访问本站目录
     proxy: process.env.NODE_ENV === 'development' ? {
       '/api': {
