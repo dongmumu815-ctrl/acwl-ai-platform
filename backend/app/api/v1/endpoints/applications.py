@@ -11,11 +11,12 @@ from app.schemas.common import PaginatedResponse
 from app.crud.application import harbor_config, app_template, app_instance
 from app.services.application_service import ApplicationService
 from app.schemas.application import (
-    HarborConfig, HarborConfigCreate, HarborConfigUpdate,
+    HarborConfig, HarborConfigCreate, HarborConfigUpdate, HarborTestConnection,
     AppTemplate, AppTemplateCreate, AppTemplateUpdate,
     AppInstance, AppInstanceCreate, AppInstanceUpdate,
     AppStatus
 )
+import httpx
 
 router = APIRouter()
 
@@ -48,6 +49,48 @@ async def get_harbor_configs(
     return PaginatedResponse(
         items=items, total=total, page=page, size=size, pages=(total + size - 1) // size
     )
+
+@router.post("/harbor-configs/test-connection", summary="测试Harbor连接")
+async def test_harbor_connection(
+    obj_in: HarborTestConnection,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    url = obj_in.url
+    username = obj_in.username
+    password = obj_in.password
+
+    # 如果有 ID 且密码为空，从数据库获取
+    if obj_in.id and not password:
+        db_obj = await harbor_config.get(db, obj_in.id)
+        if db_obj:
+            password = db_obj.password
+
+    if not password:
+        raise HTTPException(status_code=400, detail="密码不能为空")
+
+    # 去掉 URL 末尾的斜杠
+    if url.endswith("/"):
+        url = url[:-1]
+
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
+            # 尝试获取当前用户信息
+            # Harbor API: /api/v2.0/users/current
+            resp = await client.get(
+                f"{url}/api/v2.0/users/current",
+                auth=(username, password)
+            )
+            
+            if resp.status_code == 200:
+                return {"success": True, "message": "连接成功"}
+            elif resp.status_code == 401:
+                return {"success": False, "message": "用户名或密码错误"}
+            else:
+                return {"success": False, "message": f"连接失败: {resp.status_code} {resp.text[:100]}"}
+    except Exception as e:
+        return {"success": False, "message": f"连接异常: {str(e)}"}
+
 
 @router.post("/harbor-configs", response_model=HarborConfig, summary="创建Harbor配置")
 async def create_harbor_config(

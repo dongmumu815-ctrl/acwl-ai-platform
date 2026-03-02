@@ -13,6 +13,7 @@ class HarborConfigBase(BaseModel):
     password: Optional[str] = Field(None, description="密码")
     project: Optional[str] = Field(None, description="默认项目")
     is_default: bool = Field(False, description="是否默认仓库")
+    insecure_registry: bool = Field(False, description="是否Insecure Registry")
     description: Optional[str] = Field(None, description="描述")
 
 class HarborConfigCreate(HarborConfigBase):
@@ -25,7 +26,16 @@ class HarborConfigUpdate(BaseModel):
     password: Optional[str] = None
     project: Optional[str] = None
     is_default: Optional[bool] = None
+    insecure_registry: Optional[bool] = None
     description: Optional[str] = None
+
+class HarborTestConnection(BaseModel):
+    id: Optional[int] = None
+    url: str
+    username: str
+    password: Optional[str] = None
+    project: Optional[str] = None
+
 
 class HarborConfig(HarborConfigBase):
     id: int
@@ -76,6 +86,12 @@ class AppTemplate(AppTemplateBase):
 
 # --- App Deployment ---
 
+class SimpleServer(BaseModel):
+    name: str
+    ip_address: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class AppDeploymentBase(BaseModel):
     server_id: int
     role: str = "default"
@@ -101,6 +117,8 @@ class AppDeployment(AppDeploymentBase):
     container_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    
+    server: Optional[SimpleServer] = None
 
     model_config = ConfigDict(from_attributes=True)
 

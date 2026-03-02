@@ -29,14 +29,21 @@
             <el-tag v-else type="info">否</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="insecure_registry" label="Insecure Registry" width="140">
+          <template #default="{ row }">
+            <el-tag v-if="row.insecure_registry" type="warning">是</el-tag>
+            <el-tag v-else type="info">否</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
         <el-table-column prop="updated_at" label="更新时间" width="180">
           <template #default="{ row }">
             {{ formatDateTime(row.updated_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
+            <el-button link type="success" @click="handleTest(row)">测试</el-button>
             <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
@@ -81,12 +88,19 @@
         <el-form-item label="默认仓库" prop="is_default">
           <el-switch v-model="form.is_default" />
         </el-form-item>
+        <el-form-item label="Insecure Registry" prop="insecure_registry">
+          <el-switch v-model="form.insecure_registry" />
+          <div style="font-size: 12px; color: #999; margin-left: 10px;">
+            启用后将自动配置 Docker daemon.json 并重启 Docker 服务，支持 HTTP 协议
+          </div>
+        </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" />
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
+          <el-button type="success" :loading="testing" @click="handleTestDialog">测试连接</el-button>
           <el-button @click="dialogVisible = false">取消</el-button>
           <el-button type="primary" :loading="submitting" @click="handleSubmit">
             确定
@@ -99,13 +113,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { getHarborConfigs, createHarborConfig, updateHarborConfig, deleteHarborConfig } from '@/api/application'
+import { getHarborConfigs, createHarborConfig, updateHarborConfig, deleteHarborConfig, testHarborConnection } from '@/api/application'
 import type { HarborConfig, HarborConfigForm } from '@/api/application'
 import { formatDateTime } from "@/utils/date";
 
 const loading = ref(false)
+const testing = ref(false)
 const tableData = ref<HarborConfig[]>([])
 const pagination = reactive({
   page: 1,
@@ -126,6 +141,7 @@ const form = reactive<HarborConfigForm>({
   password: '',
   project: '',
   is_default: false,
+  insecure_registry: false,
   description: ''
 })
 
@@ -160,6 +176,7 @@ const handleAdd = () => {
     password: '',
     project: '',
     is_default: false,
+    insecure_registry: false,
     description: ''
   })
   dialogVisible.value = true
@@ -175,6 +192,7 @@ const handleEdit = (row: HarborConfig) => {
     password: row.password, // Usually empty from backend for security, but user might want to update it
     project: row.project,
     is_default: row.is_default,
+    insecure_registry: row.insecure_registry,
     description: row.description
   })
   dialogVisible.value = true
@@ -192,6 +210,61 @@ const handleDelete = async (row: HarborConfig) => {
     if (error !== 'cancel') {
       console.error(error)
     }
+  }
+}
+
+const handleTest = async (row: HarborConfig) => {
+  const loadingInstance = ElLoading.service({
+    target: document.querySelector('.el-table__body-wrapper') as HTMLElement,
+    text: '测试连接中...',
+    background: 'rgba(255, 255, 255, 0.7)'
+  })
+  try {
+    const res = await testHarborConnection({
+      id: row.id,
+      url: row.url,
+      username: row.username || '',
+      // 密码不需要传，后端会自己查
+      project: row.project || undefined
+    })
+    if (res.success) {
+      ElMessage.success(res.message)
+    } else {
+      ElMessage.error(res.message)
+    }
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('测试连接失败')
+  } finally {
+    loadingInstance.close()
+  }
+}
+
+const handleTestDialog = async () => {
+  if (!form.url || !form.username) {
+    ElMessage.warning('请填写Harbor地址和用户名')
+    return
+  }
+  
+  testing.value = true
+  try {
+    const res = await testHarborConnection({
+      id: currentId.value || undefined, // 如果是编辑模式，传入 ID
+      url: form.url,
+      username: form.username || '',
+      password: form.password, // 如果用户输入了新密码，或者是新增模式，这里会有值
+      project: form.project || undefined
+    })
+    if (res.success) {
+      ElMessage.success(res.message)
+    } else {
+      ElMessage.error(res.message)
+    }
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('测试连接失败')
+  } finally {
+    testing.value = false
   }
 }
 

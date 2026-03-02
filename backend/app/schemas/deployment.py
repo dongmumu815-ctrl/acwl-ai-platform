@@ -30,7 +30,7 @@ class DeploymentCreate(DeploymentBase):
     gpu_ids: Optional[List[int]] = Field(None, description="GPU ID列表")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "deployment_name": "llama2-7b-vllm",
                 "deployment_type": "vLLM",
@@ -64,7 +64,7 @@ class DeploymentUpdate(BaseModel):
     runtime_env: Optional[Dict[str, Any]] = Field(None, description="运行环境配置")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "deployment_name": "llama2-7b-vllm-updated",
                 "max_concurrent_requests": 20,

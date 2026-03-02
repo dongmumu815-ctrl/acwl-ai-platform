@@ -32,6 +32,7 @@ export interface HarborConfig {
   password?: string
   project?: string
   is_default: boolean
+  insecure_registry?: boolean
   description?: string
   created_at?: string
   updated_at?: string
@@ -44,6 +45,7 @@ export interface HarborConfigForm {
   password?: string
   project?: string
   is_default: boolean
+  insecure_registry?: boolean
   description?: string
 }
 
@@ -88,6 +90,10 @@ export interface AppDeployment {
   ports?: any
   created_at?: string
   updated_at?: string
+  server?: {
+    name: string
+    ip_address: string
+  }
 }
 
 export interface AppDeploymentForm {
@@ -121,6 +127,14 @@ export interface AppInstanceForm {
 
 // --- API Functions ---
 
+export interface HarborTestConnection {
+  id?: number
+  url: string
+  username: string
+  password?: string
+  project?: string
+}
+
 // Harbor Configs
 export function getHarborConfigs(params: any): Promise<any> {
   return request.get('/applications/harbor-configs', { params })
@@ -137,6 +151,11 @@ export function updateHarborConfig(id: number, data: HarborConfigForm): Promise<
 export function deleteHarborConfig(id: number): Promise<any> {
   return request.delete(`/applications/harbor-configs/${id}`)
 }
+
+export function testHarborConnection(data: HarborTestConnection): Promise<any> {
+  return request.post('/applications/harbor-configs/test-connection', data)
+}
+
 
 // App Templates
 export function getAppTemplates(params: any): Promise<any> {

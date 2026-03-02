@@ -96,7 +96,7 @@ class CRUDAppTemplate:
 class CRUDAppInstance:
     async def get(self, db: AsyncSession, id: int) -> Optional[AppInstance]:
         query = select(AppInstance).options(
-            selectinload(AppInstance.deployments),
+            selectinload(AppInstance.deployments).selectinload(AppDeployment.server),
             selectinload(AppInstance.template)
         ).where(AppInstance.id == id)
         result = await db.execute(query)
@@ -107,7 +107,7 @@ class CRUDAppInstance:
     ) -> Tuple[List[AppInstance], int]:
         query = select(AppInstance).options(
             selectinload(AppInstance.template),
-            selectinload(AppInstance.deployments)
+            selectinload(AppInstance.deployments).selectinload(AppDeployment.server)
         ).order_by(AppInstance.created_at.desc())
         
         total = await db.scalar(select(func.count(AppInstance.id)))
@@ -142,7 +142,7 @@ class CRUDAppInstance:
         
         # Load relationships
         query = select(AppInstance).options(
-            selectinload(AppInstance.deployments),
+            selectinload(AppInstance.deployments).selectinload(AppDeployment.server),
             selectinload(AppInstance.template)
         ).where(AppInstance.id == db_instance.id)
         result = await db.execute(query)
@@ -191,7 +191,7 @@ class CRUDAppInstance:
         
         # Reload with relationships
         query = select(AppInstance).options(
-            selectinload(AppInstance.deployments),
+            selectinload(AppInstance.deployments).selectinload(AppDeployment.server),
             selectinload(AppInstance.template)
         ).where(AppInstance.id == db_obj.id)
         result = await db.execute(query)

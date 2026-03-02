@@ -20,8 +20,15 @@
             <div class="deployments-list">
               <h4>部署节点详情</h4>
               <el-table :data="row.deployments" border size="small">
-                <el-table-column label="服务器ID" prop="server_id" width="100" />
-                <!-- In a real app, we would join server name here. For now just ID is shown unless we map it -->
+                <el-table-column label="服务器" min-width="160">
+                  <template #default="{ row: dRow }">
+                    <div v-if="dRow.server">
+                      <div style="font-weight: 500">{{ dRow.server.name }}</div>
+                      <div class="text-gray" style="font-size: 12px">{{ dRow.server.ip_address }}</div>
+                    </div>
+                    <span v-else>ID: {{ dRow.server_id }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column label="角色" prop="role" width="120" />
                 <el-table-column label="状态" prop="status" width="120">
                   <template #default="{ row: dRow }">
@@ -88,9 +95,10 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleDetail(row)">详情</el-button>
+            <el-button link type="primary" @click="handleLogs(row)">日志</el-button>
             <el-button link type="danger" @click="handleDelete(row)">卸载</el-button>
           </template>
         </el-table-column>
@@ -113,6 +121,12 @@
     <AppInstanceDetailDialog
       v-model="detailVisible"
       :instance-id="currentInstanceId"
+    />
+
+    <!-- 部署日志弹窗 -->
+    <DeploymentLogs
+      v-model="logsVisible"
+      :instance-id="logsInstanceId"
     />
 
     <!-- 卸载确认弹窗 -->
@@ -158,6 +172,7 @@ import { getAppInstances, deleteAppInstance } from '@/api/application'
 import type { AppInstance } from '@/api/application'
 import { formatDateTime } from '@/utils/date'
 import AppInstanceDetailDialog from './components/AppInstanceDetailDialog.vue'
+import DeploymentLogs from './components/DeploymentLogs.vue'
 
 const loading = ref(false)
 const tableData = ref<AppInstance[]>([])
@@ -168,6 +183,9 @@ const pagination = reactive({
 })
 const detailVisible = ref(false)
 const currentInstanceId = ref<number | undefined>(undefined)
+
+const logsVisible = ref(false)
+const logsInstanceId = ref<number | null>(null)
 
 const uninstallDialogVisible = ref(false)
 const uninstallInstance = ref<AppInstance | null>(null)
@@ -205,6 +223,11 @@ const handleDetail = (row: AppInstance) => {
   detailVisible.value = true
 }
 
+const handleLogs = (row: AppInstance) => {
+  logsInstanceId.value = row.id
+  logsVisible.value = true
+}
+
 const handleDelete = (row: AppInstance) => {
   uninstallInstance.value = row
   uninstallCleanData.value = false
@@ -214,11 +237,18 @@ const handleDelete = (row: AppInstance) => {
 const confirmUninstall = async () => {
   if (!uninstallInstance.value) return
   
+  const instanceId = uninstallInstance.value.id
   uninstallLoading.value = true
   try {
-    await deleteAppInstance(uninstallInstance.value.id, uninstallCleanData.value)
+    // 先打开日志窗口
+    logsInstanceId.value = instanceId
+    logsVisible.value = true
+    
+    await deleteAppInstance(instanceId, uninstallCleanData.value)
     ElMessage.success('卸载任务已提交')
     uninstallDialogVisible.value = false
+    
+    // 刷新列表显示状态变化
     fetchData()
   } catch (error) {
     console.error(error)

@@ -17,6 +17,8 @@ from app.core.exceptions import ACWLException
 import logging
 from app.core.middleware.user_operation_logging import UserOperationLoggingMiddleware
 from sqlalchemy import text
+from app.core.deployment_logger import deployment_logger
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,13 @@ async def lifespan(app: FastAPI):
     在应用启动时初始化数据库和多数据库管理器，
     在关闭时清理所有资源
     """
+    # 初始化 DeploymentLogger Loop
+    try:
+        deployment_logger.set_loop(asyncio.get_running_loop())
+        logger.info("DeploymentLogger initialized with running loop")
+    except Exception as e:
+        logger.error(f"Failed to set DeploymentLogger loop: {e}")
+
     # 启动时初始化数据库（添加错误处理）
     try:
         await init_db()
