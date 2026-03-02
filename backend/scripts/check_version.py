@@ -28,12 +28,17 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    print("\n--- Checking Registry Logs for recent errors ---")
-    await run_remote_command("docker logs registry 2>&1 | tail -n 20")
+    # Check harbor-core env
+    print("\n--- Checking harbor-core env ---")
+    await run_remote_command("docker exec harbor-core env")
     
-    print("\n--- Checking API for images ---")
-    cmd_api = "curl -u 'admin:Harbor12345' -H 'Content-Type: application/json' 'http://localhost:5000/api/v2.0/projects/prod/repositories/actable-server/artifacts?page=1&page_size=10'"
-    await run_remote_command(cmd_api)
+    # Check where prepare script is
+    print("\n--- Searching for prepare script ---")
+    await run_remote_command("find / -name prepare -type f 2>/dev/null | grep harbor")
+    
+    # Check if there is an install.sh
+    print("\n--- Searching for install.sh ---")
+    await run_remote_command("find / -name install.sh -type f 2>/dev/null | grep harbor")
 
 if __name__ == "__main__":
     asyncio.run(main())

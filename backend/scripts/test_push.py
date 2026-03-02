@@ -20,6 +20,7 @@ async def run_remote_command(command):
         
         if out: print(f"[STDOUT]:\n{out}")
         if err: 
+            # Filter sudo prompt
             clean_err = '\n'.join([line for line in err.split('\n') if "[sudo] password" not in line])
             if clean_err.strip(): print(f"[STDERR]:\n{clean_err}")
             
@@ -28,12 +29,21 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    print("\n--- Checking Registry Logs for recent errors ---")
-    await run_remote_command("docker logs registry 2>&1 | tail -n 20")
+    # 1. Login
+    print("\n--- Docker Login ---")
+    await run_remote_command("docker login 10.20.1.204:5000 -u admin -p Harbor12345")
     
-    print("\n--- Checking API for images ---")
-    cmd_api = "curl -u 'admin:Harbor12345' -H 'Content-Type: application/json' 'http://localhost:5000/api/v2.0/projects/prod/repositories/actable-server/artifacts?page=1&page_size=10'"
-    await run_remote_command(cmd_api)
+    # 2. Pull busybox (if not exists)
+    print("\n--- Pull Busybox ---")
+    await run_remote_command("docker pull busybox")
+    
+    # 3. Tag
+    print("\n--- Tag Image ---")
+    await run_remote_command("docker tag busybox 10.20.1.204:5000/library/busybox:test")
+    
+    # 4. Push
+    print("\n--- Push Image ---")
+    await run_remote_command("docker push 10.20.1.204:5000/library/busybox:test")
 
 if __name__ == "__main__":
     asyncio.run(main())

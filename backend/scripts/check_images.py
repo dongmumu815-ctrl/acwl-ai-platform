@@ -20,6 +20,7 @@ async def run_remote_command(command):
         
         if out: print(f"[STDOUT]:\n{out}")
         if err: 
+            # Filter sudo prompt
             clean_err = '\n'.join([line for line in err.split('\n') if "[sudo] password" not in line])
             if clean_err.strip(): print(f"[STDERR]:\n{clean_err}")
             
@@ -28,12 +29,10 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    print("\n--- Checking Registry Logs for recent errors ---")
-    await run_remote_command("docker logs registry 2>&1 | tail -n 20")
-    
-    print("\n--- Checking API for images ---")
-    cmd_api = "curl -u 'admin:Harbor12345' -H 'Content-Type: application/json' 'http://localhost:5000/api/v2.0/projects/prod/repositories/actable-server/artifacts?page=1&page_size=10'"
-    await run_remote_command(cmd_api)
+    # Remove 0.86 tag
+    print("\n--- Removing 0.86 tag ---")
+    await run_remote_command("ls -R /data/harbor/registry/docker/registry/v2/repositories/prod/actable-server/_manifests/tags")
+    # await run_remote_command("rm -rf /data/harbor/registry/docker/registry/v2/repositories/prod/actable-server/_manifests/tags/0.86")
 
 if __name__ == "__main__":
     asyncio.run(main())

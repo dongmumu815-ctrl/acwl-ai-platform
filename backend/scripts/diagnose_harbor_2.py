@@ -28,12 +28,22 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    print("\n--- Checking Registry Logs for recent errors ---")
-    await run_remote_command("docker logs registry 2>&1 | tail -n 20")
+    # 1. Read docker-compose.yml
+    print("\n--- Reading docker-compose.yml ---")
+    await run_remote_command("cat /data/harbor/docker-compose.yml")
     
-    print("\n--- Checking API for images ---")
-    cmd_api = "curl -u 'admin:Harbor12345' -H 'Content-Type: application/json' 'http://localhost:5000/api/v2.0/projects/prod/repositories/actable-server/artifacts?page=1&page_size=10'"
-    await run_remote_command(cmd_api)
+    # 2. Read registry config
+    print("\n--- Reading registry config.yml ---")
+    await run_remote_command("cat /data/harbor/common/config/registry/config.yml")
+    
+    # 3. Test notification endpoint manually again (trailing slash)
+    test_cmd = """
+    SECRET=$(docker exec harbor-core env | grep JOBSERVICE_SECRET | cut -d= -f2)
+    echo "Using Secret: $SECRET"
+    docker exec registry curl -v -H "Authorization: Harbor-Secret $SECRET" -H "Content-Type: application/json" -d '{"events": []}' http://core:8080/service/notifications/
+    """
+    print("\n--- Testing Notification Endpoint (Trailing Slash) ---")
+    await run_remote_command(test_cmd)
 
 if __name__ == "__main__":
     asyncio.run(main())

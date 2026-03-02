@@ -28,12 +28,17 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    print("\n--- Checking Registry Logs for recent errors ---")
-    await run_remote_command("docker logs registry 2>&1 | tail -n 20")
+    # 1. Read app.conf
+    print("\n--- Reading app.conf ---")
+    await run_remote_command("cat /data/harbor/common/config/core/app.conf")
     
-    print("\n--- Checking API for images ---")
-    cmd_api = "curl -u 'admin:Harbor12345' -H 'Content-Type: application/json' 'http://localhost:5000/api/v2.0/projects/prod/repositories/actable-server/artifacts?page=1&page_size=10'"
-    await run_remote_command(cmd_api)
+    # 2. Read core/env
+    print("\n--- Reading core/env ---")
+    await run_remote_command("cat /data/harbor/common/config/core/env")
+    
+    # 3. Check registry env
+    print("\n--- Checking Registry Env ---")
+    await run_remote_command("docker exec registry env")
 
 if __name__ == "__main__":
     asyncio.run(main())

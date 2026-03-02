@@ -1,6 +1,7 @@
 
 import paramiko
 import asyncio
+import time
 
 HOST = "10.20.1.204"
 USER = "ubuntu"
@@ -28,12 +29,23 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    print("\n--- Checking Registry Logs for recent errors ---")
-    await run_remote_command("docker logs registry 2>&1 | tail -n 20")
+    # Restart services with docker compose (confirmed available)
+    print("\n--- Restarting Harbor Services (docker compose) ---")
     
-    print("\n--- Checking API for images ---")
-    cmd_api = "curl -u 'admin:Harbor12345' -H 'Content-Type: application/json' 'http://localhost:5000/api/v2.0/projects/prod/repositories/actable-server/artifacts?page=1&page_size=10'"
-    await run_remote_command(cmd_api)
+    # Use docker compose (plugin)
+    # Note: docker compose automatically picks up docker-compose.override.yml if present!
+    # But let's be explicit to be safe.
+    cmd = "sh -c 'cd /data/harbor && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d'"
+    
+    await run_remote_command(cmd)
+    
+    # Wait for a bit
+    print("\n--- Waiting for 20 seconds ---")
+    await asyncio.sleep(20)
+    
+    # Check status
+    print("\n--- Checking Container Status ---")
+    await run_remote_command("docker ps")
 
 if __name__ == "__main__":
     asyncio.run(main())
