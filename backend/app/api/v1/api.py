@@ -6,7 +6,7 @@ API v1 主路由
 
 from fastapi import APIRouter
 
-from .endpoints import auth, users, models, model_service_configs, deployments, environments, health, servers, server_groups, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure, roles, permissions, api_management, es_aggregations, user_operation_logs, data_upload_logs, templates, ws_ssh, ws_monitor, monitoring, applications
+from .endpoints import auth, users, models, model_service_configs, deployments, environments, health, servers, server_groups, datasets, datasources, projects, workflows, tasks, executors, schedulers, unified_nodes, agents, es_query, sql_query, resource_package_secure, roles, permissions, api_management, es_aggregations, user_operation_logs, data_upload_logs, templates, ws_ssh, ws_monitor, ws_deploy, monitoring, applications
 from . import instruction_sets, data_resource, resource_package, resource_type
 
 # 创建API路由器
@@ -23,6 +23,11 @@ api_router.include_router(
     ws_monitor.router,
     prefix="/ws",
     tags=["WebSocket Monitor"]
+)
+
+api_router.include_router(
+    ws_deploy.router,
+    tags=["WebSocket Deploy Log"]
 )
 
 api_router.include_router(

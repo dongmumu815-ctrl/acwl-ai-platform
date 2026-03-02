@@ -206,7 +206,18 @@
                       style="width: 100%"
                     />
                     <el-switch v-else-if="prop.type === 'boolean'" v-model="globalConfig[key]" />
-                    <el-input v-else v-model="globalConfig[key]" />
+                    <el-input 
+                      v-else 
+                      v-model="globalConfig[key]" 
+                      :show-password="key.toLowerCase().includes('password')"
+                      :type="key.toLowerCase().includes('password') ? 'password' : 'text'"
+                    >
+                      <template v-if="key.toLowerCase().includes('password')" #append>
+                        <el-button @click="globalConfig[key] = generateRandomPassword()" title="重新生成">
+                          <el-icon><Refresh /></el-icon>
+                        </el-button>
+                      </template>
+                    </el-input>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -255,7 +266,18 @@
                           style="width: 100%"
                         />
                         <el-switch v-else-if="prop.type === 'boolean'" v-model="deploy.variables[key]" />
-                        <el-input v-else v-model="deploy.variables[key]" />
+                        <el-input 
+                          v-else 
+                          v-model="deploy.variables[key]" 
+                          :show-password="key.toLowerCase().includes('password')"
+                          :type="key.toLowerCase().includes('password') ? 'password' : 'text'"
+                        >
+                          <template v-if="key.toLowerCase().includes('password')" #append>
+                            <el-button @click="deploy.variables[key] = generateRandomPassword()" title="重新生成">
+                              <el-icon><Refresh /></el-icon>
+                            </el-button>
+                          </template>
+                        </el-input>
                       </el-form-item>
                     </el-col>
                   </template>
@@ -353,15 +375,63 @@ const availableRoles = computed(() => {
   return schema?.['x-roles'] || null
 })
 
+const generateRandomPassword = (length = 16) => {
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let ret = ''
+  for (let i = 0; i < length; ++i) {
+    ret += charset.charAt(Math.floor(Math.random() * charset.length))
+  }
+  return ret
+}
+
+// 提取模板处理逻辑
+const processTemplateContent = (tplId: number) => {
+  const tpl = templates.value.find(t => t.id === tplId)
+  if (!tpl) return
+
+  let content = tpl.deploy_template || ''
+  
+  // Auto-replace docker registry for Harbor and other apps using bitnami images
+  // All public mirrors (docker.io, m.daocloud.io, swr, rainbond, 1ms.run) are failing (403 or Not Found).
+  // 1ms.run also returned "not found" for postgresql:11.
+  // We will NOT force replacement anymore and let the user decide.
+  if (content.includes('bitnami/')) {
+       // Matches: image: bitnami/..., image: "bitnami/...", image: docker.io/bitnami/...
+       // Also handles potential leading spaces or quotes
+       // content = content.replace(/image:\s*(["']?)(?:docker\.io\/)?bitnami\//g, 'image: $1docker.1ms.run/bitnami/')
+       
+       // We will append a comment to the top of the file to hint the user
+        if (!content.includes('# HINT:')) {
+            content = '# HINT: If you face 403/Not Found errors, try replacing "bitnami/" with "swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/bitnami/" or "public.ecr.aws/bitnami/" or your private registry.\n' + content
+        }
+  }
+  
+  currentDeployTemplate.value = content
+  
+  // 初始化全局配置
+  const defaults = tpl.default_config ? JSON.parse(JSON.stringify(tpl.default_config)) : {}
+  
+  // 确保 schema 中的所有属性都在 globalConfig 中有定义
+  if (tpl.config_schema?.properties) {
+    Object.keys(tpl.config_schema.properties).forEach(key => {
+        if (defaults[key] === undefined) {
+            defaults[key] = '' // 初始化为空字符串，确保响应式
+        }
+        
+        // 自动生成密码逻辑：只要 key 包含 password 且值为空
+        if (key.toLowerCase().includes('password') && !defaults[key]) {
+            defaults[key] = generateRandomPassword()
+        }
+    })
+  }
+  
+  globalConfig.value = defaults
+}
+
 // 监听模板选择，初始化部署模板内容
 watch(() => installForm.template_id, (newVal) => {
   if (newVal) {
-    const tpl = templates.value.find(t => t.id === newVal)
-    if (tpl) {
-      currentDeployTemplate.value = tpl.deploy_template || ''
-      // 初始化全局配置
-      globalConfig.value = tpl.default_config ? JSON.parse(JSON.stringify(tpl.default_config)) : {}
-    }
+    processTemplateContent(newVal)
   }
 })
 
@@ -560,6 +630,9 @@ const handleInstall = (item: AppTemplate) => {
   })
   selectedServerIds.value = []
   installDialogVisible.value = true
+  
+  // Force process template content to ensure replacements are applied even if template_id doesn't change
+  processTemplateContent(item.id)
 }
 
 // Watch selected servers to update deployments list
@@ -620,6 +693,59 @@ watch(selectedServerIds, (newIds) => {
     }
   }
 
+  // Harbor Registry Automatic Configuration
+  const isHarbor = tpl?.name === 'harbor' || tpl?.name === 'harbor-registry'
+  if (isHarbor && newDeployments.length > 0) {
+    // For single node Harbor, we use the first server's IP as hostname
+    const server = serverList.value.find(s => s.id === newDeployments[0].server_id)
+    if (server) {
+      if (globalConfig.value.hostname !== undefined) globalConfig.value.hostname = server.ip_address
+      if (globalConfig.value.harbor_hostname !== undefined) globalConfig.value.harbor_hostname = server.ip_address
+      if (globalConfig.value.external_url !== undefined) globalConfig.value.external_url = `http://${server.ip_address}`
+    }
+    
+    // Default role
+    newDeployments.forEach(deploy => {
+      if (!deploy.role || (Array.isArray(deploy.role) && deploy.role.length === 0)) {
+        deploy.role = 'default'
+      }
+    })
+  }
+
+  // PostgreSQL Cluster Automatic Role Assignment
+  const isPostgres = tpl?.name?.toLowerCase().includes('postgres') || tpl?.name?.toLowerCase().includes('pgsql')
+  if (isPostgres && newDeployments.length > 0) {
+    // 1. Sort by IP Address
+    newDeployments.sort((a, b) => {
+      const serverA = serverList.value.find(s => s.id === a.server_id)
+      const serverB = serverList.value.find(s => s.id === b.server_id)
+      if (!serverA || !serverB) return 0
+      return serverA.ip_address.localeCompare(serverB.ip_address, undefined, { numeric: true })
+    })
+
+    // 2. Assign Roles & Master IP
+    let masterIp = ''
+    newDeployments.forEach((deploy, index) => {
+      const server = serverList.value.find(s => s.id === deploy.server_id)
+      
+      if (index === 0) {
+        deploy.role = 'primary'
+        if (server) masterIp = server.ip_address
+      } else {
+        deploy.role = 'read-replica'
+      }
+    })
+
+    // 3. Update Global Config
+    if (masterIp) {
+       // Support various naming conventions for master host variable
+       if (globalConfig.value.primary_ip !== undefined) globalConfig.value.primary_ip = masterIp
+       if (globalConfig.value.master_ip !== undefined) globalConfig.value.master_ip = masterIp
+       if (globalConfig.value.postgres_master_host !== undefined) globalConfig.value.postgres_master_host = masterIp
+       if (globalConfig.value.POSTGRESQL_MASTER_HOST !== undefined) globalConfig.value.POSTGRESQL_MASTER_HOST = masterIp
+    }
+  }
+
   installForm.deployments = newDeployments
 })
 
@@ -643,13 +769,13 @@ const submitInstall = async () => {
         const submissionData = JSON.parse(JSON.stringify(installForm))
         
         // 处理配置覆盖
-        // 1. 全局配置：使用模板默认值
-        const tpl = templates.value.find(t => t.id === installForm.template_id)
-        const globalConfig = tpl?.default_config ? JSON.parse(JSON.stringify(tpl.default_config)) : {}
+        // 1. 全局配置：使用当前界面上的全局配置
+        // Use the current reactive globalConfig which contains user inputs and auto-generated values
+        const currentGlobalConfig = JSON.parse(JSON.stringify(globalConfig.value))
         
         // 2. 构造 config 对象
         submissionData.config = {
-          global: globalConfig,
+          global: currentGlobalConfig,
           overrides: {}
         }
         

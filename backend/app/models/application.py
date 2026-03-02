@@ -7,9 +7,12 @@
 from sqlalchemy import Integer, String, Boolean, Text, Enum as SQLEnum, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
 from app.core.database import Base, TimestampMixin, UserMixin
+
+if TYPE_CHECKING:
+    from app.models.server import Server
 
 class AppType(str, Enum):
     """应用类型枚举"""
@@ -41,6 +44,7 @@ class HarborConfig(Base, TimestampMixin, UserMixin):
     password: Mapped[Optional[str]] = mapped_column(String(255), comment="密码")
     project: Mapped[Optional[str]] = mapped_column(String(100), comment="默认项目")
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否默认仓库")
+    insecure_registry: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否跳过HTTPS验证(Insecure Registry)")
     
     description: Mapped[Optional[str]] = mapped_column(Text, comment="描述")
 
@@ -105,7 +109,7 @@ class AppDeployment(Base, TimestampMixin):
     instance: Mapped["AppInstance"] = relationship("AppInstance", back_populates="deployments")
     
     server_id: Mapped[int] = mapped_column(Integer, ForeignKey("acwl_servers.id", ondelete="CASCADE"), nullable=False, comment="服务器ID")
-    # server: Mapped["Server"] = relationship("Server") # 避免循环引用，这里暂不定义relationship，或者使用字符串引用
+    server: Mapped["Server"] = relationship("Server")
     
     role: Mapped[Optional[str]] = mapped_column(String(50), default="default", comment="节点角色(master/worker/fe/be)")
     

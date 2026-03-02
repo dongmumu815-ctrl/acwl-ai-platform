@@ -17,6 +17,7 @@ from app.models.application import AppInstance, AppDeployment, AppTemplate, AppS
 from app.models.server import Server
 from app.crud.application import app_instance
 from app.services.server_service import ServerService
+from app.core.deployment_logger import deployment_logger
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,9 @@ class ApplicationService:
         执行应用卸载任务
         """
         logger.info(f"开始卸载应用实例: {instance_id}, 清理数据: {clean_data}")
+        
+        # 清除旧日志
+        deployment_logger.clear(f"instance_{instance_id}")
         
         try:
             # 1. 获取实例详情 (需要 eager load 部署信息)
@@ -85,6 +89,26 @@ class ApplicationService:
             server_id = deployment.server_id
             logger.info(f"正在从服务器 {server_id} 卸载应用...")
             
+            # 定义日志回调
+            channel_id = f"instance_{deployment.instance_id}"
+            
+            # 确保 deployment_logger 有正确的 loop，修复 "DeploymentLogger loop not ready" 问题
+            current_loop = asyncio.get_running_loop()
+            try:
+                # 检查 loop 是否有效 (存在且运行中)
+                # 注意：deployment_logger 是单例，.loop 属性应该在 lifespan 中初始化
+                # 但如果在某些情况下丢失，我们需要重新设置
+                if not getattr(deployment_logger, 'loop', None) or not deployment_logger.loop.is_running():
+                    logger.warning(f"DeploymentLogger loop invalid ({getattr(deployment_logger, 'loop', 'None')}), updating to current loop")
+                    deployment_logger.set_loop(current_loop)
+            except Exception as e:
+                logger.warning(f"Failed to check/update DeploymentLogger loop: {e}")
+
+            def log_cb(msg):
+                deployment_logger.log_sync(channel_id, msg)
+            
+            log_cb(f"Starting uninstall from server {server_id}...")
+            
             # 获取服务器信息
             async with self.db_lock:
                 stmt = select(Server).where(Server.id == server_id)
@@ -131,7 +155,8 @@ class ApplicationService:
                 self._ssh_uninstall_task, 
                 server_info, 
                 deploy_path,
-                data_paths
+                data_paths,
+                log_cb
             )
 
             if not result["success"]:
@@ -144,7 +169,7 @@ class ApplicationService:
             return False
 
     @staticmethod
-    def _ssh_uninstall_task(server_info: Dict[str, Any], deploy_path: str, data_paths: List[str] = None) -> Dict[str, Any]:
+    def _ssh_uninstall_task(server_info: Dict[str, Any], deploy_path: str, data_paths: List[str] = None, log_cb=None) -> Dict[str, Any]:
         """
         SSH 卸载任务 (同步执行)
         1. docker compose down
@@ -159,6 +184,8 @@ class ApplicationService:
         result = {"success": False, "message": "", "data": {}}
         
         try:
+            if log_cb: log_cb(f"Connecting to {server_info['ip_address']}...")
+            
             # 建立连接 (复用代码逻辑，考虑抽取为公共方法)
             connected = False
             last_error = None
@@ -191,6 +218,8 @@ class ApplicationService:
             
             if not connected:
                 raise last_error or Exception("无法连接到服务器")
+            
+            if log_cb: log_cb("Connected successfully.")
 
             # 辅助函数
             username = server_info["ssh_username"]
@@ -205,32 +234,60 @@ class ApplicationService:
                     return f"sudo -n {cmd}"
             
             def exec_cmd(cmd):
+                # Mask password
+                display_cmd = cmd
+                if "echo" in cmd and "sudo" in cmd and server_info.get("ssh_password"):
+                    display_cmd = cmd.replace(server_info.get("ssh_password"), "******")
+                
+                if log_cb: log_cb(f"$ {display_cmd}")
+                
                 stdin, stdout, stderr = ssh_client.exec_command(cmd)
+                
+                output_buffer = []
+                while True:
+                    line = stdout.readline()
+                    if not line:
+                        break
+                    line_str = line.strip()
+                    if line_str:
+                        output_buffer.append(line_str)
+                        if log_cb:
+                            log_cb(line_str)
+                
                 exit_status = stdout.channel.recv_exit_status()
-                out = stdout.read().decode().strip()
+                out = "\n".join(output_buffer)
                 err = stderr.read().decode().strip()
+                
+                if err and log_cb:
+                    log_cb(f"STDERR: {err}")
+                    
                 return exit_status, out, err
 
             # 1. 检查目录是否存在
+            if log_cb: log_cb(f"Checking deployment directory: {deploy_path}")
             check_cmd = f"test -d {deploy_path}"
             code, _, _ = exec_cmd(check_cmd)
             if code != 0:
                 result["success"] = True
                 result["message"] = "部署目录不存在，无需清理"
+                if log_cb: log_cb("Directory does not exist. Skipping.")
                 return result
 
             # 2. Docker Compose Down
+            if log_cb: log_cb("Stopping containers...")
             # 尝试 V2
             down_cmd = f"cd {deploy_path} && {sudo_cmd('docker compose down -v')}"
             code, out, err = exec_cmd(down_cmd)
             
             if code != 0:
                 # 尝试 V1
+                if log_cb: log_cb("Retry with docker-compose v1...")
                 down_cmd_v1 = f"cd {deploy_path} && {sudo_cmd('docker-compose down -v')}"
                 code, out, err = exec_cmd(down_cmd_v1)
                 # 即使 down 失败，我们也继续尝试删除文件，或者记录警告
 
             # 3. 删除目录
+            if log_cb: log_cb("Removing deployment directory...")
             rm_cmd = sudo_cmd(f"rm -rf {deploy_path}")
             code, out, err = exec_cmd(rm_cmd)
             if code != 0:
@@ -238,6 +295,7 @@ class ApplicationService:
 
             # 4. 清理数据目录 (如果指定)
             if data_paths:
+                if log_cb: log_cb(f"Cleaning data paths: {data_paths}")
                 cleaned_paths = []
                 failed_paths = []
                 for path in data_paths:
@@ -256,7 +314,8 @@ class ApplicationService:
                     result["message"] += f" 已清理数据: {', '.join(cleaned_paths)}"
                 if failed_paths:
                     result["message"] += f" 清理失败: {', '.join(failed_paths)}"
-
+            
+            if log_cb: log_cb("Uninstall completed successfully.")
             result["success"] = True
             
         except Exception as e:
@@ -272,6 +331,9 @@ class ApplicationService:
         执行应用部署任务
         """
         logger.info(f"开始部署应用实例: {instance_id}")
+        
+        # 清除旧日志
+        deployment_logger.clear(f"instance_{instance_id}")
         
         try:
             # 1. 获取应用实例（使用新的 Session 防止并发冲突）
@@ -606,6 +668,10 @@ class ApplicationService:
             server_id = deployment.server_id
             logger.info(f"正在部署到服务器 {server_id} ...")
             
+            # 实时日志回调 (如果需要)
+            # 目前系统没有通用的实时日志推送机制 (除了 script_execution)，暂时只记录 logger
+            # TODO: 实现 WebSocket 或 SSE 推送部署日志
+            
             # 获取服务器信息
             async with self.db_lock:
                 stmt = select(Server).where(Server.id == server_id)
@@ -648,150 +714,157 @@ class ApplicationService:
             context['current_ip'] = server.ip_address # 注入当前服务器IP
             
             # --- 自动构建 fe_servers 列表 & 计算 FE_ID (1-9) ---
+            # 仅针对 Doris 应用 (role 包含 fe/be 或者是 doris 模板)
+            # 通过模板名称或 role 特征判断
+            is_doris = False
+            if template.name and 'doris' in template.name.lower():
+                is_doris = True
+            
             # 获取该实例下的所有 FE 节点，构建 name:ip:port 列表
-            try:
-                stmt_deps = select(AppDeployment).where(AppDeployment.instance_id == deployment.instance_id)
-                res_deps = await self.db.execute(stmt_deps)
-                all_deps = res_deps.scalars().all()
-                
-                logger.warning(f"DEBUG: Found {len(all_deps)} deployments for instance {deployment.instance_id}")
-                
-                # Filter FE nodes and sort them to ensure stable ID assignment
-                fe_deps = []
-                for dep in all_deps:
-                     d_role = dep.role.lower().strip() if dep.role else "unknown"
-                     # Support multi-role (e.g. "fe-follower,be")
-                     d_roles = [r.strip() for r in d_role.split(',')]
-                     if 'fe-master' in d_roles or 'fe-follower' in d_roles or 'fe-observer' in d_roles:
-                         fe_deps.append(dep)
-                
-                # Sort: Master first, then by server_id
-                # This ensures:
-                # 1. Master gets ID 1 (fe1)
-                # 2. Others get IDs 2-9 sequentially based on server_id
-                def sort_key(d):
-                    r = d.role.lower().strip() if d.role else ""
-                    roles = [x.strip() for x in r.split(',')]
-                    if 'fe-master' in roles:
-                        return (0, d.server_id)
-                    return (1, d.server_id)
-                
-                fe_deps.sort(key=sort_key)
-                
-                # Build ID Map: server_id -> int ID (1-9)
-                fe_id_map = {}
-                current_assign_id = 1
-                for dep in fe_deps:
-                    fe_id_map[dep.server_id] = current_assign_id
-                    current_assign_id += 1
-                
-                # Determine ID for CURRENT deployment
-                my_fe_id = fe_id_map.get(deployment.server_id)
-                if not my_fe_id:
-                     # Should not happen if logic is correct
-                     logger.warning(f"Current deployment {deployment.server_id} not found in fe_deps list? Fallback to 1.")
-                     my_fe_id = 1
-                
-                if my_fe_id > 9:
-                    logger.error(f"CRITICAL: FE_ID {my_fe_id} exceeds limit of 9! Doris init script may fail.")
-                
-                context['fe_id_value'] = str(my_fe_id)
-                logger.info(f"Assigned FE_ID={my_fe_id} for server {deployment.server_id}")
-
-                fe_node_list = []
-                for dep in fe_deps:
-                    # Robust role check
-                    d_role = dep.role.lower().strip() if dep.role else "unknown"
+            if is_doris:
+                try:
+                    stmt_deps = select(AppDeployment).where(AppDeployment.instance_id == deployment.instance_id)
+                    res_deps = await self.db.execute(stmt_deps)
+                    all_deps = res_deps.scalars().all()
                     
-                    # 获取 IP
-                    stmt_srv = select(Server).where(Server.id == dep.server_id)
-                    res_srv = await self.db.execute(stmt_srv)
-                    srv_obj = res_srv.scalar_one_or_none()
+                    logger.warning(f"DEBUG: Found {len(all_deps)} deployments for instance {deployment.instance_id}")
                     
-                    if srv_obj:
-                        # 使用映射的 ID 生成名称: fe1, fe2, ...
-                        f_id = fe_id_map.get(dep.server_id)
-                        f_name = f"fe{f_id}"
-                        fe_node_list.append(f"{f_name}:{srv_obj.ip_address}:9010")
+                    # Filter FE nodes and sort them to ensure stable ID assignment
+                    fe_deps = []
+                    for dep in all_deps:
+                         d_role = dep.role.lower().strip() if dep.role else "unknown"
+                         # Support multi-role (e.g. "fe-follower,be")
+                         d_roles = [r.strip() for r in d_role.split(',')]
+                         if 'fe-master' in d_roles or 'fe-follower' in d_roles or 'fe-observer' in d_roles:
+                             fe_deps.append(dep)
+                    
+                    # Sort: Master first, then by server_id
+                    # This ensures:
+                    # 1. Master gets ID 1 (fe1)
+                    # 2. Others get IDs 2-9 sequentially based on server_id
+                    def sort_key(d):
+                        r = d.role.lower().strip() if d.role else ""
+                        roles = [x.strip() for x in r.split(',')]
+                        if 'fe-master' in roles:
+                            return (0, d.server_id)
+                        return (1, d.server_id)
+                    
+                    fe_deps.sort(key=sort_key)
+                    
+                    # Build ID Map: server_id -> int ID (1-9)
+                    fe_id_map = {}
+                    current_assign_id = 1
+                    for dep in fe_deps:
+                        fe_id_map[dep.server_id] = current_assign_id
+                        current_assign_id += 1
+                    
+                    # Determine ID for CURRENT deployment
+                    my_fe_id = fe_id_map.get(deployment.server_id)
+                    if not my_fe_id:
+                         # Should not happen if logic is correct
+                         logger.warning(f"Current deployment {deployment.server_id} not found in fe_deps list? Fallback to 1.")
+                         my_fe_id = 1
+                    
+                    if my_fe_id > 9:
+                        logger.error(f"CRITICAL: FE_ID {my_fe_id} exceeds limit of 9! Doris init script may fail.")
+                    
+                    context['fe_id_value'] = str(my_fe_id)
+                    logger.info(f"Assigned FE_ID={my_fe_id} for server {deployment.server_id}")
+    
+                    fe_node_list = []
+                    for dep in fe_deps:
+                        # Robust role check
+                        d_role = dep.role.lower().strip() if dep.role else "unknown"
+                        
+                        # 获取 IP
+                        stmt_srv = select(Server).where(Server.id == dep.server_id)
+                        res_srv = await self.db.execute(stmt_srv)
+                        srv_obj = res_srv.scalar_one_or_none()
+                        
+                        if srv_obj:
+                            # 使用映射的 ID 生成名称: fe1, fe2, ...
+                            f_id = fe_id_map.get(dep.server_id)
+                            f_name = f"fe{f_id}"
+                            fe_node_list.append(f"{f_name}:{srv_obj.ip_address}:9010")
+                        else:
+                                logger.warning(f"DEBUG: Server {dep.server_id} not found for deployment {dep.id}")
+    
+                    # 如果找到了节点，生成 fe_servers 字符串
+                    if fe_node_list:
+                        # 确保 fe1 在最前面
+                        fe_node_list.sort(key=lambda x: int(x.split(':')[0].replace('fe','')))
+                        context['fe_servers'] = ",".join(fe_node_list)
+                        logger.info(f"Generated FE_SERVERS for server {server_id}: {context['fe_servers']}")
                     else:
-                            logger.warning(f"DEBUG: Server {dep.server_id} not found for deployment {dep.id}")
-
-                # 如果找到了节点，生成 fe_servers 字符串
-                if fe_node_list:
-                    # 确保 fe1 在最前面
-                    fe_node_list.sort(key=lambda x: int(x.split(':')[0].replace('fe','')))
-                    context['fe_servers'] = ",".join(fe_node_list)
-                    logger.info(f"Generated FE_SERVERS for server {server_id}: {context['fe_servers']}")
-                else:
-                    logger.warning(f"No FE nodes found for instance {deployment.instance_id} in database (Filtered list is empty).")
-                    
-            except Exception as e:
-                logger.error(f"构建 FE_SERVERS 列表失败: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
-                # Fallback context['fe_id_value'] if it wasn't set
-                if 'fe_id_value' not in context:
-                     dep_role = deployment.role.lower().strip() if deployment.role else "default"
-                     context['fe_id_value'] = "1" if 'fe-master' in dep_role else "2"
-
-
-            # Fallback: 如果未能从数据库构建 fe_servers (列表为空或出错)，尝试使用 fe_master_ip
-            if 'fe_servers' not in context or not context['fe_servers']:
-                if 'fe_master_ip' in context:
-                    context['fe_servers'] = f"fe1:{context['fe_master_ip']}:9010"
-                    logger.info(f"Using fallback FE_SERVERS: {context['fe_servers']}")
-                else:
-                    logger.error("CRITICAL: fe_servers could not be generated and fe_master_ip is missing!")
-            
-            # --- Ensure current node is in fe_servers (Critical for Follower startup) ---
-            # 即使数据库查询遗漏了其他节点，必须确保：
-            # 1. Master 在列表中 (用于 join) - 由上面的 fallback 保证
-            # 2. 当前节点在列表中 (用于自检和端口绑定)
-            
-            logger.info(f"DEBUG: Checking FE_SERVERS for role={deployment.role}, server_id={server.id}")
-            
-            # 使用 robust role check
-            current_role = deployment.role.lower().strip() if deployment.role else "unknown"
-            current_roles = [r.strip() for r in current_role.split(',')]
-
-            if 'fe-master' in current_roles or 'fe-follower' in current_roles or 'fe-observer' in current_roles:
-                # 计算当前节点名称 - 必须与上面的 fe_node_list 构建逻辑一致
-                # 直接使用已经计算好的 fe_id_value
-                if 'fe_id_value' in context:
-                     my_fe_name = f"fe{context['fe_id_value']}"
-                elif 'fe-master' in current_roles:
-                    my_fe_name = "fe1"
-                else:
-                    # Fallback (Should not reach here if logic above succeeded)
-                    my_fe_name = f"fe{server.id}"
-                
-                my_entry = f"{my_fe_name}:{server.ip_address}:9010"
-                
-                current_servers = context.get('fe_servers', '')
-                logger.info(f"DEBUG: Current FE_SERVERS before check: '{current_servers}', My Entry: '{my_entry}'")
-                
-                # 检查当前节点名是否存在于列表中 (简单字符串检查即可)
-                if my_fe_name not in current_servers:
-                    logger.warning(f"Current node {my_fe_name} missing in FE_SERVERS. Appending it.")
-                    if current_servers:
-                        context['fe_servers'] = f"{current_servers},{my_entry}"
+                        logger.warning(f"No FE nodes found for instance {deployment.instance_id} in database (Filtered list is empty).")
+                        
+                except Exception as e:
+                    logger.error(f"构建 FE_SERVERS 列表失败: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    # Fallback context['fe_id_value'] if it wasn't set
+                    if 'fe_id_value' not in context:
+                         dep_role = deployment.role.lower().strip() if deployment.role else "default"
+                         context['fe_id_value'] = "1" if 'fe-master' in dep_role else "2"
+    
+    
+                # Fallback: 如果未能从数据库构建 fe_servers (列表为空或出错)，尝试使用 fe_master_ip
+                if 'fe_servers' not in context or not context['fe_servers']:
+                    if 'fe_master_ip' in context:
+                        context['fe_servers'] = f"fe1:{context['fe_master_ip']}:9010"
+                        logger.info(f"Using fallback FE_SERVERS: {context['fe_servers']}")
                     else:
-                        context['fe_servers'] = my_entry
+                        logger.error("CRITICAL: fe_servers could not be generated and fe_master_ip is missing!")
                 
-                logger.info(f"DEBUG: Final FE_SERVERS: {context.get('fe_servers')}")
-
-            # 确保 fe_master_ip 存在于 context 中 (供 BE 节点使用)
-            if 'fe_master_ip' not in context and 'fe_servers' in context:
-                 # 尝试从 fe_servers 解析 master ip (假设第一个是 master)
-                 try:
-                     parts = context['fe_servers'].split(',')
-                     for part in parts:
-                         if 'fe1' in part:
-                             # format: fe1:ip:port
-                             context['fe_master_ip'] = part.split(':')[1]
-                             break
-                 except:
-                     pass
+                # --- Ensure current node is in fe_servers (Critical for Follower startup) ---
+                # 即使数据库查询遗漏了其他节点，必须确保：
+                # 1. Master 在列表中 (用于 join) - 由上面的 fallback 保证
+                # 2. 当前节点在列表中 (用于自检和端口绑定)
+                
+                logger.info(f"DEBUG: Checking FE_SERVERS for role={deployment.role}, server_id={server.id}")
+                
+                # 使用 robust role check
+                current_role = deployment.role.lower().strip() if deployment.role else "unknown"
+                current_roles = [r.strip() for r in current_role.split(',')]
+    
+                if 'fe-master' in current_roles or 'fe-follower' in current_roles or 'fe-observer' in current_roles:
+                    # 计算当前节点名称 - 必须与上面的 fe_node_list 构建逻辑一致
+                    # 直接使用已经计算好的 fe_id_value
+                    if 'fe_id_value' in context:
+                         my_fe_name = f"fe{context['fe_id_value']}"
+                    elif 'fe-master' in current_roles:
+                        my_fe_name = "fe1"
+                    else:
+                        # Fallback (Should not reach here if logic above succeeded)
+                        my_fe_name = f"fe{server.id}"
+                    
+                    my_entry = f"{my_fe_name}:{server.ip_address}:9010"
+                    
+                    current_servers = context.get('fe_servers', '')
+                    logger.info(f"DEBUG: Current FE_SERVERS before check: '{current_servers}', My Entry: '{my_entry}'")
+                    
+                    # 检查当前节点名是否存在于列表中 (简单字符串检查即可)
+                    if my_fe_name not in current_servers:
+                        logger.warning(f"Current node {my_fe_name} missing in FE_SERVERS. Appending it.")
+                        if current_servers:
+                            context['fe_servers'] = f"{current_servers},{my_entry}"
+                        else:
+                            context['fe_servers'] = my_entry
+                    
+                    logger.info(f"DEBUG: Final FE_SERVERS: {context.get('fe_servers')}")
+    
+                # 确保 fe_master_ip 存在于 context 中 (供 BE 节点使用)
+                if 'fe_master_ip' not in context and 'fe_servers' in context:
+                     # 尝试从 fe_servers 解析 master ip (假设第一个是 master)
+                     try:
+                         parts = context['fe_servers'].split(',')
+                         for part in parts:
+                             if 'fe1' in part:
+                                 # format: fe1:ip:port
+                                 context['fe_master_ip'] = part.split(':')[1]
+                                 break
+                     except:
+                         pass
 
             rendered_content = ""
             # 渲染模板
@@ -811,6 +884,131 @@ class ApplicationService:
             else:
                 raise Exception("未找到部署模板内容")
             
+            # 渲染 Pre-Deploy Script (如果存在)
+            # 优先使用实例配置中的 pre_deploy_script，如果不存在则使用模板默认配置中的
+            pre_deploy_script = context.get("pre_deploy_script")
+            if not pre_deploy_script and template.default_config:
+                pre_deploy_script = template.default_config.get("pre_deploy_script")
+            
+            # 检查是否需要注入 Harbor 认证信息
+            # 如果配置了 harbor_config_id 或者全局有默认 Harbor
+            # 这里简单起见，我们查询系统默认 Harbor 配置
+            # TODO: 支持在部署时选择 Harbor 配置
+            
+            from app.models.application import HarborConfig
+            stmt_harbor = select(HarborConfig).where(HarborConfig.is_default == True)
+            res_harbor = await self.db.execute(stmt_harbor)
+            default_harbor = res_harbor.scalar_one_or_none()
+            
+            # 检查是否需要注入 Harbor 认证信息
+            # 如果配置了 harbor_config_id 或者全局有默认 Harbor
+            # 这里简单起见，我们查询系统默认 Harbor 配置
+            # TODO: 支持在部署时选择 Harbor 配置
+            
+            from app.models.application import HarborConfig
+            stmt_harbor = select(HarborConfig).where(HarborConfig.is_default == True)
+            res_harbor = await self.db.execute(stmt_harbor)
+            default_harbor = res_harbor.scalar_one_or_none()
+            
+            # --- 自动生成或增强 pre_deploy_script ---
+            # 如果没有预部署脚本，初始化为空字符串
+            if not pre_deploy_script:
+                pre_deploy_script = "#!/bin/bash\nset -e\n"
+            
+            if default_harbor:
+                # 1. 处理 Insecure Registry 配置
+                # 如果 Harbor 配置了 insecure_registry = True，则自动生成配置脚本
+                # 注意：我们只在 pre_deploy_script 中尚未包含相关逻辑时才添加
+                if getattr(default_harbor, 'insecure_registry', False):
+                     registry_domain = default_harbor.url.replace("http://", "").replace("https://", "")
+                     if registry_domain.endswith("/"): registry_domain = registry_domain[:-1]
+                     
+                     # 检查脚本中是否已有 daemon.json 修改逻辑 (简单检查)
+                     if "insecure-registries" not in pre_deploy_script:
+                         logger.info(f"Injecting Insecure Registry config for {registry_domain}")
+                         insecure_script = f"""
+# Auto-injected Insecure Registry Config for {registry_domain}
+if [ ! -f "/etc/docker/daemon.json" ]; then echo "{{}}" | sudo tee "/etc/docker/daemon.json" > /dev/null; fi
+sudo python3 -c "
+import json, os, sys
+f_path = '/etc/docker/daemon.json'
+reg = '{registry_domain}'
+try:
+    if os.path.exists(f_path):
+        with open(f_path, 'r') as f:
+            c = f.read().strip()
+            d = json.loads(c) if c else {{}}
+    else: d = {{}}
+    
+    regs = d.get('insecure-registries', [])
+    if reg not in regs:
+        regs.append(reg)
+        d['insecure-registries'] = regs
+        with open(f_path, 'w') as f: json.dump(d, f, indent=4)
+        sys.exit(100)
+except Exception as e: print(e); sys.exit(1)
+"
+if [ $? -eq 100 ]; then
+    echo "Reloading Docker..."
+    sudo systemctl reload docker || sudo systemctl restart docker
+    sleep 3
+fi
+"""
+                         pre_deploy_script += insecure_script
+
+                # 2. 处理 Docker Login 和 Pull
+                try:
+                    # 将 Harbor 信息注入 context
+                    context['harbor_url'] = default_harbor.url
+                    registry_domain = default_harbor.url.replace("http://", "").replace("https://", "")
+                    if registry_domain.endswith("/"): registry_domain = registry_domain[:-1]
+                    
+                    context['harbor_registry'] = registry_domain
+                    context['harbor_username'] = default_harbor.username
+                    context['harbor_password'] = default_harbor.password
+                    
+                    # 如果 pre_deploy_script 是模板，先渲染
+                    try:
+                        pre_deploy_script = Template(pre_deploy_script).render(**context)
+                    except Exception as tpl_err:
+                        logger.warning(f"Pre-render pre_deploy_script failed: {tpl_err}")
+
+                    # 检查脚本中是否已经包含了 login 逻辑
+                    if "docker login" not in pre_deploy_script and default_harbor.username and default_harbor.password:
+                         logger.info(f"Appending Docker Login for {registry_domain} to pre-deploy script")
+                         login_cmd = f"\n# Auto-injected Docker Login\necho '{default_harbor.password}' | docker login '{registry_domain}' -u '{default_harbor.username}' --password-stdin\n"
+                         pre_deploy_script += login_cmd
+                         
+                         # 同时尝试从渲染后的 compose 内容中提取镜像，并显式 pull
+                         # 这是一个 hack，因为 docker compose 有时读取不到 login 凭证
+                         if rendered_content:
+                             try:
+                                 import yaml
+                                 compose_data = yaml.safe_load(rendered_content)
+                                 services = compose_data.get('services', {})
+                                 for svc_name, svc_conf in services.items():
+                                     img = svc_conf.get('image')
+                                     if img and registry_domain in img:
+                                         logger.info(f"Injecting docker pull for {img}")
+                                         pre_deploy_script += f"docker pull {img}\n"
+                             except Exception as yaml_err:
+                                 logger.warning(f"Failed to parse compose file for image pulling: {yaml_err}")
+                         
+                except Exception as e:
+                    logger.warning(f"Failed to inject Harbor credentials into pre_deploy_script: {e}")
+
+            if pre_deploy_script:
+                # 再次尝试渲染，以防注入的命令中也有模板变量（虽然不太可能，但为了安全）
+                # 注意：如果上面已经渲染过，这里再次渲染通常是幂等的（除非有转义问题）
+                # 为了稳妥，我们可以跳过第二次渲染，或者捕获错误
+                try:
+                    # 只有当包含 {{ }} 时才尝试再次渲染
+                    if "{{" in pre_deploy_script:
+                        pre_deploy_script = Template(pre_deploy_script).render(**context)
+                    logger.info(f"Final pre_deploy_script ready (Length: {len(pre_deploy_script)})")
+                except Exception as e:
+                    logger.warning(f"pre_deploy_script 二次渲染失败，将使用原始内容: {e}")
+
             # 准备部署参数
             server_info = {
                 "ip_address": server.ip_address,
@@ -830,14 +1028,37 @@ class ApplicationService:
             # 同样不 commit
             # await self.db.commit()
             await self.db.commit()
+            
+            # 定义日志回调
+            channel_id = f"instance_{deployment.instance_id}"
+            
+            # 确保 deployment_logger 有正确的 loop，修复 "DeploymentLogger loop not ready" 问题
+            current_loop = asyncio.get_running_loop()
+            try:
+                # 检查 loop 是否有效 (存在且运行中)
+                # 注意：deployment_logger 是单例，.loop 属性应该在 lifespan 中初始化
+                # 但如果在某些情况下丢失，我们需要重新设置
+                if not getattr(deployment_logger, 'loop', None) or not deployment_logger.loop.is_running():
+                    logger.warning(f"DeploymentLogger loop invalid ({getattr(deployment_logger, 'loop', 'None')}), updating to current loop")
+                    deployment_logger.set_loop(current_loop)
+            except Exception as e:
+                logger.warning(f"Failed to check/update DeploymentLogger loop: {e}")
 
-            loop = asyncio.get_running_loop()
+            def log_cb(msg):
+                deployment_logger.log_sync(channel_id, msg)
+            
+            deployment_logger.log_sync(channel_id, f"Starting deployment to server {server_id}...")
+
+            loop = current_loop
             result = await loop.run_in_executor(
                 None, 
                 self._ssh_deploy_task, 
                 server_info, 
                 deploy_path, 
-                rendered_content
+                rendered_content,
+                template.app_type if template else "docker_compose",
+                pre_deploy_script,
+                log_cb
             )
 
             if not result["success"]:
@@ -849,20 +1070,22 @@ class ApplicationService:
             
             # 保存端口信息
             ports_info = {}
-            # Doris 默认端口
-            # FE 端口
-            if "fe" in str(context.get("role", "")):
-                ports_info["FE_HTTP"] = "8030"
-                ports_info["FE_RPC"] = "9020"
-                ports_info["FE_QUERY"] = "9030"
-                ports_info["FE_EDIT"] = "9010"
             
-            # BE 端口
-            if "be" in str(context.get("role", "")):
-                ports_info["BE_HTTP"] = "8040"
-                ports_info["BE_RPC"] = "9060"
-                ports_info["BE_HEARTBEAT"] = "9050"
-                ports_info["BE_BRPC"] = "8060"
+            # Doris 默认端口 (仅针对 Doris 应用)
+            if is_doris:
+                # FE 端口
+                if "fe" in str(context.get("role", "")):
+                    ports_info["FE_HTTP"] = "8030"
+                    ports_info["FE_RPC"] = "9020"
+                    ports_info["FE_QUERY"] = "9030"
+                    ports_info["FE_EDIT"] = "9010"
+                
+                # BE 端口
+                if "be" in str(context.get("role", "")):
+                    ports_info["BE_HTTP"] = "8040"
+                    ports_info["BE_RPC"] = "9060"
+                    ports_info["BE_HEARTBEAT"] = "9050"
+                    ports_info["BE_BRPC"] = "8060"
 
             if "http_port" in context:
                 ports_info["HTTP"] = context["http_port"]
@@ -897,7 +1120,7 @@ class ApplicationService:
             raise e
 
     @staticmethod
-    def _ssh_deploy_task(server_info: Dict[str, Any], deploy_path: str, compose_content: str) -> Dict[str, Any]:
+    def _ssh_deploy_task(server_info: Dict[str, Any], deploy_path: str, content: str, app_type: str = "docker_compose", pre_deploy_script: str = None, log_cb=None) -> Dict[str, Any]:
         """
         SSH 部署任务 (同步执行)
         """
@@ -911,6 +1134,9 @@ class ApplicationService:
         result = {"success": False, "message": "", "data": {}}
         
         try:
+            if log_cb:
+                log_cb(f"Connecting to {server_info['ip_address']}...")
+
             # 建立连接
             connected = False
             last_error = None
@@ -946,6 +1172,9 @@ class ApplicationService:
             if not connected:
                 raise last_error or Exception("无法连接到服务器")
             
+            if log_cb:
+                log_cb("Connected successfully.")
+
             # 设置 KeepAlive
             transport = ssh_client.get_transport()
             if transport:
@@ -953,10 +1182,35 @@ class ApplicationService:
 
             # 辅助函数：执行命令
             def exec_cmd(cmd):
+                # Mask password in log
+                display_cmd = cmd
+                if "echo" in cmd and "sudo" in cmd and server_info.get("ssh_password"):
+                    display_cmd = cmd.replace(server_info.get("ssh_password"), "******")
+                
+                if log_cb:
+                    log_cb(f"$ {display_cmd}")
+
                 stdin, stdout, stderr = ssh_client.exec_command(cmd)
+                
+                output_buffer = []
+                while True:
+                    line = stdout.readline()
+                    if not line:
+                        break
+                    line_str = line.strip()
+                    if line_str:
+                        output_buffer.append(line_str)
+                        if log_cb:
+                            log_cb(line_str)
+                
                 exit_status = stdout.channel.recv_exit_status()
-                out = stdout.read().decode().strip()
+                out = "\n".join(output_buffer)
+                
                 err = stderr.read().decode().strip()
+                if err:
+                    if log_cb:
+                        log_cb(f"STDERR: {err}")
+                
                 return exit_status, out, err
 
             # 辅助函数：生成 sudo 命令
@@ -972,88 +1226,196 @@ class ApplicationService:
                     return f"sudo -n {cmd}"
 
             # 1. 创建目录
+            if log_cb: log_cb(f"Creating directory: {deploy_path}")
             mkdir_cmd = sudo_cmd(f"mkdir -p {deploy_path}")
             code, out, err = exec_cmd(mkdir_cmd)
             if code != 0:
                 raise Exception(f"创建目录失败: {err}")
 
-            # 2. 写入 docker-compose.yml
-            b64_content = base64.b64encode(compose_content.encode()).decode()
-            temp_file = f"/tmp/compose_{int(time.time())}.yml"
+            # 1.5. 执行 Pre-Deploy Script (如果存在)
+            if pre_deploy_script:
+                logger.info(f"Executing pre_deploy_script on {server_info['ip_address']}...")
+                if log_cb: log_cb(f"Executing Pre-Deploy script...")
+                
+                pre_script_b64 = base64.b64encode(pre_deploy_script.encode()).decode()
+                pre_script_target = f"{deploy_path}/pre_deploy.sh"
+                
+                # 写入到临时文件 (因为目标目录可能需要 sudo 权限)
+                temp_pre_script = f"/tmp/pre_deploy_{int(time.time())}.sh"
+                write_pre_cmd = f"echo '{pre_script_b64}' | base64 -d > {temp_pre_script}"
+                code, out, err = exec_cmd(write_pre_cmd)
+                if code != 0:
+                     raise Exception(f"写入临时 Pre-Deploy 脚本失败: {err}")
+                
+                # 移动到目标目录
+                mv_pre_cmd = sudo_cmd(f"mv {temp_pre_script} {pre_script_target}")
+                code, out, err = exec_cmd(mv_pre_cmd)
+                if code != 0:
+                     raise Exception(f"移动 Pre-Deploy 脚本失败: {err}")
+                
+                # 赋予权限并执行
+                # 注意：pre_deploy_script 可能包含 systemctl reload docker，这可能导致 ssh 连接中断？
+                # 应该没问题，只要不重启 sshd
+                # 关键修复：Docker Login 通常是针对当前用户（这里是 root，因为用了 sudo），但 compose up 也是用 sudo
+                # 问题在于：docker login 生成的 config.json 是否能被后续的 docker compose 看到？
+                # 如果 sudo docker login，配置文件在 /root/.docker/config.json
+                # 如果 sudo docker compose，它应该也能读取 /root/.docker/config.json
+                # 为了保险，我们强制在脚本中 explicit 输出 login 结果
+                exec_pre_cmd = f"chmod +x {pre_script_target} && cd {deploy_path} && {sudo_cmd('./pre_deploy.sh')}"
+                code, out, err = exec_cmd(exec_pre_cmd)
+                
+                # 兼容性处理：只要返回 0 或者日志中包含成功标志，都视为成功
+                is_success = False
+                if code == 0:
+                    is_success = True
+                elif "Harbor configuration generated successfully" in out or "Harbor configuration generated successfully" in err:
+                    is_success = True
+                
+                if is_success:
+                    logger.info(f"Pre-Deploy 脚本执行完成 (Code {code})。Output: {out}")
+                else:
+                    raise Exception(f"Pre-Deploy 脚本执行失败 (Code {code}): {err}\nOutput: {out}")
+                
+                logger.info("Pre-Deploy script executed successfully.")
+
+            # 2. 写入文件
+            b64_content = base64.b64encode(content.encode()).decode()
+            
+            if app_type == "shell_script":
+                target_file = f"{deploy_path}/install.sh"
+            else:
+                target_file = f"{deploy_path}/docker-compose.yml"
+                
+            temp_file = f"/tmp/deploy_{int(time.time())}.tmp"
             write_cmd = f"echo '{b64_content}' | base64 -d > {temp_file}"
             code, out, err = exec_cmd(write_cmd)
             if code != 0:
                  raise Exception(f"写入临时文件失败: {err}")
             
-            mv_cmd = sudo_cmd(f"mv {temp_file} {deploy_path}/docker-compose.yml")
+            mv_cmd = sudo_cmd(f"mv {temp_file} {target_file}")
             code, out, err = exec_cmd(mv_cmd)
             if code != 0:
                  raise Exception(f"移动配置文件失败: {err}")
 
-            # 3. 检测 Docker Compose 版本
-            compose_cmd = None
-            
-            # 检查 v2
-            check_v2 = sudo_cmd("docker compose version")
-            code, out, err = exec_cmd(check_v2)
-            if code == 0:
-                compose_cmd = "docker compose"
+            # 根据 app_type 执行不同的逻辑
+            if app_type == "shell_script":
+                # 执行脚本
+                logger.info(f"Executing shell script on {server_info['ip_address']}...")
+                chmod_cmd = sudo_cmd(f"chmod +x {target_file}")
+                exec_cmd(chmod_cmd)
+                
+                # 执行脚本并捕获输出
+                # 注意：对于耗时较长的脚本，这里会阻塞直到完成
+                run_script_cmd = f"cd {deploy_path} && {sudo_cmd('./install.sh')}"
+                code, out, err = exec_cmd(run_script_cmd)
+                
+                if code != 0:
+                    raise Exception(f"脚本执行失败 (Code {code}): {err}\nOutput: {out}")
+                
+                logger.info(f"Script execution success on {server_info['ip_address']}")
+                result["success"] = True
+                result["data"]["container_id"] = "Script Executed"
+                
             else:
-                # 检查 v1
-                check_v1 = sudo_cmd("docker-compose version")
-                code, out, err = exec_cmd(check_v1)
+                # 默认 docker_compose 逻辑
+                # 3. 检测 Docker Compose 版本
+                compose_cmd = None
+                
+                # 检查 v2
+                check_v2 = sudo_cmd("docker compose version")
+                code, out, err = exec_cmd(check_v2)
                 if code == 0:
-                    compose_cmd = "docker-compose"
-            
-            if not compose_cmd:
-                raise Exception("未检测到 Docker Compose (v2 或 v1)，请先安装 Docker Compose")
-
-            # 4. 执行 Docker Compose Up
-            logger.info(f"Running {compose_cmd} up on {server_info['ip_address']}...")
-            up_cmd = f"cd {deploy_path} && {sudo_cmd(f'{compose_cmd} up -d --remove-orphans')}"
-            code, out, err = exec_cmd(up_cmd)
-            
-            if code != 0:
-                 raise Exception(f"启动应用失败: {err} (out: {out})")
-            
-            logger.info(f"Docker compose up success on {server_info['ip_address']}")
-
-            # 5. 获取 Container ID
-            # 尝试获取带服务名的格式 (仅限 v2)
-            if compose_cmd == "docker compose":
-                ps_cmd = f"cd {deploy_path} && {sudo_cmd(f'{compose_cmd} ps --format \"{{{{.Service}}}}:{{{{.ID}}}}\"')}"
-            else:
-                ps_cmd = f"cd {deploy_path} && {sudo_cmd(f'{compose_cmd} ps -q')}"
-                
-            code, out, err = exec_cmd(ps_cmd)
-            if code != 0:
-                 # Fallback for v1 or if format fails
-                 ps_cmd = f"cd {deploy_path} && {sudo_cmd(f'{compose_cmd} ps -q')}"
-                 code, out, err = exec_cmd(ps_cmd)
-                 if code != 0:
-                    raise Exception(f"获取容器ID失败: {err}")
-            
-            lines = out.splitlines()
-            formatted_ids = []
-            for line in lines:
-                line = line.strip()
-                if not line: continue
-                
-                if ":" in line and compose_cmd == "docker compose":
-                    # Format: service:full_id
-                    parts = line.split(":")
-                    if len(parts) >= 2:
-                        svc = parts[0]
-                        cid = parts[1][:12] # Short ID
-                        formatted_ids.append(f"{svc}:{cid}")
+                    compose_cmd = "docker compose"
                 else:
-                    # Just ID
-                    formatted_ids.append(line[:12])
-            
-            main_container_id = ",".join(formatted_ids) if formatted_ids else "unknown"
+                    # 检查 v1
+                    check_v1 = sudo_cmd("docker-compose version")
+                    code, out, err = exec_cmd(check_v1)
+                    if code == 0:
+                        compose_cmd = "docker-compose"
+                
+                if not compose_cmd:
+                    raise Exception("未检测到 Docker Compose (v2 或 v1)，请先安装 Docker Compose")
 
-            result["success"] = True
-            result["data"]["container_id"] = main_container_id
+                # 4. 执行 Docker Compose Up
+                logger.info(f"Running {compose_cmd} up on {server_info['ip_address']}...")
+                up_cmd = f"cd {deploy_path} && {sudo_cmd(f'{compose_cmd} up -d --remove-orphans')}"
+                code, out, err = exec_cmd(up_cmd)
+                
+                if code != 0:
+                     raise Exception(f"启动应用失败: {err} (out: {out})")
+                
+                logger.info(f"Docker compose up success on {server_info['ip_address']}")
+
+                # 5. 获取 Container ID
+                # 尝试获取带服务名的格式 (仅限 v2)
+                if compose_cmd == "docker compose":
+                    ps_cmd = f"cd {deploy_path} && {sudo_cmd(f'{compose_cmd} ps --format \"{{{{.Service}}}}:{{{{.ID}}}}\"')}"
+                else:
+                    ps_cmd = f"cd {deploy_path} && {sudo_cmd(f'{compose_cmd} ps -q')}"
+                    
+                code, out, err = exec_cmd(ps_cmd)
+                if code != 0:
+                     # Fallback for v1 or if format fails
+                     ps_cmd = f"cd {deploy_path} && {sudo_cmd(f'{compose_cmd} ps -q')}"
+                     code, out, err = exec_cmd(ps_cmd)
+                     if code != 0:
+                        raise Exception(f"获取容器ID失败: {err}")
+                
+                lines = out.splitlines()
+                formatted_ids = []
+                for line in lines:
+                    line = line.strip()
+                    if not line: continue
+                    
+                    if ":" in line and compose_cmd == "docker compose":
+                        # Format: service:full_id
+                        parts = line.split(":")
+                        if len(parts) >= 2:
+                            svc = parts[0]
+                            cid = parts[1][:12] # Short ID
+                            # Harbor has many services, so we just keep service name to save space
+                            # Or just keep the first few important ones?
+                            # Let's try to format it compactly: "svc:id"
+                            formatted_ids.append(f"{svc}:{cid}")
+                    else:
+                        # Just ID
+                        formatted_ids.append(line[:12])
+                
+                # Harbor 有 9 个服务，产生的字符串非常长 (e.g. core:xxx,jobservice:xxx...)
+                # 数据库字段可能只有 100 或 255 长度
+                # 策略：如果太长，只保留核心服务的 ID，或者截断
+                main_container_id = ",".join(formatted_ids) if formatted_ids else "unknown"
+                
+                # 强制截断以适应数据库字段 (假设是 VARCHAR(255) 或更短)
+                # 安全起见，保留前 100 个字符
+                if len(main_container_id) > 100:
+                    logger.warning(f"Container IDs string too long ({len(main_container_id)}), truncating...")
+                    # 尝试优先保留 core, portal, registry
+                    priority_svcs = ["core", "portal", "registry"]
+                    priority_ids = []
+                    other_ids = []
+                    
+                    for item in formatted_ids:
+                        is_priority = False
+                        for p in priority_svcs:
+                            if item.startswith(p):
+                                priority_ids.append(item)
+                                is_priority = True
+                                break
+                        if not is_priority:
+                            other_ids.append(item)
+                    
+                    # 重新组合，优先展示核心服务
+                    final_list = priority_ids + other_ids
+                    main_container_id = ",".join(final_list)
+                    
+                    # 再次检查并硬截断
+                    if len(main_container_id) > 100:
+                         main_container_id = main_container_id[:97] + "..."
+
+                result["success"] = True
+                result["data"]["container_id"] = main_container_id
+
             
         except Exception as e:
             result["success"] = False

@@ -50,7 +50,14 @@
             <el-table-column label="服务器名称" min-width="120">
               <template #default="{ row }">
                 <span v-if="isEdit">{{ getServerName(row.server_id) }}</span>
-                <span v-else>{{ row.server_id }} (需API关联)</span>
+                <span v-else>
+                  <template v-if="row.server">
+                    {{ row.server.name }} ({{ row.server.ip_address }})
+                  </template>
+                  <template v-else>
+                    {{ row.server_id }}
+                  </template>
+                </span>
               </template>
             </el-table-column>
             <el-table-column label="角色" prop="role" width="100">
@@ -61,7 +68,23 @@
             </el-table-column>
             <el-table-column label="状态" prop="status" width="100">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)" size="small">{{ row.status }}</el-tag>
+                <el-popover
+                  v-if="row.status === 'error' && row.error_message"
+                  placement="top"
+                  title="错误详情"
+                  :width="400"
+                  trigger="hover"
+                >
+                  <template #reference>
+                    <el-tag :type="getStatusType(row.status)" size="small" style="cursor: pointer">
+                      {{ row.status }} <el-icon><Warning /></el-icon>
+                    </el-tag>
+                  </template>
+                  <div class="error-log">
+                    {{ row.error_message }}
+                  </div>
+                </el-popover>
+                <el-tag v-else :type="getStatusType(row.status)" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="资源限制" min-width="180">
@@ -148,7 +171,7 @@ import { getAppInstance, updateAppInstance, type AppInstance } from '@/api/appli
 import { getServers } from '@/api/servers'
 import { formatDateTime } from '@/utils/date'
 import { ElMessage } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Warning } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -397,6 +420,16 @@ const getPortInfo = (row: any) => {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+}
+
+.error-log {
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 12px;
+  color: #f56c6c;
 }
 
 .font-mono {
