@@ -1,69 +1,85 @@
+
 import paramiko
-import sys
+import asyncio
+import base64
 
 HOST = "10.20.1.204"
 USER = "ubuntu"
 PASS = "cepiec1qaz@WSXaczt8912059Nxtektppyoud"
-CONFIG_PATH = "/data/harbor/common/config/registry/config.yml"
 
-TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJoYXJib3ItdG9rZW4taXNzdWVyIiwic3ViIjoiaGFyYm9yLXJlZ2lzdHJ5IiwiYXVkIjoiaGFyYm9yLWNvcmUiLCJleHAiOjIwODc3ODIyMzUsIm5iZiI6MTc3MjQyMjE3NSwiaWF0IjoxNzcyNDIyMjM1fQ.iCFdh0sOcXYtbvPXn5_52j0q4CVVFyO-zMnuElcgrW-6w4zd3VNOeUO7lS7ypbnQjJY2zncwMNVZE5dHpfhss22hDdF20J3RmJf7ORMMle_c3GwRMjMofXfyjxfj6_onUc8E8nY7BALxdgEBSpjMnXMnJh-wtVA52OdvPYTYFQiIpOJIyIGWhs31kY8gwlRQL5Ynx2ng99rV018thSuU3QyXgLFZ44TkCUdGtcZWVvfsC2rSwhjZf8flFi51pgm-DrNla5kid3pg1Hl1i0d_r-z6lE-mhaEBV36WpgO4K1LVCLubeLe4bWuF6PD57U-7XVAxWFLR1gZSUZieGP63G4Y4IAlc8xL2F2vbHLr_wR_Apzf8YUnAxcOmfCNm3Ft_55ixT3iUmXBGCHbvdJYGjFCXqP4_Ix0-jYMRkD9IGOtygBw1lcWrFD5-9fgI3TYFTpr-DzJV8LS_JL9EObFbMUpcIbu4XQp4l2wadzRoVRZskU08k5Z-qS6eZQQtXz7wjfsC8Bq0ntvv6AI6Zo90Oy1CvGcofZQSm47t3usbHZwO2UI1mVSJwsF3eEcqlvNNFmd9TTYzBnfGGG4sxpAQW4wJh3L1ub-NYBuNbOm35Cqoscrr_1X0gsN5fchR7c7NlsbLd4g9NDM4_lA2FoX5TbHXXBsPgSYNM1Yg2KP1R5I"
-
-NOTIFICATION_CONFIG = f"""
-notifications:
-  endpoints:
-    - name: harbor
-      disabled: false
-      url: http://core:8080/service/notifications
-      headers:
-        Authorization: Bearer {TOKEN}
-      timeout: 3000ms
-      threshold: 5
-      backoff: 1s
-"""
-
-def main():
+async def run_remote_command(command):
+    print(f"Executing: {command}")
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    
     try:
-        print(f"Connecting to {HOST}...")
         client.connect(HOST, username=USER, password=PASS)
+        full_cmd = f"echo '{PASS}' | sudo -S {command}"
+        stdin, stdout, stderr = client.exec_command(full_cmd)
         
-        # Read existing config
-        print(f"Reading {CONFIG_PATH}...")
-        cmd = f"cat {CONFIG_PATH}"
-        stdin, stdout, stderr = client.exec_command(cmd)
-        content = stdout.read().decode()
+        out = stdout.read().decode('utf-8')
+        err = stderr.read().decode('utf-8')
         
-        if "notifications:" in content:
-            print("Warning: 'notifications' section already exists. Skipping append.")
-            # We might want to replace it, but for now let's assume if it's there, it might be broken or I should overwrite.
-            # Given previous checks showed it missing, this branch shouldn't hit.
-        else:
-            print("Appending notifications config...")
-            new_content = content + NOTIFICATION_CONFIG
+        if out: print(f"[STDOUT]:\n{out}")
+        if err: 
+            clean_err = '\n'.join([line for line in err.split('\n') if "[sudo] password" not in line])
+            if clean_err.strip(): print(f"[STDERR]:\n{clean_err}")
             
-            # Write to temp file
-            temp_path = "/tmp/registry_config.yml"
-            sftp = client.open_sftp()
-            with sftp.file(temp_path, 'w') as f:
-                f.write(new_content)
-            
-            # Move and set permissions
-            cmd = f"echo '{PASS}' | sudo -S mv {temp_path} {CONFIG_PATH}"
-            client.exec_command(cmd)
-            
-            print("Restarting Registry...")
-            cmd = f"echo '{PASS}' | sudo -S docker restart registry"
-            stdin, stdout, stderr = client.exec_command(cmd)
-            print(stdout.read().decode())
-            
-            print("Done. Registry updated.")
-
-    except Exception as e:
-        print(f"Error: {e}")
+        return out
     finally:
         client.close()
 
+async def main():
+    # 1. Get Secret
+    print("\n--- Getting Secret ---")
+    cmd = "grep JOBSERVICE_SECRET /data/harbor/common/config/core/env"
+    secret_line = await run_remote_command(cmd)
+    
+    # Extract secret value (assuming JOBSERVICE_SECRET=xxx)
+    secret = secret_line.strip().split('=')[1] if secret_line and '=' in secret_line else ""
+    print(f"Secret found: {secret[:5]}...")
+    
+    if not secret:
+        print("Failed to find JOBSERVICE_SECRET")
+        return
+
+    # 2. Append notifications section to registry/config.yml
+    print("\n--- Updating Registry Config ---")
+    
+    # We need to construct the yaml content to append
+    # Note: indentation is important.
+    notifications_section = f"""
+notifications:
+  endpoints:
+  - name: harbor
+    disabled: false
+    url: http://core:8080/service/notifications
+    headers:
+      Authorization: [Harbor-Secret {secret}]
+    timeout: 3000ms
+    threshold: 5
+    backoff: 1s
+"""
+    
+    # We'll use python on remote to append safely
+    append_script = f"""
+with open('/data/harbor/common/config/registry/config.yml', 'a') as f:
+    f.write('''{notifications_section}''')
+"""
+    b64_script = base64.b64encode(append_script.encode()).decode()
+    cmd = f"python3 -c \"import base64; exec(base64.b64decode('{b64_script}'))\""
+    await run_remote_command(cmd)
+    
+    # Verify content
+    print("\n--- Verifying Registry Config ---")
+    await run_remote_command("tail -n 15 /data/harbor/common/config/registry/config.yml")
+    
+    # 3. Restart Registry
+    print("\n--- Restarting Registry ---")
+    await run_remote_command("docker restart registry")
+    
+    # 4. Wait a bit
+    await asyncio.sleep(5)
+    await run_remote_command("docker ps")
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
