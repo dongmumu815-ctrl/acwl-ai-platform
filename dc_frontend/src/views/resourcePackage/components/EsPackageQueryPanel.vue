@@ -1507,7 +1507,7 @@ const openPdf = () => {
 
 function buildPdfOpenUrl(url: string, page?: number | null, keyword?: string | null): string {
   const origin = window.location.origin;
-  const viewer = `${origin}/ui/pdf-viewer.html`;
+  const viewer = `${origin}/api/v1/utils/pdf-viewer`;
   const proxied = `${origin}/api/v1/utils/pdf-proxy?url=${encodeURIComponent(String(url))}`;
   const file = encodeURIComponent(proxied);
   const params = new URLSearchParams();
@@ -1518,7 +1518,8 @@ function buildPdfOpenUrl(url: string, page?: number | null, keyword?: string | n
     params.set('search', String(keyword).trim());
   }
   const hash = params.toString();
-  return `${viewer}?file=${file}${hash ? '#' + hash : ''}`;
+  // 将 page/search 放到查询字符串，viewer 也支持从 query 读取
+  return `${viewer}?file=${file}${hash ? '&' + hash : ''}`;
 }
 
 const openPdfAtHit = (row: Record<string, any>) => {
