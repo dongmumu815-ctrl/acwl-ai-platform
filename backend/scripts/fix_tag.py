@@ -28,21 +28,23 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    # 1. Check Registry Configuration
-    print("\n--- Registry Config ---")
-    await run_remote_command("cat /data/harbor/common/config/registry/config.yml")
+    # Insert tag for artifact 9
+    insert_tag_sql = """
+    INSERT INTO tag (
+        repository_id, artifact_id, name, push_time
+    ) VALUES (
+        1, 9, '0.87-fixed', NOW()
+    ) ON CONFLICT (repository_id, name) DO NOTHING;
+    """
     
-    # 2. Check Registry Logs for notifications errors specifically
-    print("\n--- Registry Notification Errors ---")
-    await run_remote_command("docker logs registry 2>&1 | grep -i notification | tail -n 20")
+    print("\n--- Inserting Tag for Artifact 9 ---")
+    psql_tag = f"docker exec harbor-db psql -U postgres -d registry -c \"{insert_tag_sql}\""
+    await run_remote_command(psql_tag)
     
-    # 3. Check Redis connection from Registry (if possible, or just assume it works if no errors)
-    # Registry uses Redis for caching layer info usually, but notifications are HTTP calls.
-    # Notifications are configured in config.yml under `notifications` section.
-    
-    # 4. Check Core logs for notification errors
-    print("\n--- Core Notification Logs ---")
-    await run_remote_command("docker logs harbor-core 2>&1 | grep -i notification | tail -n 20")
+    # Final Verify
+    print("\n--- Final API Verification ---")
+    cmd_artifacts = """curl -s -u 'admin:Harbor12345' -H 'Content-Type: application/json' 'http://localhost:5000/api/v2.0/projects/prod/repositories/actable-server/artifacts?page=1&page_size=10&with_tag=true'"""
+    await run_remote_command(cmd_artifacts)
 
 if __name__ == "__main__":
     asyncio.run(main())

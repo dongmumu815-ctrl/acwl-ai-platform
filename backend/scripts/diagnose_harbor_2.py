@@ -28,21 +28,22 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    # 1. Check Registry Configuration
-    print("\n--- Registry Config ---")
+    # 1. Read docker-compose.yml
+    print("\n--- Reading docker-compose.yml ---")
+    await run_remote_command("cat /data/harbor/docker-compose.yml")
+    
+    # 2. Read registry config
+    print("\n--- Reading registry config.yml ---")
     await run_remote_command("cat /data/harbor/common/config/registry/config.yml")
     
-    # 2. Check Registry Logs for notifications errors specifically
-    print("\n--- Registry Notification Errors ---")
-    await run_remote_command("docker logs registry 2>&1 | grep -i notification | tail -n 20")
-    
-    # 3. Check Redis connection from Registry (if possible, or just assume it works if no errors)
-    # Registry uses Redis for caching layer info usually, but notifications are HTTP calls.
-    # Notifications are configured in config.yml under `notifications` section.
-    
-    # 4. Check Core logs for notification errors
-    print("\n--- Core Notification Logs ---")
-    await run_remote_command("docker logs harbor-core 2>&1 | grep -i notification | tail -n 20")
+    # 3. Test notification endpoint manually again (trailing slash)
+    test_cmd = """
+    SECRET=$(docker exec harbor-core env | grep JOBSERVICE_SECRET | cut -d= -f2)
+    echo "Using Secret: $SECRET"
+    docker exec registry curl -v -H "Authorization: Harbor-Secret $SECRET" -H "Content-Type: application/json" -d '{"events": []}' http://core:8080/service/notifications/
+    """
+    print("\n--- Testing Notification Endpoint (Trailing Slash) ---")
+    await run_remote_command(test_cmd)
 
 if __name__ == "__main__":
     asyncio.run(main())

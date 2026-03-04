@@ -28,21 +28,17 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    # 1. Check Registry Configuration
-    print("\n--- Registry Config ---")
-    await run_remote_command("cat /data/harbor/common/config/registry/config.yml")
+    # Check harbor-core env
+    print("\n--- Checking harbor-core env ---")
+    await run_remote_command("docker exec harbor-core env")
     
-    # 2. Check Registry Logs for notifications errors specifically
-    print("\n--- Registry Notification Errors ---")
-    await run_remote_command("docker logs registry 2>&1 | grep -i notification | tail -n 20")
+    # Check where prepare script is
+    print("\n--- Searching for prepare script ---")
+    await run_remote_command("find / -name prepare -type f 2>/dev/null | grep harbor")
     
-    # 3. Check Redis connection from Registry (if possible, or just assume it works if no errors)
-    # Registry uses Redis for caching layer info usually, but notifications are HTTP calls.
-    # Notifications are configured in config.yml under `notifications` section.
-    
-    # 4. Check Core logs for notification errors
-    print("\n--- Core Notification Logs ---")
-    await run_remote_command("docker logs harbor-core 2>&1 | grep -i notification | tail -n 20")
+    # Check if there is an install.sh
+    print("\n--- Searching for install.sh ---")
+    await run_remote_command("find / -name install.sh -type f 2>/dev/null | grep harbor")
 
 if __name__ == "__main__":
     asyncio.run(main())

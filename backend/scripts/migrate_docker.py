@@ -1,134 +1,161 @@
+import paramiko
 import asyncio
-import sys
 import os
-import json
-from pathlib import Path
+import sys
+import time
 
 # Add project root to Python path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(current_dir)
+sys.path.insert(0, backend_dir)
 
 from app.core.database import AsyncSessionLocal
 from app.models.server import Server
 from sqlalchemy import select
-import paramiko
 
-async def main():
-    print("🚀 开始迁移 Docker Root Dir 到 /data/dockers...")
-    
-    # 目标服务器 IP
-    target_ip = "10.20.1.221" 
-    
-    async with AsyncSessionLocal() as db:
-        # 获取服务器信息
-        stmt = select(Server).where(Server.ip_address == target_ip)
-        result = await db.execute(stmt)
+HOST = "10.20.1.221"
+
+async def get_server_credentials():
+    async with AsyncSessionLocal() as session:
+        stmt = select(Server).where(Server.ip_address == HOST)
+        result = await session.execute(stmt)
         server = result.scalar_one_or_none()
-        
         if not server:
-            print(f"❌ 未在数据库中找到服务器: {target_ip}")
-            return
-            
-        print(f"✅ 连接服务器: {server.ip_address}")
-        await migrate_docker(server)
+            raise Exception(f"Server {HOST} not found in DB")
+        return server.ssh_username, server.ssh_password
 
-async def migrate_docker(server):
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    
+async def run_remote_script(script_content):
+    client = None
     try:
-        connect_kwargs = {
-            "hostname": server.ip_address,
-            "port": server.ssh_port,
-            "username": server.ssh_username,
-            "timeout": 20
-        }
-        if server.ssh_password:
-            connect_kwargs["password"] = server.ssh_password
-             
-        ssh.connect(**connect_kwargs)
+        user, password = await get_server_credentials()
+        print(f"Connecting to {HOST} as {user}...")
         
-        # 1. 检查 /data 分区是否可用
-        print("🔍 检查 /data 分区...")
-        stdin, stdout, stderr = ssh.exec_command("df -h /data")
-        output = stdout.read().decode().strip()
-        print(output)
-        if "/data" not in output and "mpath" not in output:
-            print("❌ /data 分区似乎未挂载，请人工确认")
-            return
-
-        # 2. 停止 Docker
-        print("🛑 停止 Docker 服务...")
-        stdin, stdout, stderr = ssh.exec_command("echo '{}' | sudo -S systemctl stop docker".format(server.ssh_password))
-        exit_status = stdout.channel.recv_exit_status()
-        if exit_status != 0:
-            print(f"❌ 停止 Docker 失败: {stderr.read().decode()}")
-            # 尝试强制停止 socket
-            ssh.exec_command("echo '{}' | sudo -S systemctl stop docker.socket".format(server.ssh_password))
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(HOST, port=22, username=user, password=password, timeout=15)
         
-        # 3. 创建新目录
-        print("📂 创建 /data/dockers...")
-        ssh.exec_command("echo '{}' | sudo -S mkdir -p /data/dockers".format(server.ssh_password))
-        
-        # 4. 迁移数据 (使用 rsync)
-        # 注意：这可能需要很长时间，这里我们只迁移关键配置或跳过，或者假设用户希望全新开始
-        # 鉴于之前磁盘已满，可能包含大量垃圾数据，建议全新开始，但为了安全，我们先备份 daemon.json
-        print("⚙️  配置 daemon.json...")
-        
-        # 读取现有 daemon.json
-        cmd_read = "cat /etc/docker/daemon.json"
-        stdin, stdout, stderr = ssh.exec_command(cmd_read)
-        current_config = stdout.read().decode().strip()
-        
-        config = {}
-        if current_config:
-            try:
-                config = json.loads(current_config)
-            except:
-                print("⚠️  现有 daemon.json 格式错误，将创建新文件")
-        
-        # 修改 data-root
-        config["data-root"] = "/data/dockers"
-        
-        # 写入临时文件
-        new_config_str = json.dumps(config, indent=4)
-        tmp_file = "/tmp/daemon.json.new"
-        
-        sftp = ssh.open_sftp()
-        with sftp.file(tmp_file, 'w') as f:
-            f.write(new_config_str)
+        # Write script to remote file
+        script_path = "/tmp/migrate_docker.sh"
+        sftp = client.open_sftp()
+        with sftp.file(script_path, 'w') as f:
+            f.write(script_content)
+        sftp.chmod(script_path, 0o755)
         sftp.close()
         
-        # 移动并覆盖
-        cmd_mv = f"echo '{server.ssh_password}' | sudo -S mv {tmp_file} /etc/docker/daemon.json"
-        ssh.exec_command(cmd_mv)
+        # Execute script with sudo
+        print("Executing migration script...")
+        command = f"echo '{password}' | sudo -S -p '' {script_path}"
         
-        # 5. 启动 Docker
-        print("▶️  启动 Docker 服务...")
-        stdin, stdout, stderr = ssh.exec_command("echo '{}' | sudo -S systemctl start docker".format(server.ssh_password))
+        stdin, stdout, stderr = client.exec_command(command, get_pty=True)
+        
+        # Stream output
+        while True:
+            line = stdout.readline()
+            if not line:
+                break
+            print(line.strip())
+            
         exit_status = stdout.channel.recv_exit_status()
-        if exit_status != 0:
-             print(f"❌ 启动 Docker 失败: {stderr.read().decode()}")
-             return
-
-        # 6. 验证
-        print("✅ 验证 Docker Root Dir...")
-        stdin, stdout, stderr = ssh.exec_command("docker info | grep 'Docker Root Dir'")
-        print(stdout.read().decode().strip())
-        
-        # 7. 清理旧数据 (可选，释放根分区)
-        # 既然已经切换了 root dir，旧的 /var/lib/docker 就可以删除了
-        # 但为了安全，我们先不自动删，只是打印提示
-        print("\n⚠️  提示: 旧的 Docker 数据仍占用根分区空间 (/var/lib/docker)")
-        print("   请在确认新环境正常后，手动执行: sudo rm -rf /var/lib/docker")
-
+        if exit_status == 0:
+            print("✅ Migration script completed successfully.")
+        else:
+            print(f"❌ Script failed with exit code {exit_status}")
+            err = stderr.read().decode()
+            if err:
+                print(f"STDERR: {err}")
+            
     except Exception as e:
-        print(f"❌ 操作失败: {e}")
+        print(f"Error: {e}")
     finally:
-        ssh.close()
+        if client:
+            client.close()
+
+SCRIPT = """#!/bin/bash
+set -e
+
+DATA_DIR="/data/docker-data"
+BACKUP_DIR="/var/lib/docker.bak"
+
+echo "Checking disk space..."
+df -h / /data
+
+if [ -d "$DATA_DIR" ]; then
+    echo "Warning: $DATA_DIR already exists."
+else
+    echo "Creating $DATA_DIR..."
+    mkdir -p "$DATA_DIR"
+fi
+
+echo "Stopping Docker service..."
+systemctl stop docker
+
+echo "Migrating data from /var/lib/docker to $DATA_DIR..."
+# Use rsync to preserve permissions and links
+if [ -d "/var/lib/docker" ]; then
+    rsync -aP /var/lib/docker/ "$DATA_DIR/"
+else
+    echo "Warning: /var/lib/docker does not exist, skipping sync."
+fi
+
+echo "Backing up old data directory..."
+if [ -d "/var/lib/docker" ]; then
+    mv /var/lib/docker "$BACKUP_DIR"
+fi
+
+echo "Configuring Docker daemon..."
+CONFIG_FILE="/etc/docker/daemon.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "{}" > "$CONFIG_FILE"
+fi
+
+# Use python to update json safely
+python3 -c "
+import json
+import os
+
+f_path = '$CONFIG_FILE'
+target = '$DATA_DIR'
+
+try:
+    with open(f_path, 'r') as f:
+        data = json.load(f)
+except:
+    data = {}
+
+data['data-root'] = target
+
+with open(f_path, 'w') as f:
+    json.dump(data, f, indent=4)
+print('Updated daemon.json')
+"
+
+echo "Starting Docker service..."
+systemctl start docker
+
+echo "Verifying..."
+docker info | grep "Docker Root Dir"
+
+echo "Migration Completed."
+"""
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        print(f"❌ 发生错误: {e}")
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    
+    print("WARNING: This will stop Docker service on 10.20.1.221 and migrate data to /data/docker-data.")
+    print("Existing containers will be stopped and restarted.")
+    # In a real scenario, we might ask for confirmation, but here we just prepare the script.
+    # asyncio.run(run_remote_script(SCRIPT))
+    print("Script is ready in backend/scripts/migrate_docker.py. Run it to execute migration.")
+"""
+
+if __name__ == "__main__":
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    
+    # Check args
+    if len(sys.argv) > 1 and sys.argv[1] == "--run":
+        asyncio.run(run_remote_script(SCRIPT))
+    else:
+        print("This script will migrate Docker data on 10.20.1.221 to /data/docker-data.")
+        print("To execute, run: python backend/scripts/migrate_docker.py --run")

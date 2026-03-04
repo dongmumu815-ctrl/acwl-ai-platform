@@ -28,21 +28,27 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    # 1. Check Registry Configuration
-    print("\n--- Registry Config ---")
-    await run_remote_command("cat /data/harbor/common/config/registry/config.yml")
+    # 1. Try a few endpoints
+    endpoints = [
+        "/service/notifications/",
+        "/api/v2.0/systeminfo",
+        "/api/v2.0/statistics",
+        "/api/v2.0/configurations",
+        "/api/internal/configurations"
+    ]
     
-    # 2. Check Registry Logs for notifications errors specifically
-    print("\n--- Registry Notification Errors ---")
-    await run_remote_command("docker logs registry 2>&1 | grep -i notification | tail -n 20")
+    # Secrets to try (for auth)
+    # We found JOBSERVICE_SECRET=321ilUSKFowXa4ix and CORE_SECRET=8bwwVONJVT7s43Qb
+    # Usually internal API uses JOBSERVICE_SECRET or CORE_SECRET.
+    # But let's just use empty auth first to check 404 vs 401.
     
-    # 3. Check Redis connection from Registry (if possible, or just assume it works if no errors)
-    # Registry uses Redis for caching layer info usually, but notifications are HTTP calls.
-    # Notifications are configured in config.yml under `notifications` section.
-    
-    # 4. Check Core logs for notification errors
-    print("\n--- Core Notification Logs ---")
-    await run_remote_command("docker logs harbor-core 2>&1 | grep -i notification | tail -n 20")
+    for ep in endpoints:
+        print(f"\n--- Trying {ep} ---")
+        await run_remote_command(f"docker exec harbor-core curl -v -I http://127.0.0.1:8080{ep}")
+
+    # 2. Check logs for the previous 404s
+    print("\n--- Checking logs for 404 ---")
+    await run_remote_command("docker logs harbor-core 2>&1 | tail -n 50")
 
 if __name__ == "__main__":
     asyncio.run(main())

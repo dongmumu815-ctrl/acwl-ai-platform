@@ -20,6 +20,7 @@ async def run_remote_command(command):
         
         if out: print(f"[STDOUT]:\n{out}")
         if err: 
+            # Filter sudo prompt
             clean_err = '\n'.join([line for line in err.split('\n') if "[sudo] password" not in line])
             if clean_err.strip(): print(f"[STDERR]:\n{clean_err}")
             
@@ -28,21 +29,10 @@ async def run_remote_command(command):
         client.close()
 
 async def main():
-    # 1. Check Registry Configuration
-    print("\n--- Registry Config ---")
-    await run_remote_command("cat /data/harbor/common/config/registry/config.yml")
-    
-    # 2. Check Registry Logs for notifications errors specifically
-    print("\n--- Registry Notification Errors ---")
-    await run_remote_command("docker logs registry 2>&1 | grep -i notification | tail -n 20")
-    
-    # 3. Check Redis connection from Registry (if possible, or just assume it works if no errors)
-    # Registry uses Redis for caching layer info usually, but notifications are HTTP calls.
-    # Notifications are configured in config.yml under `notifications` section.
-    
-    # 4. Check Core logs for notification errors
-    print("\n--- Core Notification Logs ---")
-    await run_remote_command("docker logs harbor-core 2>&1 | grep -i notification | tail -n 20")
+    # Remove 0.86 tag
+    print("\n--- Removing 0.86 tag ---")
+    await run_remote_command("ls -R /data/harbor/registry/docker/registry/v2/repositories/prod/actable-server/_manifests/tags")
+    # await run_remote_command("rm -rf /data/harbor/registry/docker/registry/v2/repositories/prod/actable-server/_manifests/tags/0.86")
 
 if __name__ == "__main__":
     asyncio.run(main())

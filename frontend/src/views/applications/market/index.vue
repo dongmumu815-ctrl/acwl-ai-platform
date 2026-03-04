@@ -131,6 +131,15 @@
             <el-form-item label="应用名称" prop="name">
               <el-input v-model="installForm.name" placeholder="给实例起个名字" />
             </el-form-item>
+            <el-form-item label="镜像版本" required>
+               <el-input v-model="globalConfig.version" placeholder="例如: latest, v1.0.0">
+                 <template #append>
+                   <el-tooltip content="在模板中使用 {{ version }} 引用此版本号" placement="top">
+                     <el-icon><QuestionFilled /></el-icon>
+                   </el-tooltip>
+                 </template>
+               </el-input>
+            </el-form-item>
             <el-form-item label="描述" prop="description">
               <el-input v-model="installForm.description" type="textarea" :rows="2" />
             </el-form-item>
