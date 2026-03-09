@@ -4,7 +4,7 @@
     <aside class="sidebar" :style="{ width: appStore.sidebarWidth }">
       <div class="sidebar-header">
         <div class="logo" @click="$router.push('/dashboard')">
-          <img src="/logo.png" alt="Logo" class="logo-icon" :style="{ width: '32px', height: '32px' }" />
+          <img :src="logo" alt="Logo" class="logo-icon" :style="{ width: '32px', height: '32px' }" />
           <span v-show="!appStore.sidebarCollapsed" class="logo-text">AI数据中台</span>
         </div>
       </div>
@@ -128,6 +128,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import SidebarMenu from './components/SidebarMenu.vue'
+import logo from '@/assets/logo.png'
 import { 
   Fold, 
   Expand, 
@@ -150,7 +151,9 @@ import {
   Connection,
   Folder,
   Key,
-  UserFilled
+  UserFilled,
+  Grid,
+  Shop
 } from '@element-plus/icons-vue'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import RobotIcon from '@/components/RobotIcon.vue'
@@ -181,7 +184,9 @@ const iconMap: Record<string, any> = {
   VideoCamera,
   Connection,
   Folder,
-  Robot: RobotIcon
+  Robot: RobotIcon,
+  App: Grid,
+  Shop
 }
 
 // 缓存的视图组件

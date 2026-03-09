@@ -959,9 +959,16 @@
           <el-tab-pane
             v-for="item in terminalSessions"
             :key="item.key"
-            :label="item.label"
             :name="item.key"
           >
+            <template #label>
+              <span 
+                class="custom-tabs-label" 
+                @contextmenu="openContextMenu($event, item)"
+              >
+                {{ item.label }}
+              </span>
+            </template>
             <div class="terminal-pane-content">
               <WebTerminal
                 :ref="(el) => setTerminalRef(el, item.key)"
@@ -971,6 +978,20 @@
             </div>
           </el-tab-pane>
         </el-tabs>
+
+        <!-- Context Menu -->
+        <div 
+          v-if="contextMenuVisible" 
+          class="context-menu" 
+          :style="{ top: contextMenuPosition.top + 'px', left: contextMenuPosition.left + 'px' }"
+          @click.stop
+          @mouseleave="closeContextMenu"
+        >
+          <div class="menu-item" @click="handleDuplicateSession">
+            <el-icon><CopyDocument /></el-icon>
+            <span>复制终端</span>
+          </div>
+        </div>
       </div>
     </el-drawer>
 
@@ -2271,6 +2292,64 @@ const scanGpus = async () => {
   }
 }
 
+// Context Menu Logic
+const contextMenuVisible = ref(false)
+const contextMenuPosition = reactive({ top: 0, left: 0 })
+const currentContextSession = ref<any>(null)
+
+const openContextMenu = (e: MouseEvent, session: any) => {
+  e.preventDefault()
+  contextMenuVisible.value = true
+  contextMenuPosition.top = e.clientY
+  contextMenuPosition.left = e.clientX
+  currentContextSession.value = session
+}
+
+const closeContextMenu = () => {
+  contextMenuVisible.value = false
+  currentContextSession.value = null
+}
+
+const handleDuplicateSession = () => {
+  if (currentContextSession.value) {
+    const session = currentContextSession.value
+    // Use a unique key for the new session
+    const newKey = `server-${session.serverId}-${Date.now()}`
+    
+    const newSession = {
+      key: newKey,
+      label: session.label, // Use same label
+      serverId: session.serverId
+    }
+    
+    // Find index to insert after
+    const index = terminalSessions.value.findIndex(s => s.key === session.key)
+    if (index !== -1) {
+      terminalSessions.value.splice(index + 1, 0, newSession)
+    } else {
+      terminalSessions.value.push(newSession)
+    }
+    
+    activeTerminalKey.value = newKey
+    closeContextMenu()
+  }
+}
+
+// Close context menu on global click
+const handleGlobalClick = () => {
+  if (contextMenuVisible.value) {
+    closeContextMenu()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleGlobalClick)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', handleGlobalClick)
+})
+
 const handleServerAction = async ({ action, server }: any) => {
   switch (action) {
     case 'edit':
@@ -2304,16 +2383,18 @@ const handleServerAction = async ({ action, server }: any) => {
       break
     case 'terminal':
       {
-        const key = `server-${server.id}`
-        const exists = terminalSessions.value.find(s => s.key === key)
-        if (!exists) {
+        const existingSession = terminalSessions.value.find(s => s.serverId === server.id)
+        if (existingSession) {
+          activeTerminalKey.value = existingSession.key
+        } else {
+          const key = `server-${server.id}-${Date.now()}`
           terminalSessions.value.push({
             key,
             label: server.name,
             serverId: server.id
           })
+          activeTerminalKey.value = key
         }
-        activeTerminalKey.value = key
         terminalDrawerVisible.value = true
       }
       break
@@ -2458,6 +2539,38 @@ const handleCurrentChange = (page: number) => {
   height: 100%;
   background-color: #1e1e1e;
   padding: 10px;
+}
+
+.custom-tabs-label {
+  display: inline-block;
+  user-select: none;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background-color: #fff;
+  border: 1px solid #dcdfe6;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 5px 0;
+  min-width: 120px;
+}
+
+.context-menu .menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #606266;
+  transition: background-color 0.3s;
+}
+
+.context-menu .menu-item:hover {
+  background-color: #f5f7fa;
+  color: #409eff;
 }
 
 /* 布局容器 */
