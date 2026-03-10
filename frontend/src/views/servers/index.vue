@@ -1652,15 +1652,9 @@ fi
 cat <<EOF | sudo tee /etc/docker/daemon.json
 {
   "registry-mirrors": [
-    "https://docker.1panel.live",
+    "https://docker.xuanyuan.me",
     "https://docker.1ms.run",
-    "https://hub.rat.dev",
-    "https://dockerproxy.net",
-    "https://proxy.vvvv.ee",
-    "https://docker.m.daocloud.io",
-    "https://registry.cyou",
-    "https://hub.rat.dev",
-    "https://hub-mirror.c.163.com"
+    "https://docker.m.daocloud.io"
   ],
   "runtimes": {
     "nvidia": {
