@@ -13,7 +13,7 @@
         <!-- Logo和标题 -->
         <div class="login-header">
           <div class="logo">
-            <img src="/logo.svg" alt="AI算力中心" class="logo-image" />
+            <img :src="logo" alt="AI算力中心" class="logo-image" />
           </div>
           <h1 class="title">AI算力中心</h1>
         </div>
@@ -107,6 +107,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import type { LoginForm } from '@/types/auth'
+import logo from '@/assets/logo.png'
 
 const router = useRouter()
 const userStore = useUserStore()

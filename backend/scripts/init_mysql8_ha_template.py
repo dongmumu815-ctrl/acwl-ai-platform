@@ -15,11 +15,11 @@ from sqlalchemy import select
 # - role: 通过部署时的角色选择决定 ('master' 或 'slave')
 # - server_id: 系统自动分配的唯一服务器ID，用作 MySQL server-id
 # - master_ip: 用户在配置中手动填写的 Master IP
-MYSQL_TEMPLATE = """version: '3'
-services:
+# - instance_id: 应用实例 ID，用于生成唯一的容器名称
+MYSQL_TEMPLATE = """services:
   mysql:
-    image: bitnami/mysql:8.0
-    container_name: mysql-{{ server_id }}
+    image: {{ image }}
+    container_name: mysql-{{ instance_id }}-{{ server_id }}
     environment:
       # 基础认证配置
       - MYSQL_ROOT_PASSWORD={{ root_password }}
@@ -38,7 +38,7 @@ services:
       {% else %}
       - MYSQL_REPLICATION_MODE=slave
       - MYSQL_MASTER_HOST={{ master_ip }}
-      - MYSQL_MASTER_PORT_NUMBER={{ port }}
+      - MYSQL_MASTER_PORT_NUMBER={{ master_port | default(port) }}
       - MYSQL_MASTER_ROOT_PASSWORD={{ root_password }}
       {% endif %}
       
@@ -58,11 +58,23 @@ CONFIG_SCHEMA = {
   "type": "object",
   "x-roles": ["master", "slave"],
   "properties": {
+    "image": {
+      "type": "string",
+      "title": "Image",
+      "default": "bitnami/mysql:8.0",
+      "description": "Docker 镜像地址 (如拉取失败可修改为私有仓库地址)"
+    },
     "port": {
       "type": "integer",
       "title": "Service Port",
       "default": 3306,
-      "description": "MySQL 服务端口"
+      "description": "MySQL 服务端口 (本机监听端口)"
+    },
+    "master_port": {
+      "type": "integer",
+      "title": "Master Port",
+      "default": 3306,
+      "description": "Master 节点端口 (Slave 模式下连接 Master 使用)"
     },
     "root_password": {
       "type": "string",
@@ -110,7 +122,9 @@ async def main():
             existing_template.description = "MySQL 8.0 High Availability (Master-Slave). 基于 Bitnami 镜像，支持一键部署主从复制集群。部署时请注意选择正确的角色(master/slave)并填写 Master IP。"
             existing_template.config_schema = CONFIG_SCHEMA
             existing_template.default_config = {
+                "image": "bitnami/mysql:8.0",
                 "port": 3306,
+                "master_port": 3306,
                 "root_password": "mysql_root_123",
                 "repl_user": "repl_user",
                 "repl_password": "repl_pass_123",
@@ -129,7 +143,9 @@ async def main():
             app_type=AppType.docker_compose,
             config_schema=CONFIG_SCHEMA,
             default_config={
+                "image": "bitnami/mysql:8.0",
                 "port": 3306,
+                "master_port": 3306,
                 "root_password": "mysql_root_123",
                 "repl_user": "repl_user",
                 "repl_password": "repl_pass_123",

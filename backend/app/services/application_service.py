@@ -711,6 +711,7 @@ class ApplicationService:
             # 确保 role 和 server_id 存在于 context 中 (供模板逻辑使用)
             context['role'] = deployment.role
             context['server_id'] = deployment.server_id
+            context['instance_id'] = deployment.instance_id
             context['current_ip'] = server.ip_address # 注入当前服务器IP
             
             # --- 自动构建 fe_servers 列表 & 计算 FE_ID (1-9) ---
@@ -933,6 +934,8 @@ sudo python3 -c "
 import json, os, sys
 f_path = '/etc/docker/daemon.json'
 reg = '{registry_domain}'
+mirrors = ['https://docker.1ms.run', 'https://docker.m.daocloud.io']
+changed = False
 try:
     if os.path.exists(f_path):
         with open(f_path, 'r') as f:
@@ -940,10 +943,23 @@ try:
             d = json.loads(c) if c else {{}}
     else: d = {{}}
     
+    # Handle Insecure Registries
+    # Handle Insecure Registries
     regs = d.get('insecure-registries', [])
     if reg not in regs:
         regs.append(reg)
         d['insecure-registries'] = regs
+        changed = True
+
+    # Handle Registry Mirrors
+    current_mirrors = d.get('registry-mirrors', [])
+    for m in mirrors:
+        if m not in current_mirrors:
+            current_mirrors.append(m)
+            changed = True
+    
+    if changed:
+        d['registry-mirrors'] = current_mirrors
         with open(f_path, 'w') as f: json.dump(d, f, indent=4)
         sys.exit(100)
 except Exception as e: print(e); sys.exit(1)
@@ -952,6 +968,13 @@ if [ $? -eq 100 ]; then
     echo "Reloading Docker..."
     sudo systemctl reload docker || sudo systemctl restart docker
     sleep 3
+else
+    # Check if registry is actually effective
+    if ! docker info 2>/dev/null | grep -q "{registry_domain}"; then
+         echo "Registry {registry_domain} not found in docker info, reloading..."
+         sudo systemctl reload docker || sudo systemctl restart docker
+         sleep 3
+    fi
 fi
 """
                          pre_deploy_script += insecure_script
@@ -988,9 +1011,15 @@ fi
                                  services = compose_data.get('services', {})
                                  for svc_name, svc_conf in services.items():
                                      img = svc_conf.get('image')
-                                     if img and registry_domain in img:
+                                     # 只要镜像不是空的，都尝试 pull。
+                                     # 即使镜像不在 Harbor 域名下，docker login 也许是针对 docker hub 的?
+                                     # 这里我们主要针对的是 Private Harbor，但也放宽限制，只要配置了 Harbor，就尝试 pull
+                                     # 如果是公共镜像，pull 也会成功。如果是私有镜像且 login 成功，也会成功。
+                                     if img:
                                          logger.info(f"Injecting docker pull for {img}")
-                                         pre_deploy_script += f"docker pull {img}\n"
+                                         # Add retry logic for docker pull (3 attempts)
+                                         pre_deploy_script += f"echo 'Pulling {img}...' \n"
+                                         pre_deploy_script += f"for i in {{1..3}}; do docker pull {img} && break || {{ echo 'Pull failed, retrying in 5s...'; sleep 5; }}; done\n"
                              except Exception as yaml_err:
                                  logger.warning(f"Failed to parse compose file for image pulling: {yaml_err}")
                          

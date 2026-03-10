@@ -9,6 +9,7 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import { WebLinksAddon } from 'xterm-addon-web-links'
+import { ElMessage } from 'element-plus'
 import { getToken } from '@/utils/auth'
 import 'xterm/css/xterm.css'
 
@@ -168,16 +169,35 @@ const debounce = (fn: Function, delay: number) => {
 
 // 复制到剪贴板
 const copyToClipboard = async (text: string) => {
+  if (!text) return
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text)
+      ElMessage.success({ message: '已复制', duration: 1000 })
     } else {
-      console.warn('Clipboard API not supported')
+      // Fallback for non-secure contexts
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.select()
+      try {
+        document.execCommand('copy')
+        ElMessage.success({ message: '已复制', duration: 1000 })
+      } catch (e) {
+        console.warn('Fallback copy failed', e)
+      }
+      document.body.removeChild(textarea)
     }
   } catch (err) {
     console.error('复制失败:', err)
   }
 }
+
+const debouncedCopy = debounce((text: string) => {
+  copyToClipboard(text)
+}, 200)
 
 const initTerminal = () => {
   if (!terminalRef.value) return
@@ -196,6 +216,19 @@ const initTerminal = () => {
   fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
   term.loadAddon(new WebLinksAddon())
+
+  // 拦截 Ctrl+C，如果有选区则复制，否则发送中断信号
+  term.attachCustomKeyEventHandler((event) => {
+    // 检测 Ctrl+C (key code 67) 或 Ctrl+Insert (key code 45)
+    if (event.ctrlKey && (event.code === 'KeyC' || event.code === 'Insert') && event.type === 'keydown') {
+      const selection = term?.getSelection()
+      if (selection) {
+        copyToClipboard(selection)
+        return false // 阻止 xterm 处理该事件（即不发送 ^C）
+      }
+    }
+    return true // 其他按键正常处理
+  })
 
   term.open(terminalRef.value)
   
@@ -221,14 +254,15 @@ const initTerminal = () => {
     }
   })
 
-  // 监听选区变化，实现选中即复制
-  term.onSelectionChange(debounce(() => {
+  // 使用 mouseup 事件监听选区结束，确保复制操作由用户交互触发
+  // 移除 setTimeout 以确保在用户交互上下文中执行 Clipboard API
+  terminalRef.value.addEventListener('mouseup', () => {
     if (!term) return
     const selection = term.getSelection()
-    if (selection) {
+    if (selection && selection.length > 0) {
       copyToClipboard(selection)
     }
-  }, 300))
+  })
 }
 
 const fit = () => {
