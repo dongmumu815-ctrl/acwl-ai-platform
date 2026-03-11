@@ -801,10 +801,22 @@ async def create_agent_tool(
                 detail=f"Tool with name {tool_data.name} already exists"
             )
             
-        new_tool = AgentTool(**tool_data.model_dump())
+        code_content = tool_data.code
+        new_tool = AgentTool(**tool_data.model_dump(exclude={"code"}))
         db.add(new_tool)
         await db.commit()
         await db.refresh(new_tool)
+        
+        try:
+            if code_content:
+                path = agent_skill_service.save_or_update_custom_skill(new_tool.name, code_content)
+                if path:
+                    new_tool.code = agent_skill_service._path_code(path)
+                    db.add(new_tool)
+                    await db.commit()
+                    await db.refresh(new_tool)
+        except Exception as e:
+            logger.warning(f"Failed to persist custom skill for {new_tool.name}: {e}")
         
         return AgentToolResponse.model_validate(new_tool)
         
@@ -839,23 +851,16 @@ async def get_agent_tool(
                 detail=f"Tool with id {tool_id} not found"
             )
             
-        # 总是尝试同步最新代码，确保 IDE 看到的是磁盘上的真实内容
         try:
-            skill_info = agent_skill_service.skill_adapter.get_skill(tool.name)
-            if skill_info:
-                path = skill_info.get("path", "")
-                if path:
-                    # 读取最新文件内容
-                    code_content = agent_skill_service._read_skill_files(path)
-                    
-                    # 如果数据库中的代码与磁盘不一致，或者数据库为空，则更新
-                    # 注意：这里我们信任磁盘内容。如果用户在 UI 上做了修改但没保存，刷新页面会丢失修改（符合预期）
-                    if code_content != "{}" and tool.code != code_content:
-                        tool.code = code_content
-                        db.add(tool)
-                        await db.commit()
-                        await db.refresh(tool)
-                        logger.info(f"Auto-synced skill code for {tool.name} from disk")
+            path = agent_skill_service._extract_path(tool.code)
+            if not path:
+                skill_info = agent_skill_service.skill_adapter.get_skill(tool.name)
+                if skill_info:
+                    path = skill_info.get("path", "")
+            if path:
+                code_content = agent_skill_service._read_skill_files(path)
+                if code_content != "{}":
+                    tool.code = code_content
         except Exception as e:
             logger.warning(f"Failed to auto-sync skill code for {tool.name}: {e}")
             
@@ -901,11 +906,23 @@ async def update_agent_tool(
             
         # 更新字段
         update_data = tool_data.model_dump(exclude_unset=True)
+        code_content = update_data.pop("code", None)
         for field, value in update_data.items():
             setattr(tool, field, value)
             
         await db.commit()
         await db.refresh(tool)
+        
+        try:
+            if code_content is not None:
+                path = agent_skill_service.save_or_update_custom_skill(tool.name, code_content)
+                if path:
+                    tool.code = agent_skill_service._path_code(path)
+                    db.add(tool)
+                    await db.commit()
+                    await db.refresh(tool)
+        except Exception as e:
+            logger.warning(f"Failed to persist custom skill for {tool.name}: {e}")
         
         return AgentToolResponse.model_validate(tool)
         

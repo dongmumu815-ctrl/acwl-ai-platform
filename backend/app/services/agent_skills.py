@@ -124,7 +124,7 @@ class AgentSkillService:
         
         # 初始化 SkillAdapter
         # 硬编码路径以匹配用户环境
-        root_path = Path("d:/works/codes/acwl-ai-data/backend/.agents")
+        root_path = Path(__file__).resolve().parents[2] / ".agents"
         self.skill_adapter = SkillAdapter(
             system_skills_path=str(root_path / "skills-system"),
             custom_skills_path=str(root_path / "skills-custom")
@@ -340,12 +340,29 @@ class AgentSkillService:
                     
         return json.dumps(file_map)
 
+    def _path_code(self, path: str) -> str:
+        return json.dumps({"__path__": path}, ensure_ascii=False)
+
+    def _extract_path(self, code: Optional[str]) -> Optional[str]:
+        if not code:
+            return None
+        try:
+            data = json.loads(code)
+            if isinstance(data, dict):
+                path = data.get("__path__")
+                if isinstance(path, str) and path:
+                    return path
+        except Exception:
+            return None
+        return None
+
     async def sync_skills_with_db(self, db: Any):
         """
         同步文件系统中的技能到数据库
         :param db: AsyncSession
         """
         from app.models import AgentTool
+        from app.models.agent import ToolType
         from sqlalchemy import select
         
         file_skills = self.skill_adapter.list_skills()
@@ -360,13 +377,16 @@ class AgentSkillService:
             result = await db.execute(query)
             db_tool = result.scalar_one_or_none()
             
-            tool_type = skill.get("tool_type", "custom")
+            tool_type_raw = skill.get("tool_type", "custom")
+            try:
+                tool_type = ToolType(tool_type_raw)
+            except Exception:
+                tool_type = ToolType.CUSTOM
             is_builtin = skill.get("is_builtin", False)
             description = skill.get("description", "")
             path = skill.get("path", "")
             
-            # 读取文件内容
-            code_content = self._read_skill_files(path)
+            code_content = self._path_code(path)
 
             # 截断描述
             if len(description) > 1000:
@@ -391,18 +411,12 @@ class AgentSkillService:
                     db_tool.tool_type = tool_type
                     update_needed = True
                     
-                if is_builtin:
-                    if db_tool.description != description:
-                        db_tool.description = description
-                        update_needed = True
-                    if db_tool.code != code_content:
-                        db_tool.code = code_content
-                        update_needed = True
-                else:
-                    # 对于非 built-in (Custom)，如果数据库里没代码，就填进去
-                    if not db_tool.code or db_tool.code == "{}":
-                        db_tool.code = code_content
-                        update_needed = True
+                if db_tool.description != description:
+                    db_tool.description = description
+                    update_needed = True
+                if db_tool.code != code_content:
+                    db_tool.code = code_content
+                    update_needed = True
                 
                 if update_needed:
                     db.add(db_tool)
@@ -553,6 +567,64 @@ class AgentSkillService:
             else:
                 logger.warning(f"Skill {name} not found")
         return tools
+
+    def save_or_update_custom_skill(self, name: str, code_json: str) -> Optional[str]:
+        try:
+            files = json.loads(code_json) if isinstance(code_json, str) else code_json
+            if not isinstance(files, dict):
+                return None
+            target_dir = Path(self.skill_adapter.custom_skills_path) / name
+            if target_dir.exists():
+                try:
+                    shutil.rmtree(target_dir)
+                except Exception as e:
+                    logger.warning(f"Cleanup failed for {target_dir}: {e}")
+            target_dir.mkdir(parents=True, exist_ok=True)
+            for rel_path, content in files.items():
+                if ".." in rel_path or rel_path.startswith("/") or rel_path.startswith("\\"):
+                    continue
+                file_path = target_dir / rel_path
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                except Exception as e:
+                    logger.error(f"Write failed {file_path}: {e}")
+            skill_md = target_dir / "SKILL.md"
+            if not skill_md.exists():
+                try:
+                    with open(skill_md, "w", encoding="utf-8") as f:
+                        f.write(f"---\nname: {name}\n---\n\n# {name}\n")
+                except Exception as e:
+                    logger.warning(f"SKILL.md init failed for {name}: {e}")
+            try:
+                self.skill_adapter.load_skills()
+            except Exception as e:
+                logger.warning(f"Reload skills failed: {e}")
+            skill_info = self.skill_adapter.get_skill(name)
+            if not skill_info:
+                return None
+            if MS_AGENT_AVAILABLE:
+                class ResourceSkillTool(BaseTool):
+                    def __init__(self, n: str, d: str, p: str):
+                        self.name = n
+                        self.description = d
+                        self.path = p
+                        self.parameters = []
+                        super().__init__()
+                    def call(self, params: str, **kwargs) -> str:
+                        return f"Skill resources for {self.name} at {self.path}"
+                desc = skill_info.get("description", "") or ""
+                path = skill_info.get("path", "")
+                self.available_skills[name] = ResourceSkillTool(name, desc, path)
+                try:
+                    TOOL_REGISTRY[name] = {'class': self.available_skills[name]}
+                except Exception:
+                    pass
+            return path
+        except Exception as e:
+            logger.error(f"Save custom skill failed for {name}: {e}")
+            return None
 
     async def execute_skill_task(
         self, 

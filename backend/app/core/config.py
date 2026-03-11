@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     # 服务器配置
     HOST: str = Field(default="0.0.0.0", description="服务器主机")
     PORT: int = Field(default=8082, description="服务器端口")
-    DEBUG: bool = Field(default=True, description="调试模式")
-    ENVIRONMENT: str = Field(default="development", description="运行环境")
+    DEBUG: bool = Field(default=False, description="调试模式")
+    ENVIRONMENT: str = Field(default="production", description="运行环境")
     
     # 安全配置
     SECRET_KEY: str = Field(default="acwl-ai-secret-key-change-in-production", description="密钥")

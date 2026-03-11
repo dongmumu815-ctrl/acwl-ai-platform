@@ -143,6 +143,7 @@ class AgentToolBase(BaseModel):
     tool_type: ToolType = Field(..., description="工具类型")
     config_schema: Optional[Dict[str, Any]] = Field(None, description="配置参数Schema")
     default_config: Optional[Dict[str, Any]] = Field(None, description="默认配置")
+    code: Optional[str] = Field(None, description="工具实现代码")
     is_enabled: bool = Field(True, description="是否启用")
     is_builtin: bool = Field(False, description="是否内置工具")
 
@@ -159,6 +160,7 @@ class AgentToolUpdate(BaseModel):
     tool_type: Optional[ToolType] = Field(None, description="工具类型")
     config_schema: Optional[Dict[str, Any]] = Field(None, description="配置参数Schema")
     default_config: Optional[Dict[str, Any]] = Field(None, description="默认配置")
+    code: Optional[str] = Field(None, description="工具实现代码")
     is_enabled: Optional[bool] = Field(None, description="是否启用")
 
 
