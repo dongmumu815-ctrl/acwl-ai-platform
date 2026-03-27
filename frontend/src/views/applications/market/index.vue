@@ -448,13 +448,10 @@ watch(() => installForm.template_id, (newVal) => {
 watch(globalConfig, (newVal) => {
   if (installForm.deployments.length > 0) {
     installForm.deployments.forEach(deploy => {
-      // 简单策略：如果节点变量存在于全局配置中，则更新
-      // 实际上，为了方便，我们直接把所有变量都同步过去
-      // 用户如果想覆盖，可以在节点配置里改，但是下次改全局又会被覆盖
-      // 改进：只同步那些“之前和全局一样”的值？太复杂。
-      // 策略：强制同步。Global Config 意为“批量设置”。
       if (deploy.variables) {
         Object.keys(newVal).forEach(key => {
+          // 不覆盖 ZOO_MY_ID，因为这是节点特有的配置
+          if (key === 'ZOO_MY_ID') return
           deploy.variables[key] = newVal[key]
         })
       }
@@ -753,6 +750,81 @@ watch(selectedServerIds, (newIds) => {
        if (globalConfig.value.postgres_master_host !== undefined) globalConfig.value.postgres_master_host = masterIp
        if (globalConfig.value.POSTGRESQL_MASTER_HOST !== undefined) globalConfig.value.POSTGRESQL_MASTER_HOST = masterIp
     }
+  }
+
+  // Zookeeper Cluster Automatic Role Assignment
+  const isZookeeper = tpl?.name?.toLowerCase().includes('zookeeper') || tpl?.name?.toLowerCase().includes('zk')
+  if (isZookeeper && newDeployments.length > 0) {
+    // 1. Sort by IP Address
+    newDeployments.sort((a, b) => {
+      const serverA = serverList.value.find(s => s.id === a.server_id)
+      const serverB = serverList.value.find(s => s.id === b.server_id)
+      if (!serverA || !serverB) return 0
+      return serverA.ip_address.localeCompare(serverB.ip_address, undefined, { numeric: true })
+    })
+
+    // 2. Generate ZOO_SERVERS string and assign ZOO_MY_ID
+    let zooServers: string[] = []
+    newDeployments.forEach((deploy, index) => {
+      const server = serverList.value.find(s => s.id === deploy.server_id)
+      const myId = index + 1
+      
+      // 注意：这里的 role 如果在 schema 的 x-roles 中定义了，必须是数组才能被 el-select correctly 识别并显示
+      // 区分主从角色：第一个节点作为 leader，其余作为 follower
+      if (index === 0) {
+        deploy.role = ['leader']
+      } else {
+        deploy.role = ['follower']
+      }
+      
+      // Ensure deploy.variables is completely disconnected from globalConfig
+      // so we don't accidentally modify the global object when assigning myId
+      if (!deploy.variables) {
+         deploy.variables = {}
+      } else {
+         deploy.variables = { ...deploy.variables } 
+      }
+      
+      deploy.variables.ZOO_MY_ID = myId
+      
+      if (server) {
+        // bitnami/zookeeper 镜像对 ZOO_SERVERS 的格式要求是只传 host:port:port::id 列表（空格分隔），
+        // 或者不带角色的 host:port:port 或者 host:port:port::id
+        // 从报错日志 java.net.UnknownHostException: server.2=10.20.1.211 来看，它不认识 `server.x=` 前缀
+        // 所以我们必须去掉 `server.${myId}=` 这一部分
+        let roleStr = ''
+        if (deploy.role && deploy.role.includes('observer')) {
+            roleStr = 'observer'
+        }
+        
+        if (roleStr) {
+            zooServers.push(`${server.ip_address}:2888:3888:${roleStr}::${myId}`)
+        } else {
+            zooServers.push(`${server.ip_address}:2888:3888::${myId}`)
+        }
+      }
+    })
+
+    // 3. Update Global Config
+    if (zooServers.length > 0) {
+       if (globalConfig.value.ZOO_SERVERS !== undefined) {
+         globalConfig.value.ZOO_SERVERS = zooServers.join(' ')
+       } else {
+         globalConfig.value.ZOO_SERVERS = zooServers.join(' ')
+       }
+    }
+  }
+
+  // DolphinScheduler Automatic Role Assignment
+  const isDolphin = tpl?.name?.toLowerCase().includes('dolphinscheduler') || tpl?.name?.toLowerCase().includes('dol')
+  if (isDolphin && newDeployments.length > 0) {
+    newDeployments.forEach((deploy) => {
+      // By default, if the user selects a node, assign all roles to it
+      // Users can manually remove the roles they don't want on specific nodes
+      if (!deploy.role || deploy.role === 'default' || (Array.isArray(deploy.role) && deploy.role.length === 0)) {
+        deploy.role = ['master', 'worker', 'api', 'alert']
+      }
+    })
   }
 
   installForm.deployments = newDeployments

@@ -163,28 +163,29 @@ async def main():
             }
             await db.commit()
             print("Template 'apache-doris' updated to version 4.0.3 with improved schema.")
-            return
-
-        template = AppTemplate(
-            name="apache-doris",
-            display_name="Apache Doris (Cluster)",
-            version="4.0.3",
-            description="Apache Doris 实时数据仓库 (集群版 4.0.3). 支持多角色混合部署. 已增强内存配置(FE Heap/Container, BE Container)及自动系统参数优化.",
-            app_type=AppType.docker_compose,
-            config_schema=CONFIG_SCHEMA,
-            default_config={
-                "priority_networks": "10.20.0.0/16",
-                "data_root_path": "/data/doris",
-                "fe_memory": "32g",
-                "fe_memory_limit": "40g",
-                "be_memory_limit": "180g"
-            },
-            deploy_template=DORIS_TEMPLATE,
-            is_system=True
-        )
-        db.add(template)
-        await db.commit()
-        print("Template 'apache-doris' created successfully.")
+        else:
+            template = AppTemplate(
+                name="apache-doris",
+                display_name="Apache Doris (Cluster)",
+                version="4.0.3",
+                description="Apache Doris 实时数据仓库 (集群版 4.0.3). 支持多角色混合部署. 已增强内存配置(FE Heap/Container, BE Container)及自动系统参数优化.",
+                app_type=AppType.docker_compose,
+                config_schema=CONFIG_SCHEMA,
+                default_config={
+                    "priority_networks": "10.20.0.0/16",
+                    "data_root_path": "/data/doris",
+                    "fe_memory": "32g",
+                    "fe_memory_limit": "40g",
+                    "be_memory_limit": "180g"
+                },
+                deploy_template=DORIS_TEMPLATE,
+                is_system=True
+            )
+            db.add(template)
+            await db.commit()
+            print("Template 'apache-doris' created successfully.")
+        
+    await engine.dispose()
 
 if __name__ == "__main__":
     asyncio.run(main())
