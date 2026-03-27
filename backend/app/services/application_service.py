@@ -714,6 +714,11 @@ class ApplicationService:
             context['instance_id'] = deployment.instance_id
             context['current_ip'] = server.ip_address # 注入当前服务器IP
             
+            # DolphinScheduler 专属：为了兼容环境变量插值，把全局配置的变量也放入 context 中，方便 Jinja 替换
+            if template.name and 'dolphinscheduler' in template.name.lower():
+                # 已经通过合并逻辑放进 context 了，不需要额外操作，但要确保 DB_URL 等在 context 里存在
+                pass
+
             # --- 自动构建 fe_servers 列表 & 计算 FE_ID (1-9) ---
             # 仅针对 Doris 应用 (role 包含 fe/be 或者是 doris 模板)
             # 通过模板名称或 role 特征判断
