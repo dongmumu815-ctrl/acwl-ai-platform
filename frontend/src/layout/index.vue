@@ -47,6 +47,12 @@
         
     <div class="header-right">
       <div class="header-actions">
+        <el-button type="text" class="action-btn theme-toggle" @click="toggleTheme">
+          <el-icon :size="18">
+            <Sunny v-if="appStore.isDark" />
+            <Moon v-else />
+          </el-icon>
+        </el-button>
         <!-- 消息通知 -->
         <el-badge :value="12" :max="99" class="notification-badge">
           <el-button type="text" class="action-btn">
@@ -153,7 +159,9 @@ import {
   Key,
   UserFilled,
   Grid,
-  Shop
+  Shop,
+  Sunny,
+  Moon
 } from '@element-plus/icons-vue'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import RobotIcon from '@/components/RobotIcon.vue'
@@ -252,6 +260,11 @@ const handleUserCommand = async (command: string) => {
       }
       break
   }
+}
+
+const toggleTheme = () => {
+  const nextMode = appStore.isDark ? 'light' : 'dark'
+  appStore.setThemeMode(nextMode)
 }
 
 // 帮助中心链接：根据当前页面上下文跳转到对应章节
@@ -434,6 +447,19 @@ onMounted(async () => {
             background-color: $bg-color-hover;
           }
         }
+      }
+      
+      .theme-toggle {
+        padding: 6px 12px;
+        border-radius: 18px;
+        gap: 6px;
+        display: inline-flex;
+        align-items: center;
+      }
+      
+      .theme-text {
+        font-size: 13px;
+        color: $text-color-regular;
       }
       
       .user-avatar {
