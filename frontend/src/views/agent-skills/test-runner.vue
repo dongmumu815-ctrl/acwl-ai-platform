@@ -27,9 +27,21 @@
             placeholder="请输入测试指令，例如：帮我获取当前时间"
           />
         </el-form-item>
-        
-        <el-form-item label="模型配置ID" v-if="false">
-            <el-input v-model="form.model_service_config_id" />
+
+        <el-form-item label="模型配置">
+          <el-select
+            v-model="form.model_service_config_id"
+            placeholder="请选择模型配置"
+            style="width: 100%"
+            clearable
+          >
+            <el-option
+              v-for="item in modelConfigs"
+              :key="item.model_id"
+              :label="`${item.label} (${item.provider_display_name} / ${item.model_name})`"
+              :value="item.model_id"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item>
@@ -50,9 +62,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
+import { modelServiceConfigApi } from '@/api/model-service-configs'
 import { ElMessage } from 'element-plus'
 
 const skills = ref([])
+const modelConfigs = ref([])
 const loading = ref(false)
 const result = ref('')
 
@@ -62,10 +76,26 @@ const form = ref({
   model_service_config_id: null
 })
 
+const fetchModelConfigs = async () => {
+  try {
+    const res = await modelServiceConfigApi.getAvailableConfigs()
+    modelConfigs.value = Array.isArray(res) ? res : []
+
+    if (modelConfigs.value.length > 0 && !form.value.model_service_config_id) {
+      const defaultModel = modelConfigs.value.find((m) => m.is_default)
+      form.value.model_service_config_id = defaultModel
+        ? defaultModel.model_id
+        : modelConfigs.value[0].model_id
+    }
+  } catch (error) {
+    console.error('Failed to fetch model configs:', error)
+  }
+}
+
 const fetchSkills = async () => {
   try {
     const res = await request({
-      url: '/api/v1/agents/tools',
+      url: '/agents/tools/',
       method: 'get',
       params: {
         page: 1,
@@ -74,17 +104,15 @@ const fetchSkills = async () => {
       }
     })
     skills.value = res.items || []
-    
-    // Auto select local_time if exists
-    if (skills.value.find(s => s.name === 'local_time')) {
-        if (!form.value.skill_names.includes('local_time')) {
-            form.value.skill_names.push('local_time')
-        }
-        if (!form.value.prompt) {
-            form.value.prompt = '请告诉我现在的本地时间是多少？'
-        }
+
+    if (skills.value.find((s) => s.name === 'local_time')) {
+      if (!form.value.skill_names.includes('local_time')) {
+        form.value.skill_names.push('local_time')
+      }
+      if (!form.value.prompt) {
+        form.value.prompt = '请告诉我现在的本地时间是多少？'
+      }
     }
-    
   } catch (error) {
     console.error('Failed to fetch skills:', error)
   }
@@ -99,13 +127,17 @@ const handleExecute = async () => {
     ElMessage.warning('请选择至少一个技能')
     return
   }
+  if (!form.value.model_service_config_id) {
+    ElMessage.warning('请选择模型配置')
+    return
+  }
 
   loading.value = true
   result.value = ''
-  
+
   try {
     const res = await request({
-      url: '/api/v1/agents/tools/execute',
+      url: '/agents/tools/execute',
       method: 'post',
       data: form.value
     })
@@ -118,8 +150,9 @@ const handleExecute = async () => {
   }
 }
 
-onMounted(() => {
-  fetchSkills()
+onMounted(async () => {
+  await fetchModelConfigs()
+  await fetchSkills()
 })
 </script>
 

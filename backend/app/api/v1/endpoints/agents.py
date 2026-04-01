@@ -5,6 +5,7 @@ Agent管理API端点
 """
 
 from typing import List, Optional, Dict, Any
+import json
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -216,7 +217,7 @@ async def list_agents(
         )
 
 
-@router.get("/{agent_id}", response_model=AgentResponse)
+@router.get("/{agent_id:int}", response_model=AgentResponse)
 async def get_agent(
     agent_id: int,
     db: AsyncSession = Depends(get_db),

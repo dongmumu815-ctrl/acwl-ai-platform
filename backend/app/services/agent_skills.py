@@ -179,22 +179,87 @@ class AgentSkillService:
                             'description': 'Arguments for the script (as a space-separated string or JSON list)',
                             'required': False
                         })
+                        self.parameters.append({
+                            'name': 'background',
+                            'type': 'boolean',
+                            'description': 'Run script in background and return immediately',
+                            'required': False
+                        })
+                        self.parameters.append({
+                            'name': 'port',
+                            'type': 'integer',
+                            'description': 'Port for API server startup (used by api.py)',
+                            'required': False
+                        })
                         
                     super().__init__()
 
                 def call(self, params: str, **kwargs) -> str:
                     try:
-                        params_dict = json.loads(params) if isinstance(params, str) else params
+                        params_dict = json.loads(params) if isinstance(params, str) else (params or {})
                     except json.JSONDecodeError:
                         params_dict = {}
                     
+                    # book-review 兼容简写参数：支持 query/type 与结构化字段
+                    if self.name == 'book-review' and not params_dict.get('run_script'):
+                        # 结构化字段优先：isbn/title/author/publisher
+                        isbn = params_dict.get('isbn')
+                        title = params_dict.get('title')
+                        author = params_dict.get('author')
+                        publisher = params_dict.get('publisher')
+
+                        if any([isbn, title, author, publisher]):
+                            parts = []
+                            if isbn:
+                                parts.append(f"ISBN:{isbn}")
+                            if title:
+                                parts.append(f"正题名:{title}")
+                            if author:
+                                parts.append(f"作者:{author}")
+                            if publisher:
+                                parts.append(f"出版社：{publisher}")
+                            content = "，".join(parts)
+                            params_dict['run_script'] = 'main.py'
+                            params_dict['args'] = f"review {json.dumps(content, ensure_ascii=False)}"
+                        query_text = params_dict.get('query')
+                        query_type = (params_dict.get('type') or '').lower()
+                        if not params_dict.get('run_script') and isinstance(query_text, str) and query_text.strip():
+                            if query_type in ['pdf', 'pdf_review']:
+                                params_dict['run_script'] = 'main.py'
+                                params_dict['args'] = f"pdf {json.dumps(query_text, ensure_ascii=False)}"
+                            else:
+                                # 默认按 review 处理（含 isbn_search）
+                                content = query_text
+                                if 'isbn' not in query_text.lower() and '正题名' not in query_text and '书名' not in query_text:
+                                    content = f"正题名:{query_text}"
+                                params_dict['run_script'] = 'main.py'
+                                params_dict['args'] = f"review {json.dumps(content, ensure_ascii=False)}"
+
+                    # 通用简写：若只有一个脚本且传了 url/query，则自动执行该脚本
+                    if not params_dict.get('run_script') and len(self.available_scripts) == 1:
+                        if params_dict.get('url'):
+                            params_dict['run_script'] = self.available_scripts[0]
+                            params_dict['args'] = json.dumps(params_dict.get('url'), ensure_ascii=False)
+                        elif params_dict.get('pdf_url'):
+                            params_dict['run_script'] = self.available_scripts[0]
+                            params_dict['args'] = json.dumps(params_dict.get('pdf_url'), ensure_ascii=False)
+                        elif params_dict.get('query'):
+                            params_dict['run_script'] = self.available_scripts[0]
+                            params_dict['args'] = json.dumps(params_dict.get('query'), ensure_ascii=False)
+
                     run_script = params_dict.get('run_script')
+                    run_in_background = bool(params_dict.get('background', False))
                     if run_script:
                         if run_script not in self.available_scripts:
                             return f"Error: Script '{run_script}' not found. Available: {self.available_scripts}"
                         
                         script_path = self.scripts_path / run_script
                         args = params_dict.get('args', '')
+                        port = params_dict.get('port')
+                        try:
+                            port = int(port) if port is not None else None
+                        except Exception:
+                            port = None
                         
                         # Prepare command
                         cmd = []
@@ -209,6 +274,20 @@ class AgentSkillService:
                         else:
                              # Try direct execution
                              cmd = [str(script_path)]
+
+                        # book-review api.py 用 uvicorn 启动，并支持自定义端口
+                        if self.name == 'book-review' and run_script == 'api.py':
+                            service_port = port or 5080
+                            cmd = [
+                                sys.executable,
+                                '-m',
+                                'uvicorn',
+                                'api:app',
+                                '--host',
+                                '0.0.0.0',
+                                '--port',
+                                str(service_port)
+                            ]
                         
                         # Add arguments
                         if args:
@@ -224,16 +303,36 @@ class AgentSkillService:
                             # Execute
                             # Default CWD to the parent of the skill directory (e.g., skills root)
                             cwd = Path(self.path).parent
+                            if self.name == 'book-review' and run_script == 'api.py':
+                                cwd = self.scripts_path
                             if not cwd.exists():
                                 cwd = Path(self.path)
 
                             logger.info(f"Executing script: {cmd} in {cwd}")
+
+                            run_env = os.environ.copy()
+                            if self.name == 'book-review':
+                                # 给 book-review 提供兜底 API Key，避免缺失时直接抛错
+                                fallback_key = run_env.get('LLM_API_KEY') or run_env.get('OPENAI_API_KEY') or 'sk-test-placeholder'
+                                run_env.setdefault('LLM_API_KEY', fallback_key)
+                                run_env.setdefault('OPENAI_API_KEY', fallback_key)
+                            if run_in_background:
+                                process = subprocess.Popen(
+                                    cmd,
+                                    cwd=str(cwd),
+                                    env=run_env,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
+                                return f"Script started in background. PID: {process.pid}"
+
                             result = subprocess.run(
                                 cmd, 
                                 capture_output=True, 
                                 text=True, 
                                 check=False,
-                                cwd=str(cwd)
+                                cwd=str(cwd),
+                                env=run_env
                             )
                             return f"Script execution result:\nStdout:\n{result.stdout}\nStderr:\n{result.stderr}\nExit Code: {result.returncode}"
                         except Exception as e:
@@ -243,7 +342,7 @@ class AgentSkillService:
 
             # 将 SkillAdapter 加载的技能也注册为 ResourceSkillTool (如果尚未存在)
             for skill in self.skill_adapter.list_skills():
-                name = skill.get("name") or skill.get("id")
+                name = skill.get("id") or skill.get("name")
                 if name and name not in self.available_skills:
                     path = skill.get("path", "")
                     # 读取代码文件以确定是否有可执行逻辑
@@ -368,7 +467,7 @@ class AgentSkillService:
         file_skills = self.skill_adapter.list_skills()
         
         for skill in file_skills:
-            name = skill.get("name") or skill.get("id")
+            name = skill.get("id") or skill.get("name")
             if not name:
                 continue
                 
@@ -668,9 +767,13 @@ class AgentSkillService:
                     llm_config['host'] = host
                     llm_config['base_url'] = host # 保险起见保留
                 elif provider == 'openai':
-                    # OpenAI 需要 api_base 参数
-                    llm_config['api_base'] = base_url
-                    llm_config['base_url'] = base_url
+                    # OpenAI 兼容服务建议传入 base URL（通常以 /v1 结尾）
+                    # 若误填到 /chat/completions，这里自动回退到基址
+                    import re
+                    normalized_base = base_url.rstrip('/')
+                    normalized_base = re.sub(r'/chat/completions/?$', '', normalized_base)
+                    llm_config['api_base'] = normalized_base
+                    llm_config['base_url'] = normalized_base
                 else:
                     llm_config['base_url'] = base_url
                     llm_config['api_base'] = base_url
