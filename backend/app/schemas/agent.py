@@ -338,9 +338,26 @@ class AgentToolExecuteRequest(BaseModel):
     """Agent工具执行请求Schema"""
     prompt: str = Field(..., description="指令")
     skill_names: List[str] = Field(..., description="启用的技能名称")
-    model_service_config_id: Optional[int] = Field(None, description="使用的模型服务配置ID")
+    model_name: Optional[str] = Field(None, description="使用的模型名称，对应 acwl_model_service_configs.model_name")
 
 
 class AgentToolExecuteResponse(BaseModel):
     """Agent工具执行响应Schema"""
     result: str = Field(..., description="执行结果")
+
+
+class AgentSkillInvokeRequest(BaseModel):
+    """按技能名直接调用请求Schema"""
+    prompt: str = Field(..., description="指令")
+    model_name: Optional[str] = Field(None, description="使用的模型名称，对应 acwl_model_service_configs.model_name")
+
+
+class AgentSkillInvokeResponse(BaseModel):
+    """按技能名直接调用响应Schema"""
+    skill_name: str = Field(..., description="技能名称")
+    result: str = Field(..., description="执行结果")
+
+
+class AgentSkillNameListResponse(BaseModel):
+    """技能名列表响应Schema"""
+    skills: List[str] = Field(default_factory=list, description="技能名称列表")

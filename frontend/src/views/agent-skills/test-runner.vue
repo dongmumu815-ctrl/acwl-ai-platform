@@ -61,8 +61,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import request from '@/utils/request'
 import { modelServiceConfigApi } from '@/api/model-service-configs'
+import { getAgentTools, executeAgentToolTask } from '@/api/agents'
 import { ElMessage } from 'element-plus'
 
 const skills = ref([])
@@ -75,6 +75,13 @@ const form = ref({
   prompt: '',
   model_service_config_id: null
 })
+
+const getErrorMessage = (error, fallback) => {
+  const detail = error?.response?.data?.detail
+  const message = error?.response?.data?.message
+  const errorMessage = error?.message
+  return detail || message || errorMessage || fallback
+}
 
 const fetchModelConfigs = async () => {
   try {
@@ -89,37 +96,27 @@ const fetchModelConfigs = async () => {
     }
   } catch (error) {
     console.error('Failed to fetch model configs:', error)
+    ElMessage.error(getErrorMessage(error, '加载模型配置失败'))
   }
 }
 
 const fetchSkills = async () => {
   try {
-    const res = await request({
-      url: '/agents/tools/',
-      method: 'get',
-      params: {
-        page: 1,
-        size: 100,
-        is_enabled: true
-      }
+    const res = await getAgentTools({
+      page: 1,
+      size: 100,
+      is_enabled: true
     })
     skills.value = res.items || []
-
-    if (skills.value.find((s) => s.name === 'local_time')) {
-      if (!form.value.skill_names.includes('local_time')) {
-        form.value.skill_names.push('local_time')
-      }
-      if (!form.value.prompt) {
-        form.value.prompt = '请告诉我现在的本地时间是多少？'
-      }
-    }
   } catch (error) {
     console.error('Failed to fetch skills:', error)
+    ElMessage.error(getErrorMessage(error, '加载技能列表失败'))
   }
 }
 
 const handleExecute = async () => {
-  if (!form.value.prompt) {
+  const prompt = (form.value.prompt || '').trim()
+  if (!prompt) {
     ElMessage.warning('请输入测试指令')
     return
   }
@@ -136,15 +133,15 @@ const handleExecute = async () => {
   result.value = ''
 
   try {
-    const res = await request({
-      url: '/agents/tools/execute',
-      method: 'post',
-      data: form.value
+    const res = await executeAgentToolTask({
+      prompt,
+      skill_names: form.value.skill_names,
+      model_service_config_id: form.value.model_service_config_id
     })
     result.value = res.result
   } catch (error) {
     console.error('Execution failed:', error)
-    result.value = `Error: ${error.message || 'Unknown error'}`
+    result.value = `Error: ${getErrorMessage(error, '执行失败，请稍后重试')}`
   } finally {
     loading.value = false
   }

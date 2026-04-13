@@ -11,7 +11,9 @@ Book Review Agent - 主入口
 
 import re
 import sys
+import io
 import argparse
+from contextlib import redirect_stdout, redirect_stderr
 from agent import BookReviewAgent
 from init_db import init_database
 
@@ -109,28 +111,21 @@ def main():
         init_database()
 
     elif args.command == 'review':
-        print("启动图书审读Agent...")
-        agent = BookReviewAgent()
-        agent.initialize()
-        # 解析结构化元数据，提取书名和结构化内容
-        content, title = parse_metadata(args.content)
-        if args.title != '未命名':
-            title = args.title  # 命令行显式指定 --title 时优先使用
-        result = agent.review_book(content, title)
-        print("\n" + "=" * 60)
-        print("审读结果")
-        print("=" * 60)
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            agent = BookReviewAgent()
+            agent.initialize()
+            content, title = parse_metadata(args.content)
+            if args.title != '未命名':
+                title = args.title
+            result = agent.review_book(content, title)
         print(result['response'])
 
     elif args.command == 'pdf':
-        print("启动图书审读Agent...")
-        agent = BookReviewAgent()
-        agent.initialize()
-        content = f"请审读以下PDF文件: {args.pdf_path}"
-        result = agent.review_book(content, f"PDF: {args.pdf_path}")
-        print("\n" + "=" * 60)
-        print("审读结果")
-        print("=" * 60)
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            agent = BookReviewAgent()
+            agent.initialize()
+            content = f"请审读以下PDF文件: {args.pdf_path}"
+            result = agent.review_book(content, f"PDF: {args.pdf_path}")
         print(result['response'])
 
     elif args.command == 'interactive':

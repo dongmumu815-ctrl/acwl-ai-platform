@@ -82,7 +82,7 @@
           <span>{{ formatDateTime(row.created_at) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="240" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="300" class-name="small-padding fixed-width">
         <template #default="{ row }">
           <el-button
             v-if="row.name === 'book-review'"
@@ -92,6 +92,15 @@
             @click="handleStartSkill(row)"
           >
             启动API
+          </el-button>
+          <el-button
+            v-if="row.name === 'book-review'"
+            type="warning"
+            size="small"
+            :loading="stoppingSkill[row.name]"
+            @click="handleStopSkill(row)"
+          >
+            停止API
           </el-button>
           <el-button type="primary" size="small" @click="handleUpdate(row)">
             编辑
@@ -122,7 +131,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAgentTools, updateAgentTool, deleteAgentTool, executeAgentToolTask } from '@/api/agents'
+import { getAgentTools, updateAgentTool, deleteAgentTool, startBookReviewApi, stopBookReviewApi } from '@/api/agents'
 import type { AgentTool } from '@/types/agent'
 import { formatDateTime } from '@/utils/date'
 import Pagination from '@/components/Pagination/index.vue'
@@ -132,6 +141,7 @@ const loading = ref(false)
 const list = ref<AgentTool[]>([])
 const total = ref(0)
 const startingSkill = reactive<Record<string, boolean>>({})
+const stoppingSkill = reactive<Record<string, boolean>>({})
 
 const queryParams = reactive({
   page: 1,
@@ -200,15 +210,24 @@ const handleDelete = (row: AgentTool) => {
 const handleStartSkill = async (row: AgentTool) => {
   startingSkill[row.name] = true
   try {
-    const response = await executeAgentToolTask({
-      prompt: 'Action: book-review\\nAction Input: {"run_script":"api.py","background":true}',
-      skill_names: [row.name]
-    })
-    ElMessage.success(response.result || '启动指令已发送')
+    const response = await startBookReviewApi(5080)
+    ElMessage.success(response.result || '启动成功')
   } catch (error) {
     ElMessage.error('启动失败')
   } finally {
     startingSkill[row.name] = false
+  }
+}
+
+const handleStopSkill = async (row: AgentTool) => {
+  stoppingSkill[row.name] = true
+  try {
+    const response = await stopBookReviewApi(5080)
+    ElMessage.success(response.result || '停止成功')
+  } catch (error) {
+    ElMessage.error('停止失败')
+  } finally {
+    stoppingSkill[row.name] = false
   }
 }
 

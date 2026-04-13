@@ -7,13 +7,14 @@ Agent管理API端点
 from typing import List, Optional, Dict, Any
 import json
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_, desc, asc, select, func
 from sqlalchemy.orm import selectinload
 import time
 
 from app.core.database import get_db
+from app.core.config import settings
 from .auth import get_current_user
 from app.models import Agent, AgentConversation, AgentMessage, AgentTool, User, ModelServiceConfig
 from app.schemas.agent import (
@@ -24,11 +25,50 @@ from app.schemas.agent import (
     AgentChatRequest, AgentChatResponse, AgentStatsResponse,
     AgentConfigValidationResponse,
     AgentToolGenerateRequest, AgentToolGenerateResponse,
-    AgentToolExecuteRequest, AgentToolExecuteResponse
+    AgentToolExecuteRequest, AgentToolExecuteResponse,
+    AgentSkillInvokeRequest, AgentSkillInvokeResponse,
+    AgentSkillNameListResponse
 )
 from app.services.review_content_safety_agent_db import EnhancedContentSafetyAgentDB
 from app.schemas.common import SimpleResponseModel as ResponseModel
 from app.core.logger import logger
+
+
+def verify_agent_skill_api_key(x_api_key: Optional[str] = Header(None)) -> str:
+    expected_key = (settings.AGENT_SKILL_API_KEY or '').strip()
+    provided_key = (x_api_key or '').strip()
+
+    if not expected_key:
+        raise HTTPException(status_code=500, detail='AGENT_SKILL_API_KEY is not configured')
+    if not provided_key or provided_key != expected_key:
+        raise HTTPException(status_code=401, detail='Invalid API key')
+    return provided_key
+
+
+async def resolve_agent_model_config(db: AsyncSession, model_name: Optional[str]) -> Dict[str, Any]:
+    normalized_name = (model_name or '').strip()
+    if normalized_name:
+        query = select(ModelServiceConfig).where(
+            ModelServiceConfig.model_name == normalized_name,
+            ModelServiceConfig.is_active == True
+        ).limit(1)
+        result = await db.execute(query)
+        config = result.scalar_one_or_none()
+        if not config:
+            raise HTTPException(status_code=404, detail=f"Model service config not found for model_name: {normalized_name}")
+    else:
+        query = select(ModelServiceConfig).where(ModelServiceConfig.is_active == True).limit(1)
+        result = await db.execute(query)
+        config = result.scalar_one_or_none()
+        if not config:
+            raise HTTPException(status_code=400, detail="No active model service config found. Please specify one.")
+
+    return {
+        'model_name': config.model_name,
+        'api_key': config.api_key or "",
+        'provider': config.provider,
+        'base_url': config.api_endpoint or ""
+    }
 
 router = APIRouter()
 
@@ -511,7 +551,46 @@ async def list_agent_tools(
         )
 
 
+@router.get("/public/tools/names", response_model=AgentSkillNameListResponse)
+async def list_public_agent_skill_names(
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_agent_skill_api_key)
+):
+    """通过 API Key 获取所有已启用技能名"""
+    try:
+        await agent_skill_service.sync_skills_with_db(db)
+        query = select(AgentTool.name).where(AgentTool.is_enabled == True).order_by(asc(AgentTool.name))
+        result = await db.execute(query)
+        skills = [name for name in result.scalars().all() if isinstance(name, str) and name.strip()]
+        return AgentSkillNameListResponse(skills=skills)
+    except Exception as e:
+        logger.error(f"Error listing public skill names: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list skill names: {str(e)}"
+        )
+
+
 from app.services.agent_skills import agent_skill_service
+
+@router.get("/public/tools/names", response_model=AgentSkillNameListResponse)
+async def list_public_agent_skill_names(
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_agent_skill_api_key)
+):
+    """通过 API Key 获取所有已启用技能名"""
+    try:
+        await agent_skill_service.sync_skills_with_db(db)
+        query = select(AgentTool.name).where(AgentTool.is_enabled == True).order_by(asc(AgentTool.name))
+        result = await db.execute(query)
+        skills = [name for name in result.scalars().all() if isinstance(name, str) and name.strip()]
+        return AgentSkillNameListResponse(skills=skills)
+    except Exception as e:
+        logger.error(f"Error listing public skill names: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list skill names: {str(e)}"
+        )
 
 @router.post("/tools/execute", response_model=AgentToolExecuteResponse)
 async def execute_agent_tool_task(
@@ -523,40 +602,37 @@ async def execute_agent_tool_task(
     执行Agent工具任务
     """
     try:
+        normalized_skill_names = []
+        for skill_name in request.skill_names or []:
+            if isinstance(skill_name, str):
+                cleaned_name = skill_name.strip()
+                if cleaned_name and cleaned_name not in normalized_skill_names:
+                    normalized_skill_names.append(cleaned_name)
+
+        if not normalized_skill_names:
+            raise HTTPException(status_code=400, detail="At least one valid skill name is required")
+
+        skill_query = select(AgentTool).where(AgentTool.name.in_(normalized_skill_names))
+        skill_result = await db.execute(skill_query)
+        db_skills = skill_result.scalars().all()
+        db_skill_map = {tool.name: tool for tool in db_skills}
+
+        missing_skills = [name for name in normalized_skill_names if name not in db_skill_map]
+        if missing_skills:
+            raise HTTPException(status_code=404, detail=f"Skills not found: {', '.join(missing_skills)}")
+
+        disabled_skills = [tool.name for tool in db_skills if not tool.is_enabled]
+        if disabled_skills:
+            raise HTTPException(status_code=400, detail=f"Skills are disabled: {', '.join(disabled_skills)}")
+
         # 1. 确定模型配置
-        model_config = {}
-        if request.model_service_config_id:
-            query = select(ModelServiceConfig).where(ModelServiceConfig.id == request.model_service_config_id)
-            result = await db.execute(query)
-            config = result.scalar_one_or_none()
-            if not config:
-                raise HTTPException(status_code=404, detail="Model service config not found")
-            model_config = {
-                'model_name': config.model_name,
-                'api_key': config.api_key or "",
-                'provider': config.provider,
-                'base_url': config.api_endpoint or ""
-            }
-        else:
-            # 尝试使用第一个可用的配置，或者系统默认
-            query = select(ModelServiceConfig).where(ModelServiceConfig.is_active == True).limit(1)
-            result = await db.execute(query)
-            config = result.scalar_one_or_none()
-            if config:
-                model_config = {
-                    'model_name': config.model_name,
-                    'api_key': config.api_key or "",
-                    'provider': config.provider,
-                    'base_url': config.api_endpoint or ""
-                }
-            else:
-                 raise HTTPException(status_code=400, detail="No active model service config found. Please specify one.")
+        model_config = await resolve_agent_model_config(db, request.model_name)
 
         # 2. 调用 AgentSkillService
         result = await agent_skill_service.execute_skill_task(
-            prompt=request.prompt,
+            prompt=(request.prompt or "").strip(),
             model_config=model_config,
-            enabled_skills=request.skill_names
+            enabled_skills=normalized_skill_names
         )
         
         return AgentToolExecuteResponse(
@@ -571,6 +647,85 @@ async def execute_agent_tool_task(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to execute tool task: {str(e)}"
+        )
+
+
+@router.post("/tools/{skill_name}/invoke", response_model=AgentSkillInvokeResponse)
+async def invoke_agent_skill(
+    skill_name: str,
+    request: AgentSkillInvokeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        normalized_name = (skill_name or "").strip()
+        if not normalized_name:
+            raise HTTPException(status_code=400, detail="skill_name is required")
+
+        await agent_skill_service.sync_skills_with_db(db)
+
+        query = select(AgentTool).where(AgentTool.name == normalized_name)
+        result = await db.execute(query)
+        tool = result.scalar_one_or_none()
+        if not tool:
+            raise HTTPException(status_code=404, detail=f"Skill not found: {normalized_name}")
+        if not tool.is_enabled:
+            raise HTTPException(status_code=400, detail=f"Skill is disabled: {normalized_name}")
+
+        model_config = await resolve_agent_model_config(db, request.model_name)
+        invoke_result = await agent_skill_service.execute_skill_task(
+            prompt=(request.prompt or "").strip(),
+            model_config=model_config,
+            enabled_skills=[normalized_name]
+        )
+        return AgentSkillInvokeResponse(skill_name=normalized_name, result=invoke_result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error invoking skill {skill_name}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to invoke skill: {str(e)}"
+        )
+
+
+@router.post("/public/tools/{skill_name}/invoke", response_model=AgentSkillInvokeResponse)
+async def invoke_agent_skill_by_api_key(
+    skill_name: str,
+    request: AgentSkillInvokeRequest,
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_agent_skill_api_key)
+):
+    try:
+        normalized_name = (skill_name or "").strip()
+        if not normalized_name:
+            raise HTTPException(status_code=400, detail="skill_name is required")
+
+        await agent_skill_service.sync_skills_with_db(db)
+
+        query = select(AgentTool).where(AgentTool.name == normalized_name)
+        result = await db.execute(query)
+        tool = result.scalar_one_or_none()
+        if not tool:
+            raise HTTPException(status_code=404, detail=f"Skill not found: {normalized_name}")
+        if not tool.is_enabled:
+            raise HTTPException(status_code=400, detail=f"Skill is disabled: {normalized_name}")
+
+        model_config = await resolve_agent_model_config(db, request.model_name)
+
+        invoke_result = await agent_skill_service.execute_skill_task(
+            prompt=(request.prompt or "").strip(),
+            model_config=model_config,
+            enabled_skills=[normalized_name]
+        )
+        return AgentSkillInvokeResponse(skill_name=normalized_name, result=invoke_result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error invoking skill by api key {skill_name}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to invoke skill: {str(e)}"
         )
 
 
@@ -1115,6 +1270,23 @@ async def chat_with_agent(
         # 根据Agent类型选择处理方式
         from app.models.agent import AgentType
         from app.services.ai_model_service import AIModelService
+
+        configured_skill_names = []
+        for skill_name in (agent.tools or []):
+            if isinstance(skill_name, str):
+                cleaned_name = skill_name.strip()
+                if cleaned_name and cleaned_name not in configured_skill_names:
+                    configured_skill_names.append(cleaned_name)
+
+        enabled_agent_skills = []
+        if configured_skill_names:
+            skill_query = select(AgentTool).where(
+                AgentTool.name.in_(configured_skill_names),
+                AgentTool.is_enabled == True
+            )
+            skill_result = await db.execute(skill_query)
+            skill_rows = skill_result.scalars().all()
+            enabled_agent_skills = [tool.name for tool in skill_rows]
         
         try:
             if agent.agent_type == AgentType.REVIEW:
@@ -1274,14 +1446,66 @@ async def chat_with_agent(
                 }
 
             else:
-                # 其他类型Agent：使用AI模型服务
-                result = await AIModelService.chat_with_model(
-                    config=agent.model_service_config,
-                    system_prompt=agent.system_prompt or "",
-                    user_message=chat_request.message,
-                    context=context,
-                    images=chat_request.images
-                )
+                if enabled_agent_skills:
+                    prompt_parts = []
+                    if agent.system_prompt:
+                        prompt_parts.append(f"系统提示词：\n{agent.system_prompt}")
+
+                    previous_messages = context.get("previous_messages", []) if context else []
+                    if previous_messages:
+                        history_lines = []
+                        for msg in previous_messages[-10:]:
+                            role = msg.get("role", "user")
+                            content = msg.get("content", "")
+                            if content:
+                                history_lines.append(f"{role}: {content}")
+                        if history_lines:
+                            prompt_parts.append("历史对话：\n" + "\n".join(history_lines))
+
+                    if chat_request.images and len(chat_request.images) > 0:
+                        prompt_parts.append(f"用户上传了 {len(chat_request.images)} 张图片。")
+
+                    prompt_parts.append(f"用户问题：\n{chat_request.message}")
+                    runtime_prompt = "\n\n".join(prompt_parts)
+
+                    skill_model_config = {
+                        'model_name': agent.model_service_config.model_name,
+                        'api_key': agent.model_service_config.api_key or "",
+                        'provider': agent.model_service_config.provider,
+                        'base_url': agent.model_service_config.api_endpoint or ""
+                    }
+                    skill_response = await agent_skill_service.execute_skill_task(
+                        prompt=runtime_prompt,
+                        model_config=skill_model_config,
+                        enabled_skills=enabled_agent_skills
+                    )
+                    if isinstance(skill_response, str) and skill_response.startswith("Execution failed:"):
+                        result = {
+                            "success": False,
+                            "error": skill_response,
+                            "message": skill_response,
+                            "tokens_used": 0,
+                            "metadata": {
+                                "enabled_skills": enabled_agent_skills
+                            }
+                        }
+                    else:
+                        result = {
+                            "success": True,
+                            "message": skill_response,
+                            "tokens_used": 0,
+                            "metadata": {
+                                "enabled_skills": enabled_agent_skills
+                            }
+                        }
+                else:
+                    result = await AIModelService.chat_with_model(
+                        config=agent.model_service_config,
+                        system_prompt=agent.system_prompt or "",
+                        user_message=chat_request.message,
+                        context=context,
+                        images=chat_request.images
+                    )
             
             if not result.get("success", False):
                 raise HTTPException(

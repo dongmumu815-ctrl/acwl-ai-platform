@@ -59,7 +59,7 @@ export interface AgentBase {
  * 智能体创建数据
  */
 export interface AgentCreate extends AgentBase {
-  tools?: number[]
+  tools?: string[]
   permissions?: {
     allowed_users?: number[]
     allowed_roles?: string[]

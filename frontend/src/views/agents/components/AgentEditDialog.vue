@@ -274,6 +274,7 @@
                   v-model="formData.tools"
                   multiple
                   placeholder="请选择工具"
+                  :loading="loadingTools"
                   style="width: 100%"
                 >
                   <el-option
@@ -603,7 +604,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { Loading, Picture, Close } from '@element-plus/icons-vue'
 import { modelApi } from '@/api/models'
 import { modelServiceConfigApi } from '@/api/model-service-configs'
-import { chatWithAgent } from '@/api/agents'
+import { chatWithAgent, getAgentTools } from '@/api/agents'
 import { instructionSetApi } from '@/api/instruction-set'
 
 // Props
@@ -741,6 +742,7 @@ const loadingModels = ref(false)
 // 可用指令集列表
 const availableInstructionSets = ref([])
 const loadingInstructionSets = ref(false)
+const loadingTools = ref(false)
 
 /**
  * 加载可用模型列表
@@ -797,16 +799,44 @@ const loadAvailableInstructionSets = async () => {
 }
 
 // 可用工具列表
-const availableTools = ref([
-  { label: '网络搜索', value: 'web_search', description: '搜索互联网信息' },
-  { label: '代码执行', value: 'code_execution', description: '执行Python代码' },
-  { label: '文件操作', value: 'file_operations', description: '读写文件' },
-  { label: '数据库查询', value: 'database_query', description: '查询数据库' },
-  { label: '图像生成', value: 'image_generation', description: '生成图像' },
-  { label: '文档解析', value: 'document_parsing', description: '解析文档内容' },
-  { label: 'API调用', value: 'api_call', description: '调用外部API' },
-  { label: '计算器', value: 'calculator', description: '数学计算' }
-])
+const availableTools = ref([])
+
+/**
+ * 加载可用技能列表（用于绑定到智能体）
+ */
+const loadAvailableTools = async () => {
+  try {
+    loadingTools.value = true
+    const allItems = []
+    let page = 1
+    const size = 100
+    let totalPages = 1
+
+    while (page <= totalPages) {
+      const response = await getAgentTools({
+        page,
+        size,
+        is_enabled: true
+      })
+      const items = Array.isArray(response?.items) ? response.items : []
+      allItems.push(...items)
+      totalPages = Number(response?.pages || 1)
+      page += 1
+    }
+
+    availableTools.value = allItems.map((tool) => ({
+      label: tool.display_name || tool.name,
+      value: tool.name,
+      description: tool.description || '暂无描述'
+    }))
+  } catch (error) {
+    console.error('加载技能列表失败:', error)
+    ElMessage.error('加载技能列表失败，请稍后重试')
+    availableTools.value = []
+  } finally {
+    loadingTools.value = false
+  }
+}
 
 // 常用标签
 const commonTags = ref([
@@ -832,7 +862,8 @@ watch(visible, async (newVisible) => {
     try {
       await Promise.all([
         loadAvailableModels(),
-        loadAvailableInstructionSets()
+        loadAvailableInstructionSets(),
+        loadAvailableTools()
       ])
     } finally {
       isLoadingModels = false

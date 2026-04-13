@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(default="acwl-ai-secret-key-change-in-production", description="密钥")
     ALGORITHM: str = Field(default="HS256", description="JWT算法")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=1440, description="访问令牌过期时间(分钟)")
+    AGENT_SKILL_API_KEY: str = Field(default="acwl-agent-skill-key-change-me", description="Agent技能直调API Key")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="刷新令牌过期时间(天)")
     
     # CORS配置
