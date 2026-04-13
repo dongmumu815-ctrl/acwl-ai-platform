@@ -12,6 +12,10 @@ import shutil
 import subprocess
 import shlex
 import sys
+import re
+import socket
+import signal
+import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -191,6 +195,49 @@ class AgentSkillService:
                             'description': 'Port for API server startup (used by api.py)',
                             'required': False
                         })
+                        if self.name == 'book-review':
+                            self.parameters.append({
+                                'name': 'query',
+                                'type': 'string',
+                                'description': 'User query or review instruction',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'type',
+                                'type': 'string',
+                                'description': 'Input type: pdf|api|http|service|pdf_review',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'pdf_url',
+                                'type': 'string',
+                                'description': 'PDF URL or local path',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'isbn',
+                                'type': 'string',
+                                'description': 'ISBN',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'title',
+                                'type': 'string',
+                                'description': 'Title',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'author',
+                                'type': 'string',
+                                'description': 'Author',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'publisher',
+                                'type': 'string',
+                                'description': 'Publisher',
+                                'required': False
+                            })
                         
                     super().__init__()
 
@@ -200,15 +247,37 @@ class AgentSkillService:
                     except json.JSONDecodeError:
                         params_dict = {}
                     
-                    # book-review 兼容简写参数：支持 query/type 与结构化字段
+                    raw_run_script = params_dict.get('run_script')
+                    if raw_run_script:
+                        try:
+                            candidate = str(raw_run_script).replace('\\', '/')
+                            if candidate.startswith('scripts/'):
+                                candidate = candidate.split('/', 1)[1]
+                            candidate = os.path.basename(candidate)
+                            if self.available_scripts:
+                                lower_map = {s.lower(): s for s in self.available_scripts}
+                                candidate = lower_map.get(candidate.lower(), candidate)
+                            params_dict['run_script'] = candidate
+                        except Exception:
+                            pass
+
+                    # book-review 的兜底执行：当模型已经决定调用该技能，但未明确指定脚本时，
+                    # 根据输入内容选择合适入口，避免退化成仅返回 SKILL.md 说明。
                     if self.name == 'book-review' and not params_dict.get('run_script'):
-                        # 结构化字段优先：isbn/title/author/publisher
+                        query_text = params_dict.get('query')
+                        query_type = (params_dict.get('type') or '').lower().strip()
+                        pdf_url = params_dict.get('pdf_url') or params_dict.get('pdf_path')
                         isbn = params_dict.get('isbn')
                         title = params_dict.get('title')
                         author = params_dict.get('author')
                         publisher = params_dict.get('publisher')
 
-                        if any([isbn, title, author, publisher]):
+                        if query_type in ['api', 'http', 'service']:
+                            params_dict['run_script'] = 'api.py'
+                        elif pdf_url:
+                            params_dict['run_script'] = 'main.py'
+                            params_dict['args'] = ['pdf', str(pdf_url)]
+                        elif any([isbn, title, author, publisher]):
                             parts = []
                             if isbn:
                                 parts.append(f"ISBN:{isbn}")
@@ -218,22 +287,27 @@ class AgentSkillService:
                                 parts.append(f"作者:{author}")
                             if publisher:
                                 parts.append(f"出版社：{publisher}")
-                            content = "，".join(parts)
                             params_dict['run_script'] = 'main.py'
-                            params_dict['args'] = f"review {json.dumps(content, ensure_ascii=False)}"
-                        query_text = params_dict.get('query')
-                        query_type = (params_dict.get('type') or '').lower()
-                        if not params_dict.get('run_script') and isinstance(query_text, str) and query_text.strip():
+                            params_dict['args'] = ['review', '，'.join(parts)]
+                        elif isinstance(query_text, str) and query_text.strip():
+                            normalized_query = query_text.strip()
                             if query_type in ['pdf', 'pdf_review']:
                                 params_dict['run_script'] = 'main.py'
-                                params_dict['args'] = f"pdf {json.dumps(query_text, ensure_ascii=False)}"
+                                params_dict['args'] = ['pdf', normalized_query]
+                            elif any(token in normalized_query.lower() for token in ['api', 'uvicorn', '/review', '/health', '启动服务', '启动api', 'start api']):
+                                params_dict['run_script'] = 'api.py'
                             else:
-                                # 默认按 review 处理（含 isbn_search）
-                                content = query_text
-                                if 'isbn' not in query_text.lower() and '正题名' not in query_text and '书名' not in query_text:
-                                    content = f"正题名:{query_text}"
                                 params_dict['run_script'] = 'main.py'
-                                params_dict['args'] = f"review {json.dumps(content, ensure_ascii=False)}"
+                                params_dict['args'] = ['review', normalized_query]
+                        if not params_dict.get('run_script'):
+                            latest_env_query = os.environ.get('AGENT_SKILL_LATEST_QUERY') or ''
+                            if isinstance(latest_env_query, str) and latest_env_query.strip():
+                                normalized_query = latest_env_query.strip()
+                                if any(token in normalized_query.lower() for token in ['api', 'uvicorn', '/review', '/health', '启动服务', '启动api', 'start api']):
+                                    params_dict['run_script'] = 'api.py'
+                                else:
+                                    params_dict['run_script'] = 'main.py'
+                                    params_dict['args'] = ['review', normalized_query]
 
                     # 通用简写：若只有一个脚本且传了 url/query，则自动执行该脚本
                     if not params_dict.get('run_script') and len(self.available_scripts) == 1:
@@ -250,8 +324,10 @@ class AgentSkillService:
                     run_script = params_dict.get('run_script')
                     run_in_background = bool(params_dict.get('background', False))
                     if run_script:
-                        if run_script not in self.available_scripts:
-                            return f"Error: Script '{run_script}' not found. Available: {self.available_scripts}"
+                        if self.available_scripts is not None:
+                            lower_set = {s.lower() for s in self.available_scripts}
+                            if str(run_script).lower() not in lower_set:
+                                return f"Error: Script '{run_script}' not found. Available: {self.available_scripts}"
                         
                         script_path = self.scripts_path / run_script
                         args = params_dict.get('args', '')
@@ -334,7 +410,11 @@ class AgentSkillService:
                                 cwd=str(cwd),
                                 env=run_env
                             )
-                            return f"Script execution result:\nStdout:\n{result.stdout}\nStderr:\n{result.stderr}\nExit Code: {result.returncode}"
+                            stdout_text = (result.stdout or '').strip()
+                            stderr_text = (result.stderr or '').strip()
+                            if result.returncode == 0:
+                                return stdout_text
+                            return stderr_text or stdout_text or f"Script exited with code {result.returncode}"
                         except Exception as e:
                             return f"Error executing script: {e}"
 
@@ -454,6 +534,78 @@ class AgentSkillService:
         except Exception:
             return None
         return None
+
+    def _load_skill_runtime_instruction(self, skill_name: str, max_chars: int = 6000) -> str:
+        skill_info = self.skill_adapter.get_skill(skill_name)
+        if not skill_info:
+            return ""
+
+        skill_path = Path(skill_info.get("path", ""))
+        if not skill_path.exists():
+            return ""
+
+        chunks: List[str] = []
+        used = 0
+
+        def _append_text(title: str, text: str):
+            nonlocal used
+            if not text or used >= max_chars:
+                return
+            remaining = max_chars - used
+            snippet = text[:remaining]
+            chunks.append(f"\n[{title}]\n{snippet}")
+            used += len(snippet)
+
+        skill_md = skill_path / "SKILL.md"
+        if skill_md.exists():
+            try:
+                _append_text("SKILL.md", skill_md.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        refs_dir = skill_path / "references"
+        if refs_dir.exists() and refs_dir.is_dir():
+            for ref_file in sorted(refs_dir.glob("*.md")):
+                if used >= max_chars:
+                    break
+                try:
+                    _append_text(f"references/{ref_file.name}", ref_file.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+
+        return "".join(chunks).strip()
+
+    def _build_skill_augmented_prompt(self, prompt: str, enabled_skills: Optional[List[str]]) -> str:
+        if not enabled_skills:
+            return prompt
+
+        sections = []
+        total_limit = 12000
+        used = 0
+
+        for skill_name in enabled_skills:
+            if used >= total_limit:
+                break
+            text = self._load_skill_runtime_instruction(skill_name, max_chars=5000)
+            if not text:
+                continue
+            remaining = total_limit - used
+            part = text[:remaining]
+            sections.append(f"\n==== 技能：{skill_name} ====\n{part}")
+            used += len(part)
+
+        if not sections:
+            return prompt
+
+        return (
+            "你正在执行技能测试任务。你必须严格遵循下方技能文档中的工作流、规则和输出要求。"
+            "当技能文档与用户指令不冲突时，优先执行技能文档。"
+            "若技能文档规定了输出风格、步骤或约束，必须完整遵守。"
+            "不要重复调用技能本身；对于没有可执行脚本的文档型技能，直接根据技能文档产出最终答案。"
+            "若需要结构化输出，请仅输出最终结果，不要输出调用痕迹、工具轨迹或中间思考。\n"
+            f"{''.join(sections)}\n"
+            f"\n==== 用户测试指令 ====\n{prompt}"
+        )
 
     async def sync_skills_with_db(self, db: Any):
         """
@@ -667,6 +819,178 @@ class AgentSkillService:
                 logger.warning(f"Skill {name} not found")
         return tools
 
+    def invoke_skill_direct(self, skill_name: str, params: Optional[Dict[str, Any]] = None) -> str:
+        normalized_name = (skill_name or "").strip()
+        if not normalized_name:
+            return "Error: skill_name is required"
+
+        params_dict = params if isinstance(params, dict) else {}
+        tool = self.available_skills.get(normalized_name)
+
+        if not tool:
+            try:
+                self.skill_adapter.load_skills()
+                if MS_AGENT_AVAILABLE:
+                    self._register_default_skills()
+                tool = self.available_skills.get(normalized_name)
+            except Exception as e:
+                logger.warning(f"Failed to reload skills before invoke: {e}")
+
+        if not tool:
+            return f"Error: Skill '{normalized_name}' not found"
+
+        try:
+            payload = json.dumps(params_dict, ensure_ascii=False)
+            call_method = getattr(tool, "call", None)
+            if callable(call_method):
+                return call_method(payload)
+
+            if callable(tool):
+                try:
+                    return tool(**params_dict)
+                except TypeError:
+                    return tool(payload)
+
+            return f"Error: Skill '{normalized_name}' is not executable"
+        except Exception as e:
+            logger.error(f"Direct invoke failed for skill {normalized_name}: {e}")
+            return f"Error executing skill '{normalized_name}': {e}"
+
+    def _is_port_listening(self, host: str, port: int, timeout: float = 0.5) -> bool:
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except Exception:
+            return False
+
+    def _start_book_review_api_directly(self, port: int = 5080) -> str:
+        skill_info = self.skill_adapter.get_skill("book-review")
+        if not skill_info:
+            return "Error: Skill 'book-review' not found."
+
+        skill_path = Path(skill_info.get("path", ""))
+        scripts_path = skill_path / "scripts"
+        api_file = scripts_path / "api.py"
+        if not api_file.exists():
+            return "Error: book-review api.py not found."
+
+        if self._is_port_listening("127.0.0.1", port) or self._is_port_listening("0.0.0.0", port):
+            return f"book-review API already running at http://10.20.1.200:{port}"
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "api:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(port),
+        ]
+
+        run_env = os.environ.copy()
+        fallback_key = run_env.get('LLM_API_KEY') or run_env.get('OPENAI_API_KEY') or 'sk-test-placeholder'
+        run_env.setdefault('LLM_API_KEY', fallback_key)
+        run_env.setdefault('OPENAI_API_KEY', fallback_key)
+
+        try:
+            process = subprocess.Popen(
+                cmd,
+                cwd=str(scripts_path),
+                env=run_env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return f"book-review API started in background. PID: {process.pid}, URL: http://10.20.1.200:{port}"
+        except Exception as e:
+            return f"Failed to start book-review API: {e}"
+
+    def _stop_book_review_api_directly(self, port: int = 5080) -> str:
+        if not self._is_port_listening("127.0.0.1", port) and not self._is_port_listening("0.0.0.0", port):
+            return f"book-review API is not running on port {port}"
+
+        try:
+            if os.name == 'nt':
+                result = subprocess.run(['netstat', '-ano'], capture_output=True, text=True, check=False)
+                pids = set()
+                for line in result.stdout.splitlines():
+                    if f":{port}" in line and "LISTENING" in line:
+                        parts = line.split()
+                        if parts:
+                            pids.add(parts[-1])
+                if not pids:
+                    return f"Failed to locate process on port {port}"
+                for pid in pids:
+                    subprocess.run(['taskkill', '/PID', str(pid), '/F'], check=False)
+            else:
+                result = subprocess.run(['lsof', '-t', f'-i:{port}'], capture_output=True, text=True, check=False)
+                pids = [p.strip() for p in result.stdout.splitlines() if p.strip()]
+                if not pids:
+                    return f"Failed to locate process on port {port}"
+                for pid in pids:
+                    try:
+                        os.kill(int(pid), signal.SIGTERM)
+                    except Exception:
+                        pass
+
+            time.sleep(0.6)
+            if self._is_port_listening("127.0.0.1", port) or self._is_port_listening("0.0.0.0", port):
+                return f"Tried to stop book-review API on port {port}, but port is still in use"
+            return f"book-review API stopped on port {port}"
+        except Exception as e:
+            return f"Failed to stop book-review API: {e}"
+
+    def _extract_latest_user_query(self, prompt: str) -> str:
+        text = (prompt or "").strip()
+        if not text:
+            return ""
+        marker = "用户问题："
+        idx = text.rfind(marker)
+        if idx != -1:
+            return text[idx + len(marker):].strip()
+        marker = "==== 用户测试指令 ===="
+        idx = text.rfind(marker)
+        if idx != -1:
+            return text[idx + len(marker):].strip()
+        return text
+
+    def _normalize_skill_response(self, text: str, enabled_skills: Optional[List[str]]) -> str:
+        if not isinstance(text, str):
+            return text
+        normalized = text.strip()
+        if not normalized:
+            return normalized
+
+        result_matches = re.findall(r'(?is)<result>\s*(.*?)\s*</result>', normalized)
+        if result_matches:
+            for candidate in reversed(result_matches):
+                candidate = (candidate or '').strip()
+                if not candidate:
+                    continue
+                try:
+                    parsed = json.loads(candidate)
+                    if isinstance(parsed, (dict, list)):
+                        return json.dumps(parsed, ensure_ascii=False)
+                    if isinstance(parsed, str):
+                        return re.sub(r'\s+', ' ', parsed).strip()
+                except Exception:
+                    pass
+                cleaned = candidate.replace('\\"', '"').replace('\\n', ' ').replace('\\t', ' ').replace('\\\\', '\\')
+                return re.sub(r'\s+', ' ', cleaned).strip()
+
+        normalized = re.sub(r'(?is)<think>.*?</think>', ' ', normalized)
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        if not normalized:
+            return normalized
+
+        if "Answer:" in normalized:
+            ans_matches = re.findall(r'(?is)Answer:\s*(.*?)\s*(?=(?:Action:|Observation:|$))', normalized)
+            if ans_matches:
+                candidate = ans_matches[-1].strip()
+                if candidate:
+                    return re.sub(r'\s+', ' ', candidate).strip()
+        return normalized
+
     def save_or_update_custom_skill(self, name: str, code_json: str) -> Optional[str]:
         try:
             files = json.loads(code_json) if isinstance(code_json, str) else code_json
@@ -707,12 +1031,240 @@ class AgentSkillService:
                 class ResourceSkillTool(BaseTool):
                     def __init__(self, n: str, d: str, p: str):
                         self.name = n
-                        self.description = d
                         self.path = p
                         self.parameters = []
+                        self.description = d
+                        self.scripts_path = Path(p) / "scripts"
+                        self.available_scripts = []
+                        if self.scripts_path.exists() and self.scripts_path.is_dir():
+                            for script_file in self.scripts_path.iterdir():
+                                if script_file.suffix in ['.py', '.sh', '.js', '.bat', '.ps1']:
+                                    self.available_scripts.append(script_file.name)
+                        if self.available_scripts:
+                            script_list = ", ".join(self.available_scripts)
+                            self.description += f"\n\nAvailable executable scripts: {script_list}. To run a script, use the 'run_script' parameter."
+                            self.parameters.append({
+                                'name': 'run_script',
+                                'type': 'string',
+                                'description': 'The name of the script to run (must be one of the available scripts)',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'args',
+                                'type': 'string',
+                                'description': 'Arguments for the script (as a space-separated string or JSON list)',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'background',
+                                'type': 'boolean',
+                                'description': 'Run script in background and return immediately',
+                                'required': False
+                            })
+                            self.parameters.append({
+                                'name': 'port',
+                                'type': 'integer',
+                                'description': 'Port for API server startup (used by api.py)',
+                                'required': False
+                            })
+                            if self.name == 'book-review':
+                                self.parameters.append({
+                                    'name': 'query',
+                                    'type': 'string',
+                                    'description': 'User query or review instruction',
+                                    'required': False
+                                })
+                                self.parameters.append({
+                                    'name': 'type',
+                                    'type': 'string',
+                                    'description': 'Input type: pdf|api|http|service|pdf_review',
+                                    'required': False
+                                })
+                                self.parameters.append({
+                                    'name': 'pdf_url',
+                                    'type': 'string',
+                                    'description': 'PDF URL or local path',
+                                    'required': False
+                                })
+                                self.parameters.append({
+                                    'name': 'isbn',
+                                    'type': 'string',
+                                    'description': 'ISBN',
+                                    'required': False
+                                })
+                                self.parameters.append({
+                                    'name': 'title',
+                                    'type': 'string',
+                                    'description': 'Title',
+                                    'required': False
+                                })
+                                self.parameters.append({
+                                    'name': 'author',
+                                    'type': 'string',
+                                    'description': 'Author',
+                                    'required': False
+                                })
+                                self.parameters.append({
+                                    'name': 'publisher',
+                                    'type': 'string',
+                                    'description': 'Publisher',
+                                    'required': False
+                                })
                         super().__init__()
                     def call(self, params: str, **kwargs) -> str:
-                        return f"Skill resources for {self.name} at {self.path}"
+                        try:
+                            params_dict = json.loads(params) if isinstance(params, str) else (params or {})
+                        except json.JSONDecodeError:
+                            params_dict = {}
+                        raw_run_script = params_dict.get('run_script')
+                        if raw_run_script:
+                            try:
+                                candidate = str(raw_run_script).replace('\\', '/')
+                                if candidate.startswith('scripts/'):
+                                    candidate = candidate.split('/', 1)[1]
+                                candidate = os.path.basename(candidate)
+                                if self.available_scripts:
+                                    lower_map = {s.lower(): s for s in self.available_scripts}
+                                    candidate = lower_map.get(candidate.lower(), candidate)
+                                params_dict['run_script'] = candidate
+                            except Exception:
+                                pass
+                        if self.name == 'book-review' and not params_dict.get('run_script'):
+                            query_text = params_dict.get('query')
+                            query_type = (params_dict.get('type') or '').lower().strip()
+                            pdf_url = params_dict.get('pdf_url') or params_dict.get('pdf_path')
+                            isbn = params_dict.get('isbn')
+                            title = params_dict.get('title')
+                            author = params_dict.get('author')
+                            publisher = params_dict.get('publisher')
+                            if query_type in ['api', 'http', 'service']:
+                                params_dict['run_script'] = 'api.py'
+                            elif pdf_url:
+                                params_dict['run_script'] = 'main.py'
+                                params_dict['args'] = ['pdf', str(pdf_url)]
+                            elif any([isbn, title, author, publisher]):
+                                parts = []
+                                if isbn:
+                                    parts.append(f"ISBN:{isbn}")
+                                if title:
+                                    parts.append(f"正题名:{title}")
+                                if author:
+                                    parts.append(f"作者:{author}")
+                                if publisher:
+                                    parts.append(f"出版社：{publisher}")
+                                params_dict['run_script'] = 'main.py'
+                                params_dict['args'] = ['review', '，'.join(parts)]
+                            elif isinstance(query_text, str) and query_text.strip():
+                                normalized_query = query_text.strip()
+                                if query_type in ['pdf', 'pdf_review']:
+                                    params_dict['run_script'] = 'main.py'
+                                    params_dict['args'] = ['pdf', normalized_query]
+                                elif any(token in normalized_query.lower() for token in ['api', 'uvicorn', '/review', '/health', '启动服务', '启动api', 'start api']):
+                                    params_dict['run_script'] = 'api.py'
+                                else:
+                                    params_dict['run_script'] = 'main.py'
+                                    params_dict['args'] = ['review', normalized_query]
+                            if not params_dict.get('run_script'):
+                                latest_env_query = os.environ.get('AGENT_SKILL_LATEST_QUERY') or ''
+                                if isinstance(latest_env_query, str) and latest_env_query.strip():
+                                    normalized_query = latest_env_query.strip()
+                                    if any(token in normalized_query.lower() for token in ['api', 'uvicorn', '/review', '/health', '启动服务', '启动api', 'start api']):
+                                        params_dict['run_script'] = 'api.py'
+                                    else:
+                                        params_dict['run_script'] = 'main.py'
+                                        params_dict['args'] = ['review', normalized_query]
+                        if not params_dict.get('run_script') and getattr(self, 'available_scripts', None) and len(self.available_scripts) == 1:
+                            if params_dict.get('url'):
+                                params_dict['run_script'] = self.available_scripts[0]
+                                params_dict['args'] = json.dumps(params_dict.get('url'), ensure_ascii=False)
+                            elif params_dict.get('pdf_url'):
+                                params_dict['run_script'] = self.available_scripts[0]
+                                params_dict['args'] = json.dumps(params_dict.get('pdf_url'), ensure_ascii=False)
+                            elif params_dict.get('query'):
+                                params_dict['run_script'] = self.available_scripts[0]
+                                params_dict['args'] = json.dumps(params_dict.get('query'), ensure_ascii=False)
+                        run_script = params_dict.get('run_script')
+                        run_in_background = bool(params_dict.get('background', False))
+                        if self.name == 'book-review' and run_script == 'api.py' and 'background' not in params_dict:
+                            run_in_background = True
+                        if run_script:
+                            if getattr(self, 'available_scripts', None) is not None:
+                                lower_set = {s.lower() for s in self.available_scripts}
+                                if str(run_script).lower() not in lower_set:
+                                    return f"Error: Script '{run_script}' not found. Available: {self.available_scripts}"
+                            script_path = self.scripts_path / run_script
+                            args = params_dict.get('args', '')
+                            port = params_dict.get('port')
+                            try:
+                                port = int(port) if port is not None else None
+                            except Exception:
+                                port = None
+                            cmd = []
+                            if script_path.suffix == '.py':
+                                cmd = [sys.executable, str(script_path)]
+                            elif script_path.suffix == '.sh':
+                                cmd = ['bash', str(script_path)]
+                            elif script_path.suffix == '.ps1':
+                                cmd = ['powershell', '-File', str(script_path)]
+                            else:
+                                cmd = [str(script_path)]
+                            if self.name == 'book-review' and run_script == 'api.py':
+                                service_port = port or 5080
+                                cmd = [
+                                    sys.executable,
+                                    '-m',
+                                    'uvicorn',
+                                    'api:app',
+                                    '--host',
+                                    '0.0.0.0',
+                                    '--port',
+                                    str(service_port)
+                                ]
+                            if args:
+                                if isinstance(args, list):
+                                    cmd.extend([str(a) for a in args])
+                                else:
+                                    try:
+                                        cmd.extend(shlex.split(args))
+                                    except:
+                                        cmd.append(args)
+                            try:
+                                cwd = Path(self.path).parent
+                                if self.name == 'book-review' and run_script == 'api.py':
+                                    cwd = self.scripts_path
+                                if not cwd.exists():
+                                    cwd = Path(self.path)
+                                logger.info(f"Executing script: {cmd} in {cwd}")
+                                run_env = os.environ.copy()
+                                if self.name == 'book-review':
+                                    fallback_key = run_env.get('LLM_API_KEY') or run_env.get('OPENAI_API_KEY') or 'sk-test-placeholder'
+                                    run_env.setdefault('LLM_API_KEY', fallback_key)
+                                    run_env.setdefault('OPENAI_API_KEY', fallback_key)
+                                if run_in_background:
+                                    process = subprocess.Popen(
+                                        cmd,
+                                        cwd=str(cwd),
+                                        env=run_env,
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL
+                                    )
+                                    return f"Script started in background. PID: {process.pid}"
+                                result = subprocess.run(
+                                    cmd,
+                                    capture_output=True,
+                                    text=True,
+                                    check=False,
+                                    cwd=str(cwd),
+                                    env=run_env
+                                )
+                                stdout_text = (result.stdout or '').strip()
+                                stderr_text = (result.stderr or '').strip()
+                                if result.returncode == 0:
+                                    return stdout_text
+                                return stderr_text or stdout_text or f"Script exited with code {result.returncode}"
+                            except Exception as e:
+                                return f"Error executing script: {e}"
+                        return f"Skill resources for {self.name} are available at {self.path}. Please read SKILL.md for instructions."
                 desc = skill_info.get("description", "") or ""
                 path = skill_info.get("path", "")
                 self.available_skills[name] = ResourceSkillTool(name, desc, path)
@@ -729,7 +1281,8 @@ class AgentSkillService:
         self, 
         prompt: str, 
         model_config: Dict[str, Any],
-        enabled_skills: List[str] = None
+        enabled_skills: List[str] = None,
+        use_tool_calls: bool = True
     ) -> str:
         """
         执行带有 Skills 的任务
@@ -739,12 +1292,39 @@ class AgentSkillService:
             model_config: 模型配置 (包含 api_key, model_name 等)
             enabled_skills: 启用的技能列表
         """
+        # 对 book-review 启动 API 的请求走直启脚本，不依赖 LLM 工具调用
+        if enabled_skills and len(enabled_skills) == 1 and enabled_skills[0] == 'book-review':
+            latest_query = self._extract_latest_user_query(prompt)
+            prompt_text = latest_query.lower()
+            has_start_intent = any(k in prompt_text for k in ['启动api', '启动 api', 'start api', '启动服务', 'start service', 'api.py', 'uvicorn'])
+            has_stop_intent = any(k in prompt_text for k in ['停止api', '停止 api', '关闭api', 'stop api', 'shutdown api', '停止服务', 'stop service'])
+            if has_start_intent or has_stop_intent:
+                port = 5080
+                m = re.search(r'(?:port|端口)\s*[:=]?\s*(\d{2,5})', latest_query, re.IGNORECASE)
+                if m:
+                    try:
+                        port = int(m.group(1))
+                    except Exception:
+                        port = 5080
+                if has_stop_intent:
+                    return self._stop_book_review_api_directly(port=port)
+                return self._start_book_review_api_directly(port=port)
+
         if not MS_AGENT_AVAILABLE:
             return "Error: modelscope-agent library is not installed."
 
         try:
+            runtime_prompt = self._build_skill_augmented_prompt(prompt, enabled_skills)
+
             # 1. 准备工具
             tools = self.get_skill_tools(enabled_skills)
+            executable_tool_names = []
+            if use_tool_calls:
+                for tool in tools:
+                    available_scripts = getattr(tool, 'available_scripts', None)
+                    if available_scripts is not None and len(available_scripts) == 0:
+                        continue
+                    executable_tool_names.append(tool.name)
             
             # 2. 初始化 Agent (使用 ModelScope 的 RolePlay 或 ReAct 代理)
             # 注意：这里适配 ModelScope 的配置格式
@@ -761,7 +1341,6 @@ class AgentSkillService:
             if base_url:
                 if provider == 'ollama':
                     # Ollama 需要 host 参数，且通常不需要 /api/chat 后缀
-                    import re
                     # 移除 /api/chat 或 /api/generate 后缀
                     host = re.sub(r'/api/(chat|generate)$', '', base_url)
                     llm_config['host'] = host
@@ -769,7 +1348,6 @@ class AgentSkillService:
                 elif provider == 'openai':
                     # OpenAI 兼容服务建议传入 base URL（通常以 /v1 结尾）
                     # 若误填到 /chat/completions，这里自动回退到基址
-                    import re
                     normalized_base = base_url.rstrip('/')
                     normalized_base = re.sub(r'/chat/completions/?$', '', normalized_base)
                     llm_config['api_base'] = normalized_base
@@ -779,9 +1357,9 @@ class AgentSkillService:
                     llm_config['api_base'] = base_url
 
             bot = RolePlay(
-                function_list=[t.name for t in tools], # 传递工具名称
+                function_list=executable_tool_names,
                 llm=llm_config,
-                instruction=prompt
+                instruction=runtime_prompt
             )
 
             # 3. 执行任务
@@ -797,19 +1375,41 @@ class AgentSkillService:
             
             # 使用 asyncio.to_thread 在后台线程中运行阻塞的 bot.run，防止阻塞 FastAPI 主事件循环
             import asyncio
-            response = await asyncio.to_thread(bot.run, prompt)
+            _prev_env_query = os.environ.get('AGENT_SKILL_LATEST_QUERY')
+            os.environ['AGENT_SKILL_LATEST_QUERY'] = self._extract_latest_user_query(runtime_prompt)
+
+            # 从 model_config 获取超时配置，默认 120 秒
+            llm_timeout = model_config.get('timeout') or model_config.get('request_timeout') or 120
+
+            async def run_with_timeout():
+                try:
+                    return await asyncio.wait_for(
+                        asyncio.to_thread(bot.run, runtime_prompt),
+                        timeout=llm_timeout
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"LLM call timeout after {llm_timeout} seconds")
+                    raise TimeoutError(f"LLM call timeout after {llm_timeout} seconds")
+
+            response = await run_with_timeout()
+            if _prev_env_query is None:
+                try:
+                    del os.environ['AGENT_SKILL_LATEST_QUERY']
+                except KeyError:
+                    pass
+            else:
+                os.environ['AGENT_SKILL_LATEST_QUERY'] = _prev_env_query
             
-            # 处理生成器返回
-            final_result = ""
-            for chunk in response:
-                # 检查是否有错误信息
-                # 有些时候 chunk 是字符串
-                if isinstance(chunk, str):
-                    final_result += chunk
-                elif isinstance(chunk, dict):
-                    final_result += chunk.get('content') or ''
-                
-            return final_result
+            def _consume(gen):
+                out = ""
+                for chunk in gen:
+                    if isinstance(chunk, str):
+                        out += chunk
+                    elif isinstance(chunk, dict):
+                        out += (chunk.get('content') or '')
+                return out
+            final_result = await asyncio.wait_for(asyncio.to_thread(_consume, response), timeout=llm_timeout)
+            return self._normalize_skill_response(final_result, enabled_skills)
 
         except Exception as e:
             import traceback
@@ -819,4 +1419,3 @@ class AgentSkillService:
 
 # 全局单例
 agent_skill_service = AgentSkillService()
-

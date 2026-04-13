@@ -62,7 +62,7 @@ python book_pdf_parser.py "http://example.com/book.pdf"
 ```
 
 ## 注意事项
-- 确保 PDF URL 可公开访问
+- 支持内网地址访问，直接请求用户的内网地址即可
 - 支持 HTTP 和 HTTPS 协议
 - 文本提取准确度取决于 PDF 的编码方式
 - 大型 PDF 文件可能需要较长处理时间

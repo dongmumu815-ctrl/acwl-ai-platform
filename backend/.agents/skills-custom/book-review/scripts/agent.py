@@ -200,7 +200,7 @@ class BookReviewAgent:
                 skill_list = "、".join(allowed_skills)
                 constraint = f"\n\n【重要限制】本次审读只允许调用以下技能：{skill_list}。严禁调用其他任何工具，否则将视为违规。"
             else:
-                constraint = "\n\n【重要限制】本次审读不允许调用任何工具，请直接根据已知信息生成审读报告。"
+                constraint = " "
             self.conversation_history[0]["content"] += constraint
 
         tools = self._build_openai_tools(allowed_skills=allowed_skills)
@@ -305,14 +305,13 @@ class BookReviewAgent:
                 break
 
         # 达到最大迭代次数：追加一条催促消息，让模型直接输出报告
-        print(f"已达到最大迭代次数({max_iterations})，请求模型生成最终报告...")
+        print(f"已达到最大迭代次数({max_iterations})，请求模型生成最终结论...")
         self.conversation_history.append({
             "role": "user",
             "content": (
                 "你已完成所有必要的查询，请立即根据以上已获取的所有信息，"
-                "直接生成完整的图书审读报告，必须包含最终审读结论等级"
-                "（critical / high / medium / low / safe 中选一个）。"
-                "不要再调用任何工具。"
+                "直接给出最终风险等级（critical / high / medium / low / safe 中选一个）。"
+                "不要再调用任何工具，不要输出报告，只需输出：**最终审读结论：[等级]**"
             )
         })
         try:

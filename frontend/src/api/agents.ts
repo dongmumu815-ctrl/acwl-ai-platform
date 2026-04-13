@@ -190,6 +190,34 @@ export function executeAgentToolTask(data: {
 }
 
 /**
+ * 启动 book-review API（直启脚本，不走LLM工具调用）
+ */
+export function startBookReviewApi(port = 5080) {
+  return request<{ result: string }>({
+    url: '/agents/tools/execute',
+    method: 'post',
+    data: {
+      prompt: `启动API 端口 ${port}`,
+      skill_names: ['book-review']
+    }
+  })
+}
+
+/**
+ * 停止 book-review API（直启脚本，不走LLM工具调用）
+ */
+export function stopBookReviewApi(port = 5080) {
+  return request<{ result: string }>({
+    url: '/agents/tools/execute',
+    method: 'post',
+    data: {
+      prompt: `停止API 端口 ${port}`,
+      skill_names: ['book-review']
+    }
+  })
+}
+
+/**
  * 与智能体聊天
  * @param id 智能体ID
  * @param data 聊天数据
