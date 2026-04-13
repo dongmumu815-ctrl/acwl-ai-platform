@@ -155,8 +155,8 @@ export function scanServerGpus(id: number): Promise<ApiResponse<any[]>> {
  * 获取服务器统计数据
  * @returns Promise<ApiResponse<{ total: number; online: number; offline: number; total_gpus: number }>>
  */
-export function getServerStats(): Promise<ApiResponse<{ total: number; online: number; offline: number; total_gpus: number }>> {
-  return request.get('/servers/stats')
+export function getServerStats(params?: any): Promise<ApiResponse<{ total: number; online: number; offline: number; total_gpus: number }>> {
+  return request.get('/servers/stats', params)
 }
 
 /**

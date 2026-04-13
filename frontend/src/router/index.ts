@@ -382,12 +382,12 @@ export const asyncRoutes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: '/fine-tuning',
+    path: '/training',
     component: Layout,
-    redirect: '/fine-tuning/jobs',
+    redirect: '/training/jobs',
     meta: {
-      title: '模型微调',
-      icon: 'Setting',
+      title: '训练与微调',
+      icon: 'DataAnalysis',
       requiresAuth: true,
       permission: PERMISSIONS.TRAINING_READ,
       noPermissionBehavior: 'hide'
@@ -395,10 +395,10 @@ export const asyncRoutes: RouteRecordRaw[] = [
     children: [
       {
         path: 'jobs',
-        name: 'FineTuningJobs',
+        name: 'TrainingJobs',
         component: () => import('@/views/training/index.vue'),
         meta: {
-          title: '微调任务',
+          title: '训练任务',
           icon: 'List',
           requiresAuth: true,
           permission: PERMISSIONS.TRAINING_READ,
@@ -407,12 +407,13 @@ export const asyncRoutes: RouteRecordRaw[] = [
       },
       {
         path: 'create',
-        name: 'FineTuningCreate',
-        component: () => import('@/views/training/index.vue'),
+        name: 'TrainingCreate',
+        component: () => import('@/views/training/create.vue'),
         meta: {
-          title: '创建微调',
+          title: '创建任务',
           icon: 'Plus',
           requiresAuth: true,
+          hideInMenu: true,
           permission: PERMISSIONS.TRAINING_CREATE,
           noPermissionBehavior: 'hide'
         }

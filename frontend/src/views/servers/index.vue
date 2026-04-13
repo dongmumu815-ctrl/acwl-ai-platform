@@ -396,14 +396,14 @@
                   <span>GPU</span>
                   <span>
                     {{ server.monitor?.gpu_memory_used ? formatSize(server.monitor.gpu_memory_used * 1024) : '?' }} / {{ server.monitor?.gpu_memory_total ? formatSize(server.monitor.gpu_memory_total * 1024) : '?' }}
-                    ({{ server.monitor?.gpu_usage || 0 }}%)
+                    ({{ getGpuMemoryUsagePct(server.monitor) }}%)
                   </span>
                 </div>
                 <el-progress 
-                  :percentage="server.monitor?.gpu_usage || 0" 
+                  :percentage="getGpuMemoryUsagePct(server.monitor)" 
                   :show-text="false" 
                   :stroke-width="4"
-                  :color="getUsageColor(server.monitor?.gpu_usage)"
+                  :color="getUsageColor(getGpuMemoryUsagePct(server.monitor))"
                 />
               </div>
             </div>
@@ -1389,6 +1389,14 @@ const getUsageColor = (usage: number = 0) => {
   return '#67c23a'
 }
 
+const getGpuMemoryUsagePct = (monitor: any) => {
+  if (monitor?.gpu_memory_used && monitor?.gpu_memory_total) {
+    const pct = Math.round((monitor.gpu_memory_used / monitor.gpu_memory_total) * 100)
+    return Math.min(100, Math.max(0, pct))
+  }
+  return monitor?.gpu_usage || 0
+}
+
 const formatSize = (kb: number) => {
   if (!kb) return '0 B'
   if (kb < 1024) return kb + ' KB'
@@ -2011,7 +2019,15 @@ const handleAutoRefreshChange = (val: boolean) => {
 // 新增：独立统计数据获取方法，保证与列表查询解耦
 const fetchStats = async () => {
   try {
-    const statsResponse = await getServerStats()
+    const params: any = {
+      search: (searchQuery.value?.trim() || undefined),
+      server_type: (filterType.value || undefined),
+      status: (filterStatus.value || undefined),
+    }
+    if (currentGroupId.value) {
+      params.group_id = currentGroupId.value
+    }
+    const statsResponse = await getServerStats(params)
     console.log('服务器统计数据:', statsResponse)
     const s = (statsResponse && (statsResponse as any).data) ? (statsResponse as any).data : statsResponse
     stats.total = (s as any)?.total ?? 0

@@ -111,20 +111,48 @@
             </el-select>
           </el-form-item>
           
-          <el-form-item label="模型类型">
+          <el-form-item label="任务类型">
+            <el-select
+              v-model="filters.trainingMode"
+              placeholder="选择类型"
+              clearable
+              style="width: 120px"
+              @change="handleFilter"
+            >
+              <el-option label="全部" value="" />
+              <el-option label="全量训练" value="full_training" />
+              <el-option label="模型微调" value="fine_tuning" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="领域/模态">
             <el-select
               v-model="filters.modelType"
-              placeholder="选择模型类型"
+              placeholder="选择领域"
               clearable
               style="width: 150px"
               @change="handleFilter"
             >
               <el-option label="全部" value="" />
-              <el-option label="图像分类" value="image_classification" />
-              <el-option label="目标检测" value="object_detection" />
-              <el-option label="文本分类" value="text_classification" />
-              <el-option label="语言模型" value="language_model" />
-              <el-option label="语音识别" value="speech_recognition" />
+              <el-option label="计算机视觉(CV)" value="cv" />
+              <el-option label="自然语言处理(NLP)" value="nlp" />
+              <el-option label="语音处理(Audio)" value="audio" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="算法/模型">
+            <el-select
+              v-model="filters.framework"
+              placeholder="如 YOLO/BERT"
+              clearable
+              style="width: 150px"
+              @change="handleFilter"
+            >
+              <el-option label="全部" value="" />
+              <el-option label="YOLO 系列" value="yolo" />
+              <el-option label="BERT 系列" value="bert" />
+              <el-option label="ResNet" value="resnet" />
+              <el-option label="LLaMA/Qwen" value="llm" />
             </el-select>
           </el-form-item>
           
@@ -184,9 +212,13 @@
               <div class="training-card">
                 <div class="training-header">
                   <div class="training-type">
-                    <el-icon class="type-icon">
-                      <component :is="getTypeIcon(training.model_type)" />
-                    </el-icon>
+                    <el-tooltip :content="getModelTypeText(training.model_type)">
+                      <el-icon class="type-icon">
+                        <component :is="getTypeIcon(training.model_type)" />
+                      </el-icon>
+                    </el-tooltip>
+                    <el-tag size="small" type="info" class="ml-2">{{ getTrainingModeText(training.training_mode) }}</el-tag>
+                    <el-tag size="small" type="success" class="ml-2">{{ getFrameworkText(training.framework) }}</el-tag>
                   </div>
                   <div class="training-status">
                     <el-tag
@@ -340,9 +372,15 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="model_type" label="模型类型" width="120">
+            <el-table-column prop="model_type" label="类型/框架" width="180">
               <template #default="{ row }">
-                <el-tag size="small">{{ getModelTypeText(row.model_type) }}</el-tag>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <span>{{ getModelTypeText(row.model_type) }}</span>
+                  <div>
+                    <el-tag size="small" type="info">{{ getTrainingModeText(row.training_mode) }}</el-tag>
+                    <el-tag size="small" type="success" style="margin-left: 4px;">{{ getFrameworkText(row.framework) }}</el-tag>
+                  </div>
+                </div>
               </template>
             </el-table-column>
             
@@ -520,6 +558,8 @@ const filters = reactive({
   search: '',
   status: '',
   modelType: '',
+  trainingMode: '',
+  framework: '',
   sortBy: 'created_at'
 })
 
@@ -550,9 +590,19 @@ const filteredTrainings = computed(() => {
     result = result.filter(training => training.status === filters.status)
   }
   
-  // 模型类型过滤
+  // 模态过滤
   if (filters.modelType) {
     result = result.filter(training => training.model_type === filters.modelType)
+  }
+
+  // 任务类型过滤
+  if (filters.trainingMode) {
+    result = result.filter(training => training.training_mode === filters.trainingMode)
+  }
+
+  // 算法/框架过滤
+  if (filters.framework) {
+    result = result.filter(training => training.framework === filters.framework)
   }
   
   // 排序
@@ -624,24 +674,34 @@ const getProgressStatus = (status: string) => {
 
 const getModelTypeText = (type: string) => {
   const typeMap: Record<string, string> = {
-    image_classification: '图像分类',
-    object_detection: '目标检测',
-    text_classification: '文本分类',
-    language_model: '语言模型',
-    speech_recognition: '语音识别'
+    cv: '计算机视觉',
+    nlp: '自然语言处理',
+    audio: '语音处理'
   }
   return typeMap[type] || type
 }
 
 const getTypeIcon = (type: string) => {
   const iconMap: Record<string, any> = {
-    image_classification: Picture,
-    object_detection: Picture,
-    text_classification: ChatDotRound,
-    language_model: ChatDotRound,
-    speech_recognition: Headset
+    cv: Picture,
+    nlp: ChatDotRound,
+    audio: Headset
   }
   return iconMap[type] || Cpu
+}
+
+const getFrameworkText = (framework: string) => {
+  const map: Record<string, string> = {
+    yolo: 'YOLO',
+    bert: 'BERT',
+    resnet: 'ResNet',
+    llm: 'LLaMA/Qwen'
+  }
+  return map[framework] || framework
+}
+
+const getTrainingModeText = (mode: string) => {
+  return mode === 'full_training' ? '全量训练' : (mode === 'fine_tuning' ? '模型微调' : mode)
 }
 
 const handleSearch = () => {
@@ -660,6 +720,8 @@ const resetFilters = () => {
   filters.search = ''
   filters.status = ''
   filters.modelType = ''
+  filters.trainingMode = ''
+  filters.framework = ''
   filters.sortBy = 'created_at'
   pagination.currentPage = 1
 }
@@ -691,7 +753,9 @@ const refreshTrainings = async () => {
         id: '1',
         name: 'ResNet50图像分类训练',
         description: '使用CIFAR-10数据集训练ResNet50模型进行图像分类',
-        model_type: 'image_classification',
+        model_type: 'cv',
+        training_mode: 'full_training',
+        framework: 'resnet',
         status: 'running',
         progress: 65,
         dataset_name: 'CIFAR-10',
@@ -708,7 +772,9 @@ const refreshTrainings = async () => {
         id: '2',
         name: 'BERT文本分类微调',
         description: '基于预训练BERT模型进行中文情感分析任务微调',
-        model_type: 'text_classification',
+        model_type: 'nlp',
+        training_mode: 'fine_tuning',
+        framework: 'bert',
         status: 'completed',
         progress: 100,
         dataset_name: '中文情感分析语料库',
@@ -726,7 +792,9 @@ const refreshTrainings = async () => {
         id: '3',
         name: 'YOLO目标检测训练',
         description: '训练YOLOv8模型进行自定义目标检测',
-        model_type: 'object_detection',
+        model_type: 'cv',
+        training_mode: 'full_training',
+        framework: 'yolo',
         status: 'failed',
         progress: 23,
         dataset_name: '自定义检测数据集',
@@ -743,7 +811,9 @@ const refreshTrainings = async () => {
         id: '4',
         name: 'Whisper语音识别训练',
         description: '基于Whisper模型进行中文语音识别训练',
-        model_type: 'speech_recognition',
+        model_type: 'audio',
+        training_mode: 'full_training',
+        framework: 'whisper',
         status: 'pending',
         progress: 0,
         dataset_name: '语音识别数据集',
@@ -756,7 +826,9 @@ const refreshTrainings = async () => {
         id: '5',
         name: 'GPT-2语言模型训练',
         description: '训练小型GPT-2模型用于文本生成',
-        model_type: 'language_model',
+        model_type: 'nlp',
+        training_mode: 'full_training',
+        framework: 'llm',
         status: 'running',
         progress: 12,
         dataset_name: '中文文本语料',

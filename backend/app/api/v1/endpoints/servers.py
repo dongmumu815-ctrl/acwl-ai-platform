@@ -10,7 +10,7 @@ from enum import Enum
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import select, update, delete, func, or_
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db, get_db_context
@@ -154,6 +154,10 @@ async def get_servers(
 
 @router.get("/stats", summary="获取服务器统计数据")
 async def get_server_stats(
+    group_id: Optional[int] = Query(None, description="服务器分组ID"),
+    search: Optional[str] = Query(None, description="搜索关键词"),
+    server_type: Optional[ServerType] = Query(None, description="服务器类型"),
+    status: Optional[ServerStatus] = Query(None, description="服务器状态"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -163,6 +167,20 @@ async def get_server_stats(
     try:
         # 获取各状态服务器数量
         status_query = select(Server.status, func.count(Server.id)).group_by(Server.status)
+        if group_id is not None:
+            status_query = status_query.where(Server.group_id == group_id)
+        if search:
+            status_query = status_query.where(
+                or_(
+                    Server.name.ilike(f"%{search}%"),
+                    Server.ip_address.ilike(f"%{search}%")
+                )
+            )
+        if server_type:
+            status_query = status_query.where(Server.server_type == server_type)
+        if status:
+            status_query = status_query.where(Server.status == status)
+        
         status_result = await db.execute(status_query)
         status_counts = dict(status_result.all())
         
@@ -175,7 +193,21 @@ async def get_server_stats(
                 counts_by_str[str(k)] = v
         
         # 获取GPU总数
-        gpu_query = select(func.count(GPUResource.id))
+        gpu_query = select(func.count(GPUResource.id)).join(Server, GPUResource.server_id == Server.id)
+        if group_id is not None:
+            gpu_query = gpu_query.where(Server.group_id == group_id)
+        if search:
+            gpu_query = gpu_query.where(
+                or_(
+                    Server.name.ilike(f"%{search}%"),
+                    Server.ip_address.ilike(f"%{search}%")
+                )
+            )
+        if server_type:
+            gpu_query = gpu_query.where(Server.server_type == server_type)
+        if status:
+            gpu_query = gpu_query.where(Server.status == status)
+            
         gpu_result = await db.execute(gpu_query)
         
         # 获取在线和离线服务器数量
