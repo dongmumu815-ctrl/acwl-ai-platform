@@ -14,11 +14,12 @@ from app.core.database import Base
 
 class DatasetType(PyEnum):
     """数据集类型枚举"""
-    TEXT = "Text"
-    IMAGE = "Image"
-    AUDIO = "Audio"
-    VIDEO = "Video"
-    MULTIMODAL = "Multimodal"
+    TEXT = "text"
+    IMAGE = "image"
+    AUDIO = "audio"
+    VIDEO = "video"
+    TABULAR = "tabular"
+    MULTIMODAL = "multimodal"
 
 
 class DatasetStatus(PyEnum):
@@ -37,7 +38,7 @@ class Dataset(Base):
     name = Column(String(100), nullable=False, comment="数据集名称")
     description = Column(Text, comment="数据集描述")
     dataset_type = Column(
-        Enum(DatasetType), 
+        Enum('text', 'image', 'audio', 'video', 'tabular', 'multimodal', name='datasettype'), 
         nullable=False, 
         comment="数据集类型：文本、图像、音频、视频、多模态"
     )
@@ -47,8 +48,8 @@ class Dataset(Base):
     storage_path = Column(Text, comment="存储路径")
     is_public = Column(Boolean, default=False, comment="是否公开")
     status = Column(
-        Enum(DatasetStatus), 
-        default=DatasetStatus.PENDING, 
+        Enum('pending', 'processing', 'ready', 'error', name='datasetstatus'), 
+        default='pending', 
         comment="数据集状态"
     )
     tags = Column(Text, comment="标签，JSON格式存储")

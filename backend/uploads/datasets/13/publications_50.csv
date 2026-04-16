@@ -1,0 +1,51 @@
+title,authors,keywords,year,journal,doi
+Deep Learning: Methods and Applications,Smith John; Johnson Mary,deep learning; neural networks,2024,Machine Learning,10.1000/ml.2024.001
+Transfer Learning for Image Classification,Brown David; Williams Sarah; Jones Robert,transfer learning; image classification; CNN,2024,IEEE Access,10.1109/ACCESS.2024.1234567
+Natural Language Processing with Transformers,Garcia Emily; Miller Thomas; Davis Jennifer,transformer; NLP; BERT,2024,arXiv,10.48550/arXiv.2024.12345
+Graph Neural Networks for Social Network Analysis,Rodriguez Michael; Martinez Lisa; Hernandez Andrew,graph neural networks; social networks,2024,Social Network Analysis,10.1000/sna.2024.001
+Reinforcement Learning in Game Playing,Wilson Thomas; Anderson Jane; Taylor David,reinforcement learning; game AI,2024,AAAI,10.1609/aaai.v38i14.12345
+Quantum Computing for Optimization Problems,Jackson Robert; Lee Sarah; Harris Emily,quantum computing; optimization,2024,Quantum,10.22331/q-2024-01-123
+Computer Vision for Autonomous Vehicles,Martin Thomas; Thompson Barbara; White Jennifer,computer vision; autonomous driving,2024,IEEE T-ITS,10.1109/TITS.2024.2345678
+Federated Learning for Privacy Preservation,Lopez Michael; Gonzalez Andrew; Martinez Lisa,federated learning; privacy,2024,IEEE Comm Mag,10.1109/COMST.2024.3456789
+Generative Models for Image Synthesis,Brown Sarah; Jones Robert; Miller David,GAN; image synthesis,2024,CVPR,10.1109/CVPR.2024.12345
+Time Series Forecasting with RNNs,Harris Emily; Wilson Thomas; Moore Andrew,RNN; time series,2024,ICML,10.1000/icml.2024.001
+Attention Mechanisms in Neural Networks,Davis Jennifer; Rodriguez Michael; Garcia Lisa,attention; neural networks,2024,NeurIPS,10.1000/neurips.2024.12345
+Multi-modal Learning for Vision-Language,Davis Robert; Anderson Thomas; Taylor Jane,multimodal; vision language,2024,ICLR,10.1000/iclr.2024.001
+Edge AI for IoT Devices,Johnson Mary; Williams David; Brown Sarah,edge AI; IoT,2024,IoT Journal,10.1109/JIOT.2024.4567890
+Blockchain for Data Security,Martinez Lisa; Hernandez Andrew; Wilson Thomas,blockchain; security,2024,IEEE T-IFS,10.1109/TIFS.2024.5678901
+Explainable AI for Healthcare,Thompson Barbara; Jackson Robert; Lee Emily,explainable AI; healthcare,2024,JAMIA,10.1093/jamia/ocad001
+Drug Discovery with Deep Learning,Miller David; Garcia Jennifer; Rodriguez Michael,drug discovery; deep learning,2024,J Cheminformatics,10.1186/s13321-024-00123-4
+Speech Recognition Advances,Brown Lisa; Taylor Susan; Anderson David,speech recognition; ASR,2024,IEEE/ACM TASLP,10.1109/TASLP.2024.6789012
+Bioinformatics with Machine Learning,Harrison Andrew; White Sarah; Martin Thomas,bioinformatics; ML,2024,Briefings in Bioinformatics,10.1093/bib/bbaa001
+Anomaly Detection in Networks,Young Robert; Phillips Jennifer; Campbell Emily,anomaly detection; networks,2024,ACM TKDD,10.1145/3600000
+Semantic Segmentation Methods,Cooper Mary; Evans Lisa; Bennett David,semantic segmentation,2024,Medical Image Analysis,10.1016/j.media.2024.001234
+Recommendation Systems Review,Hunter Michael; Foster Susan; Rice Andrew,recommender systems,2024,ACM TIST,10.1145/3600000
+Neural Architecture Search: Survey,Stone Jennifer; Grant Emily; Walsh Robert,neural architecture search,2024,IEEE TPAMI,10.1109/TPAMI.2024.7890123
+Privacy in Machine Learning,Marshall Thomas; Boyd Susan; Kennedy David,privacy; machine learning,2024,Proceedings on Privacy,10.1000/privacy.2024.001
+Cross-lingual NLP Methods,Hall Lisa; Lawrence Emily; Greene Jennifer,cross-lingual NLP,2024,ACL,10.18653/v1/2024.acl.123
+Medical Imaging with Deep Learning,Coleman William; Barnes Elizabeth; Knight Thomas,medical imaging; deep learning,2024,RadAI,10.1016/j.radai.2024.001234
+Knowledge Graph Applications,Hendrickson Robert; Underwood Sarah; Holt Lisa,knowledge graphs,2024,Semantic Web,10.3233/SW-2401234
+Distributed Deep Learning Systems,Burke Michael; Ramsey Emily; Lambert David,distributed systems; deep learning,2024,IEEE TPDS,10.1109/TPDS.2024.8901234
+Sentiment Analysis Techniques,Pierce Jennifer; Spears Barbara; Norman Andrew,sentiment analysis,2024,Expert Systems,10.1111/exsy.12345
+Object Detection Advances,Byrd Robert; Quinn Susan; Nash Thomas,object detection,2024,IEEE TPAMI,10.1109/TPAMI.2024.9012345
+Video Understanding with Deep Learning,Fletcher Lisa; Mcdonald Emily; Rich Jennifer,video understanding,2024,ICCV,10.1109/ICCV.2024.1234567
+3D Vision and Point Clouds,Howell David; Francis Susan; Chambers Michael,3D vision; point clouds,2024,3DV,10.1109/3DV.2024.2345678
+Hyperparameter Optimization,Mcdowell Andrew; Park Sarah; Kim Thomas,hyperparameter optimization,2024,IEEE TPAMI,10.1109/TPAMI.2024.3456789
+Neural Text Generation,Reynolds Lisa; Walton Jennifer; Walton David,text generation,2024,NAACL,10.18653/v1/2024.naacl.123
+Machine Learning for Finance,Henderson Robert; Tran Emily; Nguyen Susan,ML; finance,2024,JMLR,10.1000/jmlr.2024.001
+Clustering Algorithms Review,George Thomas;Fields Sarah; Klein Jennifer,clustering algorithms,2024,Data Mining KDD,10.1000/kdd.2024.001
+Contrastive Learning Methods,Powers Lisa; Malone Emily; Proctor Andrew,contrastive learning,2024,ICLR,10.1000/iclr.2024.002
+Multitask Learning Survey,Roberts Michael; Tucker Susan; Vaughn David,multitask learning,2024,ACM CSUR,10.1145/3600000
+Audio Deep Learning,Perry Jennifer; Holt David; Mckenzie Susan,audio deep learning,2024,IEEE TASLP,10.1109/TASLP.2024.4567890
+Graph Representation Learning,Webb Thomas; Mccormick Emily; Nolan Jennifer,graph representation,2024,NeurIPS,10.1000/neurips.2024.002
+Robotics with Deep RL,Dixon Robert; Sparks Sarah; Britt Lisa,robotics; deep RL,2024,ICRA,10.1109/ICRA.2024.1234567
+Causal Inference in ML,Frazier Andrew; Duke Susan; Odonnell Thomas,causal inference,2024,PMLR,10.1000/pmlr.202.001
+Energy Efficiency in ML,Weaver Jennifer; Pace Emily; Cooley David,energy efficiency,2024,ICML,10.1000/icml.2024.003
+Continual Learning Methods,Moody Michael; Swain Susan; Coffin Thomas,continual learning,2024,NeurIPS,10.1000/neurips.2024.003
+Neural PDE Solvers,Mayer Lisa; Erwin Emily; Albrecht David,neural PDE solvers,2024,JCP,10.1016/j.jcp.2024.123456
+Meta-Learning Survey,Conner Jennifer; Odell Sarah; Luo Thomas,meta-learning,2024,IEEE TPAMI,10.1109/TPAMI.2024.5678901
+Deep Learning for Graphs,Lawson Andrew; Mckay Susan; Weeks David,deep learning graphs,2024,KDD,10.1145/3600000
+Neural Compression Techniques,Carr Emily; Battle Jennifer; Buck David,neural compression,2024,IEEE TIP,10.1109/TIP.2024.6789012
+AI for Climate Change,Douglas Susan; Barry Thomas; Nolan Emily,AI climate change,2024,Nature Climate,10.1038/s41558-024-00123-4
+Robust Machine Learning,Hogan Michael; Mangan Sarah; Kilroy David,robust ML,2024,ICML,10.1000/icml.2024.004
+Neural Rendering Advances,Doyle Jennifer; Kenny Emily; OBrien Thomas,neural rendering,2024,SIGGRAPH,10.1145/3600000

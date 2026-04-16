@@ -32,18 +32,13 @@ async def create_dataset(
 ):
     """
     创建新的数据集
-    
-    Args:
-        dataset_data: 数据集创建数据
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        DatasetResponse: 创建的数据集信息
     """
     try:
-        service = DatasetService(db)
-        dataset = service.create_dataset(dataset_data, current_user.id)
+        def create(session):
+            service = DatasetService(session)
+            return service.create_dataset(dataset_data, current_user.id)
+            
+        dataset = await db.run_sync(create)
         return DatasetResponse.from_orm(dataset)
     except DatasetError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -68,22 +63,6 @@ async def get_datasets(
 ):
     """
     获取数据集列表
-    
-    Args:
-        search: 搜索关键词
-        dataset_type: 数据集类型筛选
-        status: 状态筛选
-        is_public: 公开状态筛选
-        tags: 标签筛选
-        sort_by: 排序字段
-        sort_order: 排序方向
-        page: 页码
-        size: 每页大小
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        DatasetListResponse: 数据集列表响应
     """
     try:
         # 构建筛选条件
@@ -99,8 +78,12 @@ async def get_datasets(
             size=size
         )
         
-        service = DatasetService(db)
-        datasets, total = service.get_datasets(filters, current_user.id)
+        # NOTE: Using run_sync since DatasetService uses synchronous db methods
+        def get_data(session):
+            service = DatasetService(session)
+            return service.get_datasets(filters, current_user.id)
+            
+        datasets, total = await db.run_sync(get_data)
         
         # 计算总页数
         pages = (total + size - 1) // size
@@ -124,17 +107,13 @@ async def get_dataset_stats(
 ):
     """
     获取数据集统计信息
-    
-    Args:
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        DatasetStats: 统计信息
     """
     try:
-        service = DatasetService(db)
-        return service.get_dataset_stats(current_user.id)
+        def get_stats(session):
+            service = DatasetService(session)
+            return service.get_dataset_stats(current_user.id)
+            
+        return await db.run_sync(get_stats)
     except Exception as e:
         logger.error(f"获取数据集统计API错误: {str(e)}")
         raise HTTPException(status_code=500, detail="内部服务器错误")
@@ -148,18 +127,13 @@ async def get_dataset(
 ):
     """
     获取数据集详情
-    
-    Args:
-        dataset_id: 数据集ID
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        DatasetResponse: 数据集详情
     """
     try:
-        service = DatasetService(db)
-        dataset = service.get_dataset(dataset_id, current_user.id)
+        def get_single(session):
+            service = DatasetService(session)
+            return service.get_dataset(dataset_id, current_user.id)
+            
+        dataset = await db.run_sync(get_single)
         
         if not dataset:
             raise HTTPException(status_code=404, detail="数据集不存在")
@@ -181,19 +155,13 @@ async def update_dataset(
 ):
     """
     更新数据集信息
-    
-    Args:
-        dataset_id: 数据集ID
-        dataset_data: 更新数据
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        DatasetResponse: 更新后的数据集信息
     """
     try:
-        service = DatasetService(db)
-        dataset = service.update_dataset(dataset_id, dataset_data, current_user.id)
+        def update(session):
+            service = DatasetService(session)
+            return service.update_dataset(dataset_id, dataset_data, current_user.id)
+            
+        dataset = await db.run_sync(update)
         
         if not dataset:
             raise HTTPException(status_code=404, detail="数据集不存在或无权限访问")
@@ -216,18 +184,13 @@ async def delete_dataset(
 ):
     """
     删除数据集
-    
-    Args:
-        dataset_id: 数据集ID
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        dict: 删除结果
     """
     try:
-        service = DatasetService(db)
-        success = service.delete_dataset(dataset_id, current_user.id)
+        def delete(session):
+            service = DatasetService(session)
+            return service.delete_dataset(dataset_id, current_user.id)
+            
+        success = await db.run_sync(delete)
         
         if not success:
             raise HTTPException(status_code=404, detail="数据集不存在或无权限访问")
@@ -251,15 +214,6 @@ async def upload_dataset_files(
 ):
     """
     上传数据集文件
-    
-    Args:
-        dataset_id: 数据集ID
-        files: 上传的文件列表
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        DatasetResponse: 更新后的数据集信息
     """
     try:
         # 验证文件
@@ -289,8 +243,11 @@ async def upload_dataset_files(
                     detail=f"不支持的文件类型: {file_ext}"
                 )
         
-        service = DatasetService(db)
-        dataset = service.upload_dataset_files(dataset_id, files, current_user.id)
+        def upload(session):
+            service = DatasetService(session)
+            return service.upload_dataset_files(dataset_id, files, current_user.id)
+            
+        dataset = await db.run_sync(upload)
         
         return DatasetResponse.from_orm(dataset)
     except DatasetError as e:
@@ -311,19 +268,13 @@ async def get_dataset_preview(
 ):
     """
     获取数据集预览
-    
-    Args:
-        dataset_id: 数据集ID
-        limit: 预览样本数量限制
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        DatasetPreview: 预览数据
     """
     try:
-        service = DatasetService(db)
-        preview = service.get_dataset_preview(dataset_id, current_user.id, limit)
+        def get_preview(session):
+            service = DatasetService(session)
+            return service.get_dataset_preview(dataset_id, current_user.id, limit)
+            
+        preview = await db.run_sync(get_preview)
         
         if not preview:
             raise HTTPException(status_code=404, detail="数据集不存在或暂无预览数据")
@@ -346,36 +297,29 @@ async def clone_dataset(
 ):
     """
     克隆数据集
-    
-    Args:
-        dataset_id: 源数据集ID
-        name: 新数据集名称
-        description: 新数据集描述
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        DatasetResponse: 克隆的数据集信息
     """
     try:
-        service = DatasetService(db)
-        
-        # 获取源数据集
-        source_dataset = service.get_dataset(dataset_id, current_user.id)
-        if not source_dataset:
-            raise HTTPException(status_code=404, detail="源数据集不存在")
-        
-        # 创建克隆数据集
-        clone_data = DatasetCreate(
-            name=name,
-            description=description or f"克隆自: {source_dataset.name}",
-            dataset_type=source_dataset.dataset_type.value.lower(),
-            format=source_dataset.format,
-            is_public=False,  # 克隆的数据集默认为私有
-            tags=json.loads(source_dataset.tags) if source_dataset.tags else []
-        )
-        
-        cloned_dataset = service.create_dataset(clone_data, current_user.id)
+        def perform_clone(session):
+            service = DatasetService(session)
+            
+            # 获取源数据集
+            source_dataset = service.get_dataset(dataset_id, current_user.id)
+            if not source_dataset:
+                raise HTTPException(status_code=404, detail="源数据集不存在")
+            
+            # 创建克隆数据集
+            clone_data = DatasetCreate(
+                name=name,
+                description=description or f"克隆自: {source_dataset.name}",
+                dataset_type=source_dataset.dataset_type.value.lower(),
+                format=source_dataset.format,
+                is_public=False,  # 克隆的数据集默认为私有
+                tags=json.loads(source_dataset.tags) if source_dataset.tags else []
+            )
+            
+            return service.create_dataset(clone_data, current_user.id)
+            
+        cloned_dataset = await db.run_sync(perform_clone)
         
         # TODO: 复制数据文件（异步处理）
         
@@ -389,6 +333,47 @@ async def clone_dataset(
         raise HTTPException(status_code=500, detail="内部服务器错误")
 
 
+@router.get("/{dataset_id}/download", summary="下载数据集")
+async def download_dataset(
+    dataset_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取数据集下载链接
+    """
+    try:
+        def get_dataset_info(session):
+            service = DatasetService(session)
+            return service.get_dataset(dataset_id, current_user.id)
+            
+        dataset = await db.run_sync(get_dataset_info)
+        
+        if not dataset:
+            raise HTTPException(status_code=404, detail="数据集不存在")
+            
+        if not dataset.storage_path:
+            raise HTTPException(status_code=400, detail="该数据集尚未上传文件")
+            
+        # TODO: 实际项目中应生成预签名的下载链接 (如 S3/OSS pre-signed URL) 
+        # 或者返回直接可以下载的内部路由。这里我们模拟返回一个下载链接
+        
+        # 模拟生成下载URL
+        download_url = f"/api/v1/files/download?path={dataset.storage_path}"
+        
+        return {
+            "message": "获取下载链接成功",
+            "dataset_id": dataset_id,
+            "url": download_url,
+            "filename": f"{dataset.name}_{dataset.id}.zip"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"下载数据集API错误: {str(e)}")
+        raise HTTPException(status_code=500, detail="内部服务器错误")
+
+
 @router.post("/{dataset_id}/analyze", summary="分析数据集")
 async def analyze_dataset(
     dataset_id: int,
@@ -397,18 +382,13 @@ async def analyze_dataset(
 ):
     """
     分析数据集
-    
-    Args:
-        dataset_id: 数据集ID
-        db: 数据库会话
-        current_user: 当前用户
-        
-    Returns:
-        dict: 分析结果
     """
     try:
-        service = DatasetService(db)
-        dataset = service.get_dataset(dataset_id, current_user.id)
+        def perform_analysis(session):
+            service = DatasetService(session)
+            return service.get_dataset(dataset_id, current_user.id)
+            
+        dataset = await db.run_sync(perform_analysis)
         
         if not dataset:
             raise HTTPException(status_code=404, detail="数据集不存在")

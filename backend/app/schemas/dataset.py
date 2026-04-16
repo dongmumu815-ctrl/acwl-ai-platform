@@ -16,6 +16,7 @@ class DatasetType(str, Enum):
     IMAGE = "image"
     AUDIO = "audio"
     VIDEO = "video"
+    TABULAR = "tabular"
     MULTIMODAL = "multimodal"
 
 
@@ -36,6 +37,31 @@ class DatasetBase(BaseModel):
     is_public: bool = Field(False, description="是否公开")
     tags: Optional[List[str]] = Field(default_factory=list, description="标签列表")
 
+    @validator('dataset_type', 'status', pre=True, check_fields=False)
+    def parse_enums(cls, v):
+        if v is None:
+            return v
+        if hasattr(v, 'value'):
+            return v.value.lower()
+        if isinstance(v, str):
+            return v.lower()
+        return v
+        
+    @validator('tags', pre=True)
+    def parse_tags(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                import json
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+            except Exception:
+                pass
+            return [v]
+        return v
+
 
 class DatasetCreate(DatasetBase):
     """创建数据集请求模型"""
@@ -52,6 +78,16 @@ class DatasetUpdate(BaseModel):
     tags: Optional[List[str]] = Field(None, description="标签列表")
     status: Optional[DatasetStatus] = Field(None, description="数据集状态")
 
+    @validator('dataset_type', 'status', pre=True, check_fields=False)
+    def parse_enums(cls, v):
+        if v is None:
+            return v
+        if hasattr(v, 'value'):
+            return v.value.lower()
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
 
 class DatasetUpload(BaseModel):
     """数据集上传配置模型"""
@@ -64,6 +100,16 @@ class DatasetUpload(BaseModel):
         default_factory=dict, 
         description="处理选项"
     )
+
+    @validator('dataset_type', 'status', pre=True, check_fields=False)
+    def parse_enums(cls, v):
+        if v is None:
+            return v
+        if hasattr(v, 'value'):
+            return v.value.lower()
+        if isinstance(v, str):
+            return v.lower()
+        return v
 
 
 class DatasetStats(BaseModel):
@@ -120,3 +166,13 @@ class DatasetFilter(BaseModel):
     sort_order: Optional[str] = Field("desc", description="排序方向")
     page: int = Field(1, ge=1, description="页码")
     size: int = Field(20, ge=1, le=100, description="每页大小")
+
+    @validator('dataset_type', 'status', pre=True, check_fields=False)
+    def parse_enums(cls, v):
+        if v is None:
+            return v
+        if hasattr(v, 'value'):
+            return v.value.lower()
+        if isinstance(v, str):
+            return v.lower()
+        return v

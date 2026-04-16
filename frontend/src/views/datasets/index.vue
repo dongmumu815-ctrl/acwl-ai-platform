@@ -169,10 +169,10 @@
         </template>
         
         <!-- 网格视图 -->
-        <div v-if="viewMode === 'grid'" class="grid-view">
+        <div v-if="viewMode === 'grid'" class="grid-view" v-loading="loading">
           <el-row :gutter="20">
             <el-col
-              v-for="dataset in paginatedDatasets"
+              v-for="dataset in datasets"
               :key="dataset.id"
               :xs="24"
               :sm="12"
@@ -183,7 +183,7 @@
                 <div class="dataset-header">
                   <div class="dataset-type">
                     <el-icon class="type-icon">
-                      <component :is="getTypeIcon(dataset.type)" />
+                      <component :is="getTypeIcon(dataset.dataset_type)" />
                     </el-icon>
                   </div>
                   <div class="dataset-status">
@@ -208,7 +208,7 @@
                     </div>
                     <div class="meta-item">
                       <el-icon><Document /></el-icon>
-                      <span>{{ formatNumber(dataset.sample_count) }} 样本</span>
+                      <span>{{ formatNumber(dataset.record_count) }} 样本</span>
                     </div>
                     <div class="meta-item">
                       <el-icon><Files /></el-icon>
@@ -216,7 +216,7 @@
                     </div>
                   </div>
                   
-                  <div class="dataset-tags">
+                  <div class="dataset-tags" v-if="dataset.tags && dataset.tags.length">
                     <el-tag
                       v-for="tag in dataset.tags"
                       :key="tag"
@@ -232,7 +232,7 @@
                     <div class="preview-label">数据预览:</div>
                     <div class="preview-content">
                       <div
-                        v-if="dataset.type === 'image'"
+                        v-if="dataset.dataset_type === 'image'"
                         class="image-preview"
                       >
                         <img
@@ -244,7 +244,7 @@
                         />
                       </div>
                       <div
-                        v-else-if="dataset.type === 'text'"
+                        v-else-if="dataset.dataset_type === 'text'"
                         class="text-preview"
                       >
                         <div
@@ -268,15 +268,13 @@
                     size="small"
                     @click="viewDataset(dataset)"
                   >
-                    查看
+                    查看详情
                   </el-button>
                   <el-button
-                    v-if="dataset.status === 'ready'"
-                    type="primary"
                     size="small"
-                    @click="useDataset(dataset)"
+                    @click="previewDataset(dataset)"
                   >
-                    使用
+                    预览数据
                   </el-button>
                   <el-dropdown trigger="click">
                     <el-button size="small" text>
@@ -288,10 +286,6 @@
                           <el-icon><Edit /></el-icon>
                           编辑
                         </el-dropdown-item>
-                        <el-dropdown-item @click="cloneDataset(dataset)">
-                          <el-icon><CopyDocument /></el-icon>
-                          克隆
-                        </el-dropdown-item>
                         <el-dropdown-item @click="downloadDataset(dataset)">
                           <el-icon><Download /></el-icon>
                           下载
@@ -302,7 +296,7 @@
                         </el-dropdown-item>
                         <el-dropdown-item
                           divided
-                          @click="deleteDataset(dataset)"
+                          @click="deleteDatasetAction(dataset)"
                         >
                           <el-icon><Delete /></el-icon>
                           删除
@@ -319,16 +313,17 @@
         <!-- 列表视图 -->
         <div v-else class="list-view">
           <el-table
-            :data="paginatedDatasets"
+            :data="datasets"
             style="width: 100%"
+            v-loading="loading"
             @sort-change="handleTableSort"
           >
-            <el-table-column prop="name" label="数据集名称" sortable>
+            <el-table-column prop="name" label="数据集名称" sortable="custom">
               <template #default="{ row }">
                 <div class="dataset-name-cell">
                   <div class="dataset-type-icon">
                     <el-icon>
-                      <component :is="getTypeIcon(row.type)" />
+                      <component :is="getTypeIcon(row.dataset_type)" />
                     </el-icon>
                   </div>
                   <div class="dataset-info">
@@ -339,9 +334,9 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="type" label="类型" width="100">
+            <el-table-column prop="dataset_type" label="类型" width="100">
               <template #default="{ row }">
-                <el-tag size="small">{{ getTypeText(row.type) }}</el-tag>
+                <el-tag size="small">{{ getTypeText(row.dataset_type) }}</el-tag>
               </template>
             </el-table-column>
             
@@ -357,19 +352,19 @@
               </template>
             </el-table-column>
             
-            <el-table-column prop="sample_count" label="样本数" width="120" sortable>
+            <el-table-column prop="record_count" label="样本数" width="120" sortable="custom">
               <template #default="{ row }">
-                {{ formatNumber(row.sample_count) }}
+                {{ formatNumber(row.record_count) }}
               </template>
             </el-table-column>
             
-            <el-table-column prop="size" label="大小" width="120" sortable>
+            <el-table-column prop="size" label="大小" width="120" sortable="custom">
               <template #default="{ row }">
                 {{ formatSize(row.size) }}
               </template>
             </el-table-column>
             
-            <el-table-column prop="created_at" label="创建时间" width="180" sortable>
+            <el-table-column prop="created_at" label="创建时间" width="180" sortable="custom">
               <template #default="{ row }">
                 {{ formatDate(row.created_at) }}
               </template>
@@ -378,15 +373,13 @@
             <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="viewDataset(row)">
-                  查看
+                  查看详情
                 </el-button>
                 <el-button
-                  v-if="row.status === 'ready'"
-                  type="primary"
                   size="small"
-                  @click="useDataset(row)"
+                  @click="previewDataset(row)"
                 >
-                  使用
+                  预览数据
                 </el-button>
                 <el-dropdown trigger="click">
                   <el-button size="small" text>
@@ -398,10 +391,6 @@
                         <el-icon><Edit /></el-icon>
                         编辑
                       </el-dropdown-item>
-                      <el-dropdown-item @click="cloneDataset(row)">
-                        <el-icon><CopyDocument /></el-icon>
-                        克隆
-                      </el-dropdown-item>
                       <el-dropdown-item @click="downloadDataset(row)">
                         <el-icon><Download /></el-icon>
                         下载
@@ -412,7 +401,7 @@
                       </el-dropdown-item>
                       <el-dropdown-item
                         divided
-                        @click="deleteDataset(row)"
+                        @click="deleteDatasetAction(row)"
                       >
                         <el-icon><Delete /></el-icon>
                         删除
@@ -431,7 +420,7 @@
             v-model:current-page="pagination.currentPage"
             v-model:page-size="pagination.pageSize"
             :page-sizes="[10, 20, 50, 100]"
-            :total="filteredDatasets.length"
+            :total="pagination.total"
             layout="total, sizes, prev, pager, next, jumper"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
@@ -545,13 +534,77 @@
         </div>
       </template>
     </el-dialog>
+    <!-- 数据集预览对话框 -->
+    <el-dialog
+      v-model="previewDialogVisible"
+      :title="`预览数据集: ${currentPreviewDataset?.name || ''}`"
+      width="700px"
+    >
+      <div v-loading="previewLoading" class="preview-dialog-content">
+        <template v-if="previewData && previewData.samples && previewData.samples.length">
+          <div v-if="currentPreviewDataset?.dataset_type === 'image'" class="image-preview-grid">
+            <el-image
+              v-for="(img, index) in previewData.samples"
+              :key="index"
+              :src="img"
+              fit="cover"
+              class="preview-img-item"
+              :preview-src-list="previewData.samples"
+              :initial-index="index"
+            />
+          </div>
+          <div v-else-if="currentPreviewDataset?.dataset_type === 'tabular'" class="tabular-preview">
+            <el-table :data="previewData.samples" border style="width: 100%" height="400">
+              <el-table-column
+                v-for="field in previewData.sample_fields"
+                :key="field"
+                :prop="field"
+                :label="field"
+              />
+            </el-table>
+          </div>
+          <div v-else class="text-preview-list">
+            <el-card
+              v-for="(sample, index) in previewData.samples"
+              :key="index"
+              class="preview-text-card"
+              shadow="hover"
+            >
+              <pre>{{ typeof sample === 'object' ? JSON.stringify(sample, null, 2) : sample }}</pre>
+            </el-card>
+          </div>
+          
+          <div class="preview-footer-info">
+            <el-text type="info" size="small">
+              显示前 {{ previewData.samples.length }} 条样本，共计 {{ previewData.total_count }} 条记录
+            </el-text>
+          </div>
+        </template>
+        <el-empty v-else description="暂无预览数据" />
+      </div>
+      <template #footer>
+        <el-button @click="previewDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import {
+  getDatasets,
+  getDatasetStats,
+  createDataset,
+  uploadDatasetFiles,
+  deleteDataset,
+  getDatasetPreview,
+  getDatasetDownloadUrl,
+  startDatasetAnalysis,
+  type Dataset,
+  type DatasetListParams
+} from '@/api/datasets'
 import {
   FolderOpened,
   Upload,
@@ -584,6 +637,7 @@ const viewMode = ref('grid')
 const uploadDialogVisible = ref(false)
 const uploadFormRef = ref<FormInstance>()
 const uploading = ref(false)
+const loading = ref(false)
 
 // 统计数据
 const stats = reactive({
@@ -604,11 +658,12 @@ const filters = reactive({
 // 分页
 const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
 
 // 数据集列表
-const datasets = ref<any[]>([])
+const datasets = ref<Dataset[]>([])
 
 // 上传表单
 const uploadForm = reactive({
@@ -626,6 +681,12 @@ const commonTags = [
   '图像分类', '目标检测', '语义分割', '自然语言处理', '语音识别'
 ]
 
+// 预览相关数据
+const previewDialogVisible = ref(false)
+const previewLoading = ref(false)
+const currentPreviewDataset = ref<Dataset | null>(null)
+const previewData = ref<any>(null)
+
 // 表单验证规则
 const uploadRules: FormRules = {
   name: [
@@ -642,49 +703,9 @@ const uploadRules: FormRules = {
   ]
 }
 
-// 计算属性
-const filteredDatasets = computed(() => {
-  let result = [...datasets.value]
-  
-  // 搜索过滤
-  if (filters.search) {
-    const search = filters.search.toLowerCase()
-    result = result.filter(dataset => 
-      dataset.name.toLowerCase().includes(search) ||
-      dataset.description.toLowerCase().includes(search)
-    )
-  }
-  
-  // 类型过滤
-  if (filters.type) {
-    result = result.filter(dataset => dataset.type === filters.type)
-  }
-  
-  // 状态过滤
-  if (filters.status) {
-    result = result.filter(dataset => dataset.status === filters.status)
-  }
-  
-  // 排序
-  result.sort((a, b) => {
-    const field = filters.sortBy
-    if (field === 'created_at' || field === 'updated_at') {
-      return new Date(b[field]).getTime() - new Date(a[field]).getTime()
-    }
-    return b[field] - a[field]
-  })
-  
-  return result
-})
-
-const paginatedDatasets = computed(() => {
-  const start = (pagination.currentPage - 1) * pagination.pageSize
-  const end = start + pagination.pageSize
-  return filteredDatasets.value.slice(start, end)
-})
-
 // 方法
-const formatNumber = (num: number) => {
+const formatNumber = (num: number | null | undefined) => {
+  if (!num) return '0'
   if (num >= 1000000) {
     return (num / 1000000).toFixed(1) + 'M'
   } else if (num >= 1000) {
@@ -693,8 +714,8 @@ const formatNumber = (num: number) => {
   return num.toString()
 }
 
-const formatSize = (bytes: number) => {
-  if (bytes === 0) return '0 B'
+const formatSize = (bytes: number | null | undefined) => {
+  if (!bytes) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
@@ -745,16 +766,89 @@ const getTypeIcon = (type: string) => {
   return iconMap[type] || Document
 }
 
+// 自动刷新定时器
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+const startAutoRefresh = () => {
+  if (refreshTimer) return
+  // 每10秒刷新一次
+  refreshTimer = setInterval(() => {
+    // 只有当有状态为 processing 的数据集时才刷新列表
+    const hasProcessing = datasets.value.some(d => d.status === 'processing')
+    if (hasProcessing) {
+      fetchDatasets()
+      fetchStats()
+    } else {
+      stopAutoRefresh()
+    }
+  }, 10000)
+}
+
+const stopAutoRefresh = () => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+const fetchDatasets = async () => {
+  loading.value = true
+  try {
+    const params: DatasetListParams = {
+      page: pagination.currentPage,
+      size: pagination.pageSize,
+      sort_by: filters.sortBy,
+      sort_order: 'desc'
+    }
+    
+    if (filters.search) params.search = filters.search
+    if (filters.type) params.dataset_type = filters.type
+    if (filters.status) params.status = filters.status
+
+    const response = await getDatasets(params)
+    // 兼容不同的返回格式，有的接口直接返回数据，有的可能包在 data 字段中
+    const responseData = (response as any).data || response
+    datasets.value = responseData.items || []
+    pagination.total = responseData.total || 0
+    
+    // 如果列表里有处理中的数据集，启动自动刷新
+    if (datasets.value.some(d => d.status === 'processing')) {
+      startAutoRefresh()
+    }
+  } catch (error) {
+    console.error('获取数据集列表失败:', error)
+    ElMessage.error('获取数据集列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchStats = async () => {
+  try {
+    const response = await getDatasetStats()
+    const responseData = (response as any).data || response
+    stats.total = responseData.total || 0
+    stats.totalSamples = responseData.total_samples || 0
+    stats.totalSize = responseData.total_size || 0
+    stats.processing = responseData.processing || 0
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+  }
+}
+
 const handleSearch = () => {
   pagination.currentPage = 1
+  fetchDatasets()
 }
 
 const handleFilter = () => {
   pagination.currentPage = 1
+  fetchDatasets()
 }
 
 const handleSort = () => {
   pagination.currentPage = 1
+  fetchDatasets()
 }
 
 const resetFilters = () => {
@@ -763,109 +857,30 @@ const resetFilters = () => {
   filters.status = ''
   filters.sortBy = 'created_at'
   pagination.currentPage = 1
+  fetchDatasets()
 }
 
 const handleTableSort = ({ prop, order }: any) => {
   if (order) {
     filters.sortBy = prop
+    fetchDatasets()
   }
 }
 
 const handleSizeChange = (size: number) => {
   pagination.pageSize = size
   pagination.currentPage = 1
+  fetchDatasets()
 }
 
 const handleCurrentChange = (page: number) => {
   pagination.currentPage = page
+  fetchDatasets()
 }
 
 const refreshDatasets = async () => {
-  try {
-    // 这里应该调用实际的API
-    // const response = await datasetApi.getDatasets()
-    // datasets.value = response.data
-    
-    // 模拟数据
-    datasets.value = [
-      {
-        id: '1',
-        name: 'CIFAR-10图像分类数据集',
-        description: '包含10个类别的60000张32x32彩色图像，用于图像分类任务',
-        type: 'image',
-        status: 'ready',
-        sample_count: 60000,
-        size: 163840000, // 156MB
-        tags: ['图像分类', '训练集', 'CIFAR'],
-        preview: [
-          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
-        ],
-        created_at: '2024-01-15T10:30:00Z',
-        updated_at: '2024-01-20T15:45:00Z'
-      },
-      {
-        id: '2',
-        name: '中文情感分析语料库',
-        description: '包含正面和负面情感的中文文本数据，用于情感分析模型训练',
-        type: 'text',
-        status: 'ready',
-        sample_count: 50000,
-        size: 25600000, // 24.4MB
-        tags: ['情感分析', '中文', 'NLP'],
-        preview: [
-          '这部电影真的很棒，演员表演很到位！',
-          '服务态度很差，完全不推荐。',
-          '产品质量不错，性价比很高。'
-        ],
-        created_at: '2024-01-10T08:20:00Z',
-        updated_at: '2024-01-18T12:30:00Z'
-      },
-      {
-        id: '3',
-        name: '语音识别数据集',
-        description: '多人录制的中英文语音数据，包含不同口音和语速',
-        type: 'audio',
-        status: 'processing',
-        sample_count: 12000,
-        size: 2147483648, // 2GB
-        tags: ['语音识别', '多语言', '音频'],
-        preview: ['sample1.wav', 'sample2.wav', 'sample3.wav'],
-        created_at: '2024-01-08T14:15:00Z',
-        updated_at: '2024-01-16T09:20:00Z'
-      },
-      {
-        id: '4',
-        name: '销售数据表格',
-        description: '电商平台的销售数据，包含商品信息、价格、销量等字段',
-        type: 'tabular',
-        status: 'ready',
-        sample_count: 100000,
-        size: 52428800, // 50MB
-        tags: ['销售数据', '电商', '表格'],
-        preview: ['product_id,name,price,sales', 'category,brand,rating,reviews'],
-        created_at: '2024-01-05T16:45:00Z',
-        updated_at: '2024-01-19T11:10:00Z'
-      }
-    ]
-    
-    // 更新统计数据
-    updateStats()
-    
-    ElMessage.success('数据集列表已刷新')
-  } catch (error) {
-    console.error('刷新数据集列表失败:', error)
-    ElMessage.error('刷新失败，请稍后重试')
-  }
-}
-
-const updateStats = () => {
-  stats.total = datasets.value.length
-  stats.totalSamples = datasets.value.reduce((sum, d) => sum + d.sample_count, 0)
-  stats.totalSize = datasets.value.reduce((sum, d) => sum + d.size, 0)
-  stats.processing = datasets.value.filter(d => d.status === 'processing').length
+  await Promise.all([fetchDatasets(), fetchStats()])
+  ElMessage.success('数据集列表已刷新')
 }
 
 const showUploadDialog = () => {
@@ -873,9 +888,9 @@ const showUploadDialog = () => {
 }
 
 const handleCloseUpload = () => {
-  uploadForm.name = ''
-  uploadForm.type = ''
-  uploadForm.description = ''
+  if (uploadFormRef.value) {
+    uploadFormRef.value.resetFields()
+  }
   uploadForm.tags = []
   uploadForm.files = []
   uploadForm.processing = []
@@ -893,88 +908,107 @@ const submitUpload = async () => {
     await uploadFormRef.value.validate()
     uploading.value = true
     
-    // 这里应该调用实际的API上传文件
-    // const formData = new FormData()
-    // uploadForm.files.forEach((file, index) => {
-    //   formData.append(`files[${index}]`, file)
-    // })
-    // formData.append('name', uploadForm.name)
-    // formData.append('type', uploadForm.type)
-    // formData.append('description', uploadForm.description)
-    // formData.append('tags', JSON.stringify(uploadForm.tags))
-    // formData.append('processing', JSON.stringify(uploadForm.processing))
-    // 
-    // await datasetApi.uploadDataset(formData)
+    // 1. 创建数据集记录
+    const createResponse = await createDataset({
+      name: uploadForm.name,
+      description: uploadForm.description,
+      dataset_type: uploadForm.type,
+      tags: uploadForm.tags
+    })
     
-    // 模拟上传
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    // 兼容返回数据直接包含或包在 data 中
+    const datasetData = (createResponse as any).data || createResponse
     
-    ElMessage.success('数据集上传成功')
+    // 2. 如果有文件，上传文件
+    if (uploadForm.files.length > 0 && datasetData && datasetData.id) {
+      await uploadDatasetFiles(datasetData.id, uploadForm.files)
+    }
+    
+    ElMessage.success('数据集创建成功')
     handleCloseUpload()
     refreshDatasets()
   } catch (error: any) {
     console.error('上传数据集失败:', error)
-    ElMessage.error('上传失败，请稍后重试')
+    ElMessage.error(error.response?.data?.detail || '上传失败，请稍后重试')
   } finally {
     uploading.value = false
   }
 }
 
-const viewDataset = (dataset: any) => {
+const viewDataset = (dataset: Dataset) => {
   router.push(`/datasets/${dataset.id}`)
 }
 
-const useDataset = (dataset: any) => {
-  router.push(`/training/create?datasetId=${dataset.id}`)
+const previewDataset = async (dataset: Dataset) => {
+  currentPreviewDataset.value = dataset
+  previewDialogVisible.value = true
+  previewLoading.value = true
+  previewData.value = null
+  
+  try {
+    const response = await getDatasetPreview(dataset.id, 10)
+    previewData.value = (response as any).data || response
+  } catch (error) {
+    console.error('获取预览数据失败:', error)
+    ElMessage.error('无法获取该数据集的预览数据')
+  } finally {
+    previewLoading.value = false
+  }
 }
 
-const editDataset = (dataset: any) => {
+const editDataset = (dataset: Dataset) => {
   router.push(`/datasets/${dataset.id}/edit`)
 }
 
-const cloneDataset = async (dataset: any) => {
+const downloadDataset = async (dataset: Dataset) => {
+  if (!dataset.storage_path) {
+    ElMessage.warning('该数据集尚未上传任何文件，无法下载')
+    return
+  }
+
   try {
-    await ElMessageBox.confirm(
-      `确定要克隆数据集 "${dataset.name}" 吗？`,
-      '确认克隆',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'info'
-      }
-    )
+    ElMessage.info('正在获取下载链接...')
+    const response = await getDatasetDownloadUrl(dataset.id)
+    const data = (response as any).data || response
     
-    // 这里应该调用实际的API
-    // await datasetApi.cloneDataset(dataset.id)
-    
-    ElMessage.success('数据集克隆成功')
-    refreshDatasets()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      console.error('克隆数据集失败:', error)
-      ElMessage.error('克隆失败，请稍后重试')
+    if (data && data.url) {
+      // 创建一个隐藏的 a 标签触发下载
+      const link = document.createElement('a')
+      link.href = data.url
+      link.download = data.filename || `${dataset.name}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      ElMessage.success('开始下载数据集...')
+    } else {
+      throw new Error('未返回有效的下载链接')
     }
-  }
-}
-
-const downloadDataset = async (dataset: any) => {
-  try {
-    // 这里应该调用实际的API获取下载链接
-    // const response = await datasetApi.getDownloadUrl(dataset.id)
-    // window.open(response.data.url)
-    
-    ElMessage.info('正在准备下载链接...')
-  } catch (error) {
+  } catch (error: any) {
     console.error('获取下载链接失败:', error)
-    ElMessage.error('下载失败，请稍后重试')
+    ElMessage.error(error.response?.data?.detail || '下载失败，请稍后重试')
   }
 }
 
-const analyzeDataset = (dataset: any) => {
-  router.push(`/datasets/${dataset.id}/analysis`)
+const analyzeDataset = async (dataset: Dataset) => {
+  try {
+    ElMessage.info('正在提交分析任务...')
+    const response = await startDatasetAnalysis(dataset.id)
+    const data = (response as any).data || response
+    
+    ElMessage.success(data.message || '数据集分析已启动，请稍后查看结果')
+    
+    // 如果有专门的分析页面，可以延迟跳转过去
+    setTimeout(() => {
+      router.push(`/datasets/${dataset.id}/analysis`)
+    }, 1000)
+  } catch (error: any) {
+    console.error('启动分析任务失败:', error)
+    ElMessage.error(error.response?.data?.detail || '启动分析失败，请稍后重试')
+  }
 }
 
-const deleteDataset = async (dataset: any) => {
+const deleteDatasetAction = async (dataset: Dataset) => {
   try {
     await ElMessageBox.confirm(
       `确定要删除数据集 "${dataset.name}" 吗？此操作不可恢复。`,
@@ -986,16 +1020,10 @@ const deleteDataset = async (dataset: any) => {
       }
     )
     
-    // 这里应该调用实际的API
-    // await datasetApi.deleteDataset(dataset.id)
-    
-    const index = datasets.value.findIndex(d => d.id === dataset.id)
-    if (index > -1) {
-      datasets.value.splice(index, 1)
-      updateStats()
-    }
+    await deleteDataset(dataset.id)
     
     ElMessage.success('数据集删除成功')
+    refreshDatasets()
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error('删除数据集失败:', error)
@@ -1005,7 +1033,12 @@ const deleteDataset = async (dataset: any) => {
 }
 
 onMounted(() => {
-  refreshDatasets()
+  fetchDatasets()
+  fetchStats()
+})
+
+onUnmounted(() => {
+  stopAutoRefresh()
 })
 </script>
 

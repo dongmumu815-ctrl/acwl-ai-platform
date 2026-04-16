@@ -58,11 +58,11 @@ class DatasetService:
             dataset = Dataset(
                 name=dataset_data.name,
                 description=dataset_data.description,
-                dataset_type=DatasetType(dataset_data.dataset_type.value.title()),
+                dataset_type=dataset_data.dataset_type.value,
                 format=dataset_data.format,
                 is_public=dataset_data.is_public,
                 tags=json.dumps(dataset_data.tags, ensure_ascii=False) if dataset_data.tags else None,
-                status=DatasetStatus.PENDING,
+                status="pending",
                 created_by=user_id
             )
             
@@ -141,13 +141,13 @@ class DatasetService:
         # 类型过滤
         if filters.dataset_type:
             query = query.filter(
-                Dataset.dataset_type == DatasetType(filters.dataset_type.value.title())
+                Dataset.dataset_type == filters.dataset_type.value
             )
         
         # 状态过滤
         if filters.status:
             query = query.filter(
-                Dataset.status == DatasetStatus(filters.status.value)
+                Dataset.status == filters.status.value
             )
         
         # 公开状态过滤
@@ -210,9 +210,9 @@ class DatasetService:
             
             for field, value in update_data.items():
                 if field == "dataset_type" and value:
-                    setattr(dataset, field, DatasetType(value.value.title()))
+                    setattr(dataset, field, value.value)
                 elif field == "status" and value:
-                    setattr(dataset, field, DatasetStatus(value.value))
+                    setattr(dataset, field, value.value)
                 elif field == "tags" and value is not None:
                     setattr(dataset, field, json.dumps(value, ensure_ascii=False))
                 else:
@@ -298,22 +298,22 @@ class DatasetService:
             func.sum(Dataset.size)
         ).scalar() or 0
         processing = query.filter(
-            Dataset.status == DatasetStatus.PROCESSING
+            Dataset.status == "processing"
         ).count()
         
         # 按类型统计
         type_stats = {}
         for dataset_type in DatasetType:
             count = query.filter(
-                Dataset.dataset_type == dataset_type
+                Dataset.dataset_type == dataset_type.value
             ).count()
-            type_stats[dataset_type.value.lower()] = count
+            type_stats[dataset_type.value] = count
         
         # 按状态统计
         status_stats = {}
         for status in DatasetStatus:
             count = query.filter(
-                Dataset.status == status
+                Dataset.status == status.value
             ).count()
             status_stats[status.value] = count
         
@@ -373,7 +373,7 @@ class DatasetService:
             # 更新数据集信息
             dataset.storage_path = str(dataset_dir)
             dataset.size = total_size
-            dataset.status = DatasetStatus.PROCESSING
+            dataset.status = "processing"
             
             self.db.commit()
             self.db.refresh(dataset)

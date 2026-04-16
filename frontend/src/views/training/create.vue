@@ -224,6 +224,82 @@
               </el-col>
             </el-row>
           </template>
+
+          <!-- ms-swift 参数 -->
+          <template v-if="formData.framework === 'ms-swift'">
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="模型类型 (model_type)">
+                  <el-select v-model="formData.swiftParams.modelType" placeholder="请选择或输入" class="w-full" filterable allow-create>
+                    <el-option label="Qwen1.5-7B-Chat" value="qwen1half-7b-chat" />
+                    <el-option label="LLaMA3-8B-Instruct" value="llama3-8b-instruct" />
+                    <el-option label="BERT Base Chinese" value="bert" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="微调方式 (sft_type)">
+                  <el-select v-model="formData.swiftParams.sftType" class="w-full">
+                    <el-option label="LoRA" value="lora" />
+                    <el-option label="全量参数 (Full)" value="full" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="混合精度 (FP16/BF16)">
+                  <el-switch v-model="formData.swiftParams.fp16" active-text="开启" inactive-text="关闭" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            
+            <el-row :gutter="20" v-if="formData.swiftParams.sftType === 'lora'">
+              <el-col :span="8">
+                <el-form-item label="LoRA Rank (lora_rank)">
+                  <el-select v-model="formData.swiftParams.loraRank" class="w-full">
+                    <el-option label="8" :value="8" />
+                    <el-option label="16" :value="16" />
+                    <el-option label="32" :value="32" />
+                    <el-option label="64" :value="64" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="LoRA Alpha (lora_alpha)">
+                  <el-input-number v-model="formData.swiftParams.loraAlpha" :min="16" :max="128" :step="16" class="w-full" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="目标模块 (target_modules)">
+                  <el-select v-model="formData.swiftParams.targetModules" class="w-full">
+                    <el-option label="all-linear (推荐)" value="all-linear" />
+                    <el-option label="default (默认)" value="default" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="最大序列长度 (max_length)">
+                  <el-input-number v-model="formData.swiftParams.maxLength" :min="512" :max="32768" :step="1024" class="w-full" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="梯度累积 (gradient_accumulation)">
+                  <el-input-number v-model="formData.swiftParams.gradientAccumulationSteps" :min="1" :max="64" :step="1" class="w-full" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="注意力机制 (attn_impl)">
+                  <el-select v-model="formData.swiftParams.attnImpl" class="w-full">
+                    <el-option label="Flash Attention (推荐)" value="flash_attn" />
+                    <el-option label="SDPA (PyTorch 默认)" value="sdpa" />
+                    <el-option label="Eager" value="eager" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </template>
         </el-form>
 
         <!-- 步骤 3: 计算资源 -->
@@ -318,6 +394,7 @@ const frameworkMap: Record<string, any[]> = {
     { value: 'resnet', label: 'ResNet', desc: '经典的图像分类网络', icon: '🖼️' },
   ],
   nlp: [
+    { value: 'ms-swift', label: 'ms-swift (LLaMA/Qwen/BERT)', desc: '统一的大模型与小模型微调框架', icon: '🚀' },
     { value: 'bert', label: 'BERT 系列', desc: '适合文本分类、NER', icon: '📖' },
     { value: 'llm', label: 'LLaMA / Qwen', desc: '大语言模型指令微调', icon: '🧠' },
   ],
@@ -363,6 +440,17 @@ const formData = reactive({
     loraRank: 16,
     loraAlpha: 32,
     fp16: true
+  },
+  swiftParams: {
+    modelType: 'qwen1half-7b-chat',
+    sftType: 'lora',
+    fp16: true,
+    loraRank: 8,
+    loraAlpha: 32,
+    targetModules: 'all-linear',
+    maxLength: 2048,
+    gradientAccumulationSteps: 4,
+    attnImpl: 'flash_attn'
   },
 
   // 资源
