@@ -266,44 +266,29 @@
                 <div class="dataset-actions">
                   <el-button
                     size="small"
-                    @click="viewDataset(dataset)"
-                  >
-                    查看详情
-                  </el-button>
-                  <el-button
-                    size="small"
                     @click="previewDataset(dataset)"
                   >
                     预览数据
                   </el-button>
-                  <el-dropdown trigger="click">
-                    <el-button size="small" text>
-                      <el-icon><MoreFilled /></el-icon>
-                    </el-button>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item @click="editDataset(dataset)">
-                          <el-icon><Edit /></el-icon>
-                          编辑
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="downloadDataset(dataset)">
-                          <el-icon><Download /></el-icon>
-                          下载
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="analyzeDataset(dataset)">
-                          <el-icon><TrendCharts /></el-icon>
-                          数据分析
-                        </el-dropdown-item>
-                        <el-dropdown-item
-                          divided
-                          @click="deleteDatasetAction(dataset)"
-                        >
-                          <el-icon><Delete /></el-icon>
-                          删除
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
+                  <el-button
+                    size="small"
+                    @click="editDataset(dataset)"
+                  >
+                    编辑
+                  </el-button>
+                  <el-button
+                    size="small"
+                    @click="downloadDataset(dataset)"
+                  >
+                    下载
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="danger"
+                    @click="deleteDatasetAction(dataset)"
+                  >
+                    删除
+                  </el-button>
                 </div>
               </div>
             </el-col>
@@ -370,11 +355,8 @@
               </template>
             </el-table-column>
             
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column label="操作" width="140" fixed="right">
               <template #default="{ row }">
-                <el-button size="small" @click="viewDataset(row)">
-                  查看详情
-                </el-button>
                 <el-button
                   size="small"
                   @click="previewDataset(row)"
@@ -394,10 +376,6 @@
                       <el-dropdown-item @click="downloadDataset(row)">
                         <el-icon><Download /></el-icon>
                         下载
-                      </el-dropdown-item>
-                      <el-dropdown-item @click="analyzeDataset(row)">
-                        <el-icon><TrendCharts /></el-icon>
-                        数据分析
                       </el-dropdown-item>
                       <el-dropdown-item
                         divided
@@ -534,13 +512,90 @@
         </div>
       </template>
     </el-dialog>
-    <!-- 数据集预览对话框 -->
+
+    <!-- 数据集编辑对话框 -->
     <el-dialog
+      v-model="editDialogVisible"
+      title="编辑数据集"
+      width="600px"
+      :before-close="handleCloseEdit"
+    >
+      <el-form
+        ref="editFormRef"
+        :model="editForm"
+        label-width="100px"
+      >
+        <el-form-item label="数据集名称" prop="name">
+          <el-input
+            v-model="editForm.name"
+            placeholder="请输入数据集名称"
+          />
+        </el-form-item>
+
+        <el-form-item label="数据类型" prop="type">
+          <el-select
+            v-model="editForm.type"
+            placeholder="请选择数据类型"
+            style="width: 100%"
+          >
+            <el-option label="文本" value="text" />
+            <el-option label="图像" value="image" />
+            <el-option label="音频" value="audio" />
+            <el-option label="视频" value="video" />
+            <el-option label="表格" value="tabular" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="描述" prop="description">
+          <el-input
+            v-model="editForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入数据集描述"
+          />
+        </el-form-item>
+
+        <el-form-item label="标签">
+          <el-select
+            v-model="editForm.tags"
+            multiple
+            filterable
+            allow-create
+            placeholder="请选择或输入标签"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="tag in commonTags"
+              :key="tag"
+              :label="tag"
+              :value="tag"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="editDialogVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            @click="submitEdit"
+            :loading="editLoading"
+          >
+            保存
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 数据集预览抽屉 -->
+    <el-drawer
       v-model="previewDialogVisible"
       :title="`预览数据集: ${currentPreviewDataset?.name || ''}`"
-      width="700px"
+      direction="rtl"
+      size="60%"
     >
-      <div v-loading="previewLoading" class="preview-dialog-content">
+      <div v-loading="previewLoading" class="preview-drawer-content">
         <template v-if="previewData && previewData.samples && previewData.samples.length">
           <div v-if="currentPreviewDataset?.dataset_type === 'image'" class="image-preview-grid">
             <el-image
@@ -573,7 +628,7 @@
               <pre>{{ typeof sample === 'object' ? JSON.stringify(sample, null, 2) : sample }}</pre>
             </el-card>
           </div>
-          
+
           <div class="preview-footer-info">
             <el-text type="info" size="small">
               显示前 {{ previewData.samples.length }} 条样本，共计 {{ previewData.total_count }} 条记录
@@ -582,10 +637,7 @@
         </template>
         <el-empty v-else description="暂无预览数据" />
       </div>
-      <template #footer>
-        <el-button @click="previewDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
+    </el-drawer>
   </div>
 </template>
 
@@ -597,11 +649,11 @@ import {
   getDatasets,
   getDatasetStats,
   createDataset,
+  updateDataset,
   uploadDatasetFiles,
   deleteDataset,
   getDatasetPreview,
-  getDatasetDownloadUrl,
-  startDatasetAnalysis,
+  downloadDatasetFile,
   type Dataset,
   type DatasetListParams
 } from '@/api/datasets'
@@ -622,7 +674,6 @@ import {
   Edit,
   CopyDocument,
   Download,
-  TrendCharts,
   Delete,
   Picture,
   Headset,
@@ -686,6 +737,18 @@ const previewDialogVisible = ref(false)
 const previewLoading = ref(false)
 const currentPreviewDataset = ref<Dataset | null>(null)
 const previewData = ref<any>(null)
+
+// 编辑相关数据
+const editDialogVisible = ref(false)
+const editFormRef = ref<FormInstance>()
+const editLoading = ref(false)
+const currentEditDataset = ref<Dataset | null>(null)
+const editForm = reactive({
+  name: '',
+  type: '',
+  description: '',
+  tags: [] as string[]
+})
 
 // 表单验证规则
 const uploadRules: FormRules = {
@@ -935,10 +998,6 @@ const submitUpload = async () => {
   }
 }
 
-const viewDataset = (dataset: Dataset) => {
-  router.push(`/datasets/${dataset.id}`)
-}
-
 const previewDataset = async (dataset: Dataset) => {
   currentPreviewDataset.value = dataset
   previewDialogVisible.value = true
@@ -957,7 +1016,48 @@ const previewDataset = async (dataset: Dataset) => {
 }
 
 const editDataset = (dataset: Dataset) => {
-  router.push(`/datasets/${dataset.id}/edit`)
+  currentEditDataset.value = dataset
+  editForm.name = dataset.name
+  editForm.type = dataset.dataset_type || ''
+  editForm.description = dataset.description || ''
+  editForm.tags = dataset.tags || []
+  editDialogVisible.value = true
+}
+
+const handleCloseEdit = () => {
+  if (editFormRef.value) {
+    editFormRef.value.resetFields()
+  }
+  editForm.tags = []
+  currentEditDataset.value = null
+  editDialogVisible.value = false
+}
+
+const submitEdit = async () => {
+  if (!editFormRef.value || !currentEditDataset.value) return
+
+  try {
+    await editFormRef.value.validate()
+    editLoading.value = true
+
+    await updateDataset(currentEditDataset.value.id, {
+      name: editForm.name,
+      dataset_type: editForm.type,
+      description: editForm.description,
+      tags: editForm.tags
+    })
+
+    ElMessage.success('数据集更新成功')
+    handleCloseEdit()
+    refreshDatasets()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('更新数据集失败:', error)
+      ElMessage.error(error.response?.data?.detail || '更新失败，请稍后重试')
+    }
+  } finally {
+    editLoading.value = false
+  }
 }
 
 const downloadDataset = async (dataset: Dataset) => {
@@ -967,44 +1067,12 @@ const downloadDataset = async (dataset: Dataset) => {
   }
 
   try {
-    ElMessage.info('正在获取下载链接...')
-    const response = await getDatasetDownloadUrl(dataset.id)
-    const data = (response as any).data || response
-    
-    if (data && data.url) {
-      // 创建一个隐藏的 a 标签触发下载
-      const link = document.createElement('a')
-      link.href = data.url
-      link.download = data.filename || `${dataset.name}.zip`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
-      ElMessage.success('开始下载数据集...')
-    } else {
-      throw new Error('未返回有效的下载链接')
-    }
+    ElMessage.info('正在下载数据集...')
+    await downloadDatasetFile(dataset.id, `${dataset.name}.zip`)
+    ElMessage.success('数据集下载完成')
   } catch (error: any) {
-    console.error('获取下载链接失败:', error)
+    console.error('下载数据集失败:', error)
     ElMessage.error(error.response?.data?.detail || '下载失败，请稍后重试')
-  }
-}
-
-const analyzeDataset = async (dataset: Dataset) => {
-  try {
-    ElMessage.info('正在提交分析任务...')
-    const response = await startDatasetAnalysis(dataset.id)
-    const data = (response as any).data || response
-    
-    ElMessage.success(data.message || '数据集分析已启动，请稍后查看结果')
-    
-    // 如果有专门的分析页面，可以延迟跳转过去
-    setTimeout(() => {
-      router.push(`/datasets/${dataset.id}/analysis`)
-    }, 1000)
-  } catch (error: any) {
-    console.error('启动分析任务失败:', error)
-    ElMessage.error(error.response?.data?.detail || '启动分析失败，请稍后重试')
   }
 }
 
@@ -1452,6 +1520,31 @@ onUnmounted(() => {
           border-color: var(--el-border-color);
         }
       }
+    }
+  }
+}
+
+.preview-drawer-content {
+  overflow-x: auto;
+
+  .text-preview-list {
+    .preview-text-card {
+      overflow-x: auto;
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+    }
+  }
+
+  .tabular-preview {
+    overflow-x: auto;
+    min-width: 100%;
+
+    :deep(.el-table) {
+      min-width: 500px;
     }
   }
 }

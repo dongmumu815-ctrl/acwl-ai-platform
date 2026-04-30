@@ -391,6 +391,32 @@ async def get_server(
     return server_dict
 
 
+@router.get("/{server_id}/with-password", summary="获取服务器详情（含解密密码）")
+async def get_server_with_password(
+    server_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取服务器详情，包含解密后的SSH密码（仅内部使用）"""
+    from app.core.security import decrypt_datasource_password
+
+    query = select(Server).options(selectinload(Server.gpu_resources), selectinload(Server.group)).where(Server.id == server_id)
+    result = await db.execute(query)
+    server = result.scalar_one_or_none()
+    
+    if not server:
+        raise NotFoundError("服务器不存在")
+        
+    server_dict = server.__dict__.copy()
+    if server.group:
+        server_dict['group_name'] = server.group.name
+    
+    if server_dict.get('ssh_password'):
+        server_dict['ssh_password'] = decrypt_datasource_password(server_dict['ssh_password'])
+        
+    return server_dict
+
+
 @router.post("/", response_model=ServerResponse, summary="创建服务器")
 async def create_server(
     server_in: ServerCreate,

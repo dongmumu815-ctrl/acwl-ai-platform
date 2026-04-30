@@ -1,19 +1,18 @@
 <template>
   <div class="training-page">
-    <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-content">
         <div class="header-left">
           <h1 class="page-title">
             <el-icon><TrendCharts /></el-icon>
-            训练管理
+            微调任务管理
           </h1>
-          <p class="page-description">管理和监控您的模型训练任务</p>
+          <p class="page-description">管理和监控您的模型微调任务</p>
         </div>
         <div class="header-right">
           <el-button type="primary" @click="createTraining">
             <el-icon><Plus /></el-icon>
-            创建训练
+            创建微调任务
           </el-button>
           <el-button @click="refreshTrainings">
             <el-icon><Refresh /></el-icon>
@@ -22,8 +21,7 @@
         </div>
       </div>
     </div>
-    
-    <!-- 统计卡片 -->
+
     <div class="stats-cards">
       <el-row :gutter="20">
         <el-col :xs="12" :sm="6">
@@ -33,11 +31,10 @@
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ stats.total }}</div>
-              <div class="stat-label">总训练任务</div>
+              <div class="stat-label">总任务数</div>
             </div>
           </div>
         </el-col>
-        
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon running">
@@ -49,7 +46,6 @@
             </div>
           </div>
         </el-col>
-        
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
             <div class="stat-icon completed">
@@ -61,31 +57,29 @@
             </div>
           </div>
         </el-col>
-        
         <el-col :xs="12" :sm="6">
           <div class="stat-card">
-            <div class="stat-icon gpu">
-              <el-icon><Monitor /></el-icon>
+            <div class="stat-icon failed">
+              <el-icon><CircleClose /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stats.gpuUsage }}%</div>
-              <div class="stat-label">GPU使用率</div>
+              <div class="stat-value">{{ stats.failed }}</div>
+              <div class="stat-label">失败</div>
             </div>
           </div>
         </el-col>
       </el-row>
     </div>
-    
-    <!-- 筛选和搜索 -->
+
     <div class="filter-section">
       <el-card shadow="never">
         <el-form :model="filters" inline>
           <el-form-item label="搜索">
             <el-input
               v-model="filters.search"
-              placeholder="搜索训练任务名称"
+              placeholder="搜索任务名称"
               clearable
-              style="width: 250px"
+              style="width: 200px"
               @input="handleSearch"
             >
               <template #prefix>
@@ -93,7 +87,7 @@
               </template>
             </el-input>
           </el-form-item>
-          
+
           <el-form-item label="状态">
             <el-select
               v-model="filters.status"
@@ -104,71 +98,30 @@
             >
               <el-option label="全部" value="" />
               <el-option label="等待中" value="pending" />
+              <el-option label="队列中" value="queued" />
               <el-option label="运行中" value="running" />
               <el-option label="已完成" value="completed" />
               <el-option label="已失败" value="failed" />
-              <el-option label="已停止" value="stopped" />
+              <el-option label="已取消" value="cancelled" />
             </el-select>
           </el-form-item>
-          
-          <el-form-item label="任务类型">
+
+          <el-form-item label="微调方法">
             <el-select
-              v-model="filters.trainingMode"
-              placeholder="选择类型"
+              v-model="filters.method"
+              placeholder="选择方法"
               clearable
               style="width: 120px"
               @change="handleFilter"
             >
               <el-option label="全部" value="" />
-              <el-option label="全量训练" value="full_training" />
-              <el-option label="模型微调" value="fine_tuning" />
-            </el-select>
-          </el-form-item>
-          
-          <el-form-item label="领域/模态">
-            <el-select
-              v-model="filters.modelType"
-              placeholder="选择领域"
-              clearable
-              style="width: 150px"
-              @change="handleFilter"
-            >
-              <el-option label="全部" value="" />
-              <el-option label="计算机视觉(CV)" value="cv" />
-              <el-option label="自然语言处理(NLP)" value="nlp" />
-              <el-option label="语音处理(Audio)" value="audio" />
+              <el-option label="LoRA" value="lora" />
+              <el-option label="QLoRA" value="qlora" />
+              <el-option label="全量" value="full" />
+              <el-option label="Adaptor" value="adaptor" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="算法/模型">
-            <el-select
-              v-model="filters.framework"
-              placeholder="如 YOLO/BERT"
-              clearable
-              style="width: 150px"
-              @change="handleFilter"
-            >
-              <el-option label="全部" value="" />
-              <el-option label="YOLO 系列" value="yolo" />
-              <el-option label="BERT 系列" value="bert" />
-              <el-option label="ResNet" value="resnet" />
-              <el-option label="LLaMA/Qwen" value="llm" />
-            </el-select>
-          </el-form-item>
-          
-          <el-form-item label="排序">
-            <el-select
-              v-model="filters.sortBy"
-              style="width: 150px"
-              @change="handleSort"
-            >
-              <el-option label="创建时间" value="created_at" />
-              <el-option label="开始时间" value="started_at" />
-              <el-option label="完成时间" value="completed_at" />
-              <el-option label="训练进度" value="progress" />
-            </el-select>
-          </el-form-item>
-          
           <el-form-item>
             <el-button @click="resetFilters">
               <el-icon><RefreshLeft /></el-icon>
@@ -178,322 +131,144 @@
         </el-form>
       </el-card>
     </div>
-    
-    <!-- 训练任务列表 -->
+
     <div class="training-list">
       <el-card shadow="never">
-        <template #header>
-          <div class="card-header">
-            <span>训练任务列表</span>
-            <div class="header-actions">
-              <el-radio-group v-model="viewMode" size="small">
-                <el-radio-button value="grid">
-                  <el-icon><Grid /></el-icon>
-                </el-radio-button>
-                <el-radio-button value="list">
-                  <el-icon><List /></el-icon>
-                </el-radio-button>
-              </el-radio-group>
-            </div>
-          </div>
-        </template>
-        
-        <!-- 网格视图 -->
-        <div v-if="viewMode === 'grid'" class="grid-view">
-          <el-row :gutter="20">
-            <el-col
-              v-for="training in paginatedTrainings"
-              :key="training.id"
-              :xs="24"
-              :sm="12"
-              :md="8"
-              :lg="6"
-            >
-              <div class="training-card">
-                <div class="training-header">
-                  <div class="training-type">
-                    <el-tooltip :content="getModelTypeText(training.model_type)">
-                      <el-icon class="type-icon">
-                        <component :is="getTypeIcon(training.model_type)" />
-                      </el-icon>
-                    </el-tooltip>
-                    <el-tag size="small" type="info" class="ml-2">{{ getTrainingModeText(training.training_mode) }}</el-tag>
-                    <el-tag size="small" type="success" class="ml-2">{{ getFrameworkText(training.framework) }}</el-tag>
-                  </div>
-                  <div class="training-status">
-                    <el-tag
-                      :type="getStatusType(training.status)"
-                      size="small"
-                      :class="{ 'status-running': training.status === 'running' }"
-                    >
-                      {{ getStatusText(training.status) }}
-                    </el-tag>
-                  </div>
-                </div>
-                
-                <div class="training-content">
-                  <h3 class="training-name">{{ training.name }}</h3>
-                  <p class="training-description">{{ training.description }}</p>
-                  
-                  <div class="training-meta">
-                    <div class="meta-item">
-                      <el-icon><Calendar /></el-icon>
-                      <span>{{ formatDate(training.created_at) }}</span>
-                    </div>
-                    <div class="meta-item">
-                      <el-icon><Timer /></el-icon>
-                      <span>{{ formatDuration(training.duration) }}</span>
-                    </div>
-                    <div class="meta-item">
-                      <el-icon><Monitor /></el-icon>
-                      <span>{{ training.gpu_count }} GPU</span>
-                    </div>
-                  </div>
-                  
-                  <!-- 训练进度 -->
-                  <div class="training-progress">
-                    <div class="progress-header">
-                      <span class="progress-label">训练进度</span>
-                      <span class="progress-value">{{ training.progress }}%</span>
-                    </div>
-                    <el-progress
-                      :percentage="training.progress"
-                      :status="getProgressStatus(training.status)"
-                      :stroke-width="6"
-                    />
-                  </div>
-                  
-                  <!-- 训练指标 -->
-                  <div class="training-metrics" v-if="training.metrics">
-                    <div class="metrics-header">训练指标</div>
-                    <div class="metrics-grid">
-                      <div class="metric-item">
-                        <div class="metric-label">损失</div>
-                        <div class="metric-value">{{ training.metrics.loss?.toFixed(4) || 'N/A' }}</div>
-                      </div>
-                      <div class="metric-item">
-                        <div class="metric-label">准确率</div>
-                        <div class="metric-value">{{ training.metrics.accuracy ? (training.metrics.accuracy * 100).toFixed(2) + '%' : 'N/A' }}</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- 数据集信息 -->
-                  <div class="dataset-info">
-                    <div class="info-label">数据集:</div>
-                    <div class="info-value">{{ training.dataset_name }}</div>
-                  </div>
-                </div>
-                
-                <div class="training-actions">
-                  <el-button
-                    size="small"
-                    @click="viewTraining(training)"
-                  >
-                    查看
-                  </el-button>
-                  <el-button
-                    v-if="training.status === 'running'"
-                    type="warning"
-                    size="small"
-                    @click="stopTraining(training)"
-                  >
-                    停止
-                  </el-button>
-                  <el-button
-                    v-else-if="training.status === 'completed'"
-                    type="primary"
-                    size="small"
-                    @click="deployModel(training)"
-                  >
-                    部署
-                  </el-button>
-                  <el-dropdown trigger="click">
-                    <el-button size="small" text>
-                      <el-icon><MoreFilled /></el-icon>
-                    </el-button>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item @click="viewLogs(training)">
-                          <el-icon><Document /></el-icon>
-                          查看日志
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="viewMetrics(training)">
-                          <el-icon><TrendCharts /></el-icon>
-                          训练指标
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="cloneTraining(training)">
-                          <el-icon><CopyDocument /></el-icon>
-                          克隆训练
-                        </el-dropdown-item>
-                        <el-dropdown-item
-                          v-if="training.status === 'completed'"
-                          @click="downloadModel(training)"
-                        >
-                          <el-icon><Download /></el-icon>
-                          下载模型
-                        </el-dropdown-item>
-                        <el-dropdown-item
-                          divided
-                          @click="deleteTraining(training)"
-                        >
-                          <el-icon><Delete /></el-icon>
-                          删除
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </div>
+        <el-table
+          v-loading="loading"
+          :data="paginatedTrainings"
+          style="width: 100%"
+        >
+          <!-- <el-table-column prop="job_id" label="任务ID" width="200">
+            <template #default="{ row }">
+              <span class="job-id">{{ row.job_id }}</span>
+            </template>
+          </el-table-column> -->
+
+          <el-table-column prop="job_name" label="任务名称" width="250">
+            <template #default="{ row }">
+              <div class="job-name-cell">
+                <span class="name">{{ row.job_name }}</span>
+                <span class="model-name" v-if="row.base_model_name">
+                  基础模型: {{ row.base_model_name }}
+                </span>
               </div>
-            </el-col>
-          </el-row>
-        </div>
-        
-        <!-- 列表视图 -->
-        <div v-else class="list-view">
-          <el-table
-            :data="paginatedTrainings"
-            style="width: 100%"
-            @sort-change="handleTableSort"
-          >
-            <el-table-column prop="name" label="训练任务" sortable>
-              <template #default="{ row }">
-                <div class="training-name-cell">
-                  <div class="training-type-icon">
-                    <el-icon>
-                      <component :is="getTypeIcon(row.model_type)" />
-                    </el-icon>
-                  </div>
-                  <div class="training-info">
-                    <div class="name">{{ row.name }}</div>
-                    <div class="description">{{ row.description }}</div>
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-            
-            <el-table-column prop="model_type" label="类型/框架" width="180">
-              <template #default="{ row }">
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <span>{{ getModelTypeText(row.model_type) }}</span>
-                  <div>
-                    <el-tag size="small" type="info">{{ getTrainingModeText(row.training_mode) }}</el-tag>
-                    <el-tag size="small" type="success" style="margin-left: 4px;">{{ getFrameworkText(row.framework) }}</el-tag>
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-            
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag
-                  :type="getStatusType(row.status)"
-                  size="small"
-                  :class="{ 'status-running': row.status === 'running' }"
-                >
-                  {{ getStatusText(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            
-            <el-table-column prop="progress" label="进度" width="120">
-              <template #default="{ row }">
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="method" label="方法" width="100">
+            <template #default="{ row }">
+              <el-tag size="small">{{ getMethodText(row.method) }}</el-tag>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="dataset_name" label="数据集" width="150">
+            <template #default="{ row }">
+              {{ row.dataset_name }}
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="status" label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag
+                :type="getStatusType(row.status)"
+                :class="{ 'status-running': row.status === 'running' }"
+              >
+                {{ getStatusText(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="progress" label="进度" width="100">
+            <template #default="{ row }">
+              <div class="progress-cell">
                 <el-progress
                   :percentage="row.progress"
                   :status="getProgressStatus(row.status)"
-                  :stroke-width="6"
+                  :stroke-width="8"
                   :show-text="false"
                 />
                 <span class="progress-text">{{ row.progress }}%</span>
-              </template>
-            </el-table-column>
-            
-            <el-table-column prop="dataset_name" label="数据集" width="150">
-              <template #default="{ row }">
-                {{ row.dataset_name }}
-              </template>
-            </el-table-column>
-            
-            <el-table-column prop="gpu_count" label="GPU" width="80">
-              <template #default="{ row }">
-                {{ row.gpu_count }}
-              </template>
-            </el-table-column>
-            
-            <el-table-column prop="duration" label="耗时" width="120">
-              <template #default="{ row }">
-                {{ formatDuration(row.duration) }}
-              </template>
-            </el-table-column>
-            
-            <el-table-column prop="created_at" label="创建时间" width="180" sortable>
-              <template #default="{ row }">
-                {{ formatDate(row.created_at) }}
-              </template>
-            </el-table-column>
-            
-            <el-table-column label="操作" width="200" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewTraining(row)">
-                  查看
-                </el-button>
-                <el-button
-                  v-if="row.status === 'running'"
-                  type="warning"
-                  size="small"
-                  @click="stopTraining(row)"
-                >
-                  停止
-                </el-button>
-                <el-button
-                  v-else-if="row.status === 'completed'"
-                  type="primary"
-                  size="small"
-                  @click="deployModel(row)"
-                >
-                  部署
-                </el-button>
-                <el-dropdown trigger="click">
-                  <el-button size="small" text>
-                    <el-icon><MoreFilled /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item @click="viewLogs(row)">
-                        <el-icon><Document /></el-icon>
-                        查看日志
-                      </el-dropdown-item>
-                      <el-dropdown-item @click="viewMetrics(row)">
-                        <el-icon><TrendCharts /></el-icon>
-                        训练指标
-                      </el-dropdown-item>
-                      <el-dropdown-item @click="cloneTraining(row)">
-                        <el-icon><CopyDocument /></el-icon>
-                        克隆训练
-                      </el-dropdown-item>
-                      <el-dropdown-item
-                        v-if="row.status === 'completed'"
-                        @click="downloadModel(row)"
-                      >
-                        <el-icon><Download /></el-icon>
-                        下载模型
-                      </el-dropdown-item>
-                      <el-dropdown-item
-                        divided
-                        @click="deleteTraining(row)"
-                      >
-                        <el-icon><Delete /></el-icon>
-                        删除
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-        
-        <!-- 分页 -->
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="total_epochs" label="Epochs" width="90">
+            <template #default="{ row }">
+              {{ row.current_epoch || 0 }} / {{ row.total_epochs }}
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="created_at" label="创建时间" width="160">
+            <template #default="{ row }">
+              {{ formatDate(row.created_at) }}
+            </template>
+          </el-table-column>
+
+          <el-table-column label="操作" width="380" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="row.status === 'pending' || row.status === 'failed'"
+                type="primary"
+                size="small"
+                @click="startTraining(row)"
+              >
+                启动
+              </el-button>
+              <el-button
+                v-if="row.status === 'pending'"
+                type="default"
+                size="small"
+                @click="editTraining(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="row.status === 'running' || row.status === 'queued'"
+                type="warning"
+                size="small"
+                @click="cancelTraining(row)"
+              >
+                取消
+              </el-button>
+              <el-button
+                size="small"
+                @click="viewLogs(row)"
+              >
+                日志
+              </el-button>
+              <el-button
+                size="small"
+                type="info"
+                @click="viewCommand(row)"
+              >
+                命令
+              </el-button>
+              <el-button
+                size="small"
+                type="success"
+                @click="viewCurves(row)"
+              >
+                曲线
+              </el-button>
+              <el-button
+                size="small"
+                type="warning"
+                @click="viewChat(row)"
+              >
+                测试
+              </el-button>
+              <el-button
+                size="small"
+                type="danger"
+                @click="deleteTraining(row)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
         <div class="pagination-wrapper">
           <el-pagination
             v-model:current-page="pagination.currentPage"
@@ -507,11 +282,116 @@
         </div>
       </el-card>
     </div>
+
+    <el-drawer v-model="logDrawerVisible" title="任务日志" direction="rtl" size="80%" :with-header="true">
+      <template #title>
+        <span>任务日志 - {{ currentLogJob?.job_name }}</span>
+        <el-button type="primary" size="small" style="margin-left: 16px" @click="refreshLogs">
+          刷新
+        </el-button>
+      </template>
+      <div class="log-content">
+        <pre ref="logPreRef">{{ logContent }}</pre>
+      </div>
+    </el-drawer>
+
+    <el-drawer v-model="commandDrawerVisible" title="运行命令" direction="rtl" size="50%" :with-header="true">
+      <template #title>
+        <span>运行命令 - {{ currentCommandJob?.job_name }}</span>
+      </template>
+      <div class="command-content">
+        <pre>{{ commandContent }}</pre>
+        <el-button type="primary" @click="copyCommand">复制命令</el-button>
+      </div>
+    </el-drawer>
+
+    <el-drawer v-model="curvesDrawerVisible" title="训练曲线" direction="rtl" size="60%" :with-header="true">
+      <template #title>
+        <span>训练曲线 - {{ currentCurvesJob?.job_name }}</span>
+        <el-button type="primary" size="small" style="margin-left: 16px" @click="refreshCurves">
+          刷新
+        </el-button>
+      </template>
+      <div class="curves-content">
+        <div class="curve-chart" ref="lossChartRef"></div>
+        <div class="curve-chart" ref="accChartRef"></div>
+        <div class="curve-chart" ref="lrChartRef"></div>
+        <div class="curve-chart" ref="epochChartRef"></div>
+        <div class="curve-chart" ref="gradNormChartRef"></div>
+      </div>
+    </el-drawer>
+
+    <el-drawer v-model="chatDrawerVisible" title="模型对话测试" direction="rtl" size="50%" :with-header="true">
+      <template #title>
+        <span>模型对话 - {{ currentChatJob?.job_name }}</span>
+        <el-tag v-if="currentChatJob?.model_status === 'running'" type="success" style="margin-left: 8px">服务运行中</el-tag>
+        <el-tag v-else type="danger" style="margin-left: 8px">服务已停止</el-tag>
+        <el-button
+          v-if="currentChatJob?.model_status !== 'running' && currentChatJob?.status === 'completed'"
+          type="success"
+          size="small"
+          style="margin-left: 16px"
+          @click="startModelService"
+        >
+          启动服务
+        </el-button>
+        <el-button
+          v-if="currentChatJob?.model_status === 'running'"
+          type="warning"
+          size="small"
+          style="margin-left: 16px"
+          @click="stopModelService"
+        >
+          停止服务
+        </el-button>
+      </template>
+      <div class="chat-container">
+        <template v-if="currentChatJob?.model_status === 'running'">
+          <el-alert
+            title="模型服务已启动"
+            type="success"
+            :closable="false"
+            style="margin-bottom: 16px"
+          >
+            <template #default>
+              <p>服务地址: {{ `http://${currentChatJob?.server_ip}:${currentChatJob?.model_service_port}` }}</p>
+            </template>
+          </el-alert>
+          <div class="chat-messages" ref="chatMessagesRef">
+            <div v-for="(msg, index) in chatMessages" :key="index" :class="['chat-message', msg.role]">
+              <div class="message-avatar">{{ msg.role === 'user' ? '我' : 'AI' }}</div>
+              <div class="message-content">{{ msg.content }}</div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <el-input
+              v-model="chatInput"
+              type="textarea"
+              :rows="4"
+              resize="none"
+              placeholder="输入消息... (Enter发送, Shift+Enter换行)"
+              @keydown.enter="handleEnterKey"
+            />
+            <el-button type="primary" @click="sendChatMessage" :loading="chatLoading">发送</el-button>
+          </div>
+        </template>
+        <template v-else>
+          <el-alert
+            title="模型服务未启动"
+            type="warning"
+            :closable="false"
+            style="margin-bottom: 16px"
+          >
+            请先启动模型服务后再进行对话测试
+          </el-alert>
+        </template>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -520,100 +400,88 @@ import {
   Refresh,
   Loading,
   CircleCheck,
+  CircleClose,
   Monitor,
   Search,
-  RefreshLeft,
-  Grid,
-  List,
-  Calendar,
-  Timer,
-  MoreFilled,
-  Document,
-  CopyDocument,
-  Download,
-  Delete,
-  Picture,
-  Headset,
-  VideoCamera,
-  ChatDotRound,
-  Cpu
+  RefreshLeft
 } from '@element-plus/icons-vue'
+import { fineTuningApi, type FineTuningJob, FineTuningStatus, FineTuningMethod } from '@/api/training'
+import * as echarts from 'echarts'
 
 const router = useRouter()
 
-// 响应式数据
-const viewMode = ref('grid')
+const viewMode = ref('list')
 let refreshTimer: NodeJS.Timeout | null = null
 
-// 统计数据
 const stats = reactive({
   total: 0,
   running: 0,
   completed: 0,
-  gpuUsage: 0
+  failed: 0
 })
 
-// 筛选条件
 const filters = reactive({
   search: '',
   status: '',
-  modelType: '',
-  trainingMode: '',
-  framework: '',
-  sortBy: 'created_at'
+  method: ''
 })
 
-// 分页
 const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
 
-// 训练任务列表
-const trainings = ref<any[]>([])
+const trainings = ref<FineTuningJob[]>([])
+const loading = ref(false)
+const logDrawerVisible = ref(false)
+const logContent = ref('')
+const currentLogJob = ref<FineTuningJob | null>(null)
+const logPreRef = ref<HTMLPreElement | null>(null)
+const commandDrawerVisible = ref(false)
+const commandContent = ref('')
+const currentCommandJob = ref<FineTuningJob | null>(null)
 
-// 计算属性
+const curvesDrawerVisible = ref(false)
+const currentCurvesJob = ref<FineTuningJob | null>(null)
+const chatDrawerVisible = ref(false)
+const currentChatJob = ref<FineTuningJob | null>(null)
+const chatMessages = ref<{ role: string; content: string }[]>([])
+const chatInput = ref('')
+const chatLoading = ref(false)
+const chatMessagesRef = ref<HTMLDivElement | null>(null)
+const lossChartRef = ref<HTMLDivElement | null>(null)
+const accChartRef = ref<HTMLDivElement | null>(null)
+const lrChartRef = ref<HTMLDivElement | null>(null)
+const epochChartRef = ref<HTMLDivElement | null>(null)
+const gradNormChartRef = ref<HTMLDivElement | null>(null)
+let lossChart: echarts.ECharts | null = null
+let accChart: echarts.ECharts | null = null
+let lrChart: echarts.ECharts | null = null
+let epochChart: echarts.ECharts | null = null
+let gradNormChart: echarts.ECharts | null = null
+
 const filteredTrainings = computed(() => {
   let result = [...trainings.value]
-  
-  // 搜索过滤
+
   if (filters.search) {
     const search = filters.search.toLowerCase()
-    result = result.filter(training => 
-      training.name.toLowerCase().includes(search) ||
-      training.description.toLowerCase().includes(search)
+    result = result.filter(training =>
+      training.job_name.toLowerCase().includes(search) ||
+      training.job_id.toLowerCase().includes(search) ||
+      training.fine_tuned_model_name?.toLowerCase().includes(search) ||
+      training.dataset_name.toLowerCase().includes(search)
     )
   }
-  
-  // 状态过滤
+
   if (filters.status) {
     result = result.filter(training => training.status === filters.status)
   }
-  
-  // 模态过滤
-  if (filters.modelType) {
-    result = result.filter(training => training.model_type === filters.modelType)
+
+  if (filters.method) {
+    result = result.filter(training => training.method === filters.method)
   }
 
-  // 任务类型过滤
-  if (filters.trainingMode) {
-    result = result.filter(training => training.training_mode === filters.trainingMode)
-  }
-
-  // 算法/框架过滤
-  if (filters.framework) {
-    result = result.filter(training => training.framework === filters.framework)
-  }
-  
-  // 排序
-  result.sort((a, b) => {
-    const field = filters.sortBy
-    if (field === 'created_at' || field === 'started_at' || field === 'completed_at') {
-      return new Date(b[field] || 0).getTime() - new Date(a[field] || 0).getTime()
-    }
-    return b[field] - a[field]
-  })
-  
   return result
 })
 
@@ -623,34 +491,19 @@ const paginatedTrainings = computed(() => {
   return filteredTrainings.value.slice(start, end)
 })
 
-// 方法
 const formatDate = (date: string) => {
   return new Date(date).toLocaleString('zh-CN')
-}
-
-const formatDuration = (seconds: number) => {
-  if (!seconds) return 'N/A'
-  
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${secs}s`
-  } else if (minutes > 0) {
-    return `${minutes}m ${secs}s`
-  } else {
-    return `${secs}s`
-  }
 }
 
 const getStatusType = (status: string) => {
   const statusMap: Record<string, string> = {
     pending: 'info',
+    queued: 'info',
     running: 'warning',
     completed: 'success',
     failed: 'danger',
-    stopped: 'info'
+    cancelled: 'info',
+    preparing: 'info'
   }
   return statusMap[status] || 'info'
 }
@@ -658,12 +511,24 @@ const getStatusType = (status: string) => {
 const getStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
     pending: '等待中',
+    queued: '队列中',
     running: '运行中',
     completed: '已完成',
     failed: '已失败',
-    stopped: '已停止'
+    cancelled: '已取消',
+    preparing: '准备中'
   }
   return statusMap[status] || '未知'
+}
+
+const getMethodText = (method: string) => {
+  const methodMap: Record<string, string> = {
+    lora: 'LoRA',
+    qlora: 'QLoRA',
+    full: '全量',
+    adaptor: 'Adaptor'
+  }
+  return methodMap[method] || method
 }
 
 const getProgressStatus = (status: string) => {
@@ -672,64 +537,12 @@ const getProgressStatus = (status: string) => {
   return undefined
 }
 
-const getModelTypeText = (type: string) => {
-  const typeMap: Record<string, string> = {
-    cv: '计算机视觉',
-    nlp: '自然语言处理',
-    audio: '语音处理'
-  }
-  return typeMap[type] || type
-}
-
-const getTypeIcon = (type: string) => {
-  const iconMap: Record<string, any> = {
-    cv: Picture,
-    nlp: ChatDotRound,
-    audio: Headset
-  }
-  return iconMap[type] || Cpu
-}
-
-const getFrameworkText = (framework: string) => {
-  const map: Record<string, string> = {
-    yolo: 'YOLO',
-    bert: 'BERT',
-    resnet: 'ResNet',
-    llm: 'LLaMA/Qwen'
-  }
-  return map[framework] || framework
-}
-
-const getTrainingModeText = (mode: string) => {
-  return mode === 'full_training' ? '全量训练' : (mode === 'fine_tuning' ? '模型微调' : mode)
-}
-
 const handleSearch = () => {
   pagination.currentPage = 1
 }
 
 const handleFilter = () => {
   pagination.currentPage = 1
-}
-
-const handleSort = () => {
-  pagination.currentPage = 1
-}
-
-const resetFilters = () => {
-  filters.search = ''
-  filters.status = ''
-  filters.modelType = ''
-  filters.trainingMode = ''
-  filters.framework = ''
-  filters.sortBy = 'created_at'
-  pagination.currentPage = 1
-}
-
-const handleTableSort = ({ prop, order }: any) => {
-  if (order) {
-    filters.sortBy = prop
-  }
 }
 
 const handleSizeChange = (size: number) => {
@@ -741,214 +554,99 @@ const handleCurrentChange = (page: number) => {
   pagination.currentPage = page
 }
 
-const refreshTrainings = async () => {
-  try {
-    // 这里应该调用实际的API
-    // const response = await trainingApi.getTrainings()
-    // trainings.value = response.data
-    
-    // 模拟数据
-    trainings.value = [
-      {
-        id: '1',
-        name: 'ResNet50图像分类训练',
-        description: '使用CIFAR-10数据集训练ResNet50模型进行图像分类',
-        model_type: 'cv',
-        training_mode: 'full_training',
-        framework: 'resnet',
-        status: 'running',
-        progress: 65,
-        dataset_name: 'CIFAR-10',
-        gpu_count: 2,
-        duration: 3600,
-        metrics: {
-          loss: 0.3245,
-          accuracy: 0.8567
-        },
-        created_at: '2024-01-20T10:30:00Z',
-        started_at: '2024-01-20T10:35:00Z'
-      },
-      {
-        id: '2',
-        name: 'BERT文本分类微调',
-        description: '基于预训练BERT模型进行中文情感分析任务微调',
-        model_type: 'nlp',
-        training_mode: 'fine_tuning',
-        framework: 'bert',
-        status: 'completed',
-        progress: 100,
-        dataset_name: '中文情感分析语料库',
-        gpu_count: 1,
-        duration: 7200,
-        metrics: {
-          loss: 0.1234,
-          accuracy: 0.9234
-        },
-        created_at: '2024-01-18T14:20:00Z',
-        started_at: '2024-01-18T14:25:00Z',
-        completed_at: '2024-01-18T16:25:00Z'
-      },
-      {
-        id: '3',
-        name: 'YOLO目标检测训练',
-        description: '训练YOLOv8模型进行自定义目标检测',
-        model_type: 'cv',
-        training_mode: 'full_training',
-        framework: 'yolo',
-        status: 'failed',
-        progress: 23,
-        dataset_name: '自定义检测数据集',
-        gpu_count: 4,
-        duration: 1800,
-        metrics: {
-          loss: 2.5678,
-          accuracy: 0.2345
-        },
-        created_at: '2024-01-19T09:15:00Z',
-        started_at: '2024-01-19T09:20:00Z'
-      },
-      {
-        id: '4',
-        name: 'Whisper语音识别训练',
-        description: '基于Whisper模型进行中文语音识别训练',
-        model_type: 'audio',
-        training_mode: 'full_training',
-        framework: 'whisper',
-        status: 'pending',
-        progress: 0,
-        dataset_name: '语音识别数据集',
-        gpu_count: 2,
-        duration: 0,
-        metrics: null,
-        created_at: '2024-01-21T08:45:00Z'
-      },
-      {
-        id: '5',
-        name: 'GPT-2语言模型训练',
-        description: '训练小型GPT-2模型用于文本生成',
-        model_type: 'nlp',
-        training_mode: 'full_training',
-        framework: 'llm',
-        status: 'running',
-        progress: 12,
-        dataset_name: '中文文本语料',
-        gpu_count: 8,
-        duration: 14400,
-        metrics: {
-          loss: 3.2456,
-          perplexity: 25.67
-        },
-        created_at: '2024-01-17T16:30:00Z',
-        started_at: '2024-01-17T16:35:00Z'
-      }
-    ]
-    
-    // 更新统计数据
-    updateStats()
-    
-    ElMessage.success('训练任务列表已刷新')
-  } catch (error) {
-    console.error('刷新训练任务列表失败:', error)
-    ElMessage.error('刷新失败，请稍后重试')
-  }
+const resetFilters = () => {
+  filters.search = ''
+  filters.status = ''
+  filters.method = ''
+  pagination.currentPage = 1
+  refreshTrainings()
 }
 
-const updateStats = () => {
-  stats.total = trainings.value.length
-  stats.running = trainings.value.filter(t => t.status === 'running').length
-  stats.completed = trainings.value.filter(t => t.status === 'completed').length
-  stats.gpuUsage = Math.floor(Math.random() * 100) // 模拟GPU使用率
+const refreshTrainings = async () => {
+  loading.value = true
+  try {
+    const params = {
+      skip: (pagination.currentPage - 1) * pagination.pageSize,
+      limit: pagination.pageSize,
+      search: filters.search || undefined,
+      status: filters.status as FineTuningStatus || undefined,
+      method: filters.method as FineTuningMethod || undefined
+    }
+
+    const [jobsRes, statsRes] = await Promise.all([
+      fineTuningApi.getJobs(params),
+      fineTuningApi.getStats()
+    ])
+
+    trainings.value = jobsRes.items
+    pagination.total = jobsRes.total
+
+    stats.total = statsRes.total_jobs
+    stats.running = statsRes.running_jobs
+    stats.completed = statsRes.completed_jobs
+    stats.failed = statsRes.failed_jobs
+  } catch (error) {
+    console.error('刷新任务列表失败:', error)
+    ElMessage.error('刷新失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
 }
 
 const createTraining = () => {
   router.push('/training/create')
 }
 
-const viewTraining = (training: any) => {
-  router.push(`/training/${training.id}`)
-}
-
-const stopTraining = async (training: any) => {
+const startTraining = async (training: FineTuningJob) => {
   try {
     await ElMessageBox.confirm(
-      `确定要停止训练任务 "${training.name}" 吗？`,
-      '确认停止',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    // 这里应该调用实际的API
-    // await trainingApi.stopTraining(training.id)
-    
-    training.status = 'stopped'
-    updateStats()
-    
-    ElMessage.success('训练任务已停止')
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      console.error('停止训练任务失败:', error)
-      ElMessage.error('停止失败，请稍后重试')
-    }
-  }
-}
-
-const deployModel = (training: any) => {
-  router.push(`/deployments/create?trainingId=${training.id}`)
-}
-
-const viewLogs = (training: any) => {
-  router.push(`/training/${training.id}/logs`)
-}
-
-const viewMetrics = (training: any) => {
-  router.push(`/training/${training.id}/metrics`)
-}
-
-const cloneTraining = async (training: any) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要克隆训练任务 "${training.name}" 吗？`,
-      '确认克隆',
+      `确定要启动微调任务 "${training.job_name}" 吗？`,
+      '确认启动',
       {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'info'
       }
     )
-    
-    // 这里应该调用实际的API
-    // await trainingApi.cloneTraining(training.id)
-    
-    ElMessage.success('训练任务克隆成功')
+
+    await fineTuningApi.startJob(training.id)
+    ElMessage.success('任务已启动')
     refreshTrainings()
   } catch (error: any) {
     if (error !== 'cancel') {
-      console.error('克隆训练任务失败:', error)
-      ElMessage.error('克隆失败，请稍后重试')
+      console.error('启动任务失败:', error)
+      ElMessage.error('启动失败，请稍后重试')
     }
   }
 }
 
-const downloadModel = async (training: any) => {
+const cancelTraining = async (training: FineTuningJob) => {
   try {
-    // 这里应该调用实际的API获取下载链接
-    // const response = await trainingApi.getModelDownloadUrl(training.id)
-    // window.open(response.data.url)
-    
-    ElMessage.info('正在准备模型下载链接...')
-  } catch (error) {
-    console.error('获取模型下载链接失败:', error)
-    ElMessage.error('下载失败，请稍后重试')
+    await ElMessageBox.confirm(
+      `确定要取消微调任务 "${training.job_name}" 吗？`,
+      '确认取消',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    await fineTuningApi.cancelJob(training.id)
+    ElMessage.success('任务已取消')
+    refreshTrainings()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('取消任务失败:', error)
+      ElMessage.error('取消失败，请稍后重试')
+    }
   }
 }
 
-const deleteTraining = async (training: any) => {
+const deleteTraining = async (training: FineTuningJob) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除训练任务 "${training.name}" 吗？此操作不可恢复。`,
+      `确定要删除微调任务 "${training.job_name}" 吗？此操作不可恢复。`,
       '确认删除',
       {
         confirmButtonText: '确定',
@@ -956,55 +654,349 @@ const deleteTraining = async (training: any) => {
         type: 'warning'
       }
     )
-    
-    // 这里应该调用实际的API
-    // await trainingApi.deleteTraining(training.id)
-    
-    const index = trainings.value.findIndex(t => t.id === training.id)
-    if (index > -1) {
-      trainings.value.splice(index, 1)
-      updateStats()
-    }
-    
-    ElMessage.success('训练任务删除成功')
+
+    await fineTuningApi.deleteJob(training.id)
+    ElMessage.success('任务删除成功')
+    refreshTrainings()
   } catch (error: any) {
     if (error !== 'cancel') {
-      console.error('删除训练任务失败:', error)
+      console.error('删除任务失败:', error)
       ElMessage.error('删除失败，请稍后重试')
     }
   }
 }
 
-// 自动刷新运行中的训练任务
+const viewLogs = async (training: FineTuningJob) => {
+  try {
+    currentLogJob.value = training
+    logDrawerVisible.value = true
+    const res = await fineTuningApi.getJobLogs(training.job_id)
+    logContent.value = (res.log_content || '暂无日志').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    nextTick(() => {
+      if (logPreRef.value) {
+        logPreRef.value.scrollTop = logPreRef.value.scrollHeight
+      }
+    })
+  } catch (error) {
+    console.error('获取日志失败:', error)
+    ElMessage.error('获取日志失败，请稍后重试')
+  }
+}
+
+const refreshLogs = async () => {
+  if (!currentLogJob.value) return
+  try {
+    const res = await fineTuningApi.getJobLogs(currentLogJob.value.job_id)
+    logContent.value = (res.log_content || '暂无日志').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    nextTick(() => {
+      if (logPreRef.value) {
+        logPreRef.value.scrollTop = logPreRef.value.scrollHeight
+      }
+    })
+  } catch (error) {
+    console.error('刷新日志失败:', error)
+    ElMessage.error('刷新日志失败，请稍后重试')
+  }
+}
+
+const editTraining = (training: FineTuningJob) => {
+  router.push(`/training/edit/${training.id}`)
+}
+
+const viewCommand = (training: FineTuningJob) => {
+  currentCommandJob.value = training
+  commandDrawerVisible.value = true
+  const cudaDevices = training.cuda_devices
+  const condaActivate = '/data/softs/miniconda3/bin/activate'
+  const swiftArgs = buildSwiftArgs(training)
+  if (cudaDevices) {
+    commandContent.value = `export CUDA_VISIBLE_DEVICES=${cudaDevices} && source ${condaActivate} ${training.conda_env || 'msswift'} && swift sft \\\n  ${swiftArgs}`
+  } else {
+    commandContent.value = `source ${condaActivate} ${training.conda_env || 'msswift'} && swift sft \\\n  ${swiftArgs}`
+  }
+}
+
+const viewCurves = async (training: FineTuningJob) => {
+  currentCurvesJob.value = training
+  curvesDrawerVisible.value = true
+  await loadCurvesData(training.job_id)
+}
+
+const refreshCurves = async () => {
+  if (!currentCurvesJob.value) return
+  await loadCurvesData(currentCurvesJob.value.job_id)
+}
+
+const viewChat = async (training: FineTuningJob) => {
+  currentChatJob.value = training
+  chatDrawerVisible.value = true
+  try {
+    const freshJob = await fineTuningApi.getJob(training.id)
+    if (freshJob) {
+      currentChatJob.value = freshJob
+    }
+  } catch (error) {
+    console.error('获取任务详情失败:', error)
+  }
+}
+
+const startModelService = async () => {
+  if (!currentChatJob.value) return
+  try {
+    const res = await fineTuningApi.startModelService(currentChatJob.value.id)
+    ElMessage.success(res.message)
+    currentChatJob.value.model_status = 'running'
+    currentChatJob.value.model_service_port = res.port
+    await refreshTrainings()
+  } catch (error: any) {
+    ElMessage.error(error.message || '启动模型服务失败')
+  }
+}
+
+const stopModelService = async () => {
+  if (!currentChatJob.value) return
+  try {
+    const res = await fineTuningApi.stopModelService(currentChatJob.value.id)
+    ElMessage.success(res.message)
+    currentChatJob.value.model_status = 'stopped'
+    await refreshTrainings()
+  } catch (error: any) {
+    ElMessage.error(error.message || '停止模型服务失败')
+  }
+}
+
+const handleEnterKey = (e: KeyboardEvent) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    sendChatMessage()
+  }
+}
+
+const sendChatMessage = async () => {
+  if (!chatInput.value.trim() || !currentChatJob.value) return
+
+  const userMessage = chatInput.value.trim()
+  chatInput.value = ''
+
+  chatMessages.value.push({
+    role: 'user',
+    content: userMessage
+  })
+
+  chatLoading.value = true
+
+  try {
+    const res = await fineTuningApi.chatWithModel(
+      currentChatJob.value.id,
+      userMessage,
+      currentChatJob.value.system_prompt || undefined
+    )
+
+    chatMessages.value.push({
+      role: 'assistant',
+      content: res.response
+    })
+  } catch (error: any) {
+    ElMessage.error(error.message || '发送消息失败')
+    chatMessages.value.push({
+      role: 'assistant',
+      content: `错误: ${error.message || '未知错误'}`
+    })
+  } finally {
+    chatLoading.value = false
+    nextTick(() => {
+      if (chatMessagesRef.value) {
+        chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight
+      }
+    })
+  }
+}
+
+const loadCurvesData = async (jobId: string) => {
+  try {
+    const res = await fineTuningApi.getJobCurves(jobId)
+    const curves = res.curves
+
+    nextTick(() => {
+      initLossChart(curves.loss)
+      const accData = curves.acc && curves.acc.length > 0 ? curves.acc : (curves.token_acc || [])
+      const accTitle = curves.acc && curves.acc.length > 0 ? '准确率 (Accuracy)' : 'Token准确率 (Token Accuracy)'
+      initAccChart(accData, accTitle)
+      initLRChart(curves.learning_rate)
+      initEpochChart(curves.epoch)
+      initGradNormChart(curves.grad_norm)
+    })
+  } catch (error) {
+    console.error('获取训练曲线失败:', error)
+    ElMessage.error('获取训练曲线失败')
+  }
+}
+
+const initLossChart = (data: { step: number; value: number }[]) => {
+  if (!lossChartRef.value) return
+  if (!lossChart) {
+    lossChart = echarts.init(lossChartRef.value)
+  }
+  const option = {
+    title: { text: '损失函数 (loss)', left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '10%', bottom: '15%' },
+    xAxis: { type: 'value', name: 'Step', nameLocation: 'center', nameGap: 30 },
+    yAxis: { type: 'value', name: 'Loss', nameLocation: 'center', nameGap: 40 },
+    series: [{
+      data: data.map(d => [d.step, d.value]),
+      type: 'line',
+      smooth: true,
+      showSymbol: false
+    }]
+  }
+  lossChart.setOption(option)
+}
+
+const initAccChart = (data: { step: number; value: number }[], title: string = '准确率 (Accuracy)') => {
+  if (!accChartRef.value) return
+  if (!accChart) {
+    accChart = echarts.init(accChartRef.value)
+  }
+  const option = {
+    title: { text: title, left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '10%', bottom: '15%' },
+    xAxis: { type: 'value', name: 'Step', nameLocation: 'center', nameGap: 30 },
+    yAxis: { type: 'value', name: 'Accuracy', nameLocation: 'center', nameGap: 40 },
+    series: [{
+      data: data.map(d => [d.step, d.value]),
+      type: 'line',
+      smooth: true,
+      showSymbol: false
+    }]
+  }
+  accChart.setOption(option)
+}
+
+const initLRChart = (data: { step: number; value: number }[]) => {
+  if (!lrChartRef.value) return
+  if (!lrChart) {
+    lrChart = echarts.init(lrChartRef.value)
+  }
+  const option = {
+    title: { text: '学习率 (Learning Rate)', left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '10%', bottom: '15%' },
+    xAxis: { type: 'value', name: 'Step', nameLocation: 'center', nameGap: 30 },
+    yAxis: { type: 'value', name: 'LR', nameLocation: 'center', nameGap: 40 },
+    series: [{
+      data: data.map(d => [d.step, d.value]),
+      type: 'line',
+      smooth: true,
+      showSymbol: false
+    }]
+  }
+  lrChart.setOption(option)
+}
+
+const initEpochChart = (data: { step: number; value: number }[]) => {
+  if (!epochChartRef.value) return
+  if (!epochChart) {
+    epochChart = echarts.init(epochChartRef.value)
+  }
+  const option = {
+    title: { text: '训练轮次 (Epoch)', left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '10%', bottom: '15%' },
+    xAxis: { type: 'value', name: 'Step', nameLocation: 'center', nameGap: 30 },
+    yAxis: { type: 'value', name: 'Epoch', nameLocation: 'center', nameGap: 40 },
+    series: [{
+      data: data.map(d => [d.step, d.value]),
+      type: 'line',
+      smooth: true,
+      showSymbol: false
+    }]
+  }
+  epochChart.setOption(option)
+}
+
+const initGradNormChart = (data: { step: number; value: number }[]) => {
+  if (!gradNormChartRef.value) return
+  if (!gradNormChart) {
+    gradNormChart = echarts.init(gradNormChartRef.value)
+  }
+  const option = {
+    title: { text: '梯度范数 (Grad Norm)', left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '10%', bottom: '15%' },
+    xAxis: { type: 'value', name: 'Step', nameLocation: 'center', nameGap: 30 },
+    yAxis: { type: 'value', name: 'Grad Norm', nameLocation: 'center', nameGap: 40 },
+    series: [{
+      data: data.map(d => [d.step, d.value]),
+      type: 'line',
+      smooth: true,
+      showSymbol: false
+    }]
+  }
+  gradNormChart.setOption(option)
+}
+
+const buildSwiftArgs = (job: FineTuningJob): string => {
+  const args: string[] = [
+    `--model '${job.base_model_name}'`,
+    `--model_type '${job.model_type || 'qwen2'}'`,
+    `--template '${job.template || 'qwen2_5'}'`,
+    `--dataset '${job.dataset_path || job.dataset_name}'`,
+    `--torch_dtype '${job.torch_dtype || 'bfloat16'}'`,
+    `--max_length '${job.max_length || 1024}'`,
+    `--split_dataset_ratio '${job.split_dataset_ratio ?? 0}'`,
+    `--learning_rate '${job.learning_rate || 1e-4}'`,
+    `--gradient_accumulation_steps '${job.gradient_accumulation_steps || 16}'`,
+    `--eval_steps '${job.eval_steps || 500}'`,
+    `--lora_rank '${job.lora_rank || 8}'`,
+    `--lora_alpha '${job.lora_alpha || 32}'`,
+    `--num_train_epochs '${job.total_epochs}'`,
+    `--use_chat_template 'True'`,
+    `--ignore_args_error True`
+  ]
+
+  if (job.system_prompt) {
+    args.push(`--system '${job.system_prompt}'`)
+  }
+  if (job.task_type) {
+    args.push(`--task_type '${job.task_type}'`)
+  }
+  if (job.num_labels) {
+    args.push(`--num_labels '${job.num_labels}'`)
+  }
+
+  const methodMap: Record<string, string> = {
+    lora: 'lora',
+    qlora: 'qlora',
+    full: 'full',
+    adaptor: 'adaptor'
+  }
+  const sftType = methodMap[job.method] || 'lora'
+  args.push(`--sft_type '${sftType}'`)
+
+  return args.join(' \\\n  ')
+}
+
+const copyCommand = async () => {
+  try {
+    await navigator.clipboard.writeText(commandContent.value)
+    ElMessage.success('命令已复制到剪贴板')
+  } catch (error) {
+    console.error('复制失败:', error)
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
+
 const startAutoRefresh = () => {
   refreshTimer = setInterval(() => {
-    const runningTrainings = trainings.value.filter(t => t.status === 'running')
-    if (runningTrainings.length > 0) {
-      // 这里应该只更新运行中的训练任务状态
-      // updateRunningTrainings(runningTrainings.map(t => t.id))
-      
-      // 模拟进度更新
-      runningTrainings.forEach(training => {
-        if (training.progress < 100) {
-          training.progress = Math.min(100, training.progress + Math.floor(Math.random() * 5))
-          training.duration += 30
-          
-          if (training.metrics) {
-            training.metrics.loss = Math.max(0.01, training.metrics.loss - Math.random() * 0.01)
-            if (training.metrics.accuracy) {
-              training.metrics.accuracy = Math.min(1, training.metrics.accuracy + Math.random() * 0.001)
-            }
-          }
-          
-          if (training.progress >= 100) {
-            training.status = 'completed'
-            training.completed_at = new Date().toISOString()
-            updateStats()
-          }
-        }
-      })
+    const runningCount = trainings.value.filter(t =>
+      t.status === FineTuningStatus.RUNNING || t.status === FineTuningStatus.QUEUED
+    ).length
+    if (runningCount > 0) {
+      refreshTrainings()
     }
-  }, 30000) // 每30秒更新一次
+  }, 30000)
 }
 
 const stopAutoRefresh = () => {
@@ -1027,15 +1019,15 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .training-page {
   padding: 20px;
-  
+
   .page-header {
     margin-bottom: 20px;
-    
+
     .header-content {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      
+
       .header-left {
         .page-title {
           display: flex;
@@ -1046,417 +1038,248 @@ onUnmounted(() => {
           color: var(--el-text-color-primary);
           margin: 0 0 8px 0;
         }
-        
+
         .page-description {
           color: var(--el-text-color-regular);
           margin: 0;
         }
       }
-      
+
       .header-right {
         display: flex;
         gap: 12px;
       }
     }
   }
-  
+
   .stats-cards {
     margin-bottom: 20px;
-    
+
     .stat-card {
       display: flex;
       align-items: center;
       padding: 20px;
-      background: white;
+      background: var(--el-bg-color);
       border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+
       .stat-icon {
-        width: 48px;
-        height: 48px;
+        width: 60px;
+        height: 60px;
         border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 24px;
         margin-right: 16px;
-        
-        .el-icon {
-          font-size: 24px;
-          color: white;
-        }
-        
+
         &.total {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: #e6f7ff;
+          color: #1890ff;
         }
-        
+
         &.running {
-          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-          
-          .el-icon {
-            animation: spin 2s linear infinite;
-          }
+          background: #fff7e6;
+          color: #fa8c16;
         }
-        
+
         &.completed {
-          background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+          background: #f6ffed;
+          color: #52c41a;
         }
-        
-        &.gpu {
-          background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+
+        &.failed {
+          background: #fff1f0;
+          color: #ff4d4f;
         }
       }
-      
+
       .stat-content {
         .stat-value {
-          font-size: 24px;
+          font-size: 28px;
           font-weight: 600;
           color: var(--el-text-color-primary);
-          margin-bottom: 4px;
         }
-        
+
         .stat-label {
           font-size: 14px;
-          color: var(--el-text-color-regular);
+          color: var(--el-text-color-secondary);
         }
       }
     }
   }
-  
+
   .filter-section {
     margin-bottom: 20px;
-    
-    :deep(.el-card__body) {
-      padding: 16px 20px;
-    }
   }
-  
+
   .training-list {
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      
-      .header-actions {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-    }
-    
-    .grid-view {
-      .training-card {
-        background: white;
-        border: 1px solid var(--el-border-color-light);
-        border-radius: 8px;
-        padding: 16px;
-        transition: all 0.3s ease;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        
-        &:hover {
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          transform: translateY(-2px);
-        }
-        
-        .training-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 12px;
-          
-          .training-type {
-            .type-icon {
-              width: 32px;
-              height: 32px;
-              border-radius: 6px;
-              background: var(--el-color-primary-light-9);
-              color: var(--el-color-primary);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 16px;
-            }
-          }
-          
-          .training-status {
-            .status-running {
-              animation: pulse 1.5s infinite;
-            }
-          }
-        }
-        
-        .training-content {
-          flex: 1;
-          
-          .training-name {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--el-text-color-primary);
-            margin: 0 0 8px 0;
-            line-height: 1.4;
-          }
-          
-          .training-description {
-            font-size: 14px;
-            color: var(--el-text-color-regular);
-            line-height: 1.5;
-            margin: 0 0 12px 0;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-          }
-          
-          .training-meta {
-            margin-bottom: 16px;
-            
-            .meta-item {
-              display: flex;
-              align-items: center;
-              gap: 4px;
-              font-size: 12px;
-              color: var(--el-text-color-secondary);
-              margin-bottom: 4px;
-              
-              &:last-child {
-                margin-bottom: 0;
-              }
-              
-              .el-icon {
-                font-size: 14px;
-              }
-            }
-          }
-          
-          .training-progress {
-            margin-bottom: 16px;
-            
-            .progress-header {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-bottom: 8px;
-              
-              .progress-label {
-                font-size: 12px;
-                color: var(--el-text-color-secondary);
-              }
-              
-              .progress-value {
-                font-size: 12px;
-                font-weight: 600;
-                color: var(--el-text-color-primary);
-              }
-            }
-          }
-          
-          .training-metrics {
-            margin-bottom: 16px;
-            
-            .metrics-header {
-              font-size: 12px;
-              color: var(--el-text-color-secondary);
-              margin-bottom: 8px;
-            }
-            
-            .metrics-grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 8px;
-              
-              .metric-item {
-                background: var(--el-fill-color-light);
-                padding: 8px;
-                border-radius: 4px;
-                text-align: center;
-                
-                .metric-label {
-                  font-size: 10px;
-                  color: var(--el-text-color-secondary);
-                  margin-bottom: 2px;
-                }
-                
-                .metric-value {
-                  font-size: 12px;
-                  font-weight: 600;
-                  color: var(--el-text-color-primary);
-                }
-              }
-            }
-          }
-          
-          .dataset-info {
-            margin-bottom: 16px;
-            
-            .info-label {
-              font-size: 12px;
-              color: var(--el-text-color-secondary);
-              margin-bottom: 4px;
-            }
-            
-            .info-value {
-              font-size: 14px;
-              color: var(--el-text-color-primary);
-              font-weight: 500;
-            }
-          }
-        }
-        
-        .training-actions {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-          
-          .el-button {
-            flex: 1;
-            
-            &:last-child {
-              flex: none;
-              width: auto;
-            }
-          }
-        }
-      }
-    }
-    
-    .list-view {
-      .training-name-cell {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        
-        .training-type-icon {
-          width: 32px;
-          height: 32px;
-          border-radius: 6px;
-          background: var(--el-color-primary-light-9);
-          color: var(--el-color-primary);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          
-          .el-icon {
-            font-size: 16px;
-          }
-        }
-        
-        .training-info {
-          .name {
-            font-weight: 600;
-            color: var(--el-text-color-primary);
-            margin-bottom: 2px;
-          }
-          
-          .description {
-            font-size: 12px;
-            color: var(--el-text-color-secondary);
-            display: -webkit-box;
-            -webkit-line-clamp: 1;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-          }
-        }
-      }
-      
-      .progress-text {
-        margin-left: 8px;
-        font-size: 12px;
-        color: var(--el-text-color-secondary);
-      }
-    }
-    
     .pagination-wrapper {
-      display: flex;
-      justify-content: center;
       margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+    }
+  }
+
+  .job-id {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .job-name-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .name {
+      font-weight: 500;
+    }
+
+    .model-name {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+    }
+  }
+
+  .progress-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .progress-text {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+      min-width: 35px;
+    }
+  }
+
+  .status-running {
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
     }
   }
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
-}
-
-// 响应式设计
-@media (max-width: 768px) {
-  .training-page {
+.log-content {
+  pre {
+    background: var(--el-bg-color-page);
     padding: 16px;
-    
-    .page-header {
-      .header-content {
-        flex-direction: column;
-        gap: 16px;
-        
-        .header-right {
-          width: 100%;
-          justify-content: flex-end;
-        }
-      }
-    }
-    
-    .filter-section {
-      :deep(.el-form) {
-        .el-form-item {
-          margin-bottom: 16px;
-          
-          .el-input,
-          .el-select {
-            width: 100% !important;
-          }
-        }
-      }
-    }
-    
-    .training-list {
-      .grid-view {
-        .training-card {
-          .training-actions {
-            flex-direction: column;
-            
-            .el-button {
-              width: 100%;
-            }
-          }
-        }
-      }
-    }
+    border-radius: 4px;
+    overflow: auto;
+    max-height: calc(100vh - 140px);
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    word-wrap: break-word;
   }
 }
 
-// 暗色主题
-.dark {
-  .training-page {
-    .stats-cards {
-      .stat-card {
-        background: var(--el-bg-color-page);
-        border: 1px solid var(--el-border-color);
-      }
-    }
-    
-    .training-list {
-      .grid-view {
-        .training-card {
-          background: var(--el-bg-color-page);
-          border-color: var(--el-border-color);
+.command-content {
+  pre {
+    background: var(--el-bg-color-page);
+    padding: 16px;
+    border-radius: 4px;
+    overflow: auto;
+    max-height: calc(100vh - 200px);
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .el-button {
+    margin-top: 16px;
+  }
+}
+
+.curves-content {
+  .curve-chart {
+    width: 100%;
+    height: 350px;
+    margin-bottom: 20px;
+    background: var(--el-bg-color-page);
+    border-radius: 4px;
+    padding: 16px;
+  }
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background: var(--el-bg-color-page);
+    border-radius: 4px;
+    margin-bottom: 16px;
+
+    .chat-message {
+      display: flex;
+      margin-bottom: 16px;
+
+      &.user {
+        flex-direction: row-reverse;
+
+        .message-avatar {
+          margin-left: 12px;
+        }
+
+        .message-content {
+          background: var(--el-color-primary-light-9);
         }
       }
+
+      &.assistant {
+        .message-avatar {
+          margin-right: 12px;
+        }
+
+        .message-content {
+          background: var(--el-color-success-light-9);
+        }
+      }
+
+      .message-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--el-color-primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .message-content {
+        max-width: 70%;
+        padding: 10px 14px;
+        border-radius: 8px;
+        line-height: 1.5;
+      }
+    }
+  }
+
+  .chat-input {
+    display: flex;
+    gap: 12px;
+
+    .el-textarea {
+      flex: 1;
     }
   }
 }

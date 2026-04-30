@@ -14,6 +14,22 @@ from .executor import *
 from .scheduler import *
 from .workflow import *
 from .agent import *
+from .fine_tuning import (
+    FineTuningJobBase,
+    FineTuningJobCreate,
+    FineTuningJobUpdate,
+    FineTuningJobInDB,
+    FineTuningJobResponse,
+    FineTuningJobListResponse,
+    FineTuningJobSimpleResponse,
+    FineTuningJobStatusResponse,
+    FineTuningJobCancelRequest,
+    FineTuningJobProgressUpdate,
+    FineTuningJobStartRequest,
+    FineTuningServerInfo,
+    FineTuningTrainingParams,
+    FineTuningStatsResponse,
+)
 from .unified_node import (
     UnifiedNodeType, UnifiedNodeStatus, ExecutionStatus, LogLevel, NodePriority, ErrorHandling,
     UnifiedNodeBase, UnifiedNodeCreate, UnifiedNodeUpdate, UnifiedNodeInDB, UnifiedNodeResponse,
@@ -272,4 +288,20 @@ __all__ = [
     "ModelConfigSchema",
     "MemoryConfigSchema",
     "AgentConfigValidationResponse",
+
+    # Fine-tuning schemas
+    "FineTuningJobBase",
+    "FineTuningJobCreate",
+    "FineTuningJobUpdate",
+    "FineTuningJobInDB",
+    "FineTuningJobResponse",
+    "FineTuningJobListResponse",
+    "FineTuningJobSimpleResponse",
+    "FineTuningJobStatusResponse",
+    "FineTuningJobCancelRequest",
+    "FineTuningJobProgressUpdate",
+    "FineTuningJobStartRequest",
+    "FineTuningServerInfo",
+    "FineTuningTrainingParams",
+    "FineTuningStatsResponse",
 ]

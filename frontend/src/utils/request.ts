@@ -162,7 +162,23 @@ export const request = {
       const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = downloadUrl
-      link.download = filename || 'download'
+
+      const contentDisposition = response.headers['content-disposition']
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;\n"']+)/i)
+        if (filenameMatch && filenameMatch[1]) {
+          try {
+            link.download = decodeURIComponent(filenameMatch[1])
+          } catch {
+            link.download = filenameMatch[1]
+          }
+        } else {
+          link.download = filename || 'download'
+        }
+      } else {
+        link.download = filename || 'download'
+      }
+
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)

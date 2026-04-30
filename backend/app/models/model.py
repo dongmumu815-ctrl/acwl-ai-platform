@@ -13,7 +13,7 @@ from app.core.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from .deployment import Deployment
-    # from .fine_tuning import FineTuningJob
+    from .fine_tuning import FineTuningJob
     # from .evaluation import ModelEvaluation
     # from .agent import Agent
 
@@ -147,22 +147,6 @@ class Model(Base, TimestampMixin):
         back_populates="model",
         cascade="all, delete-orphan"
     )
-    
-    # 暂时注释掉不存在的模型关系
-    # fine_tuning_jobs: Mapped[List["FineTuningJob"]] = relationship(
-    #     "FineTuningJob",
-    #     back_populates="model"
-    # )
-    # 
-    # evaluations: Mapped[List["ModelEvaluation"]] = relationship(
-    #     "ModelEvaluation",
-    #     back_populates="model"
-    # )
-    # 
-    # agents: Mapped[List["Agent"]] = relationship(
-    #     "Agent",
-    #     back_populates="model"
-    # )
     
     def __repr__(self) -> str:
         return f"<Model(id={self.id}, name='{self.name}', version='{self.version}', type='{self.model_type}')>"

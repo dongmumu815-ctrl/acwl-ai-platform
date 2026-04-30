@@ -236,7 +236,8 @@ export const asyncRoutes: RouteRecordRaw[] = [
           icon: 'Upload',
           requiresAuth: true,
           permission: PERMISSIONS.DATASET_CREATE,
-          noPermissionBehavior: 'hide'
+          noPermissionBehavior: 'hide',
+          hideInMenu: true
         }
       }
     ]
@@ -412,6 +413,19 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: {
           title: '创建任务',
           icon: 'Plus',
+          requiresAuth: true,
+          hideInMenu: true,
+          permission: PERMISSIONS.TRAINING_CREATE,
+          noPermissionBehavior: 'hide'
+        }
+      },
+      {
+        path: 'edit/:id',
+        name: 'TrainingEdit',
+        component: () => import('@/views/training/create.vue'),
+        meta: {
+          title: '编辑任务',
+          icon: 'Edit',
           requiresAuth: true,
           hideInMenu: true,
           permission: PERMISSIONS.TRAINING_CREATE,

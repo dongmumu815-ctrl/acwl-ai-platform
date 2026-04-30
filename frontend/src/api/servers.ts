@@ -125,6 +125,15 @@ export function getServerById(id: number): Promise<ApiResponse<ServerResponse>> 
 }
 
 /**
+ * 根据ID获取服务器详情（含解密密码）
+ * @param id 服务器ID
+ * @returns Promise<ApiResponse<ServerResponse & { ssh_password: string }>>
+ */
+export function getServerWithPassword(id: number): Promise<ApiResponse<ServerResponse & { ssh_password: string }>> {
+  return request.get(`/servers/${id}/with-password`)
+}
+
+/**
  * 测试服务器连接
  * @param id 服务器ID
  * @returns Promise<ApiResponse<{ status: string; message: string }>>

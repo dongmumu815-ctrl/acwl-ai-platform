@@ -7,6 +7,7 @@
 import os
 import json
 import shutil
+import tempfile
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 from pathlib import Path
@@ -17,11 +18,12 @@ from fastapi import UploadFile, HTTPException
 
 from app.models.dataset import Dataset, DatasetType, DatasetStatus
 from app.schemas.dataset import (
-    DatasetCreate, DatasetUpdate, DatasetFilter, 
+    DatasetCreate, DatasetUpdate, DatasetFilter,
     DatasetStats, DatasetPreview
 )
 from app.core.config import settings
 from app.core.exceptions import DatasetError
+from app.services.minio_service import MinIOService
 from loguru import logger
 
 
@@ -327,19 +329,19 @@ class DatasetService:
         )
     
     def upload_dataset_files(
-        self, 
-        dataset_id: int, 
-        files: List[UploadFile], 
+        self,
+        dataset_id: int,
+        files: List[UploadFile],
         user_id: int
     ) -> Dataset:
         """
         上传数据集文件
-        
+
         Args:
             dataset_id: 数据集ID
             files: 上传的文件列表
             user_id: 用户ID
-            
+
         Returns:
             Dataset: 更新后的数据集对象
         """
@@ -348,69 +350,152 @@ class DatasetService:
                 Dataset.id == dataset_id,
                 Dataset.created_by == user_id
             ).first()
-            
+
             if not dataset:
                 raise DatasetError("数据集不存在或无权限访问")
-            
-            # 创建数据集存储目录
-            dataset_dir = self.upload_dir / str(dataset_id)
-            dataset_dir.mkdir(parents=True, exist_ok=True)
-            
+
+            minio_service = MinIOService()
             total_size = 0
-            file_paths = []
-            
-            # 保存文件
+            minio_paths = []
+            temp_files = []
+            preview_samples = []
+            record_count = 0
+
             for file in files:
-                file_path = dataset_dir / file.filename
-                
-                with open(file_path, "wb") as buffer:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
                     content = file.file.read()
-                    buffer.write(content)
+                    temp_file.write(content)
+                    temp_file.flush()
+                    temp_files.append(temp_file.name)
                     total_size += len(content)
-                
-                file_paths.append(str(file_path))
-            
-            # 更新数据集信息
-            dataset.storage_path = str(dataset_dir)
+
+                    object_path = f"dataset/{dataset_id}/{file.filename}"
+
+                    minio_service.client.fput_object(
+                        bucket_name=minio_service.bucket_name,
+                        object_name=object_path,
+                        file_path=temp_file.name
+                    )
+                    minio_paths.append(object_path)
+                    logger.info(f"文件已上传到MinIO: {object_path}")
+
+                    preview_data = self._parse_file_for_preview(temp_file.name, file.filename, limit=10)
+                    if preview_data:
+                        preview_samples.extend(preview_data.get("samples", []))
+                        record_count += preview_data.get("record_count", 0)
+
+            for temp_file in temp_files:
+                os.unlink(temp_file)
+
+            dataset.storage_path = f"minio://{minio_service.bucket_name}/dataset/{dataset_id}"
             dataset.size = total_size
-            dataset.status = "processing"
-            
+            dataset.record_count = record_count
+            dataset.status = "ready"
+
+            if preview_samples:
+                dataset.preview_data = json.dumps({
+                    "samples": preview_samples[:10],
+                    "fields": list(preview_samples[0].keys()) if preview_samples else [],
+                    "record_count": record_count
+                }, ensure_ascii=False)
+                logger.info(f"数据集预览数据已生成: {len(preview_samples)} 条样本")
+            else:
+                dataset.preview_data = json.dumps({
+                    "samples": [],
+                    "fields": [],
+                    "record_count": record_count
+                }, ensure_ascii=False)
+                logger.warning(f"未能从文件生成预览数据，请检查文件格式是否支持 (jsonl/json/csv/txt)")
+
             self.db.commit()
             self.db.refresh(dataset)
-            
-            logger.info(f"数据集文件上传成功: {dataset.name} (ID: {dataset.id})")
-            
-            # TODO: 异步处理数据集（解析、验证、生成预览等）
-            # self._process_dataset_async(dataset)
-            
+
+            logger.info(f"数据集文件上传成功: {dataset.name} (ID: {dataset.id}), 文件数: {len(minio_paths)}")
+
             return dataset
-            
+
         except Exception as e:
             self.db.rollback()
             logger.error(f"上传数据集文件失败: {str(e)}")
             raise DatasetError(f"上传数据集文件失败: {str(e)}")
-    
+
+    def _parse_file_for_preview(self, file_path: str, filename: str, limit: int = 10) -> Optional[Dict[str, Any]]:
+        """解析文件内容生成预览数据"""
+        try:
+            ext = os.path.splitext(filename)[1].lower()
+            samples = []
+            record_count = 0
+
+            if ext == '.jsonl':
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for i, line in enumerate(f):
+                        if i >= limit:
+                            record_count += 1
+                            continue
+                        try:
+                            data = json.loads(line.strip())
+                            samples.append(data)
+                            record_count += 1
+                        except json.JSONDecodeError:
+                            continue
+            elif ext == '.json':
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        samples = data[:limit]
+                        record_count = len(data)
+                    elif isinstance(data, dict):
+                        samples = [data]
+                        record_count = 1
+            elif ext == '.csv':
+                import csv
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for i, row in enumerate(reader):
+                        if i >= limit:
+                            record_count += 1
+                            continue
+                        samples.append(dict(row))
+                        record_count += 1
+            elif ext == '.txt':
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for i, line in enumerate(f):
+                        if i >= limit:
+                            record_count += 1
+                            continue
+                        samples.append({"text": line.strip()})
+                        record_count += 1
+
+            return {
+                "samples": samples,
+                "record_count": record_count
+            } if samples else None
+
+        except Exception as e:
+            logger.warning(f"解析文件预览数据失败: {str(e)}")
+            return None
+
     def get_dataset_preview(
-        self, 
-        dataset_id: int, 
+        self,
+        dataset_id: int,
         user_id: Optional[int] = None,
         limit: int = 10
     ) -> Optional[DatasetPreview]:
         """
         获取数据集预览
-        
+
         Args:
             dataset_id: 数据集ID
             user_id: 用户ID
             limit: 预览样本数量限制
-            
+
         Returns:
             DatasetPreview: 预览数据
         """
         dataset = self.get_dataset(dataset_id, user_id)
         if not dataset or not dataset.preview_data:
             return None
-        
+
         try:
             preview_data = json.loads(dataset.preview_data)
             samples = preview_data.get("samples", [])[:limit]

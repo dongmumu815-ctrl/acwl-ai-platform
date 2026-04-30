@@ -61,6 +61,7 @@ from .unified_node import (
     UnifiedNodeType, NodeInstanceStatus, NodePriority, ErrorHandling
 )
 from .agent import Agent, AgentConversation, AgentMessage, AgentTool
+from .fine_tuning import FineTuningJob, FineTuningMethod, FineTuningStatus
 from .instruction_set import (
     InstructionSet, InstructionNode, InstructionExecution,
     InstructionSetStatus, NodeType, ConditionType, ActionType, ExecutionStatus
@@ -193,6 +194,10 @@ __all__ = [
     "AgentMessage",
     "AgentTool",
     "ModelServiceConfig",
+    # 微调任务相关
+    "FineTuningJob",
+    "FineTuningMethod",
+    "FineTuningStatus",
     # 指令集相关
     "InstructionSet",
     "InstructionNode",

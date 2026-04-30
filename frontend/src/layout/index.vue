@@ -161,7 +161,8 @@ import {
   Grid,
   Shop,
   Sunny,
-  Moon
+  Moon,
+  DataAnalysis
 } from '@element-plus/icons-vue'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import RobotIcon from '@/components/RobotIcon.vue'
@@ -194,7 +195,8 @@ const iconMap: Record<string, any> = {
   Folder,
   Robot: RobotIcon,
   App: Grid,
-  Shop
+  Shop,
+  DataAnalysis
 }
 
 // 缓存的视图组件

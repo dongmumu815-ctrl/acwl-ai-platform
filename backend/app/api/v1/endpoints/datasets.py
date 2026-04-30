@@ -7,9 +7,11 @@
 import json
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
 from app.schemas.dataset import (
@@ -17,6 +19,7 @@ from app.schemas.dataset import (
     DatasetFilter, DatasetStats, DatasetPreview, DatasetUpload
 )
 from app.services.dataset import DatasetService
+from app.services.minio_service import MinIOService
 from app.core.exceptions import DatasetError
 from loguru import logger
 
@@ -259,7 +262,7 @@ async def upload_dataset_files(
         raise HTTPException(status_code=500, detail="内部服务器错误")
 
 
-@router.get("/{dataset_id}/preview", response_model=DatasetPreview, summary="获取数据集预览")
+@router.get("/{dataset_id}/preview", summary="获取数据集预览")
 async def get_dataset_preview(
     dataset_id: int,
     limit: int = Query(10, ge=1, le=50, description="预览样本数量"),
@@ -273,13 +276,26 @@ async def get_dataset_preview(
         def get_preview(session):
             service = DatasetService(session)
             return service.get_dataset_preview(dataset_id, current_user.id, limit)
-            
+
         preview = await db.run_sync(get_preview)
-        
-        if not preview:
-            raise HTTPException(status_code=404, detail="数据集不存在或暂无预览数据")
-        
-        return preview
+
+        if preview:
+            return preview
+
+        def get_dataset_info(session):
+            ds_service = DatasetService(session)
+            return ds_service.get_dataset(dataset_id, current_user.id)
+
+        dataset = await db.run_sync(get_dataset_info)
+        if not dataset:
+            raise HTTPException(status_code=404, detail="数据集不存在")
+
+        return {
+            "samples": [],
+            "total_count": dataset.record_count or 0,
+            "sample_fields": []
+        }
+
     except HTTPException:
         raise
     except Exception as e:
@@ -334,42 +350,116 @@ async def clone_dataset(
 
 
 @router.get("/{dataset_id}/download", summary="下载数据集")
-async def download_dataset(
+def download_dataset(
     dataset_id: int,
-    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    获取数据集下载链接
+    下载数据集文件
     """
+    import io
+    import os
+    import tempfile
+    import zipfile
+    from starlette.responses import Response
+
+    db = SessionLocal()
     try:
-        def get_dataset_info(session):
-            service = DatasetService(session)
-            return service.get_dataset(dataset_id, current_user.id)
-            
-        dataset = await db.run_sync(get_dataset_info)
-        
+        service = DatasetService(db)
+        dataset = service.get_dataset(dataset_id, current_user.id)
+
         if not dataset:
+            db.close()
             raise HTTPException(status_code=404, detail="数据集不存在")
-            
+
         if not dataset.storage_path:
+            db.close()
             raise HTTPException(status_code=400, detail="该数据集尚未上传文件")
-            
-        # TODO: 实际项目中应生成预签名的下载链接 (如 S3/OSS pre-signed URL) 
-        # 或者返回直接可以下载的内部路由。这里我们模拟返回一个下载链接
-        
-        # 模拟生成下载URL
-        download_url = f"/api/v1/files/download?path={dataset.storage_path}"
-        
-        return {
-            "message": "获取下载链接成功",
-            "dataset_id": dataset_id,
-            "url": download_url,
-            "filename": f"{dataset.name}_{dataset.id}.zip"
-        }
+
+        storage_path = dataset.storage_path
+        dataset_name = dataset.name
+        dataset_id_val = dataset.id
+
+        if storage_path.startswith("minio://"):
+            minio_service = MinIOService()
+            path_parts = storage_path.replace("minio://", "").split("/", 1)
+            if len(path_parts) < 2:
+                db.close()
+                raise HTTPException(status_code=400, detail="MinIO路径格式错误")
+
+            prefix = path_parts[1]
+
+            logger.info(f"下载数据集: storage_path={storage_path}, prefix={prefix}")
+
+            objects = minio_service.client.list_objects(minio_service.bucket_name, prefix=prefix, recursive=True)
+            files = list(objects)
+
+            logger.info(f"找到文件数量: {len(files)}")
+
+            if not files:
+                db.close()
+                raise HTTPException(status_code=404, detail="数据集中没有找到文件")
+
+            if len(files) == 1:
+                response = minio_service.client.get_object(minio_service.bucket_name, files[0].object_name)
+                file_data = response.read()
+                response.close()
+                # 提取完整的文件名（包含扩展名）
+                filename = files[0].object_name.split("/")[-1]
+                # 确保文件名包含正确的扩展名（如果文件名缺少扩展名）
+                if '.' not in filename:
+                    # 使用数据集名称作为文件名
+                    filename = f"{dataset_name}"
+                db.close()
+                logger.info(f"单文件下载: filename={filename}, size={len(file_data)}")
+                return Response(
+                    content=file_data,
+                    media_type="application/octet-stream",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
+                )
+            else:
+                logger.info(f"开始创建zip文件, 文件数量: {len(files)}")
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as temp_file:
+                    zip_path = temp_file.name
+                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                        for obj in files:
+                            file_response = minio_service.client.get_object(minio_service.bucket_name, obj.object_name)
+                            file_data = file_response.read()
+                            file_response.close()
+                            fname = obj.object_name.split("/")[-1]
+                            logger.info(f"添加文件到zip: {fname}, 大小: {len(file_data)}")
+                            zipf.writestr(fname, file_data)
+
+                with open(zip_path, 'rb') as f:
+                    zip_data = f.read()
+                os.unlink(zip_path)
+                logger.info(f"zip文件大小: {len(zip_data)}")
+
+                zip_filename = f"{dataset_name}_{dataset_id_val}.zip"
+                db.close()
+                return Response(
+                    content=zip_data,
+                    media_type="application/zip",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{zip_filename}"}
+                )
+
+        else:
+            if not os.path.exists(storage_path):
+                db.close()
+                raise HTTPException(status_code=404, detail="本地文件不存在")
+
+            with open(storage_path, 'rb') as f:
+                file_data = f.read()
+            db.close()
+            return Response(
+                content=file_data,
+                media_type="application/octet-stream",
+                headers={"Content-Disposition": f"attachment; filename*=UTF-8''{dataset_name}_{dataset_id_val}"}
+            )
     except HTTPException:
         raise
     except Exception as e:
+        db.close()
         logger.error(f"下载数据集API错误: {str(e)}")
         raise HTTPException(status_code=500, detail="内部服务器错误")
 

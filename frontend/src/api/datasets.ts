@@ -107,10 +107,6 @@ export const getDatasetPreview = (id: number, limit = 10) => {
   return request.get<any>(`datasets/${id}/preview`, { limit })
 }
 
-export const getDatasetDownloadUrl = (id: number) => {
-  return request.get<{ url: string, filename: string }>(`datasets/${id}/download`)
-}
-
-export const startDatasetAnalysis = (id: number) => {
-  return request.post<{ message: string, status: string }>(`datasets/${id}/analyze`)
+export const downloadDatasetFile = (id: number, filename?: string) => {
+  return request.download(`datasets/${id}/download`, {}, filename || `${id}.zip`)
 }
