@@ -51,7 +51,7 @@ class OllamaLLMClient:
             self.api_url = f"{self.base_url.rstrip('/')}/api/chat"
         else:
             self.api_url = self.base_url.rstrip('/').replace('/api/chat', '')
-            # self.api_url = "http://acepiec-ai.acoming.net:11868"
+            # self.api_url = "http://your-llm-server:11868"
         self.api_url = f"{self.api_url.rstrip('/')}/api/generate"
         print("--------------------------------")
         print(self.api_url)

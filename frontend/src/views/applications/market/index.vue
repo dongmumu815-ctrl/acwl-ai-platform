@@ -674,7 +674,7 @@ watch(selectedServerIds, (newIds) => {
       const serverA = serverList.value.find(s => s.id === a.server_id)
       const serverB = serverList.value.find(s => s.id === b.server_id)
       if (!serverA || !serverB) return 0
-      // Simple string comparison for IP works well enough for 10.20.1.x
+      // Simple string comparison for IP works well enough for standard IP ranges
       return serverA.ip_address.localeCompare(serverB.ip_address, undefined, { numeric: true })
     })
 
@@ -790,8 +790,7 @@ watch(selectedServerIds, (newIds) => {
       if (server) {
         // bitnami/zookeeper 镜像对 ZOO_SERVERS 的格式要求是只传 host:port:port::id 列表（空格分隔），
         // 或者不带角色的 host:port:port 或者 host:port:port::id
-        // 从报错日志 java.net.UnknownHostException: server.2=10.20.1.211 来看，它不认识 `server.x=` 前缀
-        // 所以我们必须去掉 `server.${myId}=` 这一部分
+        // 注意：ZOO_SERVERS 格式不能包含 `server.x=` 前缀，必须是纯 host:port:port::id 格式
         let roleStr = ''
         if (deploy.role && deploy.role.includes('observer')) {
             roleStr = 'observer'

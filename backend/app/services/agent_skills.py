@@ -875,7 +875,7 @@ class AgentSkillService:
             return "Error: book-review api.py not found."
 
         if self._is_port_listening("127.0.0.1", port) or self._is_port_listening("0.0.0.0", port):
-            return f"book-review API already running at http://10.20.1.200:{port}"
+            return f"book-review API already running at http://localhost:{port}"
 
         cmd = [
             sys.executable,
@@ -901,7 +901,7 @@ class AgentSkillService:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            return f"book-review API started in background. PID: {process.pid}, URL: http://10.20.1.200:{port}"
+            return f"book-review API started in background. PID: {process.pid}, URL: http://localhost:{port}"
         except Exception as e:
             return f"Failed to start book-review API: {e}"
 

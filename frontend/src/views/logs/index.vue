@@ -421,7 +421,7 @@ const logs = ref([
     source: 'auth.py:45',
     user: 'john_doe',
     request_id: 'req_1234567890abcdef',
-    ip: '192.168.1.100',
+    ip: '10.0.0.1',
     user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     context: {
       user_id: '123',
@@ -437,7 +437,7 @@ const logs = ref([
     source: 'trainer.py:156',
     user: 'admin',
     request_id: 'req_2345678901bcdefg',
-    ip: '10.0.0.50',
+    ip: '10.0.0.2',
     user_agent: 'Python/3.9 requests/2.28.1',
     stack_trace: `Traceback (most recent call last):
   File "trainer.py", line 156, in train_model
@@ -461,7 +461,7 @@ RuntimeError: CUDA out of memory. Tried to allocate 2.00 GiB`,
     source: 'deploy.py:89',
     user: 'system',
     request_id: 'req_3456789012cdefgh',
-    ip: '172.16.0.10',
+    ip: '10.0.0.3',
     user_agent: 'Kubernetes/1.25.0',
     context: {
       service_name: 'model-api',

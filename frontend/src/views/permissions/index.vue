@@ -1088,10 +1088,8 @@ const syncPermissionsFromConstants = async () => {
     const constantCodes: string[] = Object.values(PERMISSIONS)
 
     // 2.2 解析 dc_frontend 路由中的权限代码（数据中台）
-    const dcRouterPaths = [
-      'D:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts',
-      'd:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts'
-    ]
+    // 注意：在开源版本中，数据中台路由文件路径需要由部署者自行配置
+    const dcRouterPaths: string[] = []
     let dcText: string | null = null
     for (const p of dcRouterPaths) {
       dcText = await loadExternalRouterText(p)
@@ -1179,7 +1177,7 @@ const syncPermissionsFromConstants = async () => {
 
 /**
  * 加载外部路由文件文本内容（通过 Vite 的 /@fs 机制）
- * @param absPath Windows 绝对路径，如 D:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts
+ * @param absPath Windows 绝对路径，如 C:/project/frontend/src/router/index.ts
  */
 async function loadExternalRouterText(absPath: string): Promise<string | null> {
   const normalized = absPath.replace(/\\/g, '/').replace(/^\//, '')
@@ -1493,14 +1491,9 @@ const rebuildPermissionsFromDcMenu = async () => {
     }
 
     // 2) 读取 AI 中台与数据中台路由文本
-    const aiRouterPaths = [
-      'D:/works/codes/acwl-ai-data/frontend/src/router/index.ts',
-      'd:/works/codes/acwl-ai-data/frontend/src/router/index.ts'
-    ]
-    const dcRouterPaths = [
-      'D:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts',
-      'd:/works/codes/acwl-ai-data/dc_frontend/src/router/index.ts'
-    ]
+    // 注意：在开源版本中，路由文件路径需要由部署者自行配置
+    const aiRouterPaths: string[] = []
+    const dcRouterPaths: string[] = []
     let aiText: string | null = null
     let dcText: string | null = null
     for (const p of aiRouterPaths) {
@@ -1512,8 +1505,7 @@ const rebuildPermissionsFromDcMenu = async () => {
       if (dcText) break
     }
     if (!aiText && !dcText) {
-      ElMessage.error('无法读取前端与数据中台路由文件，重建终止')
-      return
+      ElMessage.warning('未配置路由文件路径，将使用默认权限数据')
     }
 
     // 3) 从菜单可见项提取权限项（title+code），优先 AI 中台

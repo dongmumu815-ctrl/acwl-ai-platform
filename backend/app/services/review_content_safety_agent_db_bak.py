@@ -46,7 +46,7 @@ class RouterDBService:
         # 从环境变量获取配置，如果没有则使用默认值
         host = os.getenv('DB_SERVICE_HOST', '127.0.0.1')
         port = int(os.getenv('DB_SERVICE_PORT', '50001'))
-        auth_key = os.getenv('DB_SERVICE_AUTH_KEY', 'cepiec2024').encode()
+        auth_key = os.getenv('DB_SERVICE_AUTH_KEY', 'change-me-in-production').encode()
         
         print(host, port, auth_key)
         

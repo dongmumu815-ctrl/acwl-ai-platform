@@ -267,10 +267,10 @@ async def get_batch_details(
                 item["变更记录"] = ""
             if record_ids:
                 conn_change = await aiomysql.connect(
-                    host=os.getenv("TASK_HOST", "10.20.1.200"),
+                    host=os.getenv("TASK_HOST", "localhost"),
                     user=os.getenv("TASK_USER", "root"),
-                    password=os.getenv("TASK_PASSWORD", "2wsx1QAZaczt"),
-                    db=os.getenv("TASK_DATABASE", "cvs2db"),
+                    password=os.getenv("TASK_PASSWORD", "change-me"),
+                    db=os.getenv("TASK_DATABASE", "task-db"),
                     port=int(os.getenv("TASK_PORT", "3306")),
                     charset="utf8mb4"
                 )

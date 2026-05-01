@@ -87,48 +87,7 @@ CREATE INDEX IF NOT EXISTS idx_deployments_server ON deployments(server_id);
 CREATE INDEX IF NOT EXISTS idx_deployment_gpus_deployment ON deployment_gpus(deployment_id);
 CREATE INDEX IF NOT EXISTS idx_deployment_gpus_gpu ON deployment_gpus(gpu_id);
 
--- 7. 插入示例数据
-
--- 示例服务器数据
-INSERT OR IGNORE INTO servers (
-    name, ip_address, ssh_port, ssh_username, status, 
-    cpu_cores, memory_size, disk_size, os_type, os_version,
-    docker_version, nvidia_driver_version, cuda_version, description
-) VALUES 
-('GPU-Server-01', '192.168.1.100', 22, 'ubuntu', 'online', 
- 32, '128GB', '2TB', 'Ubuntu', '22.04 LTS',
- '24.0.7', '535.129.03', '12.2', 'AI训练主服务器'),
-('GPU-Server-02', '192.168.1.101', 22, 'ubuntu', 'online',
- 24, '64GB', '1TB', 'Ubuntu', '20.04 LTS', 
- '24.0.7', '525.147.05', '11.8', 'AI推理服务器'),
-('GPU-Server-03', '192.168.1.102', 22, 'ubuntu', 'maintenance',
- 16, '32GB', '500GB', 'Ubuntu', '22.04 LTS',
- '24.0.7', '535.129.03', '12.2', '开发测试服务器');
-
--- 示例GPU资源数据
-INSERT OR IGNORE INTO gpu_resources (
-    server_id, device_id, gpu_name, memory_size, compute_capability,
-    driver_version, is_available, memory_total
-) VALUES 
--- GPU-Server-01 的GPU
-(1, 0, 'NVIDIA RTX 4090', '24GB', '8.9', '535.129.03', TRUE, 24576),
-(1, 1, 'NVIDIA RTX 4090', '24GB', '8.9', '535.129.03', TRUE, 24576),
-(1, 2, 'NVIDIA RTX 4090', '24GB', '8.9', '535.129.03', FALSE, 24576),
-(1, 3, 'NVIDIA RTX 4090', '24GB', '8.9', '535.129.03', TRUE, 24576),
--- GPU-Server-02 的GPU
-(2, 0, 'NVIDIA RTX 3080', '10GB', '8.6', '525.147.05', TRUE, 10240),
-(2, 1, 'NVIDIA RTX 3080', '10GB', '8.6', '525.147.05', TRUE, 10240),
--- GPU-Server-03 的GPU
-(3, 0, 'NVIDIA GTX 1080 Ti', '11GB', '6.1', '535.129.03', TRUE, 11264);
-
--- 示例服务器监控数据
-INSERT OR IGNORE INTO server_metrics (
-    server_id, cpu_usage, memory_usage, disk_usage, 
-    network_in, network_out, load_average, uptime
-) VALUES 
-(1, 45.2, 68.5, 35.8, 1024.5, 2048.3, 2.1, 86400),
-(2, 32.1, 52.3, 28.9, 512.8, 1024.6, 1.5, 172800),
-(3, 15.6, 25.4, 45.2, 256.4, 512.1, 0.8, 259200);
+-- 7. 示例数据已移除，部署者可根据实际需求自行添加服务器配置
 
 -- 8. 创建触发器，自动更新 updated_at 字段
 CREATE TRIGGER IF NOT EXISTS update_servers_timestamp 

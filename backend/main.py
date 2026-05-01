@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ACWL-AI 大模型管理平台 - 主应用入口
+ACWL-AI 大模型管理平台 -- 主应用入口
 """
 
 # 清理Python路径，避免导入冲突

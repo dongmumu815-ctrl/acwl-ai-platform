@@ -457,7 +457,7 @@ async def get_available_servers(
             {
                 "id": 1,
                 "name": "GPU-Server-01",
-                "ip_address": "10.20.1.201",
+                "ip_address": "10.0.0.1",
                 "status": "online",
                 "total_cpu_cores": 32,
                 "total_memory": "128GB",
@@ -469,7 +469,7 @@ async def get_available_servers(
             {
                 "id": 2,
                 "name": "GPU-Server-02",
-                "ip_address": "10.20.1.202",
+                "ip_address": "10.0.0.2",
                 "status": "online",
                 "total_cpu_cores": 64,
                 "total_memory": "256GB",

@@ -24,7 +24,7 @@ class RouterDBService:
         host = os.getenv('DB_SERVICE_HOST', '127.0.0.1')
         # 默认端口调整为 50001，以匹配当前部署的 DataService
         port = int(os.getenv('DB_SERVICE_PORT', '50001'))
-        auth_key = os.getenv('DB_SERVICE_AUTH_KEY', 'cepiec2024').encode()
+        auth_key = os.getenv('DB_SERVICE_AUTH_KEY', 'change-me-in-production').encode()
         
         print(host, port, auth_key)
         
@@ -66,7 +66,7 @@ class LinkTaskService:
         """
         try:
             # 使用用户指定的端口 50000
-            self.manager = PoolManager(address=('127.0.0.1', 50001), authkey=b'cepiec2024')
+            self.manager = PoolManager(address=('127.0.0.1', 50001), authkey=b'change-me-in-production')
             self.manager.connect()
             self.service = self.manager.DataService()
         except Exception as e:
@@ -124,7 +124,7 @@ class SysDictService:
     
     def _connect(self) -> None:
         try:
-            self.manager = PoolManager(address=('127.0.0.1', 50001), authkey=b'cepiec2024')
+            self.manager = PoolManager(address=('127.0.0.1', 50001), authkey=b'change-me-in-production')
             self.manager.connect()
             self.service = self.manager.DataService()
         except Exception as e:

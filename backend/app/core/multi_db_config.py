@@ -129,10 +129,10 @@ class MultiDatabaseConfig:
         primary_db = DatabaseConfig(
             name="primary",
             type=DatabaseType.MYSQL,
-            host=os.getenv("DB_HOST", "10.20.1.200"),
+            host=os.getenv("DB_HOST", "localhost"),
             port=int(os.getenv("DB_PORT", "3306")),
             username=os.getenv("DB_USER", "root"),
-            password=os.getenv("DB_PASSWORD", "2wsx1QAZaczt"),
+            password=os.getenv("DB_PASSWORD", "change-me"),
             database=os.getenv("DB_NAME", "acwl-ai-data"),
             charset=os.getenv("DB_CHARSET", "utf8mb4"),
             business_tags=["primary", "main", "core"],

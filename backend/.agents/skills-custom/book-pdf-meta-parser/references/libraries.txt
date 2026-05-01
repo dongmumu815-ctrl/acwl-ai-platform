@@ -1,9 +1,0 @@
-Required Python libraries:
-- modelscope-agent
-- requests
-- pdf2image
-- Pillow (PIL)
-- PyMuPDF (optional for better PDF handling)
-
-Install with:
-pip install modelscope-agent requests pdf2image Pillow

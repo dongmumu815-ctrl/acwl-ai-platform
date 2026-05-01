@@ -752,7 +752,7 @@ const apiKeys = ref([
     last_used: '2024-01-21T10:30:00Z',
     expires_at: null,
     created_at: '2024-01-01T00:00:00Z',
-    ip_whitelist: '192.168.1.0/24'
+    ip_whitelist: '10.0.0.0/8'
   },
   {
     id: '2',
